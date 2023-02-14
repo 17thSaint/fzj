@@ -103,7 +103,7 @@ end
 lat_sep = 1.0
 t_val = 1.0
 edges_count = [2]
-phis_count = 1
+phis_count = 3
 phis = [0.1 + (j-1)*(1.0-0.1)/phis_count for j in 1:phis_count]
 #phi_val = 1/3
 #
