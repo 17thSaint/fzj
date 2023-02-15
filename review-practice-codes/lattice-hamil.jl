@@ -11,8 +11,18 @@ function get_position(which,edge_count,spacing)
 	return xcomp + im*ycomp
 end
 
+function get_torus_distance_btw(pos_1,pos_2,edge_count,spacing)	#enforces periodic boundary conditions of square lattice
+	x1, y1 = real(pos_1), imag(pos_1)
+	x2, y2 = real(pos_2), imag(pos_2)
+	dx = min(abs(x1 - x2), spacing*edge_count - abs(x1 - x2))
+	dy = min(abs(y1 - y2), spacing*edge_count - abs(y1 - y2))
+	z_val = dx + im*dy
+	return z_val
+end
+
 function get_j(j,k,t,phi,edge_count,spacing)
-	z = get_position(k,edge_count,spacing) - get_position(j,edge_count,spacing)
+	#z = get_position(k,edge_count,spacing) - get_position(j,edge_count,spacing)
+	z = get_torus_distance_btw(get_position(k,edge_count,spacing),get_position(j,edge_count,spacing),edge_count,spacing) # periodic boundary conditions
 	gz = (-1)^(real(z) + imag(z) + imag(z)*real(z))
 	exp_phi_part = (get_position(j,edge_count,spacing) * conj(z) - conj(get_position(j,edge_count,spacing)) * z + abs2(z) ) * pi * 0.5
 	exp_other_part = -pi * 05 * abs2(z)
@@ -99,7 +109,7 @@ function get_total_number_particles(edge_count,wavefunc)
 	end
 	println("Final Count is $count")
 end
-
+#
 lat_sep = 1.0
 t_val = 1.0
 edges_count = [2]
@@ -124,6 +134,7 @@ for i in 1:length(edges_count)
 		#percent_thru_eigvals[i][j] = [(k-1)/length(en_vals) for k in 1:length(en_vals)]
 	end
 end
+#
 #=
 for i in 1:length(edges_count)
 	edges = edges_count[i]
