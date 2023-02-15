@@ -86,7 +86,36 @@ function make_component_matrix(j,k,edge_count,num_parts=1)
 	return series_of_prods[end]
 end
 
-function make_ham_mat(edge_count,t,phi,num_parts=1,spacing=1.0,periodic=true)
+function make_single_particle_component_matrix(j,k,edge_count)
+	j_vec = zeros(Int64,edge_count^2)
+	j_vec[j] = 1
+	k_vec = zeros(Int64,edge_count^2)
+	k_vec[k] = 1
+	comp_mat = j_vec * transpose(k_vec)
+	return comp_mat
+end
+
+function make_single_part_ham(edge_count,phi,periodic=true,spacing=1.0,t=1.0)
+	ham_mat = zeros(Float64,(edge_count^2,edge_count^2))
+	for j in 1:edge_count^2
+		for k in 1:edge_count^2
+			if j == k
+				continue
+			end
+			coeff = round(get_j(j,k,t,phi,edge_count,spacing,periodic),digits=10)
+			matrix_comp = make_single_particle_component_matrix(j,k,edge_count)
+			ham_mat += coeff.*matrix_comp
+		end
+	end
+	
+	if ham_mat != conj(transpose(ham_mat))
+		println("Not Hermitian, Need to Stop: Edges=$edge_count, Phi=$phi")
+	end
+	
+	return eigvals(ham_mat),eigvecs(ham_mat),ham_mat
+end
+
+function make_ham_mat(edge_count,phi,num_parts=1,spacing=1.0,periodic=true,t=1.0)
 	ham_mat = zeros(Int64,(num_parts+1)^(edge_count^2),(num_parts+1)^(edge_count^2))
 	for i2 in 1:edge_count^2
 		#println("Site $i2 / $edge_count")
@@ -95,7 +124,7 @@ function make_ham_mat(edge_count,t,phi,num_parts=1,spacing=1.0,periodic=true)
 				continue
 			end
 			
-			coeff = get_j(j2,i2,t,phi,edge_count,spacing,periodic)
+			coeff = round(get_j(j2,i2,t,phi,edge_count,spacing,periodic),digits=10)
 			matrix_comp = make_component_matrix(j2,i2,edge_count,num_parts)
 			ham_mat += coeff.*matrix_comp
 			#println(i2,", ",j2,", ",coeff)
@@ -104,12 +133,12 @@ function make_ham_mat(edge_count,t,phi,num_parts=1,spacing=1.0,periodic=true)
 	end
 	
 	if ham_mat != conj(transpose(ham_mat))
-		println("Not Hermitian, Need to Stop")
+		println("Not Hermitian, Need to Stop: Edges=$edge_count, Phi=$phi")
 	end
 	
 	return eigvals(ham_mat),eigvecs(ham_mat),ham_mat
 end
-
+#=
 function get_total_number_particles(edge_count,wavefunc)
 	count = 0
 	for i in 1:edge_count^2
@@ -133,35 +162,42 @@ function get_total_number_particles(edge_count,wavefunc)
 	end
 	println("Final Count is $count")
 end
+=#
 
-function plot_nrgs_range_phi(phis_count,edge_count,num_parts=1,plot_ground_state=true,periodic=true,phi_start=0.1,phi_end=1.0,spacing=1.0)
+function plot_nrgs_range_phi(phis_count,edge_count,single_part=true,num_parts=1,plot_spectrum=false,plot_ground_state=true,periodic=true,phi_start=0.1,phi_end=1.0,spacing=1.0)
 	phis = [phi_start + (i-1)*(phi_end-phi_start)/phis_count for i in 1:phis_count+1]
 	energies = [[] for i in 1:phis_count+1]
 	for i in 1:phis_count+1
 		phi_val = phis[i]
-		en_vals = make_ham_mat(edge_count,1.0,phi_val,num_parts)[1]
+		if single_part
+			en_vals = make_single_part_ham(edge_count,phi_val,periodic,spacing)[1]
+		else
+			en_vals = make_ham_mat(edge_count,phi_val,num_parts)[1]
+		end
 		energies[i] = en_vals
 	end
 	if plot_ground_state
-		title_here = "Fermion"
-		if num_parts > 1
-			title_here = "Boson Np=$num_parts"
-		end
-		plot(phis,[energies[i][1] for i in 1:phis_count+1],"-p",label="Ne=$edge_count, $title_here")
+		plot(phis,[energies[i][1] for i in 1:phis_count+1],"-p",label="Ne=$edge_count")
 		xlabel("Phi")
 		ylabel("Lowest NRG")
 		legend()
+	elseif plot_spectrum
+		for j in 1:edge_count^2
+			plot(phis,[energies[i][j] for i in 1:phis_count+1],"-p",label="Ne=$edge_count, $j")
+			xlabel("Phi")
+			ylabel("Lowest NRG")
+			legend()
+		end
 	end
 	
 	return phis, energies
 end
 
-count = 30
-sites = 3
-for particles in [2]
-	plot_nrgs_range_phi(count,sites,particles)
+count = 10
+for edge_sites in 3:3
+	#println("Edge Sites= ",edge_sites)
+	plot_nrgs_range_phi(count,edge_sites,true,1,true,false)
 end
-
 
 #=
 lat_sep = 1.0
