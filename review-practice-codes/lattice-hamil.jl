@@ -1,9 +1,13 @@
 using LinearAlgebra,PyPlot
 
-annih = [0 1; 0 0]
-creat = [0 0; 1 0]
-id = [1 0; 0 1]
-
+function get_creat_annih_ops(num_parts=1)
+	annih = zeros(Float64,(num_parts+1,num_parts+1))
+	for i in 1:num_parts
+		annih[i,i+1] = sqrt(i)
+	end
+	creat = transpose(annih)
+	return creat, annih
+end
 
 function get_position(which,edge_count,spacing)
 	ycomp = spacing * (ceil(which/edge_count) - 1)
@@ -33,7 +37,7 @@ function get_torus_distance_btw(pos_1,pos_2,edge_count,spacing)	#enforces period
 	return z_val
 end
 
-function get_j(j,k,t,phi,edge_count,spacing,periodic=true)
+function get_j(j,k,t,phi,edge_count,spacing=1.0,periodic=true)
 	z = get_position(k,edge_count,spacing) - get_position(j,edge_count,spacing)
 	if periodic
 		z = get_torus_distance_btw(get_position(k,edge_count,spacing),get_position(j,edge_count,spacing),edge_count,spacing) # periodic boundary conditions
@@ -46,9 +50,10 @@ function get_j(j,k,t,phi,edge_count,spacing,periodic=true)
 	return final_val
 end
 
-function which_mat(choice)
+function which_mat(choice,num_parts=1)
+	creat, annih = get_creat_annih_ops(num_parts)
 	if choice == "id"
-		return id
+		return Matrix(I,num_parts+1,num_parts+1)
 	elseif choice == "c"
 		return creat
 	elseif choice == "a"
@@ -58,31 +63,31 @@ function which_mat(choice)
 	end
 end
 
-function make_component_matrix(j,k,edge_count)
+function make_component_matrix(j,k,edge_count,num_parts=1)
 	which_mats = ["id" for i in 1:edge_count^2]
 	c_site = j
 	an_site = k
 	which_mats[c_site] = "c"
 	which_mats[an_site] = "a"
 
-	series_of_prods = Vector{Matrix{Int64}}(undef,edge_count^2-1)
+	series_of_prods = Vector{Matrix{Float64}}(undef,edge_count^2-1)
 	for i1 in 2:edge_count^2
 		if i1 == 2
-			this_element = which_mat(which_mats[1])
+			this_element = which_mat(which_mats[1],num_parts)
 		else
 			this_element = series_of_prods[i1-2]
 		end
-		new_mat = kron(this_element,which_mat(which_mats[i1]))
+		new_mat = kron(this_element,which_mat(which_mats[i1],num_parts))
 		series_of_prods[i1-1] = new_mat
 		if i1 > 2
-			series_of_prods[i1-2] = Matrix{Int64}(undef,(2,2))
+			series_of_prods[i1-2] = Matrix{Float64}(undef,(2,2))
 		end
 	end
 	return series_of_prods[end]
 end
 
-function make_ham_mat(edge_count,t,phi,spacing,periodic=true)
-	ham_mat = zeros(Int64,2^(edge_count^2),2^(edge_count^2))
+function make_ham_mat(edge_count,t,phi,num_parts=1,spacing=1.0,periodic=true)
+	ham_mat = zeros(Int64,(num_parts+1)^(edge_count^2),(num_parts+1)^(edge_count^2))
 	for i2 in 1:edge_count^2
 		#println("Site $i2 / $edge_count")
 		for j2 in 1:edge_count^2
@@ -91,7 +96,7 @@ function make_ham_mat(edge_count,t,phi,spacing,periodic=true)
 			end
 			
 			coeff = get_j(j2,i2,t,phi,edge_count,spacing,periodic)
-			matrix_comp = make_component_matrix(j2,i2,edge_count)
+			matrix_comp = make_component_matrix(j2,i2,edge_count,num_parts)
 			ham_mat += coeff.*matrix_comp
 			#println(i2,", ",j2,", ",coeff)
 			#display(ham_mat)
@@ -129,16 +134,20 @@ function get_total_number_particles(edge_count,wavefunc)
 	println("Final Count is $count")
 end
 
-function plot_nrgs_range_phi(phis_count,edge_count,plot_ground_state=true,periodic=true,phi_start=0.1,phi_end=1.0,spacing=1.0)
+function plot_nrgs_range_phi(phis_count,edge_count,num_parts=1,plot_ground_state=true,periodic=true,phi_start=0.1,phi_end=1.0,spacing=1.0)
 	phis = [phi_start + (i-1)*(phi_end-phi_start)/phis_count for i in 1:phis_count+1]
 	energies = [[] for i in 1:phis_count+1]
 	for i in 1:phis_count+1
 		phi_val = phis[i]
-		en_vals = make_ham_mat(edge_count,1.0,phi_val,spacing)[1]
+		en_vals = make_ham_mat(edge_count,1.0,phi_val,num_parts)[1]
 		energies[i] = en_vals
 	end
 	if plot_ground_state
-		plot(phis,[energies[i][1] for i in 1:phis_count+1],"-p",label="Ne=$edge_count")
+		title_here = "Fermion"
+		if num_parts > 1
+			title_here = "Boson Np=$num_parts"
+		end
+		plot(phis,[energies[i][1] for i in 1:phis_count+1],"-p",label="Ne=$edge_count, $title_here")
 		xlabel("Phi")
 		ylabel("Lowest NRG")
 		legend()
@@ -147,9 +156,12 @@ function plot_nrgs_range_phi(phis_count,edge_count,plot_ground_state=true,period
 	return phis, energies
 end
 
-count_phis = 10
-edge_sites = 2
-plot_nrgs_range_phi(count_phis,edge_sites)
+count = 30
+sites = 3
+for particles in [2]
+	plot_nrgs_range_phi(count,sites,particles)
+end
+
 
 #=
 lat_sep = 1.0
