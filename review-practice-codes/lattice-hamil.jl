@@ -177,6 +177,7 @@ function plot_nrgs_range_phi(phis_count,edge_count,single_part=true,num_parts=1,
 	energies = [[] for i in 1:phis_count+1]
 	ground_state_wavefunc = [[] for i in 1:phis_count+1]
 	for i in 1:phis_count+1
+		println(round(100*i/(phis_count+1),digits=1),"%")
 		phi_val = phis[i]
 		if single_part
 			en_vals,eigvals,hamil = make_single_part_ham(edge_count,phi_val,periodic,spacing)
@@ -206,24 +207,44 @@ function plot_nrgs_range_phi(phis_count,edge_count,single_part=true,num_parts=1,
 end
 
 function plot_spectra_range_sites(phi_count,start_sites,end_sites)
-	fig, axs = plt.subplots(1,end_sites-start_sites+1)
 	colors = ["b","g","r","c","m","y","k"]
-	for edge_sites in start_sites:end_sites
-		count_color = colors[edge_sites-1]
+	if start_sites == end_sites
+		edge_sites = start_sites
+		count_color = colors[1]
 		phis_here, nrgs_here = plot_nrgs_range_phi(phi_count,edge_sites,true,1,false,false)[1:2]
 		for j in 1:edge_sites^2
 			if j == 1
-				axs[edge_sites-start_sites+1].plot(phis_here,[nrgs_here[i][j] for i in 1:phi_count+1],"-$count_color",label="Ne=$edge_sites, $j")
+				plot(phis_here,[nrgs_here[i][j] for i in 1:phi_count+1],"-$count_color",label="Ne=$edge_sites, $j")
 			else
-				axs[edge_sites-start_sites+1].plot(phis_here,[nrgs_here[i][j] for i in 1:phi_count+1],"-$count_color")
+				plot(phis_here,[nrgs_here[i][j] for i in 1:phi_count+1],"-$count_color")
 			end
-			#xlabel("Phi")
+		end
+		legend()
+		xlabel("Phi")
+		title("Energy Spectrum for $edge_sites Edge Sites")
+	else
+		fig, axs = plt.subplots(1,end_sites-start_sites+1)
+		for edge_sites in start_sites:end_sites
+			println("Working on $edge_sites Sites")
+			count_color = colors[edge_sites-start_sites+1]
+			phis_here, nrgs_here = plot_nrgs_range_phi(phi_count,edge_sites,true,1,false,false)[1:2]
+			for j in 1:edge_sites^2
+				if j == 1
+					axs[edge_sites-start_sites+1].plot(phis_here,[nrgs_here[i][j] for i in 1:phi_count+1],"-$count_color",label="Ne=$edge_sites, $j")
+				else
+					axs[edge_sites-start_sites+1].plot(phis_here,[nrgs_here[i][j] for i in 1:phi_count+1],"-$count_color")
+				end
+			end
+			#axs[edge_sites-start_sites+1].xlabel("Phi")
 			#ylabel("Lowest NRG")
 			axs[edge_sites-start_sites+1].legend()
 		end
+		xlabel("Phi")
+		title("Energy Spectrum for range Lattice Sites")
 	end
 end
 
+#=
 count = 100
 start_site = 3
 end_site = 5
@@ -236,7 +257,7 @@ for edge_sites in start_site:end_site
 	zlabel("Phi")
 	title("Expected GS Position for Edge Sites=$edge_sites")
 end
-
+=#
 #=
 lat_sep = 1.0
 t_val = 1.0
