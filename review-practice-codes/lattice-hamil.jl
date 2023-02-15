@@ -9,9 +9,9 @@ function get_creat_annih_ops(num_parts=1)
 	return creat, annih
 end
 
-function get_position(which,edge_count,spacing)
-	ycomp = spacing * (ceil(which/edge_count) - 1)
-	xcomp = ((which-1) % edge_count) * spacing
+function get_position(which,edge_count,spacing=1.0)
+	ycomp = spacing * (ceil(which/edge_count) - 1) - 0.5*(edge_count-1)*spacing
+	xcomp = (((which-1) % edge_count) * spacing) - 0.5*(edge_count-1)*spacing
 	return xcomp + im*ycomp
 end
 
@@ -164,17 +164,27 @@ function get_total_number_particles(edge_count,wavefunc)
 end
 =#
 
-function plot_nrgs_range_phi(phis_count,edge_count,single_part=true,num_parts=1,plot_spectrum=false,plot_ground_state=true,periodic=true,phi_start=0.1,phi_end=1.0,spacing=1.0)
+function get_expected_position(wavefunc,edge_count,spacing=1.0) # gets expectation value of position from single particle bases wavefunction
+	wavefunc_with_xpos = [wavefunc[i]*real(get_position(i,edge_count,spacing)) for i in 1:length(wavefunc)]
+	wavefunc_with_ypos = [wavefunc[i]*imag(get_position(i,edge_count,spacing)) for i in 1:length(wavefunc)]
+	final_val_x = abs2(transpose(wavefunc) * wavefunc_with_xpos)
+	final_val_y = abs2(transpose(wavefunc) * wavefunc_with_ypos)
+	return [final_val_x,final_val_y]
+end
+
+function plot_nrgs_range_phi(phis_count,edge_count,single_part=true,num_parts=1,plot_spectrum=false,plot_ground_state=true,periodic=true,phi_start=0.01,phi_end=1.0,spacing=1.0)
 	phis = [phi_start + (i-1)*(phi_end-phi_start)/phis_count for i in 1:phis_count+1]
 	energies = [[] for i in 1:phis_count+1]
+	ground_state_wavefunc = [[] for i in 1:phis_count+1]
 	for i in 1:phis_count+1
 		phi_val = phis[i]
 		if single_part
-			en_vals = make_single_part_ham(edge_count,phi_val,periodic,spacing)[1]
+			en_vals,eigvals,hamil = make_single_part_ham(edge_count,phi_val,periodic,spacing)
 		else
-			en_vals = make_ham_mat(edge_count,phi_val,num_parts)[1]
+			en_vals,eigvals,hamil = make_ham_mat(edge_count,phi_val,num_parts)
 		end
 		energies[i] = en_vals
+		ground_state_wavefunc[i] = eigvals[:,1]
 	end
 	if plot_ground_state
 		plot(phis,[energies[i][1] for i in 1:phis_count+1],"-p",label="Ne=$edge_count")
@@ -182,21 +192,49 @@ function plot_nrgs_range_phi(phis_count,edge_count,single_part=true,num_parts=1,
 		ylabel("Lowest NRG")
 		legend()
 	elseif plot_spectrum
+		#fig, axs = plt.subplots(1,2)
+		#colors = ["b","g","r","c","m","y","k"]
 		for j in 1:edge_count^2
-			plot(phis,[energies[i][j] for i in 1:phis_count+1],"-p",label="Ne=$edge_count, $j")
+			plot(phis,[energies[i][j] for i in 1:phis_count+1],"-b",label="Ne=$edge_count, $j")
 			xlabel("Phi")
 			ylabel("Lowest NRG")
 			legend()
 		end
 	end
 	
-	return phis, energies
+	return phis, energies, ground_state_wavefunc
 end
 
-count = 10
-for edge_sites in 3:3
-	#println("Edge Sites= ",edge_sites)
-	plot_nrgs_range_phi(count,edge_sites,true,1,true,false)
+function plot_spectra_range_sites(phi_count,start_sites,end_sites)
+	fig, axs = plt.subplots(1,end_sites-start_sites+1)
+	colors = ["b","g","r","c","m","y","k"]
+	for edge_sites in start_sites:end_sites
+		count_color = colors[edge_sites-1]
+		phis_here, nrgs_here = plot_nrgs_range_phi(phi_count,edge_sites,true,1,false,false)[1:2]
+		for j in 1:edge_sites^2
+			if j == 1
+				axs[edge_sites-start_sites+1].plot(phis_here,[nrgs_here[i][j] for i in 1:phi_count+1],"-$count_color",label="Ne=$edge_sites, $j")
+			else
+				axs[edge_sites-start_sites+1].plot(phis_here,[nrgs_here[i][j] for i in 1:phi_count+1],"-$count_color")
+			end
+			#xlabel("Phi")
+			#ylabel("Lowest NRG")
+			axs[edge_sites-start_sites+1].legend()
+		end
+	end
+end
+
+count = 100
+start_site = 3
+end_site = 5
+for edge_sites in start_site:end_site
+	figure()
+	phi_vals, nrgs, ground_states = plot_nrgs_range_phi(count,edge_sites,true,1,false,false)
+	scatter3D([real(get_position(i,edge_sites))/(edge_sites-1) for i in 1:edge_sites^2],[imag(get_position(i,edge_sites))/(edge_sites-1) for i in 1:edge_sites^2],[0.0 for i in 1:edge_sites^2])
+	expected_locations = [get_expected_position(ground_states[i],edge_sites) for i in 1:count+1]
+	plot3D([expected_locations[i][1]/(edge_sites-1) for i in 1:count+1],[expected_locations[i][2]/(edge_sites-1) for i in 1:count+1],phi_vals,"-pr")
+	zlabel("Phi")
+	title("Expected GS Position for Edge Sites=$edge_sites")
 end
 
 #=
