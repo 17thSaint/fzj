@@ -14,15 +14,30 @@ end
 function get_torus_distance_btw(pos_1,pos_2,edge_count,spacing)	#enforces periodic boundary conditions of square lattice
 	x1, y1 = real(pos_1), imag(pos_1)
 	x2, y2 = real(pos_2), imag(pos_2)
-	dx = min(abs(x1 - x2), spacing*edge_count - abs(x1 - x2))
-	dy = min(abs(y1 - y2), spacing*edge_count - abs(y1 - y2))
-	z_val = dx + im*dy
+	
+	abs_dists_x = [abs(x1 - x2), spacing*edge_count - abs(x1 - x2)]
+	if sort(abs_dists_x) == abs_dists_x
+		dist_x = x1 - x2
+	else
+		dist_x = sign(x1-x2) * (-1) * abs_dists_x[2]
+	end
+	
+	abs_dists_y = [abs(y1 - y2), spacing*edge_count - abs(y1 - y2)]
+	if sort(abs_dists_y) == abs_dists_y
+		dist_y = y1 - y2
+	else
+		dist_y = sign(y1-y2) * (-1) * abs_dists_y[2]
+	end
+	
+	z_val = dist_x + im*dist_y
 	return z_val
 end
 
-function get_j(j,k,t,phi,edge_count,spacing)
-	#z = get_position(k,edge_count,spacing) - get_position(j,edge_count,spacing)
-	z = get_torus_distance_btw(get_position(k,edge_count,spacing),get_position(j,edge_count,spacing),edge_count,spacing) # periodic boundary conditions
+function get_j(j,k,t,phi,edge_count,spacing,periodic=true)
+	z = get_position(k,edge_count,spacing) - get_position(j,edge_count,spacing)
+	if periodic
+		z = get_torus_distance_btw(get_position(k,edge_count,spacing),get_position(j,edge_count,spacing),edge_count,spacing) # periodic boundary conditions
+	end
 	gz = (-1)^(real(z) + imag(z) + imag(z)*real(z))
 	exp_phi_part = (get_position(j,edge_count,spacing) * conj(z) - conj(get_position(j,edge_count,spacing)) * z + abs2(z) ) * pi * 0.5
 	exp_other_part = -pi * 05 * abs2(z)
@@ -66,7 +81,7 @@ function make_component_matrix(j,k,edge_count)
 	return series_of_prods[end]
 end
 
-function make_ham_mat(edge_count,t,phi,spacing)
+function make_ham_mat(edge_count,t,phi,spacing,periodic=true)
 	ham_mat = zeros(Int64,2^(edge_count^2),2^(edge_count^2))
 	for i2 in 1:edge_count^2
 		#println("Site $i2 / $edge_count")
@@ -75,7 +90,7 @@ function make_ham_mat(edge_count,t,phi,spacing)
 				continue
 			end
 			
-			coeff = get_j(j2,i2,t,phi,edge_count,spacing)
+			coeff = get_j(j2,i2,t,phi,edge_count,spacing,periodic)
 			matrix_comp = make_component_matrix(j2,i2,edge_count)
 			ham_mat += coeff.*matrix_comp
 			#println(i2,", ",j2,", ",coeff)
@@ -113,7 +128,7 @@ end
 lat_sep = 1.0
 t_val = 1.0
 edges_count = [2]
-phis_count = 3
+phis_count = 30
 phis = [0.1 + (j-1)*(1.0-0.1)/phis_count for j in 1:phis_count]
 #phi_val = 1/3
 #
@@ -125,10 +140,11 @@ for i in 1:length(edges_count)
 	for j in 1:length(phis)
 		#println(100*j/length(phis))
 		phi_val = phis[j]
-		en_vals, eivecs, mat = make_ham_mat(num_edge_sites,t_val,phi_val,lat_sep)
-		for k in 1:1#size(eivecs)[1]
-			get_total_number_particles(num_edge_sites,eivecs[:,k])
-		end
+		en_vals, eivecs, mat = make_ham_mat(num_edge_sites,t_val,phi_val,lat_sep,true)
+		println(mat == conj(transpose(mat)))
+		#for k in 1:1#size(eivecs)[1]
+		#	get_total_number_particles(num_edge_sites,eivecs[:,k])
+		#end
 		#ham_mats = mat
 		#energies[i][j] = en_vals#./maximum(en_vals)
 		#percent_thru_eigvals[i][j] = [(k-1)/length(en_vals) for k in 1:length(en_vals)]
