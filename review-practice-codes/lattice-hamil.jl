@@ -98,6 +98,10 @@ function make_ham_mat(edge_count,t,phi,spacing,periodic=true)
 		end
 	end
 	
+	if ham_mat != conj(transpose(ham_mat))
+		println("Not Hermitian, Need to Stop")
+	end
+	
 	return eigvals(ham_mat),eigvecs(ham_mat),ham_mat
 end
 
@@ -124,7 +128,30 @@ function get_total_number_particles(edge_count,wavefunc)
 	end
 	println("Final Count is $count")
 end
-#
+
+function plot_nrgs_range_phi(phis_count,edge_count,plot_ground_state=true,periodic=true,phi_start=0.1,phi_end=1.0,spacing=1.0)
+	phis = [phi_start + (i-1)*(phi_end-phi_start)/phis_count for i in 1:phis_count+1]
+	energies = [[] for i in 1:phis_count+1]
+	for i in 1:phis_count+1
+		phi_val = phis[i]
+		en_vals = make_ham_mat(edge_count,1.0,phi_val,spacing)[1]
+		energies[i] = en_vals
+	end
+	if plot_ground_state
+		plot(phis,[energies[i][1] for i in 1:phis_count+1],"-p",label="Ne=$edge_count")
+		xlabel("Phi")
+		ylabel("Lowest NRG")
+		legend()
+	end
+	
+	return phis, energies
+end
+
+count_phis = 10
+edge_sites = 2
+plot_nrgs_range_phi(count_phis,edge_sites)
+
+#=
 lat_sep = 1.0
 t_val = 1.0
 edges_count = [2]
@@ -146,11 +173,11 @@ for i in 1:length(edges_count)
 		#	get_total_number_particles(num_edge_sites,eivecs[:,k])
 		#end
 		#ham_mats = mat
-		#energies[i][j] = en_vals#./maximum(en_vals)
-		#percent_thru_eigvals[i][j] = [(k-1)/length(en_vals) for k in 1:length(en_vals)]
+		energies[i][j] = en_vals#./maximum(en_vals)
+		percent_thru_eigvals[i][j] = [(k-1)/length(en_vals) for k in 1:length(en_vals)]
 	end
 end
-#
+=#
 #=
 for i in 1:length(edges_count)
 	edges = edges_count[i]
