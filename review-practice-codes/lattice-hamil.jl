@@ -177,7 +177,7 @@ function plot_nrgs_range_phi(phis_count,edge_count,single_part=true,num_parts=1,
 	energies = [[] for i in 1:phis_count+1]
 	ground_state_wavefunc = [[] for i in 1:phis_count+1]
 	for i in 1:phis_count+1
-		println(round(100*i/(phis_count+1),digits=1),"%")
+		#println(round(100*i/(phis_count+1),digits=1),"%")
 		phi_val = phis[i]
 		if single_part
 			en_vals,eigvals,hamil = make_single_part_ham(edge_count,phi_val,periodic,spacing)
@@ -243,6 +243,32 @@ function plot_spectra_range_sites(phi_count,start_sites,end_sites)
 		title("Energy Spectrum for range Lattice Sites")
 	end
 end
+
+function bin_nrg_spectra(phi_count,edge_sites,bin_count=10,phi_first=0.01,phi_last=1.0)
+	phis_here, nrgs_here = plot_nrgs_range_phi(phi_count,edge_sites,true,1,false,false,true,phi_first,phi_last)[1:2]
+	num_nrg_vals = zeros(Int64,phi_count+1)
+	for i in 1:phi_count+1
+		binned_nrgs = hist(nrgs_here[i],bin_count)
+		number_of_nrg_vals_local = 0
+		for j in 1:bin_count
+			if binned_nrgs[1][j] != 0.0
+				number_of_nrg_vals_local += 1
+			end
+		end
+		num_nrg_vals[i] = number_of_nrg_vals_local
+	end
+	plot(phis_here,num_nrg_vals,"-p",label="$edge_sites")
+	xlabel("Phi")
+	title("Number of Distinct Energies")
+	legend()
+	
+	return phis_here, num_nrg_vals
+end
+
+edges = 10
+bins = 50
+phis = 50
+bin_nrg_spectra(phis,edges,bins)
 
 #=
 count = 100
