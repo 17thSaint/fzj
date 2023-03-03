@@ -83,7 +83,6 @@ function get_wavefunc(amp_tensor,normed=true)
 		append!(all_amps,[amp_tensor[i]])
 	end
 	wavefunc = sum(all_org_states .* all_amps)
-	println(wavefunc)
 	if normed
 		final_wavefunc,coeff = normalize_wavefunc(wavefunc)
 		return final_wavefunc,d1,sites,all_org_states,all_amps,coeff
@@ -147,8 +146,10 @@ left_tensor[:,:,2] = [0; 1]
 right_tensor[:,:,2] = [0; 1]
 right_tensor[:,:,1] = [0; 0]
 rez_amp_tensor = left_tensor * right_tensor
-energy = get_ham_expect(rez_amp_tensor,num_sites)
-println(energy)
+#energy = get_ham_expect(rez_amp_tensor,num_sites)
+#println(energy)
+rez_wavefunc,inner_dim,site_dim,orgs,amps = get_wavefunc(rez_amp_tensor,false)
+dag_wavefunc = conj(rez_wavefunc) .* 1.0
 
 
 
