@@ -83,6 +83,7 @@ function get_wavefunc(amp_tensor,normed=true)
 		append!(all_amps,[amp_tensor[i]])
 	end
 	wavefunc = sum(all_org_states .* all_amps)
+	println(wavefunc)
 	if normed
 		final_wavefunc,coeff = normalize_wavefunc(wavefunc)
 		return final_wavefunc,d1,sites,all_org_states,all_amps,coeff
@@ -105,6 +106,8 @@ function make_hamilt(site_count,onsite_strength=1.0,inter_strength=1.0)
 				ham[:,:,i,j] = inter_strength.* (cre_mat * ani_mat)
 			elseif abs(i-j) == 0
 				ham[:,:,i,j] = onsite_strength.* (cre_mat * ani_mat)
+			else
+				ham[:,:,i,j] = [1 0; 0 1]
 			end
 		end
 	end
@@ -113,8 +116,9 @@ end
 
 function get_ham_expect(amp_tensor,site_count)
 	rez_wavefunc,inner_dim,site_dim,orgs,amps,normcoef = get_wavefunc(amp_tensor)
+	#@show rez_wavefunc
 	hamilt,local_dim1,local_dim2,onsite,intersite = make_hamilt(site_count)
-	
+	#@show hamilt
 	replaceind!(hamilt,local_dim2,inner_dim)
 	replaceind!(hamilt,intersite,site_dim)
 	
@@ -134,10 +138,17 @@ d2 = Index(bond_dim)
 n_L = Index(num_states)
 n_R = Index(num_states)
 
-left_tensor = randomITensor(d1,d2,n_L) + im .* randomITensor(d1,d2,n_L)
-right_tensor = randomITensor(d2,d1,n_R) + im .* randomITensor(d2,d1,n_R)
+left_tensor = ITensor(d1,d2,n_L)#randomITensor(d1,d2,n_L) + im .* randomITensor(d1,d2,n_L)
+left_tensor[1,1,1] = 0
+right_tensor = ITensor(d2,d1,n_R)#randomITensor(d2,d1,n_R) + im .* randomITensor(d2,d1,n_R)
+right_tensor[1,1,1] = 0
+left_tensor[:,:,1] = [0; 0]
+left_tensor[:,:,2] = [0; 1]
+right_tensor[:,:,2] = [0; 1]
+right_tensor[:,:,1] = [0; 0]
 rez_amp_tensor = left_tensor * right_tensor
-
+energy = get_ham_expect(rez_amp_tensor,num_sites)
+println(energy)
 
 
 
