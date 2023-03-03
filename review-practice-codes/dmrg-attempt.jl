@@ -48,31 +48,44 @@ function get_organizations(site_count)
 	return seq_orgs[2]
 end
 
-function get_wavefunc(amp_tensor)
-	all_orgs = get_organizations(length(size(f)))
-	for i in 2:prod(size(amp_tensor))
-		
-	end
+function normalize_wavefunc(wavefunc)
+	norm_factor = real((conj(wavefunc) * wavefunc)[1])
+	normed_wavefunc = (1/sqrt(norm_factor)) .* wavefunc
+	return normed_wavefunc,norm_factor
 end
 
-
-f, d11, d12 = get_organization_state([0,1])
-g, d21, d22 = get_organization_state([1,0])
-replaceind!(g,d21,d11)
-replaceind!(g,d22,d12)
-z = f + g
-
+function get_wavefunc(amp_tensor,normed=true)
+	all_orgs = get_organizations(length(size(amp_tensor)))
+	first_org, d1, d2 = get_organization_state(all_orgs[1])
+	all_org_states = [first_org]
+	all_amps = [amp_tensor[1]]
+	for i in 2:prod(size(amp_tensor))
+		local_org_state, d3, d4 = get_organization_state(all_orgs[i])
+		replaceind!(local_org_state,d3,d1)
+		replaceind!(local_org_state,d4,d2)
+		append!(all_org_states,[local_org_state])
+		append!(all_amps,[amp_tensor[i]])
+	end
+	wavefunc = sum(all_org_states .* all_amps)
+	if normed
+		final_wavefunc,coeff = normalize_wavefunc(wavefunc)
+		return final_wavefunc,all_org_states,all_amps,coeff
+	else
+		return wavefunc,all_org_states,all_amps
+	end
+end
 
 d1 = Index(1)
 d2 = Index(bond_dim)
 n_L = Index(num_states)
 n_R = Index(num_states)
 
-left_tensor = randomITensor(d1,d2,n_L)
-right_tensor = randomITensor(d2,d1,n_R)
+left_tensor = randomITensor(d1,d2,n_L) + im .* randomITensor(d1,d2,n_L)
+right_tensor = randomITensor(d2,d1,n_R) + im .* randomITensor(d2,d1,n_R)
 
+rez_amp_tensor = left_tensor * right_tensor
 
-
+results = get_wavefunc(rez_amp_tensor)
 
 
 
