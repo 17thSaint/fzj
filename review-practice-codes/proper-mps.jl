@@ -162,7 +162,7 @@ function make_onsite_ham(site_count,onsite_strength=1.0)
 	return final_ham,ham_indices
 end
 
-function make_nearest_neighbor_ham(site_count,periodic=true,neighbor_strength=1.0)
+function make_nearest_neighbor_ham(site_count,periodic=false,neighbor_strength=1.0)
 	iden,d5,d6 = make_identity_tensor()
 	creat_mat,annih_mat = get_creat_annih_mats()
 	creat_ten,d1,d2 = turn_matrix_into_tensor(creat_mat)
@@ -173,8 +173,17 @@ function make_nearest_neighbor_ham(site_count,periodic=true,neighbor_strength=1.
 		local_ham_parts = []
 		local_part_indices = []
 		if i == 1
-			append!(local_ham_parts,[onsite_strength.*(creat_ten*annih_ten)])
-			append!(local_part_indices,[d1,d2,d3,d4])
+			append!(local_ham_parts,[annih_ten])
+			append!(local_ham_parts,[neighbor_strength.*creat_ten]) # annihilate at size i, create at i+1
+			append!(local_part_indices,[d3,d4,d1,d2])
+		elseif i == site_count
+			if periodic
+				new_creat,new_creat_indices = assign_new_indices(creat_ten,[d1,d2])
+				append!(local_ham_parts,[new_creat])
+				append!(local_part_indices,new_creat_indices)
+			else
+				continue
+			end
 		else
 			append!(local_ham_parts,[iden])
 			append!(local_part_indices,[d5,d6])
@@ -183,18 +192,45 @@ function make_nearest_neighbor_ham(site_count,periodic=true,neighbor_strength=1.
 			if j == i
 				if j == site_count
 					if periodic
-					
+						new_annih,new_annih_indices = assign_new_indices(annih_ten,[d3,d4])
+						append!(local_ham_parts,[new_annih])
+						append!(local_part_indices,new_annih_indices)
 					else
-						continue
+						resulting_comp,local_indices = assign_new_indices(iden,[d5,d6])
+						append!(local_ham_parts,[resulting_comp])
+						append!(local_part_indices,local_indices)
 					end
 				else
-					assign_new_indices(creat_ten,)
+					new_creat,new_creat_indices = assign_new_indices(creat_ten,[d1,d2])
+					new_annih,new_annih_indices = assign_new_indices(annih_ten,[d3,d4])
+					append!(local_ham_parts,[new_annih])   # annihilate at size i, create at i+1
+					append!(local_ham_parts,[neighbor_strength.*new_creat])
+					append!(local_part_indices,new_annih_indices)
+					append!(local_part_indices,new_creat_indices)
 				end
+			elseif j == i+1
+				continue
 			else
-			
+				resulting_comp,local_indices = assign_new_indices(iden,[d5,d6])
+				append!(local_ham_parts,[resulting_comp])
+				append!(local_part_indices,local_indices)
 			end
 		end
+		local_ham_contrib = prod(local_ham_parts)
+		# add svd dim reduction step here? or at each tensor step thus diff line above
+		if i == 1
+			append!(ham_indices,local_part_indices)
+			seq_ham[1] = local_ham_contrib
+		else
+			for k in 1:length(ham_indices)
+				replaceind!(local_ham_contrib,local_part_indices[k],ham_indices[k])
+			end
+			seq_ham[2] = local_ham_contrib
+			seq_ham[1] = sum(seq_ham)
+		end
 	end
+	final_ham = seq_ham[1]
+	return final_ham,ham_indices
 end
 
 function get_expect_ham_val(hamilt,hamilt_indices,wavefunc,wavefunc_indices)
@@ -219,7 +255,7 @@ d1 = Index(1)
 d2 = Index(bond_dim)
 n_L = Index(num_states)
 n_R = Index(num_states)
-
+#
 left_tensor = ITensor(d1,d2,n_L)#randomITensor(d1,d2,n_L) + im .* randomITensor(d1,d2,n_L)
 left_tensor[1,1,1] = 0
 right_tensor = ITensor(d2,d1,n_R)#randomITensor(d2,d1,n_R) + im .* randomITensor(d2,d1,n_R)
@@ -231,9 +267,15 @@ right_tensor[:,:,1] = [0; 0]
 rez_amp_tensor = left_tensor * right_tensor
 
 upup_wavefunc,wavefunc_indices = get_full_wavefunc(rez_amp_tensor,num_sites)
-
-onsite_ham,ham_indices = make_onsite_ham(num_sites)
-
+#
+nn_ham,nn_ham_indices = make_nearest_neighbor_ham(num_sites,false)
+onsite_ham,onsite_ham_indices = make_onsite_ham(num_sites)
+for i in 1:length(nn_ham_indices)
+	replaceind!(nn_ham,nn_ham_indices[i],onsite_ham_indices[i])
+end
+full_ham = nn_ham + onsite_ham
+nrg_val = get_expect_ham_val(full_ham,onsite_ham_indices,upup_wavefunc,wavefunc_indices)
+println(nrg_val)
 
 
 
