@@ -80,11 +80,11 @@ function get_full_wavefunc(amp_tensor,site_count,normed=true)
 end
 
 function get_creat_annih_mats(num_parts=1)
-	annih = zeros(Float64,(num_parts+1,num_parts+1))
+	creat = zeros(Float64,(num_parts+1,num_parts+1))
 	for i in 1:num_parts
-		annih[i,i+1] = sqrt(i)
+		creat[i,i+1] = sqrt(i)
 	end
-	creat = transpose(annih)
+	annih = transpose(creat)
 	return creat, annih
 end
 
@@ -146,7 +146,7 @@ function make_onsite_ham(site_count,onsite_strength=1.0)
 			end
 		end
 		local_ham_contrib = prod(local_ham_parts)
-		# add svd dim reduction step here? or at each tensor step therefore diff line above
+		# add svd dim reduction step here? or at each tensor step thus diff line above
 		if i == 1
 			append!(ham_indices,local_part_indices)
 			seq_ham[1] = local_ham_contrib
@@ -160,6 +160,54 @@ function make_onsite_ham(site_count,onsite_strength=1.0)
 	end
 	final_ham = seq_ham[1]
 	return final_ham,ham_indices
+end
+
+function make_nearest_neighbor_ham(site_count,periodic=true,neighbor_strength=1.0)
+	iden,d5,d6 = make_identity_tensor()
+	creat_mat,annih_mat = get_creat_annih_mats()
+	creat_ten,d1,d2 = turn_matrix_into_tensor(creat_mat)
+	annih_ten,d3,d4 = turn_matrix_into_tensor(annih_mat)
+	ham_indices = []
+	seq_ham = Array{ITensor}(undef,2)
+	for i in 1:site_count
+		local_ham_parts = []
+		local_part_indices = []
+		if i == 1
+			append!(local_ham_parts,[onsite_strength.*(creat_ten*annih_ten)])
+			append!(local_part_indices,[d1,d2,d3,d4])
+		else
+			append!(local_ham_parts,[iden])
+			append!(local_part_indices,[d5,d6])
+		end
+		for j in 2:site_count
+			if j == i
+				if j == site_count
+					if periodic
+					
+					else
+						continue
+					end
+				else
+					assign_new_indices(creat_ten,)
+				end
+			else
+			
+			end
+		end
+	end
+end
+
+function get_expect_ham_val(hamilt,hamilt_indices,wavefunc,wavefunc_indices)
+	replaceind!(hamilt,hamilt_indices[3],wavefunc_indices[1]) # replaces indices to operate ham on wavefunc
+	replaceind!(hamilt,hamilt_indices[1],wavefunc_indices[2])
+
+	ham_on_wavefunc = hamilt * wavefunc
+
+	replaceinds!(ham_on_wavefunc,(hamilt_indices[2],hamilt_indices[4]),wavefunc_indices) # get indices ready to operate bra wavefunc
+
+	expect_val = (conj.(wavefunc) * ham_on_wavefunc)[1]
+	
+	return expect_val
 end
 
 
@@ -182,14 +230,9 @@ right_tensor[:,:,2] = [0; 1]
 right_tensor[:,:,1] = [0; 0]
 rez_amp_tensor = left_tensor * right_tensor
 
-#rez = get_full_wavefunc(rez_amp_tensor,num_sites)
-#show rez[1]
+upup_wavefunc,wavefunc_indices = get_full_wavefunc(rez_amp_tensor,num_sites)
 
-site_count = 4#num_sites
-onsite_str = 1.0
-
-
-
+onsite_ham,ham_indices = make_onsite_ham(num_sites)
 
 
 
