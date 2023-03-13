@@ -233,9 +233,12 @@ function make_nearest_neighbor_ham(site_count,periodic=false,neighbor_strength=1
 	return final_ham,ham_indices
 end
 
-function get_expect_ham_val(hamilt,hamilt_indices,wavefunc,wavefunc_indices)
-	replaceind!(hamilt,hamilt_indices[3],wavefunc_indices[1]) # replaces indices to operate ham on wavefunc
-	replaceind!(hamilt,hamilt_indices[1],wavefunc_indices[2])
+function get_expect_ham_val(hamilt,hamilt_indices,wavefunc,wavefunc_indices,site_count)
+	#replaceind!(hamilt,hamilt_indices[3],wavefunc_indices[1]) # replaces indices to operate ham on wavefunc
+	#replaceind!(hamilt,hamilt_indices[1],wavefunc_indices[2])
+	for i in 1:site_count
+		replaceind!(hamilt,hamilt_indices[2*i-1],wavefunc_indices[end-i+1])
+	end	
 
 	ham_on_wavefunc = hamilt * wavefunc
 
@@ -246,36 +249,84 @@ function get_expect_ham_val(hamilt,hamilt_indices,wavefunc,wavefunc_indices)
 	return expect_val
 end
 
+function get_random_mps_coeffs(site_count,bond_dim,possible_states=2)
+	d1 = Index(1)
+	states_indices = [Index(possible_states) for i in 1:site_count]
+	inner_indices = [Index(bond_dim) for i in 1:site_count-1]
+	left_tensor = rand([-1,1]).*randomITensor(d1,inner_indices[1],states_indices[1]) + (im * rand([-1,1])) .* randomITensor(d1,inner_indices[1],states_indices[1])
+	right_tensor = rand([-1,1]).*randomITensor(inner_indices[end],d1,states_indices[end]) + (im * rand([-1,1])) .* randomITensor(inner_indices[end],d1,states_indices[end])
+	all_tensors = [left_tensor]
+	for i in 1:site_count-2
+		local_tensor = rand([-1,1]).*randomITensor(inner_indices[i],inner_indices[i+1],states_indices[i+1]) + (im * rand([-1,1])) .* randomITensor(inner_indices[i],inner_indices[i+1],states_indices[i+1])
+		append!(all_tensors,[local_tensor])
+	end
+	append!(all_tensors,[right_tensor])
+	return prod(all_tensors),all_tensors,d1,states_indices,inner_indices
+end
 
 
-bond_dim = 2
-num_states = 2
-num_sites = 2
-d1 = Index(1)
+
+
+#=d1 = Index(1)
 d2 = Index(bond_dim)
+d3 = Index(bond_dim)
+d4 = Index(bond_dim)
 n_L = Index(num_states)
 n_R = Index(num_states)
-#
-left_tensor = ITensor(d1,d2,n_L)#randomITensor(d1,d2,n_L) + im .* randomITensor(d1,d2,n_L)
-left_tensor[1,1,1] = 0
-right_tensor = ITensor(d2,d1,n_R)#randomITensor(d2,d1,n_R) + im .* randomITensor(d2,d1,n_R)
-right_tensor[1,1,1] = 0
+n_C = Index(num_states)
+
+left_tensor = rand([-1,1]).*randomITensor(d1,d2,n_L) + (im * rand([-1,1])) .* randomITensor(d1,d2,n_L)#ITensor(d1,d2,n_L)
+#left_tensor[1,1,1] = 0
+right_tensor = rand([-1,1]).*randomITensor(d3,d1,n_R) + (im * rand([-1,1])) .* randomITensor(d3,d1,n_R)#ITensor(d3,d1,n_R)
+#right_tensor[1,1,1] = 0
+center_tensor = rand([-1,1]).*randomITensor(d2,d3,n_C) + (im * rand([-1,1])) .* randomITensor(d2,d3,n_C)
+center_tensor[1] = 0
 left_tensor[:,:,1] = [0; 0]
 left_tensor[:,:,2] = [0; 1]
+center_tensor[:,:,1] = [0 0; 0 0]
+center_tensor[:,:,2] = [0 0; 0 1]
 right_tensor[:,:,2] = [0; 1]
 right_tensor[:,:,1] = [0; 0]
-rez_amp_tensor = left_tensor * right_tensor
 
-upup_wavefunc,wavefunc_indices = get_full_wavefunc(rez_amp_tensor,num_sites)
-#
-nn_ham,nn_ham_indices = make_nearest_neighbor_ham(num_sites,false)
-onsite_ham,onsite_ham_indices = make_onsite_ham(num_sites)
-for i in 1:length(nn_ham_indices)
-	replaceind!(nn_ham,nn_ham_indices[i],onsite_ham_indices[i])
+rez_amp_tensor = left_tensor * center_tensor * right_tensor
+=#
+
+#bond_dim = 3
+#num_states = 2
+#num_sites = 3
+
+function get_random_energy(site_count,bond_dim)
+	rez_amp_tensor = get_random_mps_coeffs(site_count,bond_dim)[1]
+	chosen_wavefunc,wavefunc_indices = get_full_wavefunc(rez_amp_tensor,site_count)
+	nn_ham,nn_ham_indices = make_nearest_neighbor_ham(site_count,true)
+	onsite_ham,onsite_ham_indices = make_onsite_ham(site_count)
+	for i in 1:length(nn_ham_indices)
+		replaceind!(nn_ham,nn_ham_indices[i],onsite_ham_indices[i])
+	end
+	full_ham = nn_ham + onsite_ham
+	nrg_val = get_expect_ham_val(full_ham,onsite_ham_indices,chosen_wavefunc,wavefunc_indices,site_count)
+	#println(nrg_val)
+	return real(nrg_val)
 end
-full_ham = nn_ham + onsite_ham
-nrg_val = get_expect_ham_val(full_ham,onsite_ham_indices,upup_wavefunc,wavefunc_indices)
-println(nrg_val)
+
+range_bonddims = [i for i in 2:5]
+range_sites = [i for i in 2:4]
+all_times = [[0.0 for j in 1:length(range_bonddims)] for i in 1:length(range_sites)]
+all_time_errors = [[0.0 for j in 1:length(range_bonddims)] for i in 1:length(range_sites)]
+for i in 1:length(range_sites)
+	local_site_count = range_sites[i]
+	for j in 1:length(range_bonddims)
+		local_bond_dim = range_bonddims[j]
+		get_random_energy(local_site_count,local_bond_dim)
+		for k in 1:10
+			start_time = time()
+			get_random_energy(local_site_count,local_bond_dim)
+			end_time = time()
+			time_diff = end_time - start_time
+		end
+	end
+end
+
 
 
 
