@@ -12,6 +12,12 @@ function make_site(state,bond_dim=2)
 	return site_tensor,local_index	
 end
 
+function make_random_site(dim=2)
+	local_index = Index(dim)
+	site_tensor = rand([-1,1]) .* randomITensor(local_index) + (im*rand([-1,1])) .* randomITensor(local_index)
+	return site_tensor,local_index
+end
+
 function next_step_organizations(all_orgs)
 	new_all_orgs = vcat(all_orgs,all_orgs) .* 1
 	current_count = Int(length(new_all_orgs)/2)
@@ -92,7 +98,7 @@ function turn_matrix_into_tensor(mat)
 	a1 = Index(size(mat)[1])
 	a2 = Index(size(mat)[2])
 	tensor_version = ITensor(eltype(mat),mat,a1,a2)
-	return tensor_version,a1,a2
+	return tensor_version,[a1,a2]
 end
 
 function make_identity_tensor(bond_dim=2)
@@ -243,7 +249,6 @@ function get_expect_ham_val(hamilt,hamilt_indices,wavefunc,wavefunc_indices,site
 	ham_on_wavefunc = hamilt * wavefunc
 
 	replaceinds!(ham_on_wavefunc,(hamilt_indices[2],hamilt_indices[4]),wavefunc_indices) # get indices ready to operate bra wavefunc
-
 	expect_val = (conj.(wavefunc) * ham_on_wavefunc)[1]
 	
 	return expect_val
@@ -264,6 +269,115 @@ function get_random_mps_coeffs(site_count,bond_dim,possible_states=2)
 	return prod(all_tensors),all_tensors,d1,states_indices,inner_indices
 end
 
+function make_random_wavefunc(site_count,possible_states=2,normed=true)
+	site1, s1_index = make_random_site(possible_states)
+	seq_wavefunc = [site1]
+	all_indices = [s1_index]
+	for j in 2:site_count
+		next_site, next_index = make_random_site(possible_states)
+		append!(all_indices,[next_index])
+		if j == 2
+			append!(seq_wavefunc,[next_site])
+		else
+			seq_wavefunc[2] = next_site
+		end
+		seq_wavefunc[1] = prod(seq_wavefunc)
+	end
+	wavefunc = seq_wavefunc[1]
+	if normed
+		return normalize_wavefunc(wavefunc)[1],all_indices
+	else
+		return wavefunc,all_indices	
+	end
+end
+
+function make_reshaped_wavefunc(input_wavefunc,site_count,possible_states)
+	reshaped_wavefunc = im .* zeros(possible_states,possible_states^(site_count-1))
+	for i in 1:possible_states^(site_count-1)
+		for j in 1:possible_states
+			reshaped_wavefunc[j,i] = input_wavefunc[possible_states*(i-1) + j][1]
+		end
+	end
+	tens_reshaped_wavefunc, new_indices = turn_matrix_into_tensor(reshaped_wavefunc)
+	return tens_reshaped_wavefunc, new_indices
+end
+
+# to start input matrix is reshaped wavefunc
+function do_element_svd(input_matrix,input_indices,keep_all=false,trash_percent=0.001)
+	u,s,vt = svd(input_matrix,input_indices[1])
+	function while_loop()
+		keep = true
+		which_dim = 1
+		while keep
+			if s[which_dim,which_dim] < trash_percent * s[1,1] && !keep_all
+				#println("Throwing Out ",size(s)[1]-which_dim+1,"/",size(s)[1])
+				keep = false
+			elseif which_dim == size(s)[1]
+				#println("Keeping All")
+				which_dim += 1
+				keep = false
+			else
+				which_dim += 1
+			end
+		end
+		return which_dim
+	end
+	which_dim = while_loop()
+	new_s_indices = [Index(which_dim-1),Index(which_dim-1)]
+	new_s = ITensor(new_s_indices)
+	new_s[1] = 0.0*im
+	for i in 1:which_dim-1
+		new_s[i,i] = s[i,i]
+	end
+	new_u_indices = [inds(u)[1],Index(which_dim-1)]
+	new_u = ITensor(new_u_indices)
+	new_u[1] = 0.0*im
+	for i in 1:size(u)[1]
+		for j in 1:which_dim-1
+			new_u[i,j] = u[i,j]
+		end
+	end
+	new_vt_indices = [inds(vt)[1],Index(which_dim-1)]
+	new_vt = ITensor(new_vt_indices)
+	new_vt[1] = 0.0*im
+	for i in 1:size(vt)[1]
+		for j in 1:which_dim-1
+			new_vt[i,j] = vt[i,j]
+		end
+	end
+	replaceind!(new_s,new_s_indices[1],new_u_indices[2])
+	replaceind!(new_s,new_s_indices[2],new_vt_indices[2])
+	next_beginning_matrix = new_s * new_vt
+	next_beginning_indices = inds(next_beginning_matrix)
+	return new_u,new_u_indices,next_beginning_matrix,next_beginning_indices,size(s)[1]-which_dim+1
+	#return u,s,vt,new_u,new_s,new_vt,which_dim
+end
+
+function make_As(input_wavefunc,site_count,possible_states,keep_all=false,trash_percent=0.001)
+	all_as = []
+	as_indices = []
+	all_cs = []
+	cs_indices = []
+	throwouts = []
+	for i in 1:site_count-1
+		#println("Doing Site $i")
+		if i == 1
+			local_matrix, local_indices = make_reshaped_wavefunc(input_wavefunc,site_count,possible_states)
+			append!(all_cs,[local_matrix])
+			append!(cs_indices,[local_indices])
+		else
+			local_matrix = all_cs[end]
+			local_indices = cs_indices[end]
+		end
+		local_a,local_a_indices,next_c,next_c_indices,throwout_count = do_element_svd(local_matrix,local_indices,keep_all,trash_percent)
+		append!(throwouts,[throwout_count])
+		append!(all_as,[local_a])
+		append!(as_indices,[local_a_indices])
+		append!(all_cs,[next_c])
+		append!(cs_indices,[next_c_indices])
+	end
+	return all_as,as_indices,all_cs,cs_indices,throwouts
+end
 
 
 
@@ -291,41 +405,30 @@ right_tensor[:,:,1] = [0; 0]
 rez_amp_tensor = left_tensor * center_tensor * right_tensor
 =#
 
-#bond_dim = 3
-#num_states = 2
-#num_sites = 3
+bond_dim = 2
+#local_site_count = num_sites
+#nn_ham,nn_ham_indices = make_nearest_neighbor_ham(local_site_count,true)
+#onsite_ham,onsite_ham_indices = make_onsite_ham(local_site_count)
+#for i in 1:length(nn_ham_indices)
+#	replaceind!(nn_ham,nn_ham_indices[i],onsite_ham_indices[i])
+#end
+#full_ham = nn_ham + onsite_ham
+#rez_amp_tensor = get_random_mps_coeffs(local_site_count,bond_dim)[1]
+#chosen_wavefunc,wavefunc_indices = get_full_wavefunc(rez_amp_tensor,local_site_count)
+#u1,s1,v1 = svd(chosen_wavefunc,wavefunc_indices)
+#nrg = get_expect_ham_val(full_ham,onsite_ham_indices,chosen_wavefunc,wavefunc_indices,local_site_count)
+#println(nrg)
 
-function get_random_energy(site_count,bond_dim)
-	rez_amp_tensor = get_random_mps_coeffs(site_count,bond_dim)[1]
-	chosen_wavefunc,wavefunc_indices = get_full_wavefunc(rez_amp_tensor,site_count)
-	nn_ham,nn_ham_indices = make_nearest_neighbor_ham(site_count,true)
-	onsite_ham,onsite_ham_indices = make_onsite_ham(site_count)
-	for i in 1:length(nn_ham_indices)
-		replaceind!(nn_ham,nn_ham_indices[i],onsite_ham_indices[i])
-	end
-	full_ham = nn_ham + onsite_ham
-	nrg_val = get_expect_ham_val(full_ham,onsite_ham_indices,chosen_wavefunc,wavefunc_indices,site_count)
-	#println(nrg_val)
-	return real(nrg_val)
-end
-
-range_bonddims = [i for i in 2:5]
-range_sites = [i for i in 2:4]
-all_times = [[0.0 for j in 1:length(range_bonddims)] for i in 1:length(range_sites)]
-all_time_errors = [[0.0 for j in 1:length(range_bonddims)] for i in 1:length(range_sites)]
-for i in 1:length(range_sites)
-	local_site_count = range_sites[i]
-	for j in 1:length(range_bonddims)
-		local_bond_dim = range_bonddims[j]
-		get_random_energy(local_site_count,local_bond_dim)
-		for k in 1:10
-			start_time = time()
-			get_random_energy(local_site_count,local_bond_dim)
-			end_time = time()
-			time_diff = end_time - start_time
-		end
+for i in 2:10
+	num_states = i
+	for j in 2:10
+		num_sites = j
+		rand_wavefunc, wavefunc_indices = make_random_wavefunc(num_sites,num_states)
+		components = make_As(rand_wavefunc,num_sites,num_states,false,10^-10)
+		println("Sites $j: ",components[end][1],"/",i)
 	end
 end
+
 
 
 
