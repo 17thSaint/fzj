@@ -291,21 +291,28 @@ function make_reshaped_wavefunc(input_wavefunc,site_count,possible_states)
 end
 
 # to start input matrix is reshaped wavefunc
-function do_element_svd(input_matrix,if_keep=[false,0.01])
-	keep_all = if_keep[1]
-	if !keep_all
-		trash_percent = if_keep[2]
-	end
+# keeping type default is throw away <1%
+function do_element_svd(input_matrix,keeping_type=0.01)
 	u,s,vt = svd(input_matrix,inds(input_matrix)[1])
+	max_dim = size(s)[1]
+	if typeof(keeping_type) == Bool
+		keep_all = true
+	else
+		keep_all = false
+		if typeof(keeping_type) == Float64
+			trash_percent = keeping_type
+		elseif typeof(keeping_type) == Int64
+			max_dim = keeping_type
+		end
+	end
 	function while_loop()
 		keep = true
 		which_dim = 1
 		while keep
-			if !keep_all && s[which_dim,which_dim] < trash_percent * s[1,1]
+			if !keep_all && typeof(keeping_type) == Float64 && s[which_dim,which_dim] < trash_percent * s[1,1]
 				#println("Throwing Out ",size(s)[1]-which_dim+1,"/",size(s)[1])
 				keep = false
-			elseif which_dim == size(s)[1]
-				#println("Keeping All")
+			elseif which_dim == max_dim
 				which_dim += 1
 				keep = false
 			else
@@ -345,7 +352,16 @@ function do_element_svd(input_matrix,if_keep=[false,0.01])
 	return new_u,next_beginning_matrix,size(s)[1]-which_dim+1
 end
 
-function make_As(input_wavefunc,site_count,possible_states,if_keep=[false,0.01])
+function check_A_sym(input_A)
+	transp_A = setprime(transpose(input_A),0)
+	return transp_A == input_A
+end
+
+function check_A_diag(input_A)
+
+end
+
+function make_As(input_wavefunc,site_count,possible_states,keeping_type=0.01)
 	all_as = []
 	all_cs = []
 	throwouts = []
@@ -357,15 +373,21 @@ function make_As(input_wavefunc,site_count,possible_states,if_keep=[false,0.01])
 		else
 			local_matrix = all_cs[end]
 		end
-		local_a,next_c,throwout_count = do_element_svd(local_matrix,if_keep)
+		local_a,next_c,throwout_count = do_element_svd(local_matrix,keeping_type)
+	
 		append!(throwouts,[throwout_count])
 		append!(all_as,[local_a])
 		append!(all_cs,[next_c])
+		
+		if i != 1 && !check_A_sym(local_a)
+			println("Middle A at site $i NOT SYM")
+			return all_as,all_cs
+		end
 	end
-	if if_keep[1]
-		return all_as,all_cs
-	else
+	if typeof(keeping_type) == Float64
 		return all_as,all_cs,throwouts
+	else
+		return all_as,all_cs
 	end
 end
 
@@ -409,12 +431,23 @@ rez_amp_tensor = left_tensor * center_tensor * right_tensor
 #nrg = get_expect_ham_val(full_ham,onsite_ham_indices,chosen_wavefunc,wavefunc_indices,local_site_count)
 #println(nrg)
 
-#=
-num_sites = 4
+
+function get_keeping_type(how_keeping,keeping_val)
+	if how_keeping == "all"
+		return true
+	elseif how_keeping == "count" || how_keeping == "percent"
+		return keeping_val
+	end
+end
+
+num_sites = 6
 num_states = 4
-rand_wavefunc, wavefunc_indices = make_random_wavefunc(num_sites,num_states)
-as,cs,thrown = make_As(rand_wavefunc,num_sites,num_states,[true])
-=#
+keeping = "all"
+#keep_count = 3
+keep_type = get_keeping_type(keeping,keep_count)
+rand_wavefunc = make_random_wavefunc(num_sites,num_states)
+as,cs = make_As(rand_wavefunc,num_sites,num_states,keep_type)
+
 
 
 
