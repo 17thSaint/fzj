@@ -290,6 +290,15 @@ function make_reshaped_wavefunc(input_wavefunc,site_count,possible_states)
 	return tens_reshaped_wavefunc
 end
 
+function get_keeping_type(how_keeping,keeping_val)
+	if how_keeping == "all"
+		return true
+	elseif how_keeping == "count" || how_keeping == "percent"
+		return keeping_val
+	end
+end
+
+
 # to start input matrix is reshaped wavefunc
 # keeping type default is throw away <1%
 function do_element_svd(input_matrix,keeping_type=0.01)
@@ -358,13 +367,20 @@ function check_A_sym(input_A)
 end
 
 function check_A_diag(input_A)
-
+	if size(input_A)[1] == size(input_A)[2]
+		mat_form = Matrix(input_A,inds(input_A))
+		return !(false in isapprox.(transpose(mat_form),mat_form,atol=10^-7))
+	else
+		println("Not Square")
+		return true
+	end
 end
 
 function make_As(input_wavefunc,site_count,possible_states,keeping_type=0.01)
 	all_as = []
 	all_cs = []
 	throwouts = []
+	
 	for i in 1:site_count-1
 		#println("Doing Site $i")
 		if i == 1
@@ -373,15 +389,21 @@ function make_As(input_wavefunc,site_count,possible_states,keeping_type=0.01)
 		else
 			local_matrix = all_cs[end]
 		end
+
 		local_a,next_c,throwout_count = do_element_svd(local_matrix,keeping_type)
 	
 		append!(throwouts,[throwout_count])
 		append!(all_as,[local_a])
 		append!(all_cs,[next_c])
 		
-		if i != 1 && !check_A_sym(local_a)
-			println("Middle A at site $i NOT SYM")
-			return all_as,all_cs
+		if i != 1
+			if !check_A_sym(local_a)
+				println("Middle A at site $i NOT SYM")
+				return all_as,all_cs
+			elseif !check_A_diag(local_a)
+				println("Middle A at site $i NOT diagonal")
+				return all_as,all_cs
+			end
 		end
 	end
 	if typeof(keeping_type) == Float64
@@ -431,19 +453,10 @@ rez_amp_tensor = left_tensor * center_tensor * right_tensor
 #nrg = get_expect_ham_val(full_ham,onsite_ham_indices,chosen_wavefunc,wavefunc_indices,local_site_count)
 #println(nrg)
 
-
-function get_keeping_type(how_keeping,keeping_val)
-	if how_keeping == "all"
-		return true
-	elseif how_keeping == "count" || how_keeping == "percent"
-		return keeping_val
-	end
-end
-
 num_sites = 6
 num_states = 4
-keeping = "all"
-#keep_count = 3
+keeping = "count"
+keep_count = 3
 keep_type = get_keeping_type(keeping,keep_count)
 rand_wavefunc = make_random_wavefunc(num_sites,num_states)
 as,cs = make_As(rand_wavefunc,num_sites,num_states,keep_type)
