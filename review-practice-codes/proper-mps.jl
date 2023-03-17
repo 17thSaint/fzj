@@ -391,11 +391,19 @@ function make_As(input_wavefunc,site_count,possible_states,keeping_type=0.01)
 		end
 
 		local_a,next_c,throwout_count = do_element_svd(local_matrix,keeping_type)
+		if i == 1
+			replaceind!(local_a,inds(local_a)[1],addtags(inds(local_a)[1],"s1"))
+			replaceind!(local_a,inds(local_a)[2],addtags(inds(local_a)[2],"a1"))
+		else
+			ind1 = i - 1
+			replaceind!(local_a,inds(local_a)[1],addtags(inds(local_a)[1],"a$ind1"))
+			replaceind!(local_a,inds(local_a)[2],addtags(inds(local_a)[2],"a$i"))
+		end
 	
 		append!(throwouts,[throwout_count])
 		append!(all_as,[local_a])
 		append!(all_cs,[next_c])
-		
+		#=
 		if i != 1
 			if !check_A_sym(local_a)
 				println("Middle A at site $i NOT SYM")
@@ -405,6 +413,7 @@ function make_As(input_wavefunc,site_count,possible_states,keeping_type=0.01)
 				return all_as,all_cs
 			end
 		end
+		=#
 	end
 	if typeof(keeping_type) == Float64
 		return all_as,all_cs,throwouts
@@ -413,6 +422,11 @@ function make_As(input_wavefunc,site_count,possible_states,keeping_type=0.01)
 	end
 end
 
+function get_eigvec_tensor(state,possible_states)
+	eigvec_tensor = ITensor(Index(possible_states))
+	eigvec_tensor[state] = 1.0
+	return eigvec_tensor
+end
 
 
 #=d1 = Index(1)
@@ -454,15 +468,25 @@ rez_amp_tensor = left_tensor * center_tensor * right_tensor
 #println(nrg)
 
 num_sites = 6
-num_states = 4
-keeping = "count"
+num_states = 2
+keeping = "all"
 keep_count = 3
-keep_type = get_keeping_type(keeping,keep_count)
-rand_wavefunc = make_random_wavefunc(num_sites,num_states)
-as,cs = make_As(rand_wavefunc,num_sites,num_states,keep_type)
+#keep_type = get_keeping_type(keeping,keep_count)
+#rand_wavefunc = make_random_wavefunc(num_sites,num_states)
+#as,cs = make_As(rand_wavefunc,num_sites,num_states,keep_type)
 
+possible_states = num_states
+rho1_coeffs = conj(transpose(as[1])) * as[1]
+rho1_coeffs = swapinds(rho1_coeffs,inds(rho1_coeffs)[1],inds(rho1_coeffs)[4])
 
-
+for i in 1:possible_states
+	for j in 1:possible_states
+		ket = get_eigvec_tensor(i,possible_states)
+		bra = get_eigvec_tensor(j,possible_states)
+		outer_prod = ket * bra
+		
+	end
+end
 
 
 
