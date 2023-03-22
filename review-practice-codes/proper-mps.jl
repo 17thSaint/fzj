@@ -299,6 +299,18 @@ function get_keeping_type(how_keeping,keeping_val=0)
 end
 
 
+function reshape_Cs(current_c,next_bond_dim)
+	next_right_dim = Int(size(current_c)[2]/next_bond_dim)
+	reshaped = ITensor(Index(next_bond_dim),Index(size(current_c)[1]),Index(next_right_dim))
+	reshaped[1] = 0.0*im
+	for i in 1:next_bond_dim
+		reshaped[i,:,:] = current_c[:,(i-1)*next_right_dim+1:i*next_right_dim]
+	end
+	c1 = combiner(inds(reshaped)[1:2])
+	flattened = c1 * reshaped
+	return flattened
+end
+
 # to start input matrix is reshaped wavefunc
 # keeping type default is throw away <1%
 function do_element_svd(input_matrix,keeping_type=0.01)
@@ -319,7 +331,7 @@ function do_element_svd(input_matrix,keeping_type=0.01)
 		which_dim = 1
 		while keep
 			if !keep_all && typeof(keeping_type) == Float64 && s[which_dim,which_dim] < trash_percent * s[1,1]
-				#println("Throwing Out ",size(s)[1]-which_dim+1,"/",size(s)[1])
+				println("Throwing Out ",size(s)[1]-which_dim+1,"/",size(s)[1])
 				keep = false
 			elseif which_dim == max_dim
 				which_dim += 1
@@ -387,10 +399,11 @@ function make_As(input_wavefunc,site_count,possible_states,keeping_type=0.01,lab
 			local_matrix = make_reshaped_wavefunc(input_wavefunc,site_count,possible_states)
 			append!(all_cs,[local_matrix])
 		else
-			local_matrix = all_cs[end]
+			local_matrix = reshape_Cs(all_cs[end],possible_states)
 		end
 
 		local_a,next_c,throwout_count = do_element_svd(local_matrix,keeping_type)
+		#=
 		if labels
 			if i == 1
 				replaceind!(local_a,inds(local_a)[1],addtags(inds(local_a)[1],"s1"))
@@ -401,10 +414,11 @@ function make_As(input_wavefunc,site_count,possible_states,keeping_type=0.01,lab
 				replaceind!(local_a,inds(local_a)[2],addtags(inds(local_a)[2],"a$i"))
 			end
 		end
+		=#
 		append!(throwouts,[throwout_count])
 		append!(all_as,[local_a])
 		append!(all_cs,[next_c])
-		#
+		#=
 		if i != 1
 			if !check_A_sym(local_a)
 				println("Middle A at site $i NOT SYM")
@@ -414,7 +428,7 @@ function make_As(input_wavefunc,site_count,possible_states,keeping_type=0.01,lab
 				return all_as,all_cs
 			end
 		end
-		#
+		=#
 	end
 	if typeof(keeping_type) == Float64
 		return all_as,all_cs,throwouts
@@ -493,14 +507,19 @@ rez_amp_tensor = left_tensor * center_tensor * right_tensor
 #println(nrg)
 
 
-#
+
 num_sites = 5
 num_states = 3
-keeping = "count"
-keep_count = 2
+keeping = "percent"
+keep_count = 0.01
 keep_type = get_keeping_type(keeping,keep_count)
 rand_wavefunc = make_random_wavefunc(num_sites,num_states)
-as,cs = make_As(rand_wavefunc,num_sites,num_states,keep_type,true)
+as,cs = make_As(rand_wavefunc,num_sites,num_states,keep_type)
+
+
+
+
+
 
 
 
