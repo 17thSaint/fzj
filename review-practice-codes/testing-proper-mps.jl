@@ -2,7 +2,7 @@ using Test
 
 include("proper-mps.jl")
 
-do_all = true
+do_all = false
 
 function make_upupup()
 	d1 = Index(1)
@@ -152,6 +152,92 @@ end
 
 end;
 end
+
+if do_all | false
+
+num_sites = 4
+num_states = 2
+keeping = "all"
+keep_type = get_keeping_type(keeping)
+rand_wavefunc = make_random_wavefunc(num_sites,num_states)
+as,cs = make_As(rand_wavefunc,num_sites,num_states,keep_type,true)
+
+@testset "orthogonality of A1" begin
+
+for a1 in 1:size(as[1])[2]
+	for a1p in 1:size(as[1])[2]
+		local_val = sum(as[1][i,a1] * conj(as[1])[i,a1p] for i in 1:size(as[1])[1])
+		if a1 == a1p
+			@test isapprox(1.0,local_val,atol=10^-5)
+		else
+			@test isapprox(0.0,local_val,atol=10^-5)
+		end
+	end
+end
+
+end;
+
+@testset "orthogonality of As" begin
+
+for a2 in 1:size(as[2])[2]
+	for a2p in 1:size(as[2])[2]
+		local_val = sum(as[2][i,a2] * conj(as[2])[i,a2p] for i in 1:size(as[2])[1])
+		if a2 == a2p
+			@test isapprox(1.0,local_val,atol=10^-5)
+		else
+			@test isapprox(0.0,local_val,atol=10^-5)
+		end
+	end
+end
+
+
+end;
+
+end
+
+if do_all | true
+
+num_sites = 4
+num_states = 4
+keeping = "count"
+keep_count = 3
+keep_type = get_keeping_type(keeping,keep_count)
+rand_wavefunc = make_random_wavefunc(num_sites,num_states)
+as,cs = make_As(rand_wavefunc,num_sites,num_states,keep_type,true)
+
+@testset "orthogonality of A1 w/SVD" begin
+
+for a1 in 1:size(as[1])[2]
+	for a1p in 1:size(as[1])[2]
+		local_val = sum(as[1][i,a1] * conj(as[1])[i,a1p] for i in 1:size(as[1])[1])
+		if a1 == a1p
+			@test isapprox(1.0,local_val,atol=10^-5)
+		else
+			@test isapprox(0.0,local_val,atol=10^-5)
+		end
+	end
+end
+
+end;
+
+@testset "orthogonality of A2 w/SVD" begin
+
+for a2 in 1:size(as[2])[2]
+	for a2p in 1:size(as[2])[2]
+		local_val = sum(as[2][i,a2] * conj(as[2])[i,a2p] for i in 1:size(as[2])[1])
+		if a2 == a2p
+			@test isapprox(1.0,local_val,atol=10^-5)
+		else
+			@test isapprox(0.0,local_val,atol=10^-5)
+		end
+	end
+end
+
+
+end;
+
+end
+
 
 
 
