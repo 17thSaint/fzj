@@ -193,11 +193,18 @@ end
 
 end;
 
+@testset "check norm" begin
+
+inner_prod = (cs[end] * conj(cs[end]))[1]
+@test isapprox(1.0,inner_prod,atol=10^-5)
+
+end;
+
 end
 
-if do_all | true
+if do_all | false
 
-num_sites = 4
+num_sites = 3
 num_states = 4
 keeping = "count"
 keep_count = 3
@@ -233,6 +240,12 @@ for a2 in 1:size(as[2])[2]
 	end
 end
 
+end;
+
+@testset "check norm" begin
+
+inner_prod = (cs[end] * conj(cs[end]))[1]
+@test isapprox(1.0,inner_prod,atol=10^-5)
 
 end;
 
