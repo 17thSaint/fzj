@@ -290,7 +290,7 @@ function make_reshaped_wavefunc(input_wavefunc,site_count,possible_states)
 	return tens_reshaped_wavefunc
 end
 
-function get_keeping_type(how_keeping,keeping_val)
+function get_keeping_type(how_keeping,keeping_val=0)
 	if how_keeping == "all"
 		return true
 	elseif how_keeping == "count" || how_keeping == "percent"
@@ -404,7 +404,7 @@ function make_As(input_wavefunc,site_count,possible_states,keeping_type=0.01,lab
 		append!(throwouts,[throwout_count])
 		append!(all_as,[local_a])
 		append!(all_cs,[next_c])
-		#=
+		#
 		if i != 1
 			if !check_A_sym(local_a)
 				println("Middle A at site $i NOT SYM")
@@ -414,7 +414,7 @@ function make_As(input_wavefunc,site_count,possible_states,keeping_type=0.01,lab
 				return all_as,all_cs
 			end
 		end
-		=#
+		#
 	end
 	if typeof(keeping_type) == Float64
 		return all_as,all_cs,throwouts
@@ -427,6 +427,30 @@ function get_eigvec_tensor(state,possible_states)
 	eigvec_tensor = ITensor(Index(possible_states))
 	eigvec_tensor[state] = 1.0
 	return eigvec_tensor
+end
+
+# the 1 state is (1 0) and the 2 state is (0 1)
+# j is s'
+function get_first_rho(a1)
+	dim1 = size(a1)[1]
+	rho1_coeffs = conj(transpose(a1)) * a1
+	mat_local_dens = zeros(dim1,dim1) .+ im*0.0
+	for i in 1:dim1
+		for j in 1:dim1
+			coeff = sum(rho1_coeffs[j,k1,i,k2] for k2 in 1:size(a1)[2] for k1 in 1:size(a1)[2])
+			mat_local_dens[i,j] = coeff
+		end
+	end
+	println(tr(mat_local_dens))
+	local_dens_mat = turn_matrix_into_tensor(mat_local_dens)
+	return local_dens_mat
+end
+
+function get_inner_rho(ai)
+	coeff = sum((ai * conj(transpose(ai)))[i,j] for i in 1:size(ai)[1] for j in 1:size(ai)[1])
+	local_dens_mat = ITensor(Index(size(ai)[1]),Index(size(ai)[1]))
+	local_dens_mat = ones(size(ai)[1],size(ai)[1]) .* coeff
+	return local_dens_mat
 end
 
 
@@ -468,29 +492,16 @@ rez_amp_tensor = left_tensor * center_tensor * right_tensor
 #nrg = get_expect_ham_val(full_ham,onsite_ham_indices,chosen_wavefunc,wavefunc_indices,local_site_count)
 #println(nrg)
 
-#=
 
-num_sites = 6
-num_states = 2
-keeping = "all"
-keep_count = 3
-#keep_type = get_keeping_type(keeping,keep_count)
-#rand_wavefunc = make_random_wavefunc(num_sites,num_states)
-#as,cs = make_As(rand_wavefunc,num_sites,num_states,keep_type)
+#
+num_sites = 5
+num_states = 3
+keeping = "count"
+keep_count = 2
+keep_type = get_keeping_type(keeping,keep_count)
+rand_wavefunc = make_random_wavefunc(num_sites,num_states)
+as,cs = make_As(rand_wavefunc,num_sites,num_states,keep_type,true)
 
-possible_states = num_states
-rho1_coeffs = conj(transpose(as[1])) * as[1]
-rho1_coeffs = swapinds(rho1_coeffs,inds(rho1_coeffs)[1],inds(rho1_coeffs)[4])
-
-for i in 1:possible_states
-	for j in 1:possible_states
-		ket = get_eigvec_tensor(i,possible_states)
-		bra = get_eigvec_tensor(j,possible_states)
-		outer_prod = ket * bra
-		
-	end
-end
-=#
 
 
 
