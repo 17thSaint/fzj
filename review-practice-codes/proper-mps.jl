@@ -376,7 +376,7 @@ function check_A_diag(input_A)
 	end
 end
 
-function make_As(input_wavefunc,site_count,possible_states,keeping_type=0.01)
+function make_As(input_wavefunc,site_count,possible_states,keeping_type=0.01,labels=false)
 	all_as = []
 	all_cs = []
 	throwouts = []
@@ -391,15 +391,16 @@ function make_As(input_wavefunc,site_count,possible_states,keeping_type=0.01)
 		end
 
 		local_a,next_c,throwout_count = do_element_svd(local_matrix,keeping_type)
-		if i == 1
-			replaceind!(local_a,inds(local_a)[1],addtags(inds(local_a)[1],"s1"))
-			replaceind!(local_a,inds(local_a)[2],addtags(inds(local_a)[2],"a1"))
-		else
-			ind1 = i - 1
-			replaceind!(local_a,inds(local_a)[1],addtags(inds(local_a)[1],"a$ind1"))
-			replaceind!(local_a,inds(local_a)[2],addtags(inds(local_a)[2],"a$i"))
+		if labels
+			if i == 1
+				replaceind!(local_a,inds(local_a)[1],addtags(inds(local_a)[1],"s1"))
+				replaceind!(local_a,inds(local_a)[2],addtags(inds(local_a)[2],"a1"))
+			else
+				ind1 = i - 1
+				replaceind!(local_a,inds(local_a)[1],addtags(inds(local_a)[1],"a$ind1"))
+				replaceind!(local_a,inds(local_a)[2],addtags(inds(local_a)[2],"a$i"))
+			end
 		end
-	
 		append!(throwouts,[throwout_count])
 		append!(all_as,[local_a])
 		append!(all_cs,[next_c])
@@ -467,6 +468,8 @@ rez_amp_tensor = left_tensor * center_tensor * right_tensor
 #nrg = get_expect_ham_val(full_ham,onsite_ham_indices,chosen_wavefunc,wavefunc_indices,local_site_count)
 #println(nrg)
 
+#=
+
 num_sites = 6
 num_states = 2
 keeping = "all"
@@ -487,7 +490,7 @@ for i in 1:possible_states
 		
 	end
 end
-
+=#
 
 
 

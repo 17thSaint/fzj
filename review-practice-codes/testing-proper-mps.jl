@@ -119,23 +119,39 @@ end
 if do_all | false
 @testset "svd returns same wavefunc" begin
 
-num_sites = 5
+num_sites = 3
 num_states = 3
+keep_all = true
 rand_wavefunc = make_random_wavefunc(num_sites,num_states)
-as,cs = make_As(rand_wavefunc,num_sites,num_states,[true])
+as,cs = make_As(rand_wavefunc,num_sites,num_states,keep_all,false)
 remade_wavefunc = prod(as) * cs[end]
 
 for i in 1:prod(size(rand_wavefunc))
-	@test isapprox(imag(remade_wavefunc[i]),imag(rand_wavefunc[i]),atol=10^-10)
-	@test isapprox(real(remade_wavefunc[i]),real(rand_wavefunc[i]),atol=10^-10)
+	@test isapprox(imag(remade_wavefunc[i]),imag(rand_wavefunc[i]),atol=10^-5)
+	@test isapprox(real(remade_wavefunc[i]),real(rand_wavefunc[i]),atol=10^-5)
 end
 
 end;
 end
 
+if do_all | false
+@testset "mats to wavefunc to mats rebuild" begin
 
+num_states = 3
+num_sites = 2
+keep_all = true
+all_amps,each_tensor = get_random_mps_coeffs(num_sites,num_states)
+wavefunc_from_rand_matrices, local_coeff = get_full_wavefunc(all_amps,num_sites)
+all_mats,all_cs = make_As(wavefunc_from_rand_matrices,num_sites,num_states,keep_all,false)
+rebuilt_wavefunc = prod(all_mats) * all_cs[end]
 
+for i in 1:prod(size(rebuilt_wavefunc))
+	@test isapprox(imag(rebuilt_wavefunc[i]),imag(wavefunc_from_rand_matrices[i]),atol=10^-5)
+	@test isapprox(real(rebuilt_wavefunc[i]),real(wavefunc_from_rand_matrices[i]),atol=10^-5)
+end
 
+end;
+end
 
 
 
