@@ -332,74 +332,21 @@ function do_element_svd(input_matrix,possible_states,keeping_type=10^-5,needs_re
 		input_matrix = reshape_Cs(input_matrix,possible_states)
 	end
 	
-	max_dim = Int(size(input_matrix)[1] * next_bond_dim / possible_states)
+	max_dim = Int(minimum(size(input_matrix)) * next_bond_dim / possible_states)
 	if typeof(keeping_type) == Float64
 		u,s,vt = svd(input_matrix,inds(input_matrix)[1];cutoff=keeping_type)
-	else
+	end
+	if typeof(keeping_type) == Int64
 		u,s,vt = svd(input_matrix,inds(input_matrix)[1];maxdim=max_dim)
 	end
-	println("Dims of input C ",size(input_matrix),", SVD sizes ",size(u),", ",size(s),", ",size(vt))
-	#=
 	if typeof(keeping_type) == Bool
-		keep_all = true
-	else
-		keep_all = false
-		if typeof(keeping_type) == Float64
-			trash_percent = keeping_type
-		end
+		u,s,vt = svd(input_matrix,inds(input_matrix)[1])
 	end
-	function while_loop()
-		keep = true
-		which_dim = 1
-		while keep
-			if !keep_all && typeof(keeping_type) == Float64 && s[which_dim,which_dim] < trash_percent * s[1,1]
-				println("Throwing Out ",size(s)[1]-which_dim+1,"/",size(s)[1])
-				keep = false
-			elseif which_dim == max_dim
-				which_dim += 1
-				keep = false
-			else
-				which_dim += 1
-			end
-		end
-		return which_dim
-	end
-	which_dim = while_loop()
-		new_s_indices = [Index(which_dim-1),Index(which_dim-1)]
-		new_s = ITensor(new_s_indices)
-		new_s[1] = 0.0*im
-		for i in 1:which_dim-1
-			new_s[i,i] = s[i,i]
-		end
-		new_u_indices = [inds(u)[1],Index(which_dim-1)]
-		new_u = ITensor(new_u_indices)
-		new_u[1] = 0.0*im
-		for i in 1:size(u)[1]
-			for j in 1:which_dim-1
-				new_u[i,j] = u[i,j]
-			end
-		end
-		new_vt_indices = [inds(vt)[1],Index(which_dim-1)]
-		new_vt = ITensor(new_vt_indices)
-		new_vt[1] = 0.0*im
-		for i in 1:size(vt)[1]
-			for j in 1:which_dim-1
-				new_vt[i,j] = vt[i,j]
-			end
-		end
-		replaceind!(new_s,new_s_indices[1],new_u_indices[2])
-		replaceind!(new_s,new_s_indices[2],new_vt_indices[2])
-		next_beginning_matrix = new_s * new_vt
-		next_beginning_indices = inds(next_beginning_matrix)
-	=#	
+	#println("Dims of input C ",size(input_matrix),", SVD sizes ",size(u),", ",size(s),", ",size(vt))
+		
 	next_beginning_matrix = s * vt
-	#if needs_reshaping
-	#	c1 = combiner(inds(next_beginning_matrix)[1:end-1])
-	#	next_beginning_matrix = c1 * next_beginning_matrix
-	#end
-
-	#println(size(new_u),", ",size(next_beginning_matrix))
-	return u,next_beginning_matrix,0
+	
+	return u,next_beginning_matrix,size(s)[1]
 end
 
 function check_A_sym(input_A)
@@ -420,7 +367,7 @@ end
 function make_As(input_wavefunc,site_count,possible_states,keeping_type=0.01,labels=false)
 	all_as = []
 	all_cs = []
-	throwouts = []
+	bond_dims = []
 	
 	for i in 1:site_count-1
 		#println("Doing Site $i")
@@ -433,7 +380,7 @@ function make_As(input_wavefunc,site_count,possible_states,keeping_type=0.01,lab
 			local_matrix = all_cs[end]
 			needs_reshaping = true
 		end
-		local_a,next_c,throwout_count = do_element_svd(local_matrix,possible_states,keeping_type,needs_reshaping)
+		local_a,next_c,local_dim = do_element_svd(local_matrix,possible_states,keeping_type,needs_reshaping)
 		#=
 		if labels
 			if i == 1
@@ -446,26 +393,13 @@ function make_As(input_wavefunc,site_count,possible_states,keeping_type=0.01,lab
 			end
 		end
 		=#
-		append!(throwouts,[throwout_count])
+		
+		append!(bond_dims,[local_dim])
 		append!(all_as,[local_a])
 		append!(all_cs,[next_c])
-		#=
-		if i != 1
-			if !check_A_sym(local_a)
-				println("Middle A at site $i NOT SYM")
-				return all_as,all_cs
-			elseif !check_A_diag(local_a)
-				println("Middle A at site $i NOT diagonal")
-				return all_as,all_cs
-			end
-		end
-		=#
 	end
-	if typeof(keeping_type) == Float64
-		return all_as,all_cs,throwouts
-	else
-		return all_as,all_cs
-	end
+
+	return all_as,all_cs,bond_dims
 end
 
 function get_eigvec_tensor(state,possible_states)
@@ -499,30 +433,6 @@ function get_inner_rho(ai)
 end
 
 
-#=d1 = Index(1)
-d2 = Index(bond_dim)
-d3 = Index(bond_dim)
-d4 = Index(bond_dim)
-n_L = Index(num_states)
-n_R = Index(num_states)
-n_C = Index(num_states)
-
-left_tensor = rand([-1,1]).*randomITensor(d1,d2,n_L) + (im * rand([-1,1])) .* randomITensor(d1,d2,n_L)#ITensor(d1,d2,n_L)
-#left_tensor[1,1,1] = 0
-right_tensor = rand([-1,1]).*randomITensor(d3,d1,n_R) + (im * rand([-1,1])) .* randomITensor(d3,d1,n_R)#ITensor(d3,d1,n_R)
-#right_tensor[1,1,1] = 0
-center_tensor = rand([-1,1]).*randomITensor(d2,d3,n_C) + (im * rand([-1,1])) .* randomITensor(d2,d3,n_C)
-center_tensor[1] = 0
-left_tensor[:,:,1] = [0; 0]
-left_tensor[:,:,2] = [0; 1]
-center_tensor[:,:,1] = [0 0; 0 0]
-center_tensor[:,:,2] = [0 0; 0 1]
-right_tensor[:,:,2] = [0; 1]
-right_tensor[:,:,1] = [0; 0]
-
-rez_amp_tensor = left_tensor * center_tensor * right_tensor
-=#
-
 #bond_dim = 2
 #local_site_count = num_sites
 #nn_ham,nn_ham_indices = make_nearest_neighbor_ham(local_site_count,true)
@@ -537,20 +447,28 @@ rez_amp_tensor = left_tensor * center_tensor * right_tensor
 #nrg = get_expect_ham_val(full_ham,onsite_ham_indices,chosen_wavefunc,wavefunc_indices,local_site_count)
 #println(nrg)
 
-
+function reindex_As(given_A,possible_states,dims)
+	dim_left_a,dim_right_a = dims
+	reindexed_A = ITensor(Index(possible_states),Index(dim_left_a),Index(dim_right_a))
+	reindexed_A[1] = 0.0*im
+	for i in 1:dim_right_a
+		for j in 1:dim_left_a
+			for k in 1:possible_states
+				reindexed_A[k,j,i] = given_A[(j-1)*possible_states+k,i]
+			end
+		end
+	end
+	return reindexed_A
+end
 
 num_sites = 5
-num_states = 4
-keeping = "all"
+num_states = 3
+keeping = "percent"
 keep_count = 10^-5
 keep_type = get_keeping_type(keeping,keep_count)
 rand_wavefunc = make_random_wavefunc(num_sites,num_states)
-as,cs = make_As(rand_wavefunc,num_sites,num_states,keep_type)
-
-
-
-
-
+as,cs,dims = make_As(rand_wavefunc,num_sites,num_states,keep_type)
+redone_as = [reindex_As(as[i],num_states,dims[i-1:i]) for i in 2:length(as)]
 
 
 
