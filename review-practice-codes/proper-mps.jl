@@ -308,7 +308,7 @@ function reshape_Cs(current_c,possible_states)
 	end
 	c1 = combiner(inds(reshaped)[1:2])
 	flattened = c1 * reshaped
-	return reshaped#flattened
+	return flattened
 end
 
 function flatten_starting_wavefunc(starting_wavefunc)
@@ -332,7 +332,7 @@ function do_element_svd(input_matrix,possible_states,keeping_type=10^-5,needs_re
 		input_matrix = reshape_Cs(input_matrix,possible_states)
 	end
 	
-	max_dim = Int(prod(size(input_matrix)[1:end-1]) * next_bond_dim / possible_states)
+	max_dim = Int(size(input_matrix)[1] * next_bond_dim / possible_states)
 	if typeof(keeping_type) == Float64
 		u,s,vt = svd(input_matrix,inds(input_matrix)[1];cutoff=keeping_type)
 	else
