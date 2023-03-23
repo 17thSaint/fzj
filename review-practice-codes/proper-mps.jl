@@ -540,9 +540,9 @@ rez_amp_tensor = left_tensor * center_tensor * right_tensor
 
 
 num_sites = 5
-num_states = 2
+num_states = 4
 keeping = "all"
-keep_count = 0.01
+keep_count = 10^-5
 keep_type = get_keeping_type(keeping,keep_count)
 rand_wavefunc = make_random_wavefunc(num_sites,num_states)
 as,cs = make_As(rand_wavefunc,num_sites,num_states,keep_type)
