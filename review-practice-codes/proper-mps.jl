@@ -364,6 +364,20 @@ function check_A_diag(input_A)
 	end
 end
 
+function reindex_As(given_A,possible_states,dims)
+	dim_left_a,dim_right_a = dims
+	reindexed_A = ITensor(Index(possible_states),Index(dim_left_a),Index(dim_right_a))
+	reindexed_A[1] = 0.0*im
+	for i in 1:dim_right_a
+		for j in 1:dim_left_a
+			for k in 1:possible_states
+				reindexed_A[k,j,i] = given_A[(j-1)*possible_states+k,i]
+			end
+		end
+	end
+	return reindexed_A
+end
+
 function make_As(input_wavefunc,site_count,possible_states,keeping_type=0.01,labels=false)
 	all_as = []
 	all_cs = []
@@ -395,7 +409,13 @@ function make_As(input_wavefunc,site_count,possible_states,keeping_type=0.01,lab
 		=#
 		
 		append!(bond_dims,[local_dim])
-		append!(all_as,[local_a])
+		if i != 1
+			reindexed_a = reindex_As(local_a,possible_states,bond_dims[end-1:end])
+			replaceind!(reindexed_a,inds(reindexed_a)[2],inds(all_as[end])[end])
+			append!(all_as,[reindexed_a])
+		else
+			append!(all_as,[local_a])
+		end	
 		append!(all_cs,[next_c])
 	end
 
@@ -447,30 +467,17 @@ end
 #nrg = get_expect_ham_val(full_ham,onsite_ham_indices,chosen_wavefunc,wavefunc_indices,local_site_count)
 #println(nrg)
 
-function reindex_As(given_A,possible_states,dims)
-	dim_left_a,dim_right_a = dims
-	reindexed_A = ITensor(Index(possible_states),Index(dim_left_a),Index(dim_right_a))
-	reindexed_A[1] = 0.0*im
-	for i in 1:dim_right_a
-		for j in 1:dim_left_a
-			for k in 1:possible_states
-				reindexed_A[k,j,i] = given_A[(j-1)*possible_states+k,i]
-			end
-		end
-	end
-	return reindexed_A
-end
-
-num_sites = 5
-num_states = 3
-keeping = "percent"
+#=
+num_sites = 3
+num_states = 2
+keeping = "all"
 keep_count = 10^-5
 keep_type = get_keeping_type(keeping,keep_count)
 rand_wavefunc = make_random_wavefunc(num_sites,num_states)
 as,cs,dims = make_As(rand_wavefunc,num_sites,num_states,keep_type)
-redone_as = [reindex_As(as[i],num_states,dims[i-1:i]) for i in 2:length(as)]
+#redone_as = [reindex_As(as[i],num_states,dims[i-1:i]) for i in 2:length(as)]
 
-
+=#
 
 
 "fin"

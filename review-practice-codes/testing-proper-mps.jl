@@ -116,21 +116,21 @@ calced_nrg = get_expect_ham_val(onsite_ham_n3,wavefunc_n3,3)
 end;
 end
 
-if do_all | false
+if do_all | true
 @testset "svd returns same wavefunc" begin
 
 num_sites = 3
 num_states = 3
 keep_all = true
 rand_wavefunc = make_random_wavefunc(num_sites,num_states)
-as,cs = make_As(rand_wavefunc,num_sites,num_states,keep_all,false)
-remade_wavefunc = prod(as) * cs[end]
+as,cs,dims = make_As(rand_wavefunc,num_sites,num_states,keep_all,false)
 
-for i in 1:prod(size(rand_wavefunc))
-	@test isapprox(imag(remade_wavefunc[i]),imag(rand_wavefunc[i]),atol=10^-5)
-	@test isapprox(real(remade_wavefunc[i]),real(rand_wavefunc[i]),atol=10^-5)
+for j in 1:num_sites-1
+	remade_wavefunc = prod(as[1:j]) * cs[j+1]
+	for i in 1:prod(size(cs[1]))
+		@test isapprox(remade_wavefunc[i],cs[1][i],atol=10^-5)
+	end
 end
-
 end;
 end
 
@@ -142,7 +142,7 @@ num_sites = 2
 keep_all = true
 all_amps,each_tensor = get_random_mps_coeffs(num_sites,num_states)
 wavefunc_from_rand_matrices, local_coeff = get_full_wavefunc(all_amps,num_sites)
-all_mats,all_cs = make_As(wavefunc_from_rand_matrices,num_sites,num_states,keep_all,false)
+all_mats,all_cs,dims = make_As(wavefunc_from_rand_matrices,num_sites,num_states,keep_all,false)
 rebuilt_wavefunc = prod(all_mats) * all_cs[end]
 
 for i in 1:prod(size(rebuilt_wavefunc))
@@ -160,7 +160,7 @@ num_states = 2
 keeping = "all"
 keep_type = get_keeping_type(keeping)
 rand_wavefunc = make_random_wavefunc(num_sites,num_states)
-as,cs = make_As(rand_wavefunc,num_sites,num_states,keep_type,true)
+as,cs,dims = make_As(rand_wavefunc,num_sites,num_states,keep_type,true)
 
 @testset "orthogonality of A1" begin
 
@@ -210,7 +210,7 @@ keeping = "count"
 keep_count = 3
 keep_type = get_keeping_type(keeping,keep_count)
 rand_wavefunc = make_random_wavefunc(num_sites,num_states)
-as,cs = make_As(rand_wavefunc,num_sites,num_states,keep_type,true)
+as,cs,dims = make_As(rand_wavefunc,num_sites,num_states,keep_type,true)
 
 @testset "orthogonality of A1 w/SVD" begin
 
