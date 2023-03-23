@@ -298,32 +298,54 @@ function get_keeping_type(how_keeping,keeping_val=0)
 	end
 end
 
-
-function reshape_Cs(current_c,next_bond_dim)
-	next_right_dim = Int(size(current_c)[2]/next_bond_dim)
-	reshaped = ITensor(Index(next_bond_dim),Index(size(current_c)[1]),Index(next_right_dim))
+function reshape_Cs(current_c,possible_states)
+	#println(size(current_c))
+	next_right_dim = Int(size(current_c)[2]/possible_states)
+	reshaped = ITensor(Index(possible_states),Index(size(current_c)[1]),Index(next_right_dim))
 	reshaped[1] = 0.0*im
-	for i in 1:next_bond_dim
+	for i in 1:possible_states
 		reshaped[i,:,:] = current_c[:,(i-1)*next_right_dim+1:i*next_right_dim]
 	end
 	c1 = combiner(inds(reshaped)[1:2])
 	flattened = c1 * reshaped
+	return reshaped#flattened
+end
+
+function flatten_starting_wavefunc(starting_wavefunc)
+	c1 = combiner(inds(starting_wavefunc))
+	correct_shape = ITensor(Index(1))
+	correct_shape[1] = 1.0
+	flattened = correct_shape * (c1 * starting_wavefunc)
 	return flattened
 end
 
 # to start input matrix is reshaped wavefunc
 # keeping type default is throw away <1%
-function do_element_svd(input_matrix,keeping_type=0.01)
-	u,s,vt = svd(input_matrix,inds(input_matrix)[1])
-	max_dim = size(s)[1]
+# when keeping type is count, this is local bond dim
+function do_element_svd(input_matrix,possible_states,keeping_type=10^-5,needs_reshaping=true)
+	next_bond_dim = possible_states
+	if typeof(keeping_type) == Int64
+		next_bond_dim = keeping_type
+	end
+	
+	if needs_reshaping
+		input_matrix = reshape_Cs(input_matrix,possible_states)
+	end
+	
+	max_dim = Int(prod(size(input_matrix)[1:end-1]) * next_bond_dim / possible_states)
+	if typeof(keeping_type) == Float64
+		u,s,vt = svd(input_matrix,inds(input_matrix)[1];cutoff=keeping_type)
+	else
+		u,s,vt = svd(input_matrix,inds(input_matrix)[1];maxdim=max_dim)
+	end
+	println("Dims of input C ",size(input_matrix),", SVD sizes ",size(u),", ",size(s),", ",size(vt))
+	#=
 	if typeof(keeping_type) == Bool
 		keep_all = true
 	else
 		keep_all = false
 		if typeof(keeping_type) == Float64
 			trash_percent = keeping_type
-		elseif typeof(keeping_type) == Int64
-			max_dim = keeping_type
 		end
 	end
 	function while_loop()
@@ -343,34 +365,41 @@ function do_element_svd(input_matrix,keeping_type=0.01)
 		return which_dim
 	end
 	which_dim = while_loop()
-	new_s_indices = [Index(which_dim-1),Index(which_dim-1)]
-	new_s = ITensor(new_s_indices)
-	new_s[1] = 0.0*im
-	for i in 1:which_dim-1
-		new_s[i,i] = s[i,i]
-	end
-	new_u_indices = [inds(u)[1],Index(which_dim-1)]
-	new_u = ITensor(new_u_indices)
-	new_u[1] = 0.0*im
-	for i in 1:size(u)[1]
-		for j in 1:which_dim-1
-			new_u[i,j] = u[i,j]
+		new_s_indices = [Index(which_dim-1),Index(which_dim-1)]
+		new_s = ITensor(new_s_indices)
+		new_s[1] = 0.0*im
+		for i in 1:which_dim-1
+			new_s[i,i] = s[i,i]
 		end
-	end
-	new_vt_indices = [inds(vt)[1],Index(which_dim-1)]
-	new_vt = ITensor(new_vt_indices)
-	new_vt[1] = 0.0*im
-	for i in 1:size(vt)[1]
-		for j in 1:which_dim-1
-			new_vt[i,j] = vt[i,j]
+		new_u_indices = [inds(u)[1],Index(which_dim-1)]
+		new_u = ITensor(new_u_indices)
+		new_u[1] = 0.0*im
+		for i in 1:size(u)[1]
+			for j in 1:which_dim-1
+				new_u[i,j] = u[i,j]
+			end
 		end
-	end
-	replaceind!(new_s,new_s_indices[1],new_u_indices[2])
-	replaceind!(new_s,new_s_indices[2],new_vt_indices[2])
-	next_beginning_matrix = new_s * new_vt
-	next_beginning_indices = inds(next_beginning_matrix)
-	
-	return new_u,next_beginning_matrix,size(s)[1]-which_dim+1
+		new_vt_indices = [inds(vt)[1],Index(which_dim-1)]
+		new_vt = ITensor(new_vt_indices)
+		new_vt[1] = 0.0*im
+		for i in 1:size(vt)[1]
+			for j in 1:which_dim-1
+				new_vt[i,j] = vt[i,j]
+			end
+		end
+		replaceind!(new_s,new_s_indices[1],new_u_indices[2])
+		replaceind!(new_s,new_s_indices[2],new_vt_indices[2])
+		next_beginning_matrix = new_s * new_vt
+		next_beginning_indices = inds(next_beginning_matrix)
+	=#	
+	next_beginning_matrix = s * vt
+	#if needs_reshaping
+	#	c1 = combiner(inds(next_beginning_matrix)[1:end-1])
+	#	next_beginning_matrix = c1 * next_beginning_matrix
+	#end
+
+	#println(size(new_u),", ",size(next_beginning_matrix))
+	return u,next_beginning_matrix,0
 end
 
 function check_A_sym(input_A)
@@ -396,13 +425,15 @@ function make_As(input_wavefunc,site_count,possible_states,keeping_type=0.01,lab
 	for i in 1:site_count-1
 		#println("Doing Site $i")
 		if i == 1
+			#local_matrix = make_reshaped_wavefunc(input_wavefunc,site_count,possible_states)
 			local_matrix = make_reshaped_wavefunc(input_wavefunc,site_count,possible_states)
 			append!(all_cs,[local_matrix])
+			needs_reshaping = false
 		else
-			local_matrix = reshape_Cs(all_cs[end],possible_states)
+			local_matrix = all_cs[end]
+			needs_reshaping = true
 		end
-
-		local_a,next_c,throwout_count = do_element_svd(local_matrix,keeping_type)
+		local_a,next_c,throwout_count = do_element_svd(local_matrix,possible_states,keeping_type,needs_reshaping)
 		#=
 		if labels
 			if i == 1
@@ -509,8 +540,8 @@ rez_amp_tensor = left_tensor * center_tensor * right_tensor
 
 
 num_sites = 5
-num_states = 3
-keeping = "percent"
+num_states = 2
+keeping = "all"
 keep_count = 0.01
 keep_type = get_keeping_type(keeping,keep_count)
 rand_wavefunc = make_random_wavefunc(num_sites,num_states)
