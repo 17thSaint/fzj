@@ -1,13 +1,10 @@
-using LinearAlgebra
+using Einsum,ITensors
 
 x = [0 1;1 0]
 xx = [0 0 0 1;0 0 1 0;0 1 0 0;1 0 0 0]
 z = [1 0;0 -1]
+zz = [1 0 0 0;0 -1 0 0;0 0 -1 0;0 0 0 1]
 id = [1 0;0 1]
-
-n = 3
-qubit = 2
-full_mat = zeros(2^n,2^n)
 
 function get_flattened_index(b_list)
 	return sum(b_list .* [2^(length(b_list) - i) for i in 1:length(b_list)]) + 1
@@ -40,27 +37,56 @@ function get_two_qubit_elem(mat,bs,bps,which_qubits)
 	return prod_rez * mat[mat_b_elem_index,mat_bp_elem_index]
 end
 
-#
-for b1 in 0:1
-	for b1p in 0:1
-		for b2 in 0:1
-			for b2p in 0:1
-				for b3 in 0:1
-					for b3p in 0:1
-						bs_local = [b1,b2,b3]
-						b_elem = get_flattened_index(bs_local)
-						bps_local = [b1p,b2p,b3p]
-						bp_elem = get_flattened_index(bps_local)
-						full_mat[b_elem,bp_elem] = get_two_qubit_elem(xx,bs_local,bps_local,[1,2])
-					end
-				end
-			end
-		end
+function make_site(state)
+	site_tensor = ITensor(Index(2))
+	site_tensor[1] = 0
+	if state == 0
+		site_tensor[:] = [0,1]
+	elseif state == 1
+		site_tensor[:] = [1,0]
 	end
+	return site_tensor	
 end
-#
 
-display(full_mat)
+function get_wavefunc_givenorg(local_org)
+	site1 = make_site(local_org[1])
+	seq_wavefunc_localorg = [site1]
+	for j in 2:length(local_org)
+		next_site = make_site(local_org[j])
+		append!(seq_wavefunc_localorg,[next_site])
+	end
+	wavefunc_localorg = prod(seq_wavefunc_localorg)
+	return wavefunc_localorg
+end
+
+function turn_matrix_into_tensor(mat)
+	a1 = Index(size(mat)[1])
+	a2 = Index(size(mat)[2])
+	tensor_version = ITensor(eltype(mat),mat,a1,a2)
+	return tensor_version
+end
+
+function normalize_wavefunc(wavefunc)
+	norm_factor = real((conj(wavefunc) * wavefunc)[1])
+	normed_wavefunc = (1/sqrt(norm_factor)) .* wavefunc
+	return normed_wavefunc
+end
+
+function make_rand_wavefunc(site_count)
+	base_wavefunc = randomITensor([Index(2) for i in 1:site_count])
+	normed_wavefunc = normalize_wavefunc(base_wavefunc)
+	return normed_wavefunc
+end
+
+n = 2
+downup_wavefunc = get_wavefunc_givenorg([0,1])
+x_tens = turn_matrix_into_tensor(x)
+phi_form = randomITensor([Index(2) for i in 1:n])
+
+@einsum phi_form[b1,b2] := x_tens[b1,b1p] * downup_wavefunc[b1p,b2]
+
+
+
 
 
 
