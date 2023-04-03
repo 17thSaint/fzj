@@ -1,4 +1,4 @@
-using Einsum,ITensors
+using Einsum,ITensors,LinearAlgebra
 
 x = [0 1;1 0]
 xx = [0 0 0 1;0 0 1 0;0 1 0 0;1 0 0 0]
@@ -17,7 +17,12 @@ function get_single_qubit_elem(mat,bs,bps,which_qubit)
 			append!(prod_parts,[bs[j] == bps[j]])
 		end
 	end
-	return prod(prod_parts) * mat[bs[which_qubit]+1,bps[which_qubit]+1] 
+	if length(prod_parts) < 1
+		prod_rez = 1
+	else
+		prod_rez = prod(prod_parts)
+	end
+	return prod_rez * mat[bs[which_qubit]+1,bps[which_qubit]+1] 
 end
 
 function get_two_qubit_elem(mat,bs,bps,which_qubits)
@@ -78,15 +83,51 @@ function make_rand_wavefunc(site_count)
 	return normed_wavefunc
 end
 
-n = 2
-downup_wavefunc = get_wavefunc_givenorg([0,1])
-x_tens = turn_matrix_into_tensor(x)
-phi_form = randomITensor([Index(2) for i in 1:n])
+function int_to_binary(given::Int,len::Int)
+    # Initialize an empty array to store the binary digits
+    binary = []
+    # Loop until the integer is reduced to zero
+    while given > 0
+        # Get the remainder of n when divided by 2
+        digit = given % 2
+        # Prepend the digit to the binary array
+        pushfirst!(binary, digit)
+        # Integer divide n by 2 to reduce its value
+        given = div(given, 2)
+    end
+    # Return the binary array
+    if length(binary) < len
+    	return append!([0 for i in 1:(len-length(binary))],binary)
+    else
+    	return binary
+    end
+end
 
-@einsum phi_form[b1,b2] := x_tens[b1,b1p] * downup_wavefunc[b1p,b2]
+function make_manybody_form(mat,site_count,which_qubit)
+	full_mat = zeros(2^site_count,2^site_count)
+	for i in 1:2^site_count
+		for j in 1:2^site_count
+			bs = int_to_binary(i-1,site_count)
+			bps = int_to_binary(j-1,site_count)
+			if length(which_qubit) > 1
+				full_mat[i,j] = get_two_qubit_elem(mat,bs,bps,which_qubit)
+			else
+				full_mat[i,j] = get_single_qubit_elem(mat,bs,bps,which_qubit)
+			end
+		end
+	end
+	return full_mat
+end
 
 
 
+org = [0,1]
+n = length(org)
+#given_wavefunc = get_wavefunc_givenorg(org)
+#x_tens = turn_matrix_into_tensor(x)
+#phi_form = randomITensor([Index(2) for i in 1:n])
+
+#@einsum phi_form[b1,b2] := x_tens[b1,b1p] * given_wavefunc[b1p,b2]
 
 
 
