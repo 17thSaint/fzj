@@ -119,9 +119,50 @@ function make_manybody_form(mat,site_count,which_qubit)
 	return full_mat
 end
 
+function get_exp_xpart(which_site,site_count,dt,hx_strength,order=2)
+	coeff = -im * dt * hx_strength
+	if order == 2
+		coeff *= 0.5
+	end
+	fin_x = exp(coeff .* make_manybody_form(x,site_count,which_site))
+	return fin_x
+end
 
+function get_exp_zpart(which_sites,site_count,j_strength,hz_strength,dt)
+	coeff_int = -im * j_strength * dt
+	coeff_ons = -im * 0.5 * dt * hz_strength
+	int_part = coeff_int .* make_manybody_form(zz,site_count,which_sites)
+	ons_part = coeff_ons .* (make_manybody_form(z,site_count,which_sites[1]) + make_manybody_form(z,site_count,which_sites[2]))
+	fin_z = exp(int_part + ons_part)
+	return fin_z
+end
 
-org = [0,1]
+function get_mbham_local(site_count,which_sites,j_strength,hz_strength,hx_strength,dt,order=2)
+	zpart = get_exp_zpart(which_sites,site_count,j_strength,hz_strength,dt)
+	xpart = get_exp_xpart(which_sites[1],site_count,dt,hx_strength,order)
+	if order == 2
+		fin_ham = xpart * zpart * xpart
+	else
+		fin_ham = zpart * xpart
+	end
+	return fin_ham
+end
+
+function get_full_ham(site_count,j_strength,hz_strength,hx_strength,dt,order=2)
+	seq_ham = [get_mbham_local(site_count,[1,2],j_strength,hz_strength,hx_strength,dt,order),Matrix{ComplexF64}(undef,2^site_count,2^site_count)]
+	for i in 2:site_count
+		next_sites = [i,i+1]
+		if i == site_count
+			next_sites[2] = 1
+		end
+		next_contrib = get_mbham_local(site_count,next_sites,j_strength,hz_strength,hx_strength,dt,order)
+		seq_ham[2] = next_contrib
+		seq_ham[1] = prod(seq_ham)
+	end
+	return seq_ham[1]
+end
+
+org = [0,1,0]
 n = length(org)
 #given_wavefunc = get_wavefunc_givenorg(org)
 #x_tens = turn_matrix_into_tensor(x)
@@ -129,6 +170,13 @@ n = length(org)
 
 #@einsum phi_form[b1,b2] := x_tens[b1,b1p] * given_wavefunc[b1p,b2]
 
+site = 1
+dt = 0.1
+hx = 1.0
+hz = 1.0
+js = 2.0
+ham = get_full_ham(n,js,hz,hx,dt)
+display(ham)
 
 
 
