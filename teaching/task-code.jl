@@ -1,4 +1,4 @@
-using Einsum,ITensors,LinearAlgebra
+using Einsum,ITensors,LinearAlgebra,PyPlot,Statistics
 
 x = [0 1;1 0]
 xx = [0 0 0 1;0 0 1 0;0 1 0 0;1 0 0 0]
@@ -131,7 +131,7 @@ end
 function get_exp_zpart(which_sites,site_count,j_strength,hz_strength,dt)
 	coeff_int = -im * j_strength * dt
 	coeff_ons = -im * 0.5 * dt * hz_strength
-	int_part = coeff_int .* make_manybody_form(zz,site_count,which_sites)
+	int_part = coeff_int .* make_manybody_form(xx,site_count,which_sites)
 	ons_part = coeff_ons .* (make_manybody_form(z,site_count,which_sites[1]) + make_manybody_form(z,site_count,which_sites[2]))
 	fin_z = exp(int_part + ons_part)
 	return fin_z
@@ -162,24 +162,97 @@ function get_full_ham(site_count,j_strength,hz_strength,hx_strength,dt,order=2)
 	return seq_ham[1]
 end
 
-org = [0,1,0]
+function make_tens_wavefunc_vec(input_wavefunc)
+	comb = combiner(inds(input_wavefunc))
+	flat_tens = comb * input_wavefunc
+	return Vector(flat_tens)
+end
+
+function get_local_magnetization(which_site,wavefunc)
+	site_count = Int(log(2,length(wavefunc)))
+	full_z = make_manybody_form(z,site_count,which_site)
+	magn_val = (transpose(wavefunc) * full_z * wavefunc) / (transpose(wavefunc) * wavefunc)
+	return magn_val
+end
+
+function get_arrow_shifts(loc_bit)
+	yp = cos(angle(loc_bit))/10
+	xp = sin(angle(loc_bit))/10
+	return xp,yp
+end
+
+function get_average_magnetization(all_magns,time_steps)
+	return [mean(all_magns[i][1:end]) for i in 1:time_steps+1]
+end
+
+function get_twosite_correlation(sites,wavefunc)
+	site_count = Int(log(2,length(wavefunc)))
+	first_elem = (transpose(wavefunc) * make_manybody_form(zz,site_count,sites) * wavefunc) / (transpose(wavefunc) * wavefunc)
+	second_elem = get_local_magnetization(sites[1],wavefunc) * get_local_magnetization(sites[2],wavefunc)
+	return first_elem - second_elem
+end
+
+function get_avg_correl_wdists(wavefunc)
+	sites_count = Int(log(2,length(wavefunc)))
+	all_corrs = [0.0*im for i in 1:sites_count]
+	for i in 1:sites_count
+		local_val = get_twosite_correlation([Int(ceil(sites_count/2)),i],wavefunc)
+		all_corrs[i] = local_val
+	end
+	return all_corrs
+end
+
+function plot_site_mag_time_ev(site_vals,all_magns,all_times,site_count,time_steps)
+	for i in 1:n
+		for j in 1:time_steps+1
+			xcomp,ycomp = get_arrow_shifts(magns[j][i])
+			plot([site_vals[i],site_vals[i] + xcomp],[all_times[j],all_times[j] + ycomp],"-b")
+		end
+		plot([site_vals[i],site_vals[i]],[all_times[1],all_times[end]],"-k")
+	end
+	xlabel("Sites")
+	ylabel("Time (x10)")
+	return
+end
+
+
+org = [0,0,1,0,0]
 n = length(org)
-#given_wavefunc = get_wavefunc_givenorg(org)
+starting_wavefunc = make_tens_wavefunc_vec(get_wavefunc_givenorg(org))
 #x_tens = turn_matrix_into_tensor(x)
 #phi_form = randomITensor([Index(2) for i in 1:n])
 
 #@einsum phi_form[b1,b2] := x_tens[b1,b1p] * given_wavefunc[b1p,b2]
-
-site = 1
-dt = 0.1
-hx = 1.0
+#
+final_time = 2.0
+time_steps = 100
+dt = final_time/time_steps
+hx = 0.0
 hz = 1.0
 js = 2.0
 ham = get_full_ham(n,js,hz,hx,dt)
-display(ham)
-
-
-
+#magns = [[0.0*im for i in 1:n] for j in 1:time_steps+1]
+times = [10*(i-1)*final_time/time_steps for i in 1:time_steps+1]
+twosite_correls = im.*zeros(n,time_steps+1)
+#sites = [i for i in 1:n]
+for i in 1:time_steps+1
+	if i == 1
+		global loc_wavefunc = starting_wavefunc
+	end
+	println(i)
+	#=
+	for j in 1:n
+		next_magn = get_local_magnetization(j,loc_wavefunc)
+		magns[i][j] = next_magn
+	end
+	=#
+	rez = get_avg_correl_wdists(loc_wavefunc)
+	twosite_correls[:,i] = rez
+	global loc_wavefunc = ham * loc_wavefunc
+end
+#
+imshow(real.(twosite_correls))
+colorbar()
 
 
 
