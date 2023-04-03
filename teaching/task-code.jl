@@ -224,12 +224,13 @@ starting_wavefunc = make_tens_wavefunc_vec(get_wavefunc_givenorg(org))
 
 #@einsum phi_form[b1,b2] := x_tens[b1,b1p] * given_wavefunc[b1p,b2]
 #
-final_time = 2.0
-time_steps = 100
+
+final_time = 0.05
+time_steps = 50
 dt = final_time/time_steps
 hx = 0.0
-hz = 1.0
 js = 2.0
+hz = 0.25
 ham = get_full_ham(n,js,hz,hx,dt)
 #magns = [[0.0*im for i in 1:n] for j in 1:time_steps+1]
 times = [10*(i-1)*final_time/time_steps for i in 1:time_steps+1]
@@ -251,9 +252,8 @@ for i in 1:time_steps+1
 	global loc_wavefunc = ham * loc_wavefunc
 end
 #
-imshow(real.(twosite_correls))
+imshow(abs.(twosite_correls))
 colorbar()
-
 
 
 
