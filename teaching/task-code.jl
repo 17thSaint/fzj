@@ -133,7 +133,7 @@ function get_exp_xpart(which_site,site_count,dt,hx_strength,order=2)
 		coeff *= 0.5
 	end
 	fin_x = exp(coeff .* make_manybody_form(x,site_count,which_site))
-	return fin_x
+	return dropzeros(sparse(fin_x))
 end
 
 function get_exp_zpart(which_sites,site_count,j_strength,hz_strength,dt)
@@ -142,7 +142,7 @@ function get_exp_zpart(which_sites,site_count,j_strength,hz_strength,dt)
 	int_part = coeff_int .* make_manybody_form(xx,site_count,which_sites)
 	ons_part = coeff_ons .* (make_manybody_form(z,site_count,which_sites[1]) + make_manybody_form(z,site_count,which_sites[2]))
 	fin_z = exp(int_part + ons_part)
-	return fin_z
+	return dropzeros(sparse(fin_z))
 end
 
 function get_mbham_local(site_count,which_sites,j_strength,hz_strength,hx_strength,dt,order=2)
@@ -223,67 +223,51 @@ function plot_site_mag_time_ev(site_vals,all_magns,all_times,site_count,time_ste
 	return
 end
 
-count = 7
+function do_trotter_step(input_wavefunc,hamilt)
+	return hamilt * input_wavefunc
+end
+
+
+
+count = 5
 org = [0 for i in 1:count]
 n = length(org)
-sa1 = sprand(32,32,0.0625)
-sa2 = sprand(32,32,0.0625)
-da1 = Array(sa1)
-da2 = Array(sa2)
-rs = sa1 * sa2
-rd = da1 * da2
-dens_times = []
-spar_times = []
-for i in 1:30
-	start = time()
-	loc = sa1 * sa2
-	fin = time()
-	append!(spar_times,[fin-start])
-end
-for i in 1:30
-	start = time()
-	loc = da1 * da2
-	fin = time()
-	append!(dens_times,[fin-start])
-end
-plot(dens_times[3:end]./spar_times[3:end],"-p")
-#=
-starting_wavefunc = make_tens_wavefunc_vec(get_wavefunc_givenorg(org))
-#x_tens = turn_matrix_into_tensor(x)
-#phi_form = randomITensor([Index(2) for i in 1:n])
 
-#@einsum phi_form[b1,b2] := x_tens[b1,b1p] * given_wavefunc[b1p,b2]
-#
+first_wavefunc = sparse(make_tens_wavefunc_vec(get_wavefunc_givenorg(org)))
 
+steps = [5,10,25,50]
 final_time = 0.05
-time_steps = 50
-dt = final_time/time_steps
 hx = 0.0
 js = 2.0
 hz = 0.25
-ham = get_full_ham(n,js,hz,hx,dt)
-#magns = [[0.0*im for i in 1:n] for j in 1:time_steps+1]
-times = [10*(i-1)*final_time/time_steps for i in 1:time_steps+1]
-twosite_correls = im.*zeros(n,time_steps+1)
-#sites = [i for i in 1:n]
-for i in 1:time_steps+1
-	if i == 1
-		global loc_wavefunc = starting_wavefunc
+for i in 1:length(steps)
+	time_steps = steps[i]
+	dt = final_time/time_steps
+	ham = get_full_ham(n,js,hz,hx,dt)
+	
+	next_wavefunc = do_trotter_step(first_wavefunc,ham)
+	for i in 2:time_steps
+		next_wavefunc = do_trotter_step(next_wavefunc,ham)
 	end
-	println(i)
-	#=
-	for j in 1:n
-		next_magn = get_local_magnetization(j,loc_wavefunc)
-		magns[i][j] = next_magn
-	end
-	=#
-	rez = get_avg_correl_wdists(loc_wavefunc)
-	twosite_correls[:,i] = rez
-	global loc_wavefunc = ham * loc_wavefunc
+	
 end
-#
-imshow(abs.(twosite_correls))
-colorbar()
-=#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 "fin"
