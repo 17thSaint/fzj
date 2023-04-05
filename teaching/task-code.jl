@@ -112,7 +112,7 @@ function int_to_binary(given::Int,len::Int)
 end
 
 function make_manybody_form(mat,site_count,which_qubit)
-	full_mat = zeros(2^site_count,2^site_count)
+	full_mat = im.*zeros(2^site_count,2^site_count)
 	for i in 1:2^site_count
 		for j in 1:2^site_count
 			bs = int_to_binary(i-1,site_count)
@@ -125,28 +125,6 @@ function make_manybody_form(mat,site_count,which_qubit)
 		end
 	end
 	return full_mat
-end
-
-function make_manybody_expform(mat,site_count,which_qubit,dt,strength)
-	full_mat = im.*zeros(2^site_count,2^site_count)
-	for i in 1:2^site_count
-		for j in 1:2^site_count
-			bs = int_to_binary(i-1,site_count)
-			bps = int_to_binary(j-1,site_count)
-			full_mat[i,j] = get_exp_elems(mat,which_qubit,site_count,bs,bps,dt,strength)
-		end
-	end
-	return full_mat
-end
-
-function get_exp_elems(mat,which_site,site_count,bs,bps,dt,strength)
-	coeff = strength * dt
-	if mat == x
-		exp_mat = [cos(coeff) -im*sin(coeff); -im*sin(coeff) cos(coeff)]
-	else
-		exp_mat = [exp(-im*coeff) 0; 0 exp(im*coeff)]
-	end
-	return get_single_qubit_elem(exp_mat,bs,bps,which_site)
 end
 
 function get_exp_xpart(which_site,site_count,dt,hx_strength,order=2)
