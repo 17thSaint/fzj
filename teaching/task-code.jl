@@ -1,4 +1,4 @@
-using Einsum,ITensors,LinearAlgebra,PyPlot,Statistics
+using ITensors,LinearAlgebra,PyPlot,Statistics,SparseArrays
 
 x = [0 1;1 0]
 xx = [0 0 0 1;0 0 1 0;0 1 0 0;1 0 0 0]
@@ -14,7 +14,11 @@ function get_single_qubit_elem(mat,bs,bps,which_qubit)
 	prod_parts = []
 	for j in 1:length(bs)
 		if j != which_qubit
-			append!(prod_parts,[bs[j] == bps[j]])
+			if bs[j] != bps[j]
+				return 0.0
+			else
+				append!(prod_parts,[bs[j] == bps[j]])
+			end
 		end
 	end
 	if length(prod_parts) < 1
@@ -29,7 +33,11 @@ function get_two_qubit_elem(mat,bs,bps,which_qubits)
 	prod_parts = []
 	for j in 1:length(bs)
 		if j != which_qubits[1] && j != which_qubits[2]
-			append!(prod_parts,[bs[j] == bps[j]])
+			if bs[j] != bps[j]
+				return 0.0
+			else
+				append!(prod_parts,[bs[j] == bps[j]])
+			end
 		end
 	end
 	if length(prod_parts) < 1
@@ -215,9 +223,31 @@ function plot_site_mag_time_ev(site_vals,all_magns,all_times,site_count,time_ste
 	return
 end
 
-
-org = [0,0,1,0,0]
+count = 7
+org = [0 for i in 1:count]
 n = length(org)
+sa1 = sprand(32,32,0.0625)
+sa2 = sprand(32,32,0.0625)
+da1 = Array(sa1)
+da2 = Array(sa2)
+rs = sa1 * sa2
+rd = da1 * da2
+dens_times = []
+spar_times = []
+for i in 1:30
+	start = time()
+	loc = sa1 * sa2
+	fin = time()
+	append!(spar_times,[fin-start])
+end
+for i in 1:30
+	start = time()
+	loc = da1 * da2
+	fin = time()
+	append!(dens_times,[fin-start])
+end
+plot(dens_times[3:end]./spar_times[3:end],"-p")
+#=
 starting_wavefunc = make_tens_wavefunc_vec(get_wavefunc_givenorg(org))
 #x_tens = turn_matrix_into_tensor(x)
 #phi_form = randomITensor([Index(2) for i in 1:n])
@@ -254,7 +284,6 @@ end
 #
 imshow(abs.(twosite_correls))
 colorbar()
-
-
+=#
 
 "fin"
