@@ -29,6 +29,12 @@ function get_single_qubit_elem(mat,bs,bps,which_qubit)
 	return prod_rez * mat[bs[which_qubit]+1,bps[which_qubit]+1] 
 end
 
+function get_exp_single_qubit_elem(mat,bs,bps,which_qubit,strength,dt)
+	coeff = strength * dt / 2
+	exp_mat = exp(coeff.*mat)
+	return get_single_qubit_elem(exp_mat,bs,bps,which_qubit)
+end
+
 function get_two_qubit_elem(mat,bs,bps,which_qubits)
 	prod_parts = []
 	for j in 1:length(bs)
@@ -50,6 +56,12 @@ function get_two_qubit_elem(mat,bs,bps,which_qubits)
 	return prod_rez * mat[mat_b_elem_index,mat_bp_elem_index]
 end
 
+function get_exp_two_qubit_elem(mat,bs,bps,which_qubits,strength,dt)
+	coeff = strength * dt
+	exp_mat = exp(coeff.*mat)
+	return get_two_qubit_elem(exp_mat,bs,bps,which_qubits)
+end
+
 function make_site(state)
 	site_tensor = ITensor(Index(2))
 	site_tensor[1] = 0
@@ -58,7 +70,7 @@ function make_site(state)
 	elseif state == 1
 		site_tensor[:] = [1,0]
 	end
-	return site_tensor	
+	return site_tensor
 end
 
 function get_wavefunc_givenorg(local_org)
@@ -109,6 +121,74 @@ function int_to_binary(given::Int,len::Int)
     else
     	return binary
     end
+end
+
+function find_nonzero_exp_elems(mat,site_count,which_qubit)
+	locations = []
+	values = []
+	for i in 1:2^site_count
+		for j in 1:2^site_count
+			bs = int_to_binary(i-1,site_count)
+			bps = int_to_binary(j-1,site_count)
+			if length(which_qubit) > 1
+				local_value = get_exp_two_qubit_elem(mat,bs,bps,which_qubit,strength,dt)
+			else
+				local_value = get_exp_single_qubit_elem(mat,bs,bps,which_qubit,strength,dt)
+			end
+			if local_value != 0.0
+				append!(locations,[[i,j]])
+				append!(values,[local_value])
+			end
+		end
+	end
+	return locations,values
+end
+
+function find_any_nonzero_elems(mat)
+	locations = []
+	values = []
+	for i in 1:size(mat)[1]
+		for j in 1:size(mat)[2]
+			if mat[i,j] != 0.0
+				append!(locations,[[i,j]])
+				append!(values,[mat[i,j]])
+			end
+		end
+	end
+	return locations,values
+end
+
+function make_mat_from_nonzeros(locations,values,dims)
+	mat = zeros(dims[1],dims[2])
+	if typeof(values[1]) == ComplexF64
+		mat .*= im
+	end
+	for i in 1:length(locations)
+		mat[locations[i][1],locations[i][2]] = values[i]
+	end
+	return mat
+end
+
+function multiply_matrices(mat1,mat2,site_count)
+	locs_1,vals_1 = mat1
+	locs_2,vals_2 = mat2
+	locs_rez = []
+	vals_rez = []
+	all_possibilities = [k for k in 1:2^site_count]
+	for i in 1:2^site_count
+		for j in 1:2^site_count
+			println(i,", ",j)
+			inner_sum_indices = findall(v1 -> ([i,v1] in locs_1) && ([v1,j] in locs_2),all_possibilities)
+			if length(inner_sum_indices) != 0
+				found_vals_1 = [vals_1[findfirst(x->x==[i,inner_sum_indices[b]],locs_1)] for b in 1:length(inner_sum_indices)]
+				found_vals_2 = [vals_2[findfirst(x->x==[inner_sum_indices[b],j],locs_2)] for b in 1:length(inner_sum_indices)]
+				result = sum(found_vals_1 .* found_vals_2)
+				append!(locs_rez,[[i,j]])
+				append!(vals_rez,[result])
+			end
+		end
+	end
+	return locs_rez,vals_rez
 end
 
 function make_manybody_form(mat,site_count,which_qubit)
