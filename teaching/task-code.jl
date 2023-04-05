@@ -30,7 +30,7 @@ function get_single_qubit_elem(mat,bs,bps,which_qubit)
 end
 
 function get_exp_single_qubit_elem(mat,bs,bps,which_qubit,strength,dt)
-	coeff = strength * dt / 2
+	coeff = -im * strength * dt / 2
 	exp_mat = exp(coeff.*mat)
 	return get_single_qubit_elem(exp_mat,bs,bps,which_qubit)
 end
@@ -57,7 +57,7 @@ function get_two_qubit_elem(mat,bs,bps,which_qubits)
 end
 
 function get_exp_two_qubit_elem(mat,bs,bps,which_qubits,strength,dt)
-	coeff = strength * dt
+	coeff = -im * strength * dt
 	exp_mat = exp(coeff.*mat)
 	return get_two_qubit_elem(exp_mat,bs,bps,which_qubits)
 end
@@ -123,9 +123,8 @@ function int_to_binary(given::Int,len::Int)
     end
 end
 
-function find_nonzero_exp_elems(mat,site_count,which_qubit)
-	locations = []
-	values = []
+function find_nonzero_exp_elems(mat,site_count,which_qubit,strength,dt)
+	data = []
 	for i in 1:2^site_count
 		for j in 1:2^site_count
 			bs = int_to_binary(i-1,site_count)
@@ -136,40 +135,57 @@ function find_nonzero_exp_elems(mat,site_count,which_qubit)
 				local_value = get_exp_single_qubit_elem(mat,bs,bps,which_qubit,strength,dt)
 			end
 			if local_value != 0.0
-				append!(locations,[[i,j]])
-				append!(values,[local_value])
+				append!(data,[[i,j,local_value]])
 			end
 		end
 	end
-	return locations,values
+	return data
 end
 
 function find_any_nonzero_elems(mat)
-	locations = []
-	values = []
+	data = []
 	for i in 1:size(mat)[1]
 		for j in 1:size(mat)[2]
 			if mat[i,j] != 0.0
-				append!(locations,[[i,j]])
-				append!(values,[mat[i,j]])
+				append!(data,[[i,j,mat[i,j]]])
 			end
 		end
 	end
-	return locations,values
+	return data
 end
 
-function make_mat_from_nonzeros(locations,values,dims)
-	mat = zeros(dims[1],dims[2])
-	if typeof(values[1]) == ComplexF64
-		mat .*= im
-	end
-	for i in 1:length(locations)
-		mat[locations[i][1],locations[i][2]] = values[i]
+function make_mat_from_nonzeros(data,dims)
+	mat = im.*zeros(dims[1],dims[2])
+	for i in 1:length(data)
+		mat[Int(real(data[i][1])),Int(real(data[i][2]))] = data[i][3]
 	end
 	return mat
 end
 
-function multiply_matrices(mat1,mat2,site_count)
+function multiply_matrices(A,B)
+	vals = Dict{Tuple{Int,Int},ComplexF64}()
+    	for i = 1:length(A)
+        	rowA, colA, valA = A[i]
+		for j = 1:length(B)
+		    	rowB, colB, valB = B[j]
+		    	if colA == rowB
+		        	key = (Int(rowA), Int(colB))
+		        	if haskey(vals, key)
+		            		vals[key] += valA * valB
+		        	else
+		           		vals[key] = valA * valB
+		        	end
+		    	end
+		end
+	end
+    
+    # Convert the dictionary of non-zero values to an array of tuples
+    non_zero_C = [[key[1], key[2], vals[key]] for key in keys(vals)]
+    
+    return non_zero_C
+end
+
+function multiply_matrices2(mat1,mat2,site_count)
 	locs_1,vals_1 = mat1
 	locs_2,vals_2 = mat2
 	locs_rez = []
@@ -177,7 +193,6 @@ function multiply_matrices(mat1,mat2,site_count)
 	all_possibilities = [k for k in 1:2^site_count]
 	for i in 1:2^site_count
 		for j in 1:2^site_count
-			println(i,", ",j)
 			inner_sum_indices = findall(v1 -> ([i,v1] in locs_1) && ([v1,j] in locs_2),all_possibilities)
 			if length(inner_sum_indices) != 0
 				found_vals_1 = [vals_1[findfirst(x->x==[i,inner_sum_indices[b]],locs_1)] for b in 1:length(inner_sum_indices)]
@@ -189,6 +204,38 @@ function multiply_matrices(mat1,mat2,site_count)
 		end
 	end
 	return locs_rez,vals_rez
+end
+
+function get_locvals_local_ham(which_qubits,site_count,j_strength,hz_strength,hx_strength,dt)
+	x_part = find_nonzero_exp_elems(x,site_count,which_qubits[1],hx_strength,dt)
+	xx_part = find_nonzero_exp_elems(xx,site_count,which_qubits,j_strength,dt)
+	z_part1 = find_nonzero_exp_elems(z,site_count,which_qubits[1],hz_strength,dt)
+	z_part2 = find_nonzero_exp_elems(z,site_count,which_qubits[2],hz_strength,dt)
+	
+	comb_z_ons = multiply_matrices(z_part1,z_part2)
+	comb_zpart = multiply_matrices(xx_part,comb_z_ons)
+	comb_xleft = multiply_matrices(x_part,comb_zpart)
+	final_form = multiply_matrices(comb_xleft,x_part)
+	return final_form
+end
+
+function get_lv_fullham(site_count,j_strength,hz_strength,hx_strength,dt)
+	seq_ham = [get_locvals_local_ham([1,2],site_count,j_strength,hz_strength,hx_strength,dt)]
+	for i in 2:site_count
+		println(i)
+		next_sites = [i,i+1]
+		if i == site_count
+			next_sites[2] = 1
+		end
+		next_local_ham = get_locvals_local_ham(next_sites,site_count,j_strength,hz_strength,hx_strength,dt)
+		if i == 2
+			append!(seq_ham,[next_local_ham])
+		else
+			seq_ham[2] = next_local_ham
+		end
+		seq_ham[1] = multiply_matrices(seq_ham[1],seq_ham[2])
+	end
+	return seq_ham[1]
 end
 
 function make_manybody_form(mat,site_count,which_qubit)
@@ -213,16 +260,16 @@ function get_exp_xpart(which_site,site_count,dt,hx_strength,order=2)
 		coeff *= 0.5
 	end
 	fin_x = exp(coeff .* make_manybody_form(x,site_count,which_site))
-	return dropzeros(sparse(fin_x))
+	return fin_x
 end
 
 function get_exp_zpart(which_sites,site_count,j_strength,hz_strength,dt)
 	coeff_int = -im * j_strength * dt
 	coeff_ons = -im * 0.5 * dt * hz_strength
-	int_part = coeff_int .* make_manybody_form(xx,site_count,which_sites)
-	ons_part = coeff_ons .* (make_manybody_form(z,site_count,which_sites[1]) + make_manybody_form(z,site_count,which_sites[2]))
-	fin_z = exp(int_part + ons_part)
-	return dropzeros(sparse(fin_z))
+	int_part = exp(coeff_int .* make_manybody_form(xx,site_count,which_sites))
+	ons_part = exp(coeff_ons .* (make_manybody_form(z,site_count,which_sites[1]) + make_manybody_form(z,site_count,which_sites[2])))
+	fin_z = int_part * ons_part
+	return fin_z
 end
 
 function get_mbham_local(site_count,which_sites,j_strength,hz_strength,hx_strength,dt,order=2)
@@ -307,12 +354,10 @@ function do_trotter_step(input_wavefunc,hamilt)
 	return hamilt * input_wavefunc
 end
 
-#=
-
-count = 5
+count = 9
 org = [0 for i in 1:count]
 n = length(org)
-
+#=
 first_wavefunc = sparse(make_tens_wavefunc_vec(get_wavefunc_givenorg(org)))
 
 steps = [5,10,25,50]
@@ -331,14 +376,13 @@ for i in 1:length(steps)
 	end
 	
 end
-
 =#
-
-
-
-
-
-
+js = 1.0
+hz = 1.0
+hx = 1.0
+dt = 0.5
+#og_ham = get_full_ham(n,js,hz,hx,dt)
+el_lv_ham = get_lv_fullham(n,js,hz,hx,dt)
 
 
 
