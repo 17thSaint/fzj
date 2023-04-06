@@ -5,6 +5,7 @@ xx = [0 0 0 1;0 0 1 0;0 1 0 0;1 0 0 0]
 z = [1 0;0 -1]
 zz = [1 0 0 0;0 -1 0 0;0 0 -1 0;0 0 0 1]
 id = [1 0;0 1]
+zers = [0 0;0 0]
 
 function get_flattened_index(b_list)
 	return sum(b_list .* [2^(length(b_list) - i) for i in 1:length(b_list)]) + 1
@@ -60,6 +61,98 @@ function get_exp_two_qubit_elem(mat,bs,bps,which_qubits,strength,dt)
 	coeff = -im * strength * dt
 	exp_mat = exp(coeff.*mat)
 	return get_two_qubit_elem(exp_mat,bs,bps,which_qubits)
+end
+
+function get_mat_type(mat,bs,bps,which_qubits,strength,dt)
+	if size(mat)[1] > 2
+		return get_exp_two_qubit_elem(mat,bs,bps,which_qubits,strength,dt)
+	else
+		return get_exp_single_qubit_elem(mat,bs,bps,which_qubits,strength,dt)
+	end
+end
+
+function elem_multiply_exp_matrices(mat1,mat2,bs,bps,which_qubits1,which_qubits2,strength1,strength2,dt)
+	site_count = length(bs)
+	final_val = im*0.0
+	for i in 1:2^site_count
+		summed_index = int_to_binary(i-1,site_count)
+		
+		left = get_mat_type(mat1,which_qubits1,bs,summed_index,strength1,dt)
+		right = get_mat_type(mat2,which_qubits2,summed_index,bps,strength2,dt)
+		
+		final_val += left * right
+	end
+	return final_val
+end
+
+function get_zz_elem(bs,bps,which_qubits,hz_strength,dt)
+	return elem_multiply_exp_matrices(z,z,bs,bps,which_qubits[1],which_qubits[2],hz_strength,hz_strength,dt)
+end
+
+function elem_mult_matrices(left_func,right_func,bs,bps,which_qubits1,which_qubits2,strength1,strength2,dt,mat1=zers,mat2=zers)
+	site_count = length(bs)
+	final_val = im*0.0
+	for i in 1:2^site_count
+		summed_index = int_to_binary(i-1,site_count)
+		
+		if mat1 != zers
+			left = left_func(mat1,bs,summed_index,which_qubits1,strength1,dt)
+		else
+			left = left_func(bs,summed_index,which_qubits1,strength1,dt)
+		end
+		
+		if mat2 != zers
+			right = right_func(mat2,summed_index,bps,which_qubits2,strength2,dt)
+		else
+			right = right_func(summed_index,bps,which_qubits2,strength2,dt)
+		end
+		
+		final_val += left * right
+	end
+	return final_val
+end
+
+function get_inter_elem(bs,bps,which_qubits,strengths,dt)
+	site_count = length(bs)
+	final_val = im*0.0
+	j_strength,hz_strength = strengths
+	for i in 1:2^site_count
+		summed_index = int_to_binary(i-1,site_count)
+		
+		xx_part = get_exp_two_qubit_elem(xx,bs,summed_index,which_qubits,j_strength,dt)
+		zz_part = get_exp_single_qubit_elem(z,summed_index,bps,which_qubits[1],hz_strength,dt) + get_exp_single_qubit_elem(z,summed_index,bps,which_qubits[2],hz_strength,dt)
+		
+		final_val += zz_part * xx_part
+	end
+	return final_val
+end
+
+function get_leftx_on_inter_elem(bs,bps,which_qubits,j_strength,hx_strength,hz_strength,dt)
+	site_count = length(bs)
+	final_val = im*0.0
+	for i in 1:2^site_count
+		summed_index = int_to_binary(i-1,site_count)
+		
+		x_part = get_exp_single_qubit_elem(x,bs,summed_index,which_qubits[1],hx_strength,dt)
+		inter_part = get_inter_elem(summed_index,bps,which_qubits,j_strength,hz_strength,dt)
+
+		final_val += x_part * inter_part
+	end
+	return final_val
+end
+
+function get_localham_elem(bs,bps,which_qubits,j_strength,hx_strength,hz_strength,dt)
+	site_count = length(bs)
+	final_val = im*0.0
+	for i in 1:2^site_count
+		summed_index = int_to_binary(i-1,site_count)
+		
+		left_part = get_leftx_on_inter_elem(bs,summed_index,which_qubits,j_strength,hx_strength,hz_strength,dt)
+		x_part = get_exp_single_qubit_elem(x,summed_index,bs,which_qubits[1],hx_strength,dt)
+
+		final_val += left_part * x_part
+	end
+	return final_val
 end
 
 function make_site(state)
@@ -354,10 +447,10 @@ function do_trotter_step(input_wavefunc,hamilt)
 	return hamilt * input_wavefunc
 end
 
-count = 9
+#=
+count = 3
 org = [0 for i in 1:count]
 n = length(org)
-#=
 first_wavefunc = sparse(make_tens_wavefunc_vec(get_wavefunc_givenorg(org)))
 
 steps = [5,10,25,50]
@@ -377,12 +470,7 @@ for i in 1:length(steps)
 	
 end
 =#
-js = 1.0
-hz = 1.0
-hx = 1.0
-dt = 0.5
-#og_ham = get_full_ham(n,js,hz,hx,dt)
-el_lv_ham = get_lv_fullham(n,js,hz,hx,dt)
+
 
 
 
