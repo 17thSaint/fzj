@@ -11,7 +11,8 @@ function get_flattened_index(b_list)
 	return sum(b_list .* [2^(length(b_list) - i) for i in 1:length(b_list)]) + 1
 end
 
-function get_single_qubit_elem(mat,bs,bps,which_qubit)
+function get_single_qubit_elem(A)
+	bs,bps,mat,which_qubit = A
 	prod_parts = []
 	for j in 1:length(bs)
 		if j != which_qubit
@@ -30,13 +31,16 @@ function get_single_qubit_elem(mat,bs,bps,which_qubit)
 	return prod_rez * mat[bs[which_qubit]+1,bps[which_qubit]+1] 
 end
 
-function get_exp_single_qubit_elem(mat,bs,bps,which_qubit,strength,dt)
+function get_exp_single_qubit_elem(A)
+	display(A)
+	bs,bps,mat,which_qubit,strength,dt = A
 	coeff = -im * strength * dt / 2
 	exp_mat = exp(coeff.*mat)
-	return get_single_qubit_elem(exp_mat,bs,bps,which_qubit)
+	return get_single_qubit_elem((bs,bps,exp_mat,which_qubit))
 end
 
-function get_two_qubit_elem(mat,bs,bps,which_qubits)
+function get_two_qubit_elem(A)
+	bs,bps,mat,which_qubits = A
 	prod_parts = []
 	for j in 1:length(bs)
 		if j != which_qubits[1] && j != which_qubits[2]
@@ -57,20 +61,22 @@ function get_two_qubit_elem(mat,bs,bps,which_qubits)
 	return prod_rez * mat[mat_b_elem_index,mat_bp_elem_index]
 end
 
-function get_exp_two_qubit_elem(mat,bs,bps,which_qubits,strength,dt)
+function get_exp_two_qubit_elem(A)
+	bs,bps,mat,which_qubits,strength,dt = A
 	coeff = -im * strength * dt
 	exp_mat = exp(coeff.*mat)
-	return get_two_qubit_elem(exp_mat,bs,bps,which_qubits)
+	return get_two_qubit_elem((exp_bs,bps,mat,which_qubits))
 end
 
-function get_mat_type(mat,bs,bps,which_qubits,strength,dt)
+function get_mat_type(A)
+	bs,bps,mat,which_qubits,strength,dt = A
 	if size(mat)[1] > 2
-		return get_exp_two_qubit_elem(mat,bs,bps,which_qubits,strength,dt)
+		return get_exp_two_qubit_elem((bs,bps,mat,which_qubits,strength,dt))
 	else
-		return get_exp_single_qubit_elem(mat,bs,bps,which_qubits,strength,dt)
+		return get_exp_single_qubit_elem((bs,bps,mat,which_qubits,strength,dt))
 	end
 end
-
+#=
 function elem_multiply_exp_matrices(mat1,mat2,bs,bps,which_qubits1,which_qubits2,strength1,strength2,dt)
 	site_count = length(bs)
 	final_val = im*0.0
@@ -84,9 +90,23 @@ function elem_multiply_exp_matrices(mat1,mat2,bs,bps,which_qubits1,which_qubits2
 	end
 	return final_val
 end
+=#
+function build_matrix_from_elements(func,arguments,site_count)
+	mat = im.*zeros(2^site_count,2^site_count)
+	for i in 1:2^site_count
+		for j in 1:2^site_count
+			bs = int_to_binary(i-1,site_count)
+			bps = int_to_binary(j-1,site_count)
+			full_args = ((bs,bps)...,arguments)
+			mat[i,j] = func(full_args)
+		end
+	end
+	return mat
+end
 
-function get_zz_elem(bs,bps,which_qubits,hz_strength,dt)
-	return elem_multiply_exp_matrices(z,z,bs,bps,which_qubits[1],which_qubits[2],hz_strength,hz_strength,dt)
+function get_zz_elem(A)
+	bs,bps,which_qubits,hz_strength,dt = A
+	return elem_mult_matrices(get_exp_single_qubit_elem,get_exp_single_qubit_elem,bs,bps,which_qubits[1],which_qubits[2],hz_strength,hz_strength,dt,z,z)
 end
 
 function elem_mult_matrices(left_func,right_func,bs,bps,which_qubits1,which_qubits2,strength1,strength2,dt,mat1=zers,mat2=zers)
@@ -96,15 +116,15 @@ function elem_mult_matrices(left_func,right_func,bs,bps,which_qubits1,which_qubi
 		summed_index = int_to_binary(i-1,site_count)
 		
 		if mat1 != zers
-			left = left_func(mat1,bs,summed_index,which_qubits1,strength1,dt)
+			left = left_func([bs,summed_index,mat1,which_qubits1,strength1,dt])
 		else
-			left = left_func(bs,summed_index,which_qubits1,strength1,dt)
+			left = left_func([bs,summed_index,which_qubits1,strength1,dt])
 		end
 		
 		if mat2 != zers
-			right = right_func(mat2,summed_index,bps,which_qubits2,strength2,dt)
+			right = right_func([summed_index,bps,mat2,which_qubits2,strength2,dt])
 		else
-			right = right_func(summed_index,bps,which_qubits2,strength2,dt)
+			right = right_func([summed_index,bps,which_qubits2,strength2,dt])
 		end
 		
 		final_val += left * right
@@ -112,6 +132,7 @@ function elem_mult_matrices(left_func,right_func,bs,bps,which_qubits1,which_qubi
 	return final_val
 end
 
+#=
 function get_inter_elem(bs,bps,which_qubits,strengths,dt)
 	site_count = length(bs)
 	final_val = im*0.0
@@ -126,6 +147,7 @@ function get_inter_elem(bs,bps,which_qubits,strengths,dt)
 	end
 	return final_val
 end
+
 
 function get_leftx_on_inter_elem(bs,bps,which_qubits,j_strength,hx_strength,hz_strength,dt)
 	site_count = length(bs)
@@ -154,6 +176,7 @@ function get_localham_elem(bs,bps,which_qubits,j_strength,hx_strength,hz_strengt
 	end
 	return final_val
 end
+=#
 
 function make_site(state)
 	site_tensor = ITensor(Index(2))
@@ -215,7 +238,7 @@ function int_to_binary(given::Int,len::Int)
     	return binary
     end
 end
-
+#=
 function find_nonzero_exp_elems(mat,site_count,which_qubit,strength,dt)
 	data = []
 	for i in 1:2^site_count
@@ -223,9 +246,9 @@ function find_nonzero_exp_elems(mat,site_count,which_qubit,strength,dt)
 			bs = int_to_binary(i-1,site_count)
 			bps = int_to_binary(j-1,site_count)
 			if length(which_qubit) > 1
-				local_value = get_exp_two_qubit_elem(mat,bs,bps,which_qubit,strength,dt)
+				local_value = get_exp_two_qubit_elem(bs,bps,mat,which_qubit,strength,dt)
 			else
-				local_value = get_exp_single_qubit_elem(mat,bs,bps,which_qubit,strength,dt)
+				local_value = get_exp_single_qubit_elem(bs,bps,mat,which_qubit,strength,dt)
 			end
 			if local_value != 0.0
 				append!(data,[[i,j,local_value]])
@@ -330,7 +353,7 @@ function get_lv_fullham(site_count,j_strength,hz_strength,hx_strength,dt)
 	end
 	return seq_ham[1]
 end
-
+=#
 function make_manybody_form(mat,site_count,which_qubit)
 	full_mat = im.*zeros(2^site_count,2^site_count)
 	for i in 1:2^site_count
@@ -338,9 +361,9 @@ function make_manybody_form(mat,site_count,which_qubit)
 			bs = int_to_binary(i-1,site_count)
 			bps = int_to_binary(j-1,site_count)
 			if length(which_qubit) > 1
-				full_mat[i,j] = get_two_qubit_elem(mat,bs,bps,which_qubit)
+				full_mat[i,j] = get_two_qubit_elem(bs,bps,mat,which_qubit)
 			else
-				full_mat[i,j] = get_single_qubit_elem(mat,bs,bps,which_qubit)
+				full_mat[i,j] = get_single_qubit_elem(bs,bps,mat,which_qubit)
 			end
 		end
 	end
