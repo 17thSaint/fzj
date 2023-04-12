@@ -198,6 +198,109 @@ function get_localham_elem(; kwargs...)
 	return elem_mult_matrices(bs=bs,bps=bps,arguments=(get_left_localham_elem,(which_qubits,j_strength,hx_strength,hz_strength,dt),get_x_elem,(which_qubits[1],hx_strength,dt)))
 end
 
+function get_3ham_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	j_strength,hx_strength,hz_strength,dt = get(kwargs, :arguments, 3)
+	left_args = ([1,2],j_strength,hx_strength,hz_strength,dt)
+	right_args = ([2,3],j_strength,hx_strength,hz_strength,dt)
+	return  elem_mult_matrices(bs=bs,bps=bps,arguments=(get_localham_elem,left_args,get_localham_elem,right_args))
+end
+
+function get_4ham_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	j_strength,hx_strength,hz_strength,dt = get(kwargs, :arguments, 3)
+	left_args = (j_strength,hx_strength,hz_strength,dt)
+	right_args = ([3,4],j_strength,hx_strength,hz_strength,dt)
+	return  elem_mult_matrices(bs=bs,bps=bps,arguments=(get_3ham_elem,left_args,get_localham_elem,right_args))
+end
+
+function get_5ham_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	j_strength,hx_strength,hz_strength,dt = get(kwargs, :arguments, 3)
+	left_args = (j_strength,hx_strength,hz_strength,dt)
+	right_args = ([4,5],j_strength,hx_strength,hz_strength,dt)
+	return  elem_mult_matrices(bs=bs,bps=bps,arguments=(get_4ham_elem,left_args,get_localham_elem,right_args))
+end
+
+function get_6ham_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	j_strength,hx_strength,hz_strength,dt = get(kwargs, :arguments, 3)
+	left_args = (j_strength,hx_strength,hz_strength,dt)
+	right_args = ([5,6],j_strength,hx_strength,hz_strength,dt)
+	return  elem_mult_matrices(bs=bs,bps=bps,arguments=(get_5ham_elem,left_args,get_localham_elem,right_args))
+end
+
+function get_7ham_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	j_strength,hx_strength,hz_strength,dt = get(kwargs, :arguments, 3)
+	left_args = (j_strength,hx_strength,hz_strength,dt)
+	right_args = ([6,7],j_strength,hx_strength,hz_strength,dt)
+	return  elem_mult_matrices(bs=bs,bps=bps,arguments=(get_6ham_elem,left_args,get_localham_elem,right_args))
+end
+
+function get_8ham_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	j_strength,hx_strength,hz_strength,dt = get(kwargs, :arguments, 3)
+	left_args = (j_strength,hx_strength,hz_strength,dt)
+	right_args = ([7,8],j_strength,hx_strength,hz_strength,dt)
+	return  elem_mult_matrices(bs=bs,bps=bps,arguments=(get_7ham_elem,left_args,get_localham_elem,right_args))
+end
+
+function get_9ham_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	j_strength,hx_strength,hz_strength,dt = get(kwargs, :arguments, 3)
+	left_args = (j_strength,hx_strength,hz_strength,dt)
+	right_args = ([8,9],j_strength,hx_strength,hz_strength,dt)
+	return  elem_mult_matrices(bs=bs,bps=bps,arguments=(get_8ham_elem,left_args,get_localham_elem,right_args))
+end
+
+function get_10ham_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	j_strength,hx_strength,hz_strength,dt = get(kwargs, :arguments, 3)
+	left_args = (j_strength,hx_strength,hz_strength,dt)
+	right_args = ([9,10],j_strength,hx_strength,hz_strength,dt)
+	return  elem_mult_matrices(bs=bs,bps=bps,arguments=(get_9ham_elem,left_args,get_localham_elem,right_args))
+end
+
+function get_count_ham_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	site_count,j_strength,hx_strength,hz_strength,dt = get(kwargs, :arguments, 3)
+	local_args = j_strength,hx_strength,hz_strength,dt
+	if site_count == 3
+		return get_3ham_elem(bs=bs,bps=bps,arguments=local_args)
+	elseif site_count == 4
+		return get_4ham_elem(bs=bs,bps=bps,arguments=local_args)
+	elseif site_count == 5
+		return get_5ham_elem(bs=bs,bps=bps,arguments=local_args)
+	elseif site_count == 6
+		return get_6ham_elem(bs=bs,bps=bps,arguments=local_args)
+	elseif site_count == 7
+		return get_7ham_elem(bs=bs,bps=bps,arguments=local_args)
+	elseif site_count == 8
+		return get_8ham_elem(bs=bs,bps=bps,arguments=local_args)
+	elseif site_count == 9
+		return get_9ham_elem(bs=bs,bps=bps,arguments=local_args)
+	elseif site_count == 10
+		return get_10ham_elem(bs=bs,bps=bps,arguments=local_args)
+	else
+		println("Don't have func for $site_count Sites")
+	end
+	return
+end
+
+function get_expectation(operator_func,operator_args,wavefunc_func)
+
+end
+
 #=
 function get_inter_elem(bs,bps,which_qubits,strengths,dt)
 	site_count = length(bs)
@@ -448,11 +551,11 @@ end
 
 function get_full_ham(site_count,j_strength,hz_strength,hx_strength,dt,order=2)
 	seq_ham = [get_mbham_local(site_count,[1,2],j_strength,hz_strength,hx_strength,dt,order),Matrix{ComplexF64}(undef,2^site_count,2^site_count)]
-	for i in 2:site_count
+	for i in 2:site_count-1
 		next_sites = [i,i+1]
-		if i == site_count
-			next_sites[2] = 1
-		end
+		#if i == site_count
+		#	next_sites[2] = 1
+		#end
 		next_contrib = get_mbham_local(site_count,next_sites,j_strength,hz_strength,hx_strength,dt,order)
 		seq_ham[2] = next_contrib
 		seq_ham[1] = prod(seq_ham)

@@ -39,7 +39,7 @@ if do_all | false
 end;
 end
 
-if do_all | true
+if do_all | false
 @testset "local hamiltonian parts" begin
 
 	og_fullz, ogxx, ogzz = get_exp_zpart(sites,n,js,hz,dt)
@@ -59,6 +59,19 @@ if do_all | true
 	calced_localham = build_matrix_from_elements(get_localham_elem,localham_args,count)
 	oglocalham = get_mbham_local(n,sites,js,hz,hx,dt)
 	@test isapprox(calced_localham,oglocalham,atol=10^-5)
+
+end;
+end
+
+if do_all | false
+@testset "full hamiltonian" begin
+
+	for counts in 3:3
+		ogham = get_full_ham(counts,js,hz,hx,dt)
+	
+		calced_ham = build_matrix_from_elements(get_count_ham_elem,(counts,js,hx,hz,dt),counts)
+		@test isapprox(ogham,calced_ham,atol=10^-5)
+	end
 
 end;
 end
