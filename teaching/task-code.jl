@@ -177,6 +177,27 @@ function get_x_elem(; kwargs...)
 	return get_exp_single_qubit_elem(bs=bs,bps=bps,arguments=local_args)
 end
 
+function get_fullz_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	which_qubits,j_strength,hz_strength,dt = get(kwargs, :arguments, 3)
+	return elem_mult_matrices(bs=bs,bps=bps,arguments=(get_xx_elem,(which_qubits,j_strength,dt),get_zz_elem,(which_qubits,hz_strength,dt)))
+end
+
+function get_left_localham_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	which_qubits,j_strength,hx_strength,hz_strength,dt = get(kwargs, :arguments, 3)
+	return elem_mult_matrices(bs=bs,bps=bps,arguments=(get_x_elem,(which_qubits[1],hx_strength,dt),get_fullz_elem,(which_qubits,j_strength,hz_strength,dt)))
+end
+
+function get_localham_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	which_qubits,j_strength,hx_strength,hz_strength,dt = get(kwargs, :arguments, 3)
+	return elem_mult_matrices(bs=bs,bps=bps,arguments=(get_left_localham_elem,(which_qubits,j_strength,hx_strength,hz_strength,dt),get_x_elem,(which_qubits[1],hx_strength,dt)))
+end
+
 #=
 function get_inter_elem(bs,bps,which_qubits,strengths,dt)
 	site_count = length(bs)

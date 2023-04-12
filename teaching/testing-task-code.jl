@@ -12,7 +12,6 @@ hz = 1.0
 hx = 1.0
 dt = 0.5
 sites = [1,2]
-#ogham = get_mbham_local(n,sites,js,hz,hx,dt)
 
 if do_all | false
 @testset "single qubit many-body matrix" begin
@@ -46,7 +45,7 @@ if do_all | true
 	og_fullz, ogxx, ogzz = get_exp_zpart(sites,n,js,hz,dt)
 	calced_xx = build_matrix_from_elements(get_xx_elem,(sites,js,dt),count)
 	calced_zz = build_matrix_from_elements(get_zz_elem,(sites,hz,dt),count)
-	calced_fullz = build_matrix_from_elements(elem_mult_matrices,(get_xx_elem,(sites,js,dt),get_zz_elem,(sites,hz,dt)),count)
+	calced_fullz = build_matrix_from_elements(get_fullz_elem,(sites,js,hz,dt),count)
 	
 	@test isapprox(calced_xx,ogxx,atol=10^-5)
 	@test isapprox(calced_zz,ogzz,atol=10^-5)
@@ -55,6 +54,11 @@ if do_all | true
 	ogx = get_exp_xpart(sites[1],count,dt,hx)
 	calced_x = build_matrix_from_elements(get_x_elem,(sites[1],hx,dt),count)
 	@test isapprox(calced_x,ogx,atol=10^-5)
+	
+	localham_args = (sites,js,hx,hz,dt)
+	calced_localham = build_matrix_from_elements(get_localham_elem,localham_args,count)
+	oglocalham = get_mbham_local(n,sites,js,hz,hx,dt)
+	@test isapprox(calced_localham,oglocalham,atol=10^-5)
 
 end;
 end
