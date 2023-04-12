@@ -11,11 +11,34 @@ function get_flattened_index(b_list)
 	return sum(b_list .* [2^(length(b_list) - i) for i in 1:length(b_list)]) + 1
 end
 
-function get_single_qubit_elem(A)
-	bs,bps,mat,which_qubit = A
+function int_to_binary(given::Int,len::Int)
+    # Initialize an empty array to store the binary digits
+    binary = []
+    # Loop until the integer is reduced to zero
+    while given > 0
+        # Get the remainder of n when divided by 2
+        digit = given % 2
+        # Prepend the digit to the binary array
+        pushfirst!(binary, digit)
+        # Integer divide n by 2 to reduce its value
+        given = div(given, 2)
+    end
+    # Return the binary array
+    if length(binary) < len
+    	return append!([0 for i in 1:(len-length(binary))],binary)
+    else
+    	return binary
+    end
+end
+
+
+function get_single_qubit_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	mat,which_qubits = get(kwargs, :arguments, 3)
 	prod_parts = []
 	for j in 1:length(bs)
-		if j != which_qubit
+		if j != which_qubits
 			if bs[j] != bps[j]
 				return 0.0
 			else
@@ -28,19 +51,22 @@ function get_single_qubit_elem(A)
 	else
 		prod_rez = prod(prod_parts)
 	end
-	return prod_rez * mat[bs[which_qubit]+1,bps[which_qubit]+1] 
+	return prod_rez * mat[bs[which_qubits]+1,bps[which_qubits]+1] 
 end
 
-function get_exp_single_qubit_elem(A)
-	display(A)
-	bs,bps,mat,which_qubit,strength,dt = A
+function get_exp_single_qubit_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	mat,which_qubits,strength,dt = get(kwargs, :arguments, 3)
 	coeff = -im * strength * dt / 2
 	exp_mat = exp(coeff.*mat)
-	return get_single_qubit_elem((bs,bps,exp_mat,which_qubit))
+	return get_single_qubit_elem(bs=bs,bps=bps,arguments=(exp_mat,which_qubits))
 end
 
-function get_two_qubit_elem(A)
-	bs,bps,mat,which_qubits = A
+function get_two_qubit_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	mat,which_qubits = get(kwargs, :arguments, 3)
 	prod_parts = []
 	for j in 1:length(bs)
 		if j != which_qubits[1] && j != which_qubits[2]
@@ -61,21 +87,26 @@ function get_two_qubit_elem(A)
 	return prod_rez * mat[mat_b_elem_index,mat_bp_elem_index]
 end
 
-function get_exp_two_qubit_elem(A)
-	bs,bps,mat,which_qubits,strength,dt = A
+function get_exp_two_qubit_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	mat,which_qubits,strength,dt = get(kwargs, :arguments, 3)
 	coeff = -im * strength * dt
 	exp_mat = exp(coeff.*mat)
-	return get_two_qubit_elem((exp_bs,bps,mat,which_qubits))
+	return get_two_qubit_elem(bs=bs,bps=bps,arguments=(exp_mat,which_qubits))
 end
 
-function get_mat_type(A)
-	bs,bps,mat,which_qubits,strength,dt = A
+function get_mat_type(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	mat,which_qubits,strength,dt = get(kwargs, :arguments, 3)
 	if size(mat)[1] > 2
-		return get_exp_two_qubit_elem((bs,bps,mat,which_qubits,strength,dt))
+		return get_exp_two_qubit_elem(bs=bs,bps=bps,arguments=(mat,which_qubits,strength,dt))
 	else
-		return get_exp_single_qubit_elem((bs,bps,mat,which_qubits,strength,dt))
+		return get_exp_single_qubit_elem(bs=bs,bps=bps,arguments=(mat,which_qubits,strength,dt))
 	end
 end
+
 #=
 function elem_multiply_exp_matrices(mat1,mat2,bs,bps,which_qubits1,which_qubits2,strength1,strength2,dt)
 	site_count = length(bs)
@@ -97,35 +128,33 @@ function build_matrix_from_elements(func,arguments,site_count)
 		for j in 1:2^site_count
 			bs = int_to_binary(i-1,site_count)
 			bps = int_to_binary(j-1,site_count)
-			full_args = ((bs,bps)...,arguments)
-			mat[i,j] = func(full_args)
+			mat[i,j] = func(bs=bs,bps=bps,arguments=arguments)
 		end
 	end
 	return mat
 end
 
-function get_zz_elem(A)
-	bs,bps,which_qubits,hz_strength,dt = A
-	return elem_mult_matrices(get_exp_single_qubit_elem,get_exp_single_qubit_elem,bs,bps,which_qubits[1],which_qubits[2],hz_strength,hz_strength,dt,z,z)
+function get_zz_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	which_qubits,hz_strength,dt = get(kwargs, :arguments, 3)
+	left_args = (z,which_qubits[1],hz_strength,dt)
+	right_args = (z,which_qubits[2],hz_strength,dt)
+	return elem_mult_matrices(bs=bs,bps=bps,left_vals=(get_exp_single_qubit_elem,left_args),right_vals=(get_exp_single_qubit_elem,right_args))
 end
 
-function elem_mult_matrices(left_func,right_func,bs,bps,which_qubits1,which_qubits2,strength1,strength2,dt,mat1=zers,mat2=zers)
+function elem_mult_matrices(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	left_func,left_args,right_func,right_args = get(kwargs, :arguments, 3)
 	site_count = length(bs)
 	final_val = im*0.0
 	for i in 1:2^site_count
 		summed_index = int_to_binary(i-1,site_count)
-		
-		if mat1 != zers
-			left = left_func([bs,summed_index,mat1,which_qubits1,strength1,dt])
-		else
-			left = left_func([bs,summed_index,which_qubits1,strength1,dt])
-		end
-		
-		if mat2 != zers
-			right = right_func([summed_index,bps,mat2,which_qubits2,strength2,dt])
-		else
-			right = right_func([summed_index,bps,which_qubits2,strength2,dt])
-		end
+
+		left = left_func(bs=bs,bps=summed_index,arguments=left_args)
+
+		right = right_func(bs=summed_index,bps=bps,arguments=right_args)
 		
 		final_val += left * right
 	end
@@ -219,25 +248,6 @@ function make_rand_wavefunc(site_count)
 	return normed_wavefunc
 end
 
-function int_to_binary(given::Int,len::Int)
-    # Initialize an empty array to store the binary digits
-    binary = []
-    # Loop until the integer is reduced to zero
-    while given > 0
-        # Get the remainder of n when divided by 2
-        digit = given % 2
-        # Prepend the digit to the binary array
-        pushfirst!(binary, digit)
-        # Integer divide n by 2 to reduce its value
-        given = div(given, 2)
-    end
-    # Return the binary array
-    if length(binary) < len
-    	return append!([0 for i in 1:(len-length(binary))],binary)
-    else
-    	return binary
-    end
-end
 #=
 function find_nonzero_exp_elems(mat,site_count,which_qubit,strength,dt)
 	data = []
