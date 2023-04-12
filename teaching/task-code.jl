@@ -134,15 +134,6 @@ function build_matrix_from_elements(func,arguments,site_count)
 	return mat
 end
 
-function get_zz_elem(; kwargs...)
-	bs = get(kwargs, :bs, 1)
-	bps = get(kwargs, :bps, 2)
-	which_qubits,hz_strength,dt = get(kwargs, :arguments, 3)
-	left_args = (z,which_qubits[1],hz_strength,dt)
-	right_args = (z,which_qubits[2],hz_strength,dt)
-	return elem_mult_matrices(bs=bs,bps=bps,left_vals=(get_exp_single_qubit_elem,left_args),right_vals=(get_exp_single_qubit_elem,right_args))
-end
-
 function elem_mult_matrices(; kwargs...)
 	bs = get(kwargs, :bs, 1)
 	bps = get(kwargs, :bps, 2)
@@ -159,6 +150,31 @@ function elem_mult_matrices(; kwargs...)
 		final_val += left * right
 	end
 	return final_val
+end
+
+function get_zz_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	which_qubits,hz_strength,dt = get(kwargs, :arguments, 3)
+	left_args = (z,which_qubits[1],hz_strength,dt)
+	right_args = (z,which_qubits[2],hz_strength,dt)
+	return elem_mult_matrices(bs=bs,bps=bps,arguments=(get_exp_single_qubit_elem,left_args,get_exp_single_qubit_elem,right_args))
+end
+
+function get_xx_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	which_qubits,j_strength,dt = get(kwargs, :arguments, 3)
+	local_args = (xx,which_qubits,j_strength,dt)
+	return get_exp_two_qubit_elem(bs=bs,bps=bps,arguments=local_args)
+end
+
+function get_x_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	which_qubit,hx_strength,dt = get(kwargs, :arguments, 3)
+	local_args = (x,which_qubit,hx_strength,dt)
+	return get_exp_single_qubit_elem(bs=bs,bps=bps,arguments=local_args)
 end
 
 #=
@@ -371,9 +387,9 @@ function make_manybody_form(mat,site_count,which_qubit)
 			bs = int_to_binary(i-1,site_count)
 			bps = int_to_binary(j-1,site_count)
 			if length(which_qubit) > 1
-				full_mat[i,j] = get_two_qubit_elem(bs,bps,mat,which_qubit)
+				full_mat[i,j] = get_two_qubit_elem(bs=bs,bps=bps,arguments=(mat,which_qubit))
 			else
-				full_mat[i,j] = get_single_qubit_elem(bs,bps,mat,which_qubit)
+				full_mat[i,j] = get_single_qubit_elem(bs=bs,bps=bps,arguments=(mat,which_qubit))
 			end
 		end
 	end
@@ -395,11 +411,11 @@ function get_exp_zpart(which_sites,site_count,j_strength,hz_strength,dt)
 	int_part = exp(coeff_int .* make_manybody_form(xx,site_count,which_sites))
 	ons_part = exp(coeff_ons .* (make_manybody_form(z,site_count,which_sites[1]) + make_manybody_form(z,site_count,which_sites[2])))
 	fin_z = int_part * ons_part
-	return fin_z
+	return fin_z,int_part,ons_part
 end
 
 function get_mbham_local(site_count,which_sites,j_strength,hz_strength,hx_strength,dt,order=2)
-	zpart = get_exp_zpart(which_sites,site_count,j_strength,hz_strength,dt)
+	zpart = get_exp_zpart(which_sites,site_count,j_strength,hz_strength,dt)[1]
 	xpart = get_exp_xpart(which_sites[1],site_count,dt,hx_strength,order)
 	if order == 2
 		fin_ham = xpart * zpart * xpart

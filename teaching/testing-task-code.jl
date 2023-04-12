@@ -26,7 +26,7 @@ if do_all | false
 end;
 end
 
-if do_all | true
+if do_all | false
 @testset "elementwise multiply matrices" begin
 
 	args1 = (x,sites[1],hx,dt)
@@ -40,8 +40,25 @@ if do_all | true
 end;
 end
 
+if do_all | true
+@testset "local hamiltonian parts" begin
 
-#oginter = get_exp_zpart(sites,n,js,hz,dt)
+	og_fullz, ogxx, ogzz = get_exp_zpart(sites,n,js,hz,dt)
+	calced_xx = build_matrix_from_elements(get_xx_elem,(sites,js,dt),count)
+	calced_zz = build_matrix_from_elements(get_zz_elem,(sites,hz,dt),count)
+	calced_fullz = build_matrix_from_elements(elem_mult_matrices,(get_xx_elem,(sites,js,dt),get_zz_elem,(sites,hz,dt)),count)
+	
+	@test isapprox(calced_xx,ogxx,atol=10^-5)
+	@test isapprox(calced_zz,ogzz,atol=10^-5)
+	@test isapprox(calced_fullz,og_fullz,atol=10^-5)
+	
+	ogx = get_exp_xpart(sites[1],count,dt,hx)
+	calced_x = build_matrix_from_elements(get_x_elem,(sites[1],hx,dt),count)
+	@test isapprox(calced_x,ogx,atol=10^-5)
+
+end;
+end
+
 #newinter = im.*zeros(2^n,2^n)
 #zz = im.*zeros(2^n,2^n)
 
