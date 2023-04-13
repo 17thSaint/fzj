@@ -93,16 +93,20 @@ if true
 num_sites = 2
 org = [0 for i in 1:num_sites]
 org[Int(ceil(num_sites/2))] = 1
+starting_wavefunc = get_matwavefunc_givenorg(org)
 js = 5.0
 hx = 0.0
 hz = 0.25
 input_args = (num_sites,js,hx,hz)
-time_end = 0.5
-timesteps = 100
-starting_wavefunc = get_matwavefunc_givenorg(org)
-rez = do_time_evolution(time_end,timesteps,starting_wavefunc; arguments=input_args,corr=true)
+#timesteps = 100
+time_end = 0.05
+for timesteps in [5,25,60]
+rez = do_time_evolution(time_end,timesteps,starting_wavefunc; arguments=input_args,avg_mag=true)
+plot(real.(rez["times"][1]),real.(rez["avg_mags"][1]),label="$timesteps")
+end
+legend()
 #plot_correlations(rez["corrs"])
-plot([rez["corrs"][i][1] for i in 1:timesteps+1])
+#plot([rez["corrs"][i][1] for i in 1:timesteps+1])
 #plot_site_mag_time_ev([i for i in 1:num_sites],rez["local_mag"],10 .* real.(rez["times"][1]),num_sites,timesteps)
 
 

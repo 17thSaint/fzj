@@ -368,7 +368,7 @@ function do_time_evolution(final_time,time_steps,wavefunc; kwargs...)
 	site_count,j_strength,hx_strength,hz_strength = get(kwargs, :arguments, 1)
 	dt = final_time/time_steps
 	center_site = Int(ceil(site_count/2))
-	ham_args = (site_count,j_strength,hx_strength,hz_strength,dt)
+	ham_args = (j_strength,hx_strength,hz_strength,dt)
 	results = Dict("times"=>[[(i-1)*dt+0.0*im for i in 1:time_steps+1]])
 	if_local_mag = get(kwargs, :local_mag, false)
 	if_avg_mag = get(kwargs, :avg_mag, false)
@@ -386,7 +386,7 @@ function do_time_evolution(final_time,time_steps,wavefunc; kwargs...)
 	if if_corr
 		all_corrs = [[0.0*im for j in 1:site_count] for i in 1:time_steps+1]
 	end
-	println("Starting Trotter Evolution")
+	println("Starting Trotter Evolution $dt")
 	for i in 1:time_steps+1
 		if if_keepwavefunc
 			all_wavefuncs[i] = wavefunc
@@ -404,7 +404,7 @@ function do_time_evolution(final_time,time_steps,wavefunc; kwargs...)
 				all_local_mags[i] = local_mags
 			end
 			if if_avg_mag
-				avg_mag[1][i] = mean(local_mags)
+				avg_mag[1][i] = mean(abs.(local_mags))
 			end
 		end
 		wavefunc = trotter_step(wavefunc; arguments=ham_args)
