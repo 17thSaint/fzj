@@ -354,6 +354,10 @@ function get_local_magnetization(which_qubit,wavefunc)
 	return get_expectation(get_single_qubit_elem,(z,which_qubit),wavefunc)
 end
 
+function get_long_magnetization(which_qubit,wavefunc)
+	return get_expectation(get_single_qubit_elem,(x,which_qubit),wavefunc)
+end
+
 function get_correlation(which_qubits,wavefunc,mm_included=false; kwargs...)
 	zz_part = get_expectation(get_two_qubit_elem,(zz,which_qubits),wavefunc)
 	if mm_included
@@ -364,6 +368,15 @@ function get_correlation(which_qubits,wavefunc,mm_included=false; kwargs...)
 	return zz_part - mm_part
 end
 
+function get_dist_corr(distance,wavefunc)
+	site_count = Int(log(2,length(wavefunc)))
+	dist_corr = 0.0*im
+	for i in 1:site_count
+		dist_corr += get_correlation([i,mod(i+distance,1:site_count)],wavefunc,false) / site_count
+	end
+	return dist_corr
+end
+
 function do_time_evolution(final_time,time_steps,wavefunc; kwargs...)
 	site_count,j_strength,hx_strength,hz_strength = get(kwargs, :arguments, 1)
 	dt = final_time/time_steps
@@ -371,9 +384,11 @@ function do_time_evolution(final_time,time_steps,wavefunc; kwargs...)
 	ham_args = (j_strength,hx_strength,hz_strength,dt)
 	results = Dict("times"=>[[(i-1)*dt+0.0*im for i in 1:time_steps+1]])
 	if_local_mag = get(kwargs, :local_mag, false)
+	if_long_mag = get(kwargs, :long_mag, false)
 	if_avg_mag = get(kwargs, :avg_mag, false)
 	if_keepwavefunc = get(kwargs, :keep_wavefunc, false)
 	if_corr = get(kwargs, :corr, false)
+	if_dist_corr = get(kwargs, :dist_corr, false)
 	if if_keepwavefunc
 		all_wavefuncs = [[0.0*im for i in 1:2^site_count] for j in 1:time_steps+1]
 	end
@@ -383,21 +398,36 @@ function do_time_evolution(final_time,time_steps,wavefunc; kwargs...)
 	if if_avg_mag
 		avg_mag = [[0.0*im for i in 1:time_steps+1]]
 	end
+	if if_long_mag
+		long_mag = [[0.0*im for i in 1:time_steps+1]]
+	end
 	if if_corr
 		all_corrs = [[0.0*im for j in 1:site_count] for i in 1:time_steps+1]
 	end
-	println("Starting Trotter Evolution $dt")
+	if if_dist_corr
+		all_dist_corrs = [[0.0*im for j in 1:Int(floor(site_count/2))+1] for i in 1:time_steps+1]
+	end
+	println("Starting Trotter Evolution")
 	for i in 1:time_steps+1
 		if if_keepwavefunc
 			all_wavefuncs[i] = wavefunc
 		end
-		if if_local_mag | if_avg_mag | if_corr
+		if if_long_mag
+			long_mags = [get_long_magnetization(j,wavefunc) for j in 1:site_count]
+			long_mag[1][i] = mean(abs.(long_mags))
+		end
+		if if_local_mag | if_avg_mag | if_corr | if_dist_corr
 			local_mags = [get_local_magnetization(j,wavefunc) for j in 1:site_count]
 			if if_corr
 				for k in 1:site_count
 					local_mm = local_mags[center_site] * local_mags[k]
 					local_corr = get_correlation([center_site,k],wavefunc,true; mmpart=local_mm)
 					all_corrs[i][k] = abs(local_corr)
+				end
+			end
+			if if_dist_corr
+				for k in 1:Int(floor(site_count/2))+1
+					all_dist_corrs[i][k] = get_dist_corr(k-1,wavefunc)
 				end
 			end
 			if if_local_mag
@@ -408,7 +438,7 @@ function do_time_evolution(final_time,time_steps,wavefunc; kwargs...)
 			end
 		end
 		wavefunc = trotter_step(wavefunc; arguments=ham_args)
-		println(round(100*i/(time_steps+1),digits=3),"%")
+		println(round(100*i/(time_steps+1),digits=1),"%")
 	end
 	if if_keepwavefunc
 		results["all_wavefunc"] = all_wavefuncs	
@@ -419,8 +449,14 @@ function do_time_evolution(final_time,time_steps,wavefunc; kwargs...)
 	if if_avg_mag
 		results["avg_mags"] = avg_mag
 	end
+	if if_long_mag
+		results["long_mags"] = long_mag
+	end
 	if if_corr
 		results["corrs"] = all_corrs
+	end
+	if if_dist_corr
+		results["dist_corrs"] = all_dist_corrs
 	end
 	return results
 end
@@ -699,7 +735,7 @@ function make_tens_wavefunc_vec(input_wavefunc)
 	return Vector(flat_tens)
 end
 
-function get_local_magnetization(which_site,wavefunc)
+function hard_get_local_magnetization(which_site,wavefunc)
 	site_count = Int(log(2,length(wavefunc)))
 	full_z = make_manybody_form(z,site_count,which_site)
 	magn_val = (transpose(wavefunc) * full_z * wavefunc) / (transpose(wavefunc) * wavefunc)
@@ -719,9 +755,19 @@ end
 function get_twosite_correlation(sites,wavefunc)
 	site_count = Int(log(2,length(wavefunc)))
 	first_elem = (transpose(wavefunc) * make_manybody_form(zz,site_count,sites) * wavefunc) / (transpose(wavefunc) * wavefunc)
-	second_elem = get_local_magnetization(sites[1],wavefunc) * get_local_magnetization(sites[2],wavefunc)
+	second_elem = hard_get_local_magnetization(sites[1],wavefunc) * hard_get_local_magnetization(sites[2],wavefunc)
 	return first_elem - second_elem
 end
+
+function hard_get_dist_corr(distance,wavefunc)
+	site_count = Int(log(2,length(wavefunc)))
+	dist_corr = 0.0*im
+	for i in 1:site_count
+		dist_corr += get_twosite_correlation([i,mod(i+distance,1:site_count)],wavefunc) / site_count
+	end
+	return dist_corr
+end
+
 
 function get_avg_correl_wdists(wavefunc)
 	sites_count = Int(log(2,length(wavefunc)))
@@ -760,6 +806,95 @@ end
 
 function do_trotter_step(input_wavefunc,hamilt)
 	return hamilt * input_wavefunc
+end
+
+function hard_do_time_evolution(final_time,time_steps,wavefunc; kwargs...)
+	site_count,j_strength,hx_strength,hz_strength = get(kwargs, :arguments, 1)
+	dt = final_time/time_steps
+	center_site = Int(ceil(site_count/2))
+	ham = get_full_ham(site_count,j_strength,hz_strength,hx_strength,dt)
+	#ham_args = (j_strength,hx_strength,hz_strength,dt)
+	results = Dict("times"=>[[(i-1)*dt+0.0*im for i in 1:time_steps+1]])
+	if_local_mag = get(kwargs, :local_mag, false)
+	if_long_mag = get(kwargs, :long_mag, false)
+	if_avg_mag = get(kwargs, :avg_mag, false)
+	if_keepwavefunc = get(kwargs, :keep_wavefunc, false)
+	if_corr = get(kwargs, :corr, false)
+	if_dist_corr = get(kwargs, :dist_corr, false)
+	if if_keepwavefunc
+		all_wavefuncs = [[0.0*im for i in 1:2^site_count] for j in 1:time_steps+1]
+	end
+	if if_local_mag
+		all_local_mags = [[0.0*im for i in 1:site_count] for j in 1:time_steps+1]
+	end
+	if if_avg_mag
+		avg_mag = [[0.0*im for i in 1:time_steps+1]]
+	end
+	if if_long_mag
+		long_mag = [[0.0*im for i in 1:time_steps+1]]
+	end
+	if if_corr
+		all_corrs = [[0.0*im for j in 1:site_count] for i in 1:time_steps+1]
+	end
+	if if_dist_corr
+		all_dist_corrs = [[0.0*im for j in 1:Int(floor(site_count/2))+1] for i in 1:time_steps+1]
+	end
+	println("Starting Trotter Evolution")
+	for i in 1:time_steps+1
+		if if_keepwavefunc
+			all_wavefuncs[i] = wavefunc
+		end
+		#=
+		if if_long_mag
+			long_mags = [get_long_magnetization(j,wavefunc) for j in 1:site_count]
+			long_mag[1][i] = mean(abs.(long_mags))
+		end
+		=#
+		if if_local_mag | if_avg_mag | if_corr | if_dist_corr
+			local_mags = [hard_get_local_magnetization(j,wavefunc) for j in 1:site_count]
+			#=
+			if if_corr
+				for k in 1:site_count
+					local_mm = local_mags[center_site] * local_mags[k]
+					local_corr = get_correlation([center_site,k],wavefunc,true; mmpart=local_mm)
+					all_corrs[i][k] = abs(local_corr)
+				end
+			end
+			=#
+			if if_dist_corr
+				for k in 1:Int(floor(site_count/2))+1
+					all_dist_corrs[i][k] = get_dist_corr(k-1,wavefunc)
+				end
+			end
+			if if_local_mag
+				all_local_mags[i] = local_mags
+			end
+			if if_avg_mag
+				avg_mag[1][i] = mean(abs.(local_mags))
+			end
+		end
+		wavefunc = do_trotter_step(wavefunc,ham)
+		println(round(100*i/(time_steps+1),digits=1),"%")
+	end
+	if if_keepwavefunc
+		results["all_wavefunc"] = all_wavefuncs	
+	end
+	if if_local_mag
+		results["local_mag"] = all_local_mags
+	end
+	if if_avg_mag
+		results["avg_mags"] = avg_mag
+	end
+	if if_long_mag
+		results["long_mags"] = long_mag
+	end
+	if if_corr
+		results["corrs"] = all_corrs
+	end
+	if if_dist_corr
+		results["dist_corrs"] = all_dist_corrs
+	end
+	return results
 end
 
 #=
