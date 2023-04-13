@@ -125,8 +125,8 @@ end
 function build_matrix_from_elements(func,arguments,site_count)
 	mat = im.*zeros(2^site_count,2^site_count)
 	for i in 1:2^site_count
+		bs = int_to_binary(i-1,site_count)
 		for j in 1:2^site_count
-			bs = int_to_binary(i-1,site_count)
 			bps = int_to_binary(j-1,site_count)
 			mat[i,j] = func(bs=bs,bps=bps,arguments=arguments)
 		end
@@ -198,13 +198,21 @@ function get_localham_elem(; kwargs...)
 	return elem_mult_matrices(bs=bs,bps=bps,arguments=(get_left_localham_elem,(which_qubits,j_strength,hx_strength,hz_strength,dt),get_x_elem,(which_qubits[1],hx_strength,dt)))
 end
 
+function get_2ham_elem(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	j_strength,hx_strength,hz_strength,dt = get(kwargs, :arguments, 3)
+	local_args = ([1,2],j_strength,hx_strength,hz_strength,dt)
+	return get_localham_elem(bs=bs,bps=bps,arguments=local_args)
+end
+
 function get_3ham_elem(; kwargs...)
 	bs = get(kwargs, :bs, 1)
 	bps = get(kwargs, :bps, 2)
 	j_strength,hx_strength,hz_strength,dt = get(kwargs, :arguments, 3)
-	left_args = ([1,2],j_strength,hx_strength,hz_strength,dt)
+	left_args = (j_strength,hx_strength,hz_strength,dt)
 	right_args = ([2,3],j_strength,hx_strength,hz_strength,dt)
-	return  elem_mult_matrices(bs=bs,bps=bps,arguments=(get_localham_elem,left_args,get_localham_elem,right_args))
+	return elem_mult_matrices(bs=bs,bps=bps,arguments=(get_2ham_elem,left_args,get_localham_elem,right_args))
 end
 
 function get_4ham_elem(; kwargs...)
@@ -274,8 +282,10 @@ function get_count_ham_elem(; kwargs...)
 	bs = get(kwargs, :bs, 1)
 	bps = get(kwargs, :bps, 2)
 	site_count,j_strength,hx_strength,hz_strength,dt = get(kwargs, :arguments, 3)
-	local_args = j_strength,hx_strength,hz_strength,dt
-	if site_count == 3
+	local_args = (j_strength,hx_strength,hz_strength,dt)
+	if site_count == 2
+		return get_2ham_elem(bs=bs,bps=bps,arguments=local_args)
+	elseif site_count == 3
 		return get_3ham_elem(bs=bs,bps=bps,arguments=local_args)
 	elseif site_count == 4
 		return get_4ham_elem(bs=bs,bps=bps,arguments=local_args)
@@ -297,8 +307,122 @@ function get_count_ham_elem(; kwargs...)
 	return
 end
 
-function get_expectation(operator_func,operator_args,wavefunc_func)
+function get_ham_elem_finished(; kwargs...)
+	bs = get(kwargs, :bs, 1)
+	bps = get(kwargs, :bps, 2)
+	site_count,j_strength,hx_strength,hz_strength,dt = get(kwargs, :arguments, 3)
+	left_args = (site_count,j_strength,hx_strength,hz_strength,dt)
+	right_args = ([site_count,1],j_strength,hx_strength,hz_strength,dt)
+	return elem_mult_matrices(bs=bs,bps=bps,arguments=(get_count_ham_elem,left_args,get_localham_elem,right_args))
+end
 
+
+function get_operator_on_wavefunc(operator_func,operator_args,wavefunc)
+	site_count = Int(log(2,length(wavefunc)))
+	resulting_wavefunc = im.*zeros(length(wavefunc))
+	for i in 1:2^site_count
+		bs = int_to_binary(i-1,site_count)
+		for j in 1:2^site_count
+			bps = int_to_binary(j-1,site_count)
+			resulting_wavefunc[i] += operator_func(bs=bs,bps=bps,arguments=operator_args) * wavefunc[j]
+		end
+	end
+	return resulting_wavefunc	
+end
+
+function get_expectation(operator_func,operator_args,wavefunc)
+	site_count = Int(log(2,length(wavefunc)))
+	result = 0.0*im
+	for i in 1:2^site_count
+		bs = int_to_binary(i-1,site_count)
+		for j in 1:2^site_count
+			bps = int_to_binary(j-1,site_count)
+			result += conj(wavefunc[i]) * operator_func(bs=bs,bps=bps,arguments=operator_args) * wavefunc[j]
+		end
+	end
+	return result
+end
+
+function trotter_step(wavefunc; kwargs...)
+	site_count = Int(log(2,length(wavefunc)))
+	j_strength,hx_strength,hz_strength,dt = get(kwargs, :arguments, 3)
+	ham_args = (site_count,j_strength,hx_strength,hz_strength,dt)
+	return get_operator_on_wavefunc(get_ham_elem_finished,ham_args,wavefunc)
+end
+
+function get_local_magnetization(which_qubit,wavefunc)
+	return get_expectation(get_single_qubit_elem,(z,which_qubit),wavefunc)
+end
+
+function get_correlation(which_qubits,wavefunc,mm_included=false; kwargs...)
+	zz_part = get_expectation(get_two_qubit_elem,(zz,which_qubits),wavefunc)
+	if mm_included
+		mm_part = get(kwargs, :mmpart, 1)
+	else
+		mm_part = get_local_magnetization(which_qubits[1],wavefunc) * get_local_magnetization(which_qubits[2],wavefunc)
+	end
+	return zz_part - mm_part
+end
+
+function do_time_evolution(final_time,time_steps,wavefunc; kwargs...)
+	site_count,j_strength,hx_strength,hz_strength = get(kwargs, :arguments, 1)
+	dt = final_time/time_steps
+	center_site = Int(ceil(site_count/2))
+	ham_args = (site_count,j_strength,hx_strength,hz_strength,dt)
+	results = Dict("times"=>[[(i-1)*dt+0.0*im for i in 1:time_steps+1]])
+	if_local_mag = get(kwargs, :local_mag, false)
+	if_avg_mag = get(kwargs, :avg_mag, false)
+	if_keepwavefunc = get(kwargs, :keep_wavefunc, false)
+	if_corr = get(kwargs, :corr, false)
+	if if_keepwavefunc
+		all_wavefuncs = [[0.0*im for i in 1:2^site_count] for j in 1:time_steps+1]
+	end
+	if if_local_mag
+		all_local_mags = [[0.0*im for i in 1:site_count] for j in 1:time_steps+1]
+	end
+	if if_avg_mag
+		avg_mag = [[0.0*im for i in 1:time_steps+1]]
+	end
+	if if_corr
+		all_corrs = [[0.0*im for j in 1:site_count] for i in 1:time_steps+1]
+	end
+	println("Starting Trotter Evolution")
+	for i in 1:time_steps+1
+		if if_keepwavefunc
+			all_wavefuncs[i] = wavefunc
+		end
+		if if_local_mag | if_avg_mag | if_corr
+			local_mags = [get_local_magnetization(j,wavefunc) for j in 1:site_count]
+			if if_corr
+				for k in 1:site_count
+					local_mm = local_mags[center_site] * local_mags[k]
+					local_corr = get_correlation([center_site,k],wavefunc,true; mmpart=local_mm)
+					all_corrs[i][k] = abs(local_corr)
+				end
+			end
+			if if_local_mag
+				all_local_mags[i] = local_mags
+			end
+			if if_avg_mag
+				avg_mag[1][i] = mean(local_mags)
+			end
+		end
+		wavefunc = trotter_step(wavefunc; arguments=ham_args)
+		println(round(100*i/(time_steps+1),digits=3),"%")
+	end
+	if if_keepwavefunc
+		results["all_wavefunc"] = all_wavefuncs	
+	end
+	if if_local_mag
+		results["local_mag"] = all_local_mags
+	end
+	if if_avg_mag
+		results["avg_mags"] = avg_mag
+	end
+	if if_corr
+		results["corrs"] = all_corrs
+	end
+	return results
 end
 
 #=
@@ -367,6 +491,12 @@ function get_wavefunc_givenorg(local_org)
 	end
 	wavefunc_localorg = prod(seq_wavefunc_localorg)
 	return wavefunc_localorg
+end
+
+function get_matwavefunc_givenorg(local_org)
+	tensor_wavefunc = get_wavefunc_givenorg(local_org)
+	reshaped = combiner(inds(tensor_wavefunc)) * tensor_wavefunc
+	return Array(reshaped,inds(reshaped))
 end
 
 function turn_matrix_into_tensor(mat)
@@ -551,11 +681,11 @@ end
 
 function get_full_ham(site_count,j_strength,hz_strength,hx_strength,dt,order=2)
 	seq_ham = [get_mbham_local(site_count,[1,2],j_strength,hz_strength,hx_strength,dt,order),Matrix{ComplexF64}(undef,2^site_count,2^site_count)]
-	for i in 2:site_count-1
+	for i in 2:site_count
 		next_sites = [i,i+1]
-		#if i == site_count
-		#	next_sites[2] = 1
-		#end
+		if i == site_count
+			next_sites[2] = 1
+		end
 		next_contrib = get_mbham_local(site_count,next_sites,j_strength,hz_strength,hx_strength,dt,order)
 		seq_ham[2] = next_contrib
 		seq_ham[1] = prod(seq_ham)
@@ -604,15 +734,27 @@ function get_avg_correl_wdists(wavefunc)
 end
 
 function plot_site_mag_time_ev(site_vals,all_magns,all_times,site_count,time_steps)
-	for i in 1:n
+	for i in 1:site_count
 		for j in 1:time_steps+1
-			xcomp,ycomp = get_arrow_shifts(magns[j][i])
+			xcomp,ycomp = get_arrow_shifts(all_magns[j][i])
 			plot([site_vals[i],site_vals[i] + xcomp],[all_times[j],all_times[j] + ycomp],"-b")
 		end
 		plot([site_vals[i],site_vals[i]],[all_times[1],all_times[end]],"-k")
 	end
 	xlabel("Sites")
 	ylabel("Time (x10)")
+	return
+end
+
+function plot_correlations(all_corrs)
+	mat_corrs = zeros(length(all_corrs[1]),length(all_corrs))
+	for i in 1:length(all_corrs)
+		mat_corrs[:,i] = real.(all_corrs[i])
+	end
+	imshow(mat_corrs)
+	xlabel("Time")
+	ylabel("Distance")
+	colorbar()
 	return
 end
 

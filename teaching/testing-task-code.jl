@@ -66,23 +66,48 @@ end
 if do_all | false
 @testset "full hamiltonian" begin
 
-	for counts in 3:3
+	for counts in 2:3
 		ogham = get_full_ham(counts,js,hz,hx,dt)
 	
-		calced_ham = build_matrix_from_elements(get_count_ham_elem,(counts,js,hx,hz,dt),counts)
+		calced_ham = build_matrix_from_elements(get_ham_elem_finished,(counts,js,hx,hz,dt),counts)
 		@test isapprox(ogham,calced_ham,atol=10^-5)
+		@test isapprox(conj(transpose(ogham)) * ogham,I,atol=10^-5)
 	end
 
 end;
 end
 
-#newinter = im.*zeros(2^n,2^n)
-#zz = im.*zeros(2^n,2^n)
+if do_all | false
+@testset "expectation value" begin
+	
+	downdown_wavefunc = get_matwavefunc_givenorg(org)
+	op_args = (id,1)
+	calced_result = get_expectation(get_single_qubit_elem,op_args,downdown_wavefunc)
+	@test isapprox(calced_result,1.0,atol=10^-5)
+	
+end;
+end
+
+if true
+
+num_sites = 2
+org = [0 for i in 1:num_sites]
+org[Int(ceil(num_sites/2))] = 1
+js = 5.0
+hx = 0.0
+hz = 0.25
+input_args = (num_sites,js,hx,hz)
+time_end = 0.5
+timesteps = 100
+starting_wavefunc = get_matwavefunc_givenorg(org)
+rez = do_time_evolution(time_end,timesteps,starting_wavefunc; arguments=input_args,corr=true)
+#plot_correlations(rez["corrs"])
+plot([rez["corrs"][i][1] for i in 1:timesteps+1])
+#plot_site_mag_time_ev([i for i in 1:num_sites],rez["local_mag"],10 .* real.(rez["times"][1]),num_sites,timesteps)
 
 
 
-
-
+end
 
 
 
