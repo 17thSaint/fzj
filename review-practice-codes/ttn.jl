@@ -23,23 +23,26 @@ function get_site_number(x, y, side_length)
 end
 
 function get_ydir_greenfunc(edge_length,ttn; kwargs...)
+	adag = "Adag"#"S+"
+	ahat = "A"#"S-"
 	all_yvals = zeros(edge_length,edge_length)
-	all_greens = zeros(edge_length,edge_length)
-	for starting_site in 1:edge_length
-		adag = "S+"
-		reg_sites = (starting_site)
-		prime_sites = [get_site_number(starting_site,i,edge_length) for i in 1:edge_length]
-		ahat = "S-"
-
-		all_yvals[starting_site,:] = [get_xy(prime_sites[i],edge_length)[2] for i in 1:length(prime_sites)] 
-		for i in 1:length(prime_sites)
-			all_greens[starting_site,i] = TTNKit.correlation(ttn,adag,ahat,reg_sites,(prime_sites[i]))
-			norm_reg = TTNKit.correlation(ttn,adag,ahat,reg_sites,reg_sites)
-			norm_prime = TTNKit.correlation(ttn,adag,ahat,(prime_sites[i]),(prime_sites[i]))
-			all_greens[starting_site,i] /= sqrt(norm_reg * norm_prime)
+	all_greens = im.*zeros(edge_length,edge_length)
+	for x in 1:edge_length
+		for y in 1:edge_length
+			site_left = get_site_number(x,1,edge_length)
+			site_right = get_site_number(x,y,edge_length)
+			
+			all_greens[x,y] = TTNKit.correlation(ttn,adag,ahat,(site_left),(site_right))
+			all_yvals[x,y] = y
+			
+			if true
+			norm_reg = TTNKit.correlation(ttn,adag,ahat,(site_left),(site_left))
+			norm_prime = TTNKit.correlation(ttn,adag,ahat,(site_right),(site_right))
+			all_greens[x,y] /= sqrt(norm_reg * norm_prime)
+			end
 		end
 	end
-	
+	all_greens = abs.(all_greens)
 	if get(kwargs, :if_plot, true)
 		subplot_num = get(kwargs, :subplot_number, 111)
 		if subplot_num > 150
@@ -52,7 +55,8 @@ function get_ydir_greenfunc(edge_length,ttn; kwargs...)
 			plot(all_yvals[i,:],all_greens[i,:],"-p",label="x=$i")
 		end
 	yscale("log")
-	title(get(kwargs, :plot_title, "Spatial Green's Function, Edge Count = $edge_length"))
+	title_string = "Spatial Green's Function, " * get(kwargs, :plot_title, "Edge Count = $edge_length")
+	title(title_string)
 	xlabel("Y")
 	ylabel("Correlation")
 	legend()
@@ -62,15 +66,16 @@ function get_ydir_greenfunc(edge_length,ttn; kwargs...)
 end
 
 function get_current_yfunc(edge_length,ttn; kwargs...)
-	adag = "S+"
-	ahat = "S-"
+	adag = "Adag"#"S+"
+	ahat = "A"#"S-"
+	norm_string = "Adag * A"#"S+ * S-"
 	if_periodic = get(kwargs, :if_periodic, true)
 	if if_periodic
 		all_yvals = zeros(edge_length,edge_length)
-		all_currents = zeros(edge_length,edge_length)
+		all_currents = im.*zeros(edge_length,edge_length)
 	else
 		all_yvals = zeros(edge_length-1,edge_length)
-		all_currents = zeros(edge_length-1,edge_length)
+		all_currents = im.*zeros(edge_length-1,edge_length)
 	end
 	for x in 1:size(all_currents)[1]
 		x_upper = x + 1
@@ -84,7 +89,7 @@ function get_current_yfunc(edge_length,ttn; kwargs...)
 		for y in 1:size(all_currents)[2]
 			all_yvals[x,y] = y
 			all_currents[x,y] = TTNKit.correlation(ttn,adag,ahat,(get_site_number(x_upper,y,edge_length)),(get_site_number(x,y,edge_length))) - TTNKit.correlation(ttn,ahat,adag,(get_site_number(x_upper,y,edge_length)),(get_site_number(x,y,edge_length)))
-			norm_left = TTNKit.expect(ttn,"S+ * S-",get_site_number(x,y,edge_length)) + TTNKit.expect(ttn,"S+ * S-",get_site_number(x_upper,y,edge_length))
+			norm_left = TTNKit.expect(ttn,norm_string,get_site_number(x,y,edge_length)) + TTNKit.expect(ttn,norm_string,get_site_number(x_upper,y,edge_length))
 			all_currents[x,y] /= norm_left
 		end
 	end
@@ -100,7 +105,8 @@ function get_current_yfunc(edge_length,ttn; kwargs...)
 		for i in 1:size(all_currents)[1]
 			plot(all_yvals[i,:],2 .* all_currents[i,:],"-p",label="x=$i")
 		end
-	title(get(kwargs, :plot_title, "Current, Edge Count = $edge_length"))
+	title_string = "Current, " * get(kwargs, :plot_title, "Edge Count = $edge_length")
+	title(title_string)
 	xlabel("Y")
 	ylabel("Current")
 	legend()
@@ -109,11 +115,43 @@ function get_current_yfunc(edge_length,ttn; kwargs...)
 	return all_yvals,all_currents
 end
 
+function get_chain_hofstadter(edge_length,u_strength,t_strength,phi; kwargs...)
+	onsite = TTNKit.OpSum()
+	interaction = TTNKit.OpSum()
+	if_periodic = get(kwargs, :if_periodic, true)
+	for i in 1:edge_length
+		next_site = i+1
+		if i == edge_length && if_periodic
+			next_site = 1
+		end
+		
+		onsite += (u_strength,"N",i,"N - Id",i)
+		
+		if i == edge_length && !if_periodic
+			continue
+		else#*exp(im*2*pi*phi*i)
+			interaction += (-t_strength,"Adag",next_site,"A",i)
+			interaction += (-t_strength,"Adag",i,"A",next_site)
+		end
+	end
+	return onsite + interaction
+end
+
 
 function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi; kwargs...)
 	onsite = TTNKit.OpSum()
 	interaction = TTNKit.OpSum()
 	if_periodic = get(kwargs, :if_periodic, true)
+	#=
+	mapping = collect(TTNKit.eachindex(lat))
+	for (i,j) in TTNKit.nearest_neighbors(lat,mapping; periodic=if_periodic)
+		interaction += (-t_strength,"Adag",i,"A",j)
+	end
+	
+	for i in TTNKit.eachindex(lat)
+		onsite += ()
+	end
+	=#
 	for x in 1:edge_length
 		x_upper = x+1
 		if if_periodic && x == edge_length
@@ -129,6 +167,8 @@ function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi
 			
 			if x == edge_length && !if_periodic
 				continue
+			elseif y == edge_length && !if_periodic
+				continue
 			else
 				next_x = (get_site_number(x_upper,y,edge_length))
 				next_y = (get_site_number(x,y_upper,edge_length))
@@ -143,65 +183,69 @@ function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi
 	return onsite + interaction
 end
 
+function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_strength,filling; kwargs...)
+	max_dim = get(kwargs, :max_dim, 2)
+	num_sweeps = get(kwargs, :num_sweeps, 1)
+	noise = get(kwargs, :noise, 0.0)
+
+	square = TTNKit.BinaryNetwork((edge_sites,edge_sites), TTNKit.ITensorNode, "Boson")
+	lat = TTNKit.physical_lattice(square)
+	num_sites = length(lat)
+	println("Finished Building Network")
+
+	states = fill("0",num_sites)
+	for i in 1:num_particles
+		states[rand((1:num_sites))] = "1"
+	end
+
+	ttn = TTNKit.ProductTreeTensorNetwork(square,states;orthogonalize=true)
+	ttn = TTNKit.increase_dim_tree_tensor_network_zeros(ttn, maxdim = max_dim)
+	println("Added States")
+
+	eigsolve_tol = TTNKit.DEFAULT_TOL_DMRG
+	eigsolve_krylovdim = TTNKit.DEFAULT_KRYLOVDIM_DMRG
+	eigsolve_maxiter = TTNKit.DEFAULT_MAXITER_DMRG
+	ishermitian = TTNKit.DEFAULT_ISHERMITIAN_DMRG
+	eigsolve_which_eigenvalue = TTNKit.DEFAULT_WHICH_EIGENVALUE_DMRG
+	func = (action,T) -> TTNKit.eigsolve(action, T, 1,
+		                    eigsolve_which_eigenvalue;
+		                    ishermitian=ishermitian,
+		                    tol=eigsolve_tol,
+		                    krylovdim=eigsolve_krylovdim,
+		                    maxiter=eigsolve_maxiter)
+	
+	phi = num_particles/(filling * (edge_sites^2))
+	ham_operator = get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi; kwargs...)
+	ham = TTNKit.Hamiltonian(ham_operator,lat)
+	proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
+	println("Finished Making Hamiltonian")
+
+	sp = TTNKit.SimpleSweepHandler(ttn,proj_tpo,func,num_sweeps,[max_dim],[noise],TTNKit.NoExpander())
+	TTNKit.sweep(ttn,sp);
+
+	return ttn,ham
+end
+
+function get_particles_needed(edge_length;kwargs...)
+	phi = get(kwargs, :phi, 0.0)
+	nu = get(kwargs, :nu, 0.0)
+	parts_needed = Int(ceil(phi * nu * (edge_length^2)))
+	min_dim = parts_needed + 1
+	return parts_needed,min_dim
+end
+
 edge_sites = 4
-num_particles = 5
-maxdim = 2
-num_sweeps = 1
-noise = 0.0
-
-if true
-
-square = TTNKit.BinaryNetwork((edge_sites,edge_sites), TTNKit.ITensorNode, "Boson")
-lat = TTNKit.physical_lattice(square)
-num_sites = length(lat)
-println("Finished Building Network")
-#sh = TTNKit.SimpleSweepHandler(chain,num_sweeps)
-
-states = fill("0",num_sites)
-for i in 1:num_particles
-	states[rand((1:num_sites))] = "1"
-end
-#states[Int(ceil(num_sites/2))] = "Dn"
-ttn = TTNKit.ProductTreeTensorNetwork(square,states;orthogonalize=true)
-ttn = TTNKit.increase_dim_tree_tensor_network_zeros(ttn, maxdim = maxdim)
-println("Added States")
-
-eigsolve_tol = TTNKit.DEFAULT_TOL_DMRG
-eigsolve_krylovdim = TTNKit.DEFAULT_KRYLOVDIM_DMRG
-eigsolve_maxiter = TTNKit.DEFAULT_MAXITER_DMRG
-ishermitian = TTNKit.DEFAULT_ISHERMITIAN_DMRG
-eigsolve_which_eigenvalue = TTNKit.DEFAULT_WHICH_EIGENVALUE_DMRG
-func = (action,T) -> TTNKit.eigsolve(action, T, 1,
-                            eigsolve_which_eigenvalue;
-                            ishermitian=ishermitian,
-                            tol=eigsolve_tol,
-                            krylovdim=eigsolve_krylovdim,
-                            maxiter=eigsolve_maxiter)
-
-#=
-js, gs = -1.0, -2.0
-ising = TTNKit.TransverseFieldIsing(J = js, g = gs)
-tpo = TTNKit.Hamiltonian(ising,lat)
-proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,tpo)
-println("Finished Making Hamiltonian")
-
-
-sp = TTNKit.SimpleSweepHandler(ttn,proj_tpo,func,num_sweeps,[maxdim],[noise],TTNKit.NoExpander())
-TTNKit.sweep(ttn,sp);
-=#
-end
-
-#rez = get_current_yfunc(edge_sites,ttn)
-
+tot_sites = edge_sites^2
 us = 1.0
 ts = 1.0
-filling = 1/3
-mixing = num_particles/(filling * (edge_sites^2))
-hofham = get_hofstadter_interacting_hamilt(edge_sites,us,ts,mixing)
-tpo = TTNKit.TPO(hofham,lat)
+phi_val = 1/16
+nu = 1/2
+num_particles,max_dim = get_particles_needed(edge_sites; phi=phi_val, nu=nu)
+println("Using $num_particles on $tot_sites Sites")
 
-
-
+#gs_ttn, harphof_ham = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=3, max_dim=max_dim)
+#rez = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="MaxDim = $max_dim")
+#rez2 = get_current_yfunc(edge_sites,gs_ttn; plot_title="MaxDim = $max_dim")
 
 
 
