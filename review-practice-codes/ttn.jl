@@ -153,22 +153,36 @@ function get_xy_coeffs(x,y,edge_length,t_strength,phi,thetax=thetax_1,thetay=the
 	return x_coeff, y_coeff
 end
 
+function get_inter_coeff(s1,s2,edge_length,t_strength,phi; kwargs...)
+	if s1[1] == s2[1]
+		thetay = get(kwargs, :thetay, thetay_1)
+		return -t_strength * exp(im*2*pi*(phi*s1[1] - ==(edge_length,s1[2])*thetay))
+	elseif s1[2] == s2[2]
+		thetax = get(kwargs, :thetax, thetax_1)
+		return -t_strength * exp(-im*2*pi* ==(edge_length,s1[1]) *thetax)
+	end
+end
+
 function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi; kwargs...)
 	onsite = TTNKit.OpSum()
 	interaction = TTNKit.OpSum()
 	if_periodic = get(kwargs, :if_periodic, true)
-	thetax = get(kwargs, :thetax, thetax_2)
-	thetay = get(kwargs, :thetay, thetay_2)
-	#=
-	mapping = collect(TTNKit.eachindex(lat))
-	for (i,j) in TTNKit.nearest_neighbors(lat,mapping; periodic=if_periodic)
-		interaction += (-t_strength,"Adag",i,"A",j)
+	
+	lat = TTNKit.Square(edge_length,edge_length)
+	for (s1,s2) in TTNKit.nearest_neighbours(lat,collect(1:TTNKit.number_of_sites(lat)); periodic=if_periodic)
+		s1_coord = TTNKit.coordinate(lat,s1)
+		s2_coord = TTNKit.coordinate(lat,s2)
+		coeff = get_inter_coeff(s1_coord,s2_coord,edge_length,t_strength,phi)
+		interaction += (coeff,"Adag",s1_coord,"A",s2_coord)
+		interaction += (conj(coeff),"Adag",s2_coord,"A",s1_coord)
+	end
+	for x in 1:edge_length
+		for y in 1:edge_length
+			onsite += (u_strength,"N",(x,y),"N - Id",(x,y))
+		end
 	end
 	
-	for i in TTNKit.eachindex(lat)
-		onsite += ()
-	end
-	=#
+	#=
 	for x in 1:edge_length
 		x_upper = x+1
 		if if_periodic && x == edge_length
@@ -199,6 +213,7 @@ function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi
 			end
 		end
 	end
+	=#
 	return onsite + interaction
 end
 
@@ -223,7 +238,8 @@ function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_str
 	
 	phi = num_particles/(filling * (edge_sites^2))
 	ham_operator = get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi; kwargs...)
-	ham = TTNKit.Hamiltonian(ham_operator,lat)
+	ham = TTNKit.TPO(ham_operator,lat)
+	println("Made TPO")
 	proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
 	println("Finished Making Hamiltonian")
 	#
@@ -270,13 +286,13 @@ end
 #final_time = 0.1
 if_periodic = false
 bc_string = get_periodic_title_string(if_periodic)
-edge_sites = 8
+edge_sites = 2
 tot_sites = edge_sites^2
 us = 1.0
 ts = 1.0
 phi_val = 1/16
 nu = 1/2
-num_particles = 20#get_particles_needed(edge_sites; phi=phi_val, nu=nu)
+num_particles = 2#get_particles_needed(edge_sites; phi=phi_val, nu=nu)
 max_dim = num_particles + 1
 #println("Using $num_particles particle on $tot_sites sites")
 
