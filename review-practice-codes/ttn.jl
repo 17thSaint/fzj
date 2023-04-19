@@ -4,6 +4,9 @@ using TTNKit,PyPlot
 Need to figure out how sweeps works
 =#
 
+thetax_1,thetay_1 = 0.2, 0.12
+thetax_2,thetay_2 = 0.64,0.56
+
 function get_flattened_index(b_list)
 	return sum(b_list .* [2^(length(b_list) - i) for i in 1:length(b_list)]) + 1
 end
@@ -13,12 +16,19 @@ function get_xy(site_number,side_length)
 	x = (site_number % side_length)
 	if x == 0
 		return x+1,y-1
+	elseif x > site_length | y > site_length
+		println("ERROR: Outside Square")
+		return x,y
 	end
 	return x,y
 end
 
 function get_site_number(x, y, side_length)
     site_number = (y - 1) * side_length + x
+    if site_number > side_length^2
+    	println("ERROR: Outside Square")
+    	return Int(site_number)
+    end
     return Int(site_number)
 end
 
@@ -54,12 +64,12 @@ function get_ydir_greenfunc(edge_length,ttn; kwargs...)
 		for i in 1:edge_length
 			plot(all_yvals[i,:],all_greens[i,:],"-p",label="x=$i")
 		end
-	yscale("log")
-	title_string = "Spatial Green's Function, " * get(kwargs, :plot_title, "Edge Count = $edge_length")
-	title(title_string)
-	xlabel("Y")
-	ylabel("Correlation")
-	legend()
+		yscale("log")
+		title_string = "Spatial Green's Function, " * get(kwargs, :plot_title, "Edge Count = $edge_length")
+		title(title_string)
+		xlabel("Y")
+		ylabel("Correlation")
+		legend()
 	end
 	
 	return all_yvals,all_greens
@@ -137,11 +147,18 @@ function get_chain_hofstadter(edge_length,u_strength,t_strength,phi; kwargs...)
 	return onsite + interaction
 end
 
+function get_xy_coeffs(x,y,edge_length,t_strength,phi,thetax=thetax_1,thetay=thetay_1)
+	x_coeff = -t_strength * exp(==(x,edge_length) * -im * 2 * pi * thetax)
+	y_coeff = -t_strength * exp(im * 2 * pi * (phi * x - ==(y,edge_length) * thetay))
+	return x_coeff, y_coeff
+end
 
 function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi; kwargs...)
 	onsite = TTNKit.OpSum()
 	interaction = TTNKit.OpSum()
 	if_periodic = get(kwargs, :if_periodic, true)
+	thetax = get(kwargs, :thetax, thetax_2)
+	thetay = get(kwargs, :thetay, thetay_2)
 	#=
 	mapping = collect(TTNKit.eachindex(lat))
 	for (i,j) in TTNKit.nearest_neighbors(lat,mapping; periodic=if_periodic)
@@ -170,13 +187,15 @@ function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi
 			elseif y == edge_length && !if_periodic
 				continue
 			else
+				x_coeff,y_coeff = get_xy_coeffs(x,y,edge_length,t_strength,phi,thetax,thetay)
+				
 				next_x = (get_site_number(x_upper,y,edge_length))
 				next_y = (get_site_number(x,y_upper,edge_length))
-				interaction += (-t_strength,"Adag",next_x,"A",site_number)
-				interaction += (-t_strength*exp(im*2*pi*phi*x),"Adag",site_number,"A",next_y)
+				interaction += (x_coeff,"Adag",next_x,"A",site_number)
+				interaction += (y_coeff,"Adag",site_number,"A",next_y)
 				
-				interaction += (-t_strength,"Adag",site_number,"A",next_x)
-				interaction += (-t_strength*exp(-im*2*pi*phi*x),"Adag",next_y,"A",site_number)
+				interaction += (conj(x_coeff),"Adag",site_number,"A",next_x)
+				interaction += (conj(y_coeff),"Adag",next_y,"A",site_number)
 			end
 		end
 	end
@@ -185,8 +204,6 @@ end
 
 function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_strength,filling; kwargs...)
 	max_dim = get(kwargs, :max_dim, 2)
-	num_sweeps = get(kwargs, :num_sweeps, 1)
-	noise = get(kwargs, :noise, 0.0)
 
 	square = TTNKit.BinaryNetwork((edge_sites,edge_sites), TTNKit.ITensorNode, "Boson")
 	lat = TTNKit.physical_lattice(square)
@@ -202,6 +219,14 @@ function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_str
 	ttn = TTNKit.increase_dim_tree_tensor_network_zeros(ttn, maxdim = max_dim)
 	println("Added States")
 
+	
+	
+	phi = num_particles/(filling * (edge_sites^2))
+	ham_operator = get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi; kwargs...)
+	ham = TTNKit.Hamiltonian(ham_operator,lat)
+	proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
+	println("Finished Making Hamiltonian")
+	#
 	eigsolve_tol = TTNKit.DEFAULT_TOL_DMRG
 	eigsolve_krylovdim = TTNKit.DEFAULT_KRYLOVDIM_DMRG
 	eigsolve_maxiter = TTNKit.DEFAULT_MAXITER_DMRG
@@ -213,17 +238,17 @@ function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_str
 		                    tol=eigsolve_tol,
 		                    krylovdim=eigsolve_krylovdim,
 		                    maxiter=eigsolve_maxiter)
-	
-	phi = num_particles/(filling * (edge_sites^2))
-	ham_operator = get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi; kwargs...)
-	ham = TTNKit.Hamiltonian(ham_operator,lat)
-	proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
-	println("Finished Making Hamiltonian")
-
+	num_sweeps = get(kwargs, :num_sweeps, 1)
+	noise = get(kwargs, :noise, 0.0)
 	sp = TTNKit.SimpleSweepHandler(ttn,proj_tpo,func,num_sweeps,[max_dim],[noise],TTNKit.NoExpander())
 	TTNKit.sweep(ttn,sp);
+	#=
+	fin_time = get(kwargs, :fin_time, 0.1)
+	timestep = get(kwargs, :timestep, fin_time/25)
+	sp = TTNKit.tdvp(ttn,ham; timestep=timestep, finaltime=fin_time)
+	=#
 
-	return ttn,ham
+	return ttn,ham,sp
 end
 
 function get_particles_needed(edge_length;kwargs...)
@@ -234,18 +259,30 @@ function get_particles_needed(edge_length;kwargs...)
 	return parts_needed,min_dim
 end
 
-edge_sites = 4
+function get_periodic_title_string(if_periodic)
+	if if_periodic
+		return "PBC"
+	else
+		return "OBC"
+	end
+end
+
+#final_time = 0.1
+if_periodic = false
+bc_string = get_periodic_title_string(if_periodic)
+edge_sites = 8
 tot_sites = edge_sites^2
 us = 1.0
 ts = 1.0
 phi_val = 1/16
 nu = 1/2
-num_particles,max_dim = get_particles_needed(edge_sites; phi=phi_val, nu=nu)
-println("Using $num_particles on $tot_sites Sites")
+num_particles = 20#get_particles_needed(edge_sites; phi=phi_val, nu=nu)
+max_dim = num_particles + 1
+#println("Using $num_particles particle on $tot_sites sites")
 
-#gs_ttn, harphof_ham = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=3, max_dim=max_dim)
-#rez = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="MaxDim = $max_dim")
-#rez2 = get_current_yfunc(edge_sites,gs_ttn; plot_title="MaxDim = $max_dim")
+gs_ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=3, max_dim=max_dim, if_periodic=if_periodic)
+rez = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="MaxDim = $max_dim, $bc_string")
+rez2 = get_current_yfunc(edge_sites,gs_ttn; plot_title="MaxDim = $max_dim, $bc_string")
 
 
 
