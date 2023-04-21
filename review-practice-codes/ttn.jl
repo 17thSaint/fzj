@@ -35,12 +35,18 @@ end
 function get_ydir_greenfunc(edge_length,ttn; kwargs...)
 	adag = "Adag"#"S+"
 	ahat = "A"#"S-"
+	direct = get(kwargs, :direction, "norm")
 	all_yvals = zeros(edge_length,edge_length)
 	all_greens = im.*zeros(edge_length,edge_length)
 	for x in 1:edge_length
 		for y in 1:edge_length
-			site_left = get_site_number(x,1,edge_length)
-			site_right = get_site_number(x,y,edge_length)
+			if direct == "norm"
+				site_left = get_site_number(x,1,edge_length)
+				site_right = get_site_number(x,y,edge_length)
+			else
+				site_left = get_site_number(x,y,edge_length)
+				site_right = get_site_number(x,edge_length,edge_length)
+			end
 			
 			all_greens[x,y] = TTNKit.correlation(ttn,adag,ahat,(site_left),(site_right))
 			all_yvals[x,y] = y
@@ -48,7 +54,7 @@ function get_ydir_greenfunc(edge_length,ttn; kwargs...)
 			if true
 			norm_reg = TTNKit.correlation(ttn,adag,ahat,(site_left),(site_left))
 			norm_prime = TTNKit.correlation(ttn,adag,ahat,(site_right),(site_right))
-			all_greens[x,y] /= sqrt(norm_reg * norm_prime)
+			#all_greens[x,y-1] /= sqrt(norm_reg * norm_prime)
 			end
 		end
 	end
@@ -86,12 +92,18 @@ end
 function get_xdir_greenfunc(edge_length,ttn; kwargs...)
 	adag = "Adag"#"S+"
 	ahat = "A"#"S-"
+	direct = get(kwargs, :direction, "norm")
 	all_xvals = zeros(edge_length,edge_length)
 	all_greens = im.*zeros(edge_length,edge_length)
 	for x in 1:edge_length
 		for y in 1:edge_length
-			site_left = get_site_number(1,y,edge_length)
-			site_right = get_site_number(x,y,edge_length)
+			if direct == "norm"
+				site_left = get_site_number(1,y,edge_length)
+				site_right = get_site_number(x,y,edge_length)
+			else
+				site_left = get_site_number(x,y,edge_length)
+				site_right = get_site_number(edge_length,y,edge_length)
+			end
 			
 			all_greens[x,y] = TTNKit.correlation(ttn,adag,ahat,(site_left),(site_right))
 			all_xvals[x,y] = x
@@ -99,7 +111,7 @@ function get_xdir_greenfunc(edge_length,ttn; kwargs...)
 			if true
 			norm_reg = TTNKit.correlation(ttn,adag,ahat,(site_left),(site_left))
 			norm_prime = TTNKit.correlation(ttn,adag,ahat,(site_right),(site_right))
-			all_greens[x,y] /= sqrt(norm_reg * norm_prime)
+			#all_greens[x-1,y] /= sqrt(norm_reg * norm_prime)
 			end
 		end
 	end
@@ -372,7 +384,7 @@ end
 function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_strength,filling; kwargs...)
 	max_dim = get(kwargs, :max_dim, particle_count+1)
 
-	square = TTNKit.BinaryNetwork((edge_sites,edge_sites), TTNKit.ITensorNode, "Boson")
+	square = TTNKit.BinaryNetwork((edge_length,edge_length), TTNKit.ITensorNode, "Boson")
 	lat = TTNKit.physical_lattice(square)
 	num_sites = length(lat)
 	println("Finished Building Network")
@@ -384,7 +396,7 @@ function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_str
 	println("Added States")
 
 	
-	phi = num_particles/(filling * (edge_sites^2))
+	phi = particle_count/(filling * (edge_length^2))
 	ham_operator = get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi; if_periodic=get(kwargs, :if_periodic, true),if_hopping=get(kwargs, :if_hopping, true))
 	ham = TTNKit.TPO(ham_operator,lat)
 	#ham = TTNKit.Hamiltonian(ham_operator,lat; mapping=TTNKit.hilbert_curve(lat))
@@ -467,23 +479,26 @@ end
 
 
 #final_time = 0.1
-if_periodic = true
-bc_string = get_periodic_title_string(if_periodic)
+if_per = true
+bc_string = get_periodic_title_string(if_per)
 edge_sites = 8
 tot_sites = edge_sites^2
 us = 100.0
 ts = 1.0
 #phi_val = 1/16
 nu = 1/2
-num_particles = 20#get_particles_needed(edge_sites; phi=phi_val, nu=nu)
+#for num_particles in [1,5,10]
+num_particles = 1#get_particles_needed(edge_sites; phi=phi_val, nu=nu)
 #max_dim = num_particles + 1
 println("Using $num_particles particles on $tot_sites sites")
 
-gs_ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=3, if_periodic=if_periodic,max_dim=20)
-rez = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="$bc_string")
-rez2 = get_xdir_greenfunc(edge_sites,gs_ttn; plot_title="$bc_string")
-rez3 = get_current_yfunc(edge_sites,gs_ttn; plot_title="$bc_string")
-rez4 = get_current_xfunc(edge_sites,gs_ttn; plot_title="$bc_string")
+gs_ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=3, if_periodic=if_per,max_dim=20)
+#rez = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
+#rez2 = get_xdir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
+#rez3 = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string", direction="rev")
+#rez4 = get_xdir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string", direction="rev")
+#rez3 = get_current_yfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
+#rez4 = get_current_xfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
 
-
+#end
 "fin"
