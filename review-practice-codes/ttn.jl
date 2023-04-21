@@ -291,6 +291,7 @@ function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi
 	if_periodic = get(kwargs, :if_periodic, true)
 	if_hopping = get(kwargs, :if_hopping, true)
 	
+	#=
 	if if_hopping
 		interaction = TTNKit.OpSum()
 		lat = TTNKit.Square(edge_length,edge_length)
@@ -307,6 +308,7 @@ function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi
 		end
 		append!(resulting_ham,[interaction])
 	end
+	=#
 	for x in 1:edge_length
 		for y in 1:edge_length
 			#site_num = get_site_number(x,y,edge_length)
@@ -315,7 +317,8 @@ function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi
 		end
 	end
 	
-	#=
+	#
+	interaction = TTNKit.OpSum()
 	for x in 1:edge_length
 		x_upper = x+1
 		if if_periodic && x == edge_length
@@ -326,27 +329,25 @@ function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi
 			if if_periodic && y == edge_length
 				y_upper = 1
 			end
-			site_number = (get_site_number(x,y,edge_length))
-			onsite += (u_strength,"N",site_number,"N - Id",site_number)
 			
 			if x == edge_length && !if_periodic
 				continue
 			elseif y == edge_length && !if_periodic
 				continue
 			else
-				x_coeff,y_coeff = get_xy_coeffs(x,y,edge_length,t_strength,phi,thetax,thetay)
+				x_coeff = get_inter_coeff((x_upper,y),(x,y),edge_length,t_strength,phi)
+				y_coeff = get_inter_coeff((x,y),(x,y_upper),edge_length,t_strength,phi)
 				
-				next_x = (get_site_number(x_upper,y,edge_length))
-				next_y = (get_site_number(x,y_upper,edge_length))
-				interaction += (x_coeff,"Adag",next_x,"A",site_number)
-				interaction += (y_coeff,"Adag",site_number,"A",next_y)
+				interaction += (x_coeff,"Adag",(x_upper,y),"A",(x,y))
+				interaction += (y_coeff,"Adag",(x,y),"A",(x,y_upper))
 				
-				interaction += (conj(x_coeff),"Adag",site_number,"A",next_x)
-				interaction += (conj(y_coeff),"Adag",next_y,"A",site_number)
+				interaction += (conj(x_coeff),"Adag",(x,y),"A",(x_upper,y))
+				interaction += (conj(y_coeff),"Adag",(x,y_upper),"A",(x,y))
 			end
 		end
 	end
-	=#
+	append!(resulting_ham,[interaction])
+	#
 	if length(resulting_ham) > 1
 		return sum(resulting_ham)
 	else
@@ -493,10 +494,10 @@ num_particles = 1#get_particles_needed(edge_sites; phi=phi_val, nu=nu)
 println("Using $num_particles particles on $tot_sites sites")
 
 gs_ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=3, if_periodic=if_per,max_dim=20)
-#rez = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
-#rez2 = get_xdir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
-#rez3 = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string", direction="rev")
-#rez4 = get_xdir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string", direction="rev")
+rez = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
+rez2 = get_xdir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
+rez3 = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string", direction="rev")
+rez4 = get_xdir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string", direction="rev")
 #rez3 = get_current_yfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
 #rez4 = get_current_xfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
 
