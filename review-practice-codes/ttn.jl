@@ -54,7 +54,7 @@ function get_ydir_greenfunc(edge_length,ttn; kwargs...)
 			if true
 			norm_reg = TTNKit.correlation(ttn,adag,ahat,(site_left),(site_left))
 			norm_prime = TTNKit.correlation(ttn,adag,ahat,(site_right),(site_right))
-			#all_greens[x,y-1] /= sqrt(norm_reg * norm_prime)
+			all_greens[x,y] /= sqrt(norm_reg * norm_prime)
 			end
 		end
 	end
@@ -111,7 +111,7 @@ function get_xdir_greenfunc(edge_length,ttn; kwargs...)
 			if true
 			norm_reg = TTNKit.correlation(ttn,adag,ahat,(site_left),(site_left))
 			norm_prime = TTNKit.correlation(ttn,adag,ahat,(site_right),(site_right))
-			#all_greens[x-1,y] /= sqrt(norm_reg * norm_prime)
+			all_greens[x,y] /= sqrt(norm_reg * norm_prime)
 			end
 		end
 	end
@@ -278,10 +278,16 @@ end
 function get_inter_coeff(s1,s2,edge_length,t_strength,phi; kwargs...)
 	if s1[1] == s2[1]
 		thetay = get(kwargs, :thetay, thetay_2)
-		return -t_strength * exp(im*2*pi*(phi*s1[1] - ==(edge_length,s1[2])*thetay))
+		if ==(edge_length,s1[2])
+			println("Using ThetaY")
+		end
+		return -t_strength #* exp(im*2*pi*(phi*s1[1] - ==(edge_length,s1[2])*thetay))
 	elseif s1[2] == s2[2]
 		thetax = get(kwargs, :thetax, thetax_2)
-		return -t_strength * exp(-im*2*pi* ==(edge_length,s1[1]) *thetax)
+		if ==(edge_length,s1[1])
+			println("Using ThetaX")
+		end
+		return -t_strength #* exp(-im*2*pi* ==(edge_length,s1[1]) *thetax)
 	end
 end
 
@@ -290,8 +296,8 @@ function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi
 	resulting_ham = [onsite]
 	if_periodic = get(kwargs, :if_periodic, true)
 	if_hopping = get(kwargs, :if_hopping, true)
-	
-	#=
+	#if_hand = get(kwargs, :if_hand, false)
+	#
 	if if_hopping
 		interaction = TTNKit.OpSum()
 		lat = TTNKit.Square(edge_length,edge_length)
@@ -308,7 +314,7 @@ function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi
 		end
 		append!(resulting_ham,[interaction])
 	end
-	=#
+	#
 	for x in 1:edge_length
 		for y in 1:edge_length
 			#site_num = get_site_number(x,y,edge_length)
@@ -317,7 +323,8 @@ function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi
 		end
 	end
 	
-	#
+	#=
+	if if_hand
 	interaction = TTNKit.OpSum()
 	for x in 1:edge_length
 		x_upper = x+1
@@ -347,7 +354,8 @@ function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi
 		end
 	end
 	append!(resulting_ham,[interaction])
-	#
+	end
+	=#
 	if length(resulting_ham) > 1
 		return sum(resulting_ham)
 	else
@@ -398,10 +406,11 @@ function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_str
 
 	
 	phi = particle_count/(filling * (edge_length^2))
-	ham_operator = get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi; if_periodic=get(kwargs, :if_periodic, true),if_hopping=get(kwargs, :if_hopping, true))
+	ham_operator = get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi; if_periodic=get(kwargs, :if_periodic, true),if_hopping=get(kwargs, :if_hopping, true),if_hand=get(kwargs, :if_hand, true))
 	ham = TTNKit.TPO(ham_operator,lat)
 	#ham = TTNKit.Hamiltonian(ham_operator,lat; mapping=TTNKit.hilbert_curve(lat))
 	println("Made TPO")
+	#return ttn,ham
 	proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
 	println("Finished Making Hamiltonian")
 	#
@@ -463,7 +472,7 @@ function get_avg_occupancy(avg_count,edge_length,particle_count,u_strength,t_str
 end
 
 function get_particles_needed(edge_length;kwargs...)
-	phi = get(kwargs, :phi, 0.0)
+	phi = get(kwargs, :phi, 1/edge_length)
 	nu = get(kwargs, :nu, 0.0)
 	parts_needed = Int(ceil(phi * nu * (edge_length^2)))
 	#min_dim = parts_needed + 1
@@ -480,24 +489,43 @@ end
 
 
 #final_time = 0.1
-if_per = true
+if_per = false
 bc_string = get_periodic_title_string(if_per)
-edge_sites = 8
+edge_sites = 4
 tot_sites = edge_sites^2
 us = 100.0
 ts = 1.0
 #phi_val = 1/16
 nu = 1/2
 #for num_particles in [1,5,10]
-num_particles = 1#get_particles_needed(edge_sites; phi=phi_val, nu=nu)
+num_particles = get_particles_needed(edge_sites; nu=nu)
 #max_dim = num_particles + 1
 println("Using $num_particles particles on $tot_sites sites")
+all_ttns = []
+for i in 1:10
+gs_ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=10, if_periodic=if_per,max_dim=4)
+append!(all_ttns,[gs_ttn])
+end
 
-gs_ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=3, if_periodic=if_per,max_dim=20)
+for i in 1:length(all_ttns)
+	for j in 1:length(all_ttns)
+		if i == j
+			continue
+		else
+			overlap = TTNKit.inner(all_ttns[i],all_ttns[j])
+			if real(overlap) != 0.0
+				println("$i, $j: ",overlap)
+			end
+		end
+	end
+end
+
+#=
 rez = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
 rez2 = get_xdir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
 rez3 = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string", direction="rev")
 rez4 = get_xdir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string", direction="rev")
+=#
 #rez3 = get_current_yfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
 #rez4 = get_current_xfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
 
