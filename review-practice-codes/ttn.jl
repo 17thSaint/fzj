@@ -278,16 +278,18 @@ end
 function get_inter_coeff(s1,s2,edge_length,t_strength,phi; kwargs...)
 	if s1[1] == s2[1]
 		thetay = get(kwargs, :thetay, thetay_2)
-		if ==(edge_length,s1[2])
+		#=if ==(edge_length,s1[2])
 			println("Using ThetaY")
 		end
-		return -t_strength #* exp(im*2*pi*(phi*s1[1] - ==(edge_length,s1[2])*thetay))
+		=#
+		return -t_strength * exp(im*2*pi*(phi*s1[1] - ==(edge_length,s1[2])*thetay))
 	elseif s1[2] == s2[2]
 		thetax = get(kwargs, :thetax, thetax_2)
-		if ==(edge_length,s1[1])
+		#=if ==(edge_length,s1[1])
 			println("Using ThetaX")
 		end
-		return -t_strength #* exp(-im*2*pi* ==(edge_length,s1[1]) *thetax)
+		=#
+		return -t_strength * exp(-im*2*pi* ==(edge_length,s1[1]) *thetax)
 	end
 end
 
@@ -396,23 +398,23 @@ function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_str
 	square = TTNKit.BinaryNetwork((edge_length,edge_length), TTNKit.ITensorNode, "Boson")
 	lat = TTNKit.physical_lattice(square)
 	num_sites = length(lat)
-	println("Finished Building Network")
+	#println("Finished Building Network")
 
 	states = fill_states(particle_count,num_sites)
-	println("Built States Vector")
+	#println("Built States Vector")
 	ttn = TTNKit.ProductTreeTensorNetwork(square,states;orthogonalize=true)
 	ttn = TTNKit.increase_dim_tree_tensor_network_zeros(ttn, maxdim = max_dim)
-	println("Added States")
+	#println("Added States")
 
 	
 	phi = particle_count/(filling * (edge_length^2))
 	ham_operator = get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi; if_periodic=get(kwargs, :if_periodic, true),if_hopping=get(kwargs, :if_hopping, true),if_hand=get(kwargs, :if_hand, true))
 	ham = TTNKit.TPO(ham_operator,lat)
 	#ham = TTNKit.Hamiltonian(ham_operator,lat; mapping=TTNKit.hilbert_curve(lat))
-	println("Made TPO")
+	#println("Made TPO")
 	#return ttn,ham
 	proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
-	println("Finished Making Hamiltonian")
+	#println("Finished Making Hamiltonian")
 	#
 	eigsolve_tol = TTNKit.DEFAULT_TOL_DMRG
 	eigsolve_krylovdim = TTNKit.DEFAULT_KRYLOVDIM_DMRG
@@ -428,7 +430,7 @@ function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_str
 	num_sweeps = get(kwargs, :num_sweeps, 1)
 	noise = get(kwargs, :noise, 0.0)
 	sp = TTNKit.SimpleSweepHandler(ttn,proj_tpo,func,num_sweeps,[max_dim],[noise],TTNKit.NoExpander())
-	TTNKit.sweep(ttn,sp);
+	TTNKit.sweep(ttn,sp;outputlevel=0);
 	#=
 	fin_time = get(kwargs, :fin_time, 0.1)
 	timestep = get(kwargs, :timestep, fin_time/25)
@@ -471,6 +473,24 @@ function get_avg_occupancy(avg_count,edge_length,particle_count,u_strength,t_str
 	return avg_occ_mat
 end
 
+function rewrite_inds(tensor,ref_tensor)
+	num_layers = TTNKit.number_of_layers(TTNKit.network(tensor))
+	for i in 1:num_layers
+		num_tensors = length(tensor.data[i])
+		for j in 1:num_tensors
+			old_inds = TTNKit.inds(tensor.data[i][j])
+			new_inds = TTNKit.inds(ref_tensor.data[i][j])
+			if all([TTNKit.tags(old_inds[i1])==TTNKit.tags(new_inds[i1]) for i1 in 1:length(old_inds)])
+				tensor.data[i][j] = TTNKit.replaceinds(tensor.data[i][j],old_inds,new_inds)
+			else
+				println("Index Tags Don't Match")
+			end
+		end
+	end
+	return tensor
+end
+
+
 function get_particles_needed(edge_length;kwargs...)
 	phi = get(kwargs, :phi, 1/edge_length)
 	nu = get(kwargs, :nu, 0.0)
@@ -487,6 +507,58 @@ function get_periodic_title_string(if_periodic)
 	end
 end
 
+function localinner(ttn1::TTNKit.TreeTensorNetwork{N, T}, old_ttn2::TTNKit.TreeTensorNetwork{N, T},nexttt=false) where{N<:TTNKit.BinaryNetwork,T}
+
+    net = TTNKit.network(ttn1)
+    
+    ttn2 = rewrite_inds(old_ttn2,ttn1)
+
+    elT = promote_type(eltype(ttn1), eltype(ttn2))
+    # check in case if symmetric the Top node for qn correspondence
+    if !(TTNKit.sectortype(net) == Int64)
+        fl1 = flux(ttn1[TTNKit.number_of_layers(net), 1])
+        fl2 = flux(ttn2[TTNKit.number_of_layers(net), 2])
+        fl1 == fl2 || return zero(elT)
+    end
+
+    # contruct the network starting from the first layer upwards
+    #ns = number_of_sites(net)
+    
+    phys_lat = TTNKit.physical_lattice(net)
+    if nexttt
+	    println(size(res))
+    end
+    res = map(phys_lat) do nd
+    	TTNKit.delta(TTNKit.hilbertspace(nd), TTNKit.prime(TTNKit.hilbertspace(nd)))
+    end
+
+
+    for ll in TTNKit.eachlayer(net)
+        nt = TTNKit.number_of_tensors(net,ll)
+        res_new = Vector{T}(undef, nt)
+        for pp in TTNKit.eachindex(net, ll)
+            childs_idx = TTNKit.getindex.(TTNKit.child_nodes(net, (ll,pp)),2)
+            tn1 = ttn1[ll,pp]
+            tn2 = ttn2[ll,pp]
+            rpre1 = res[childs_idx[1]]
+            rpre2 = res[childs_idx[2]]
+            if prod(size(rpre1)) > 2^5
+            	println("Stop here: ",typeof(res))
+            	return res
+            end
+            res_new[pp] = TTNKit._dot_inner(tn1, tn2, rpre1, rpre2)
+        end
+        res = res_new
+    end
+    # better exception
+    length(res) == 1 || error("Tree Tensor Contraction don't leed to a single resulting tensor.")
+    res = res[1]
+    
+    sres = TTNKit.ITensors.scalar(res)
+
+    return abs(sres)
+end
+
 
 #final_time = 0.1
 if_per = false
@@ -499,27 +571,30 @@ ts = 1.0
 nu = 1/2
 #for num_particles in [1,5,10]
 num_particles = get_particles_needed(edge_sites; nu=nu)
-#max_dim = num_particles + 1
+mdim = 5
 println("Using $num_particles particles on $tot_sites sites")
-all_ttns = []
-for i in 1:10
-gs_ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=10, if_periodic=if_per,max_dim=4)
-append!(all_ttns,[gs_ttn])
-end
-
-for i in 1:length(all_ttns)
-	for j in 1:length(all_ttns)
-		if i == j
-			continue
-		else
-			overlap = TTNKit.inner(all_ttns[i],all_ttns[j])
-			if real(overlap) != 0.0
-				println("$i, $j: ",overlap)
-			end
-		end
+howmany = 250
+all_swps = [1,3,5,10]
+histdata = []
+start = time()
+for j in 1:length(all_swps)
+	overlaps = []
+	nswps = all_swps[j]
+	for i in 1:howmany
+		gs_ttn1, harphof_ham1, hh_sp1 = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim)
+		gs_ttn2, harphof_ham2, hh_sp2 = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim)
+		overlap = localinner(gs_ttn1,gs_ttn2)
+		println(round(100*(i-1)/howmany,digits=2),"%: ",round(overlap,digits=4))
+		append!(overlaps,[overlap])
 	end
+	fig = figure()
+	dats = hist(overlaps,bins=50)
+	append!(histdata,[[dats]])
+	title("Degeneracy: Sweeps = $nswps")
 end
-
+fin = time()
+println("Time = ",fin-start)
+#
 #=
 rez = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
 rez2 = get_xdir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
