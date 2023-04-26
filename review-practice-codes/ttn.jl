@@ -518,7 +518,10 @@ function localinner(ttn1::TTNKit.TreeTensorNetwork{N, T}, old_ttn2::TTNKit.TreeT
     if !(TTNKit.sectortype(net) == Int64)
         fl1 = flux(ttn1[TTNKit.number_of_layers(net), 1])
         fl2 = flux(ttn2[TTNKit.number_of_layers(net), 2])
-        fl1 == fl2 || return zero(elT)
+        if fl1 != fl2
+        	println("Flux issue")
+        	return zero(elT)
+        end
     end
 
     # contruct the network starting from the first layer upwards
@@ -542,10 +545,12 @@ function localinner(ttn1::TTNKit.TreeTensorNetwork{N, T}, old_ttn2::TTNKit.TreeT
             tn2 = ttn2[ll,pp]
             rpre1 = res[childs_idx[1]]
             rpre2 = res[childs_idx[2]]
+            #=
             if prod(size(rpre1)) > 2^5
             	println("Stop here: ",typeof(res))
             	return res
             end
+            =#
             res_new[pp] = TTNKit._dot_inner(tn1, tn2, rpre1, rpre2)
         end
         res = res_new
@@ -556,12 +561,12 @@ function localinner(ttn1::TTNKit.TreeTensorNetwork{N, T}, old_ttn2::TTNKit.TreeT
     
     sres = TTNKit.ITensors.scalar(res)
 
-    return abs(sres)
+    return abs2(sres)
 end
 
 
 #final_time = 0.1
-if_per = false
+if_per = true
 bc_string = get_periodic_title_string(if_per)
 edge_sites = 4
 tot_sites = edge_sites^2
@@ -571,11 +576,11 @@ ts = 1.0
 nu = 1/2
 #for num_particles in [1,5,10]
 num_particles = get_particles_needed(edge_sites; nu=nu)
-mdim = 5
+mdim = 50
 println("Using $num_particles particles on $tot_sites sites")
 howmany = 250
-all_swps = [1,3,5,10]
-histdata = []
+all_swps = [1 for i in 0:0]
+trackswpvals = zeros(4,length(all_swps))
 start = time()
 for j in 1:length(all_swps)
 	overlaps = []
@@ -588,12 +593,26 @@ for j in 1:length(all_swps)
 		append!(overlaps,[overlap])
 	end
 	fig = figure()
-	dats = hist(overlaps,bins=50)
-	append!(histdata,[[dats]])
-	title("Degeneracy: Sweeps = $nswps")
+	dats = hist(overlaps,bins=50; weights=ones(length(overlaps))/length(overlaps));
+	#append!(histdata,[[dats]])
+	title("Degeneracy: MaxDim = $mdim, $bc_string")
+	#=
+	where_overlaps = findall(x -> x != 0.0,dats[1])
+	for k in 1:length(where_overlaps)
+		trackswpvals[k,j] = dats[1][where_overlaps[k]]
+	end
+	=#
 end
 fin = time()
+#=
+fig2 = figure()
+for i in 1:4
+	plot(all_swps,trackswpvals[i,:],"-p",label="$i")
+end
+legend()
+=#
 println("Time = ",fin-start)
+println("Error = ",round(100*sqrt(howmany)/howmany,digits=4))
 #
 #=
 rez = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
