@@ -51,7 +51,7 @@ function get_ydir_greenfunc(edge_length,ttn; kwargs...)
 			all_greens[x,y] = TTNKit.correlation(ttn,adag,ahat,(site_left),(site_right))
 			all_yvals[x,y] = y
 			
-			if true
+			if false
 			norm_reg = TTNKit.correlation(ttn,adag,ahat,(site_left),(site_left))
 			norm_prime = TTNKit.correlation(ttn,adag,ahat,(site_right),(site_right))
 			all_greens[x,y] /= sqrt(norm_reg * norm_prime)
@@ -108,7 +108,7 @@ function get_xdir_greenfunc(edge_length,ttn; kwargs...)
 			all_greens[x,y] = TTNKit.correlation(ttn,adag,ahat,(site_left),(site_right))
 			all_xvals[x,y] = x
 			
-			if true
+			if false
 			norm_reg = TTNKit.correlation(ttn,adag,ahat,(site_left),(site_left))
 			norm_prime = TTNKit.correlation(ttn,adag,ahat,(site_right),(site_right))
 			all_greens[x,y] /= sqrt(norm_reg * norm_prime)
@@ -298,10 +298,11 @@ function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi
 	resulting_ham = [onsite]
 	if_periodic = get(kwargs, :if_periodic, true)
 	if_hopping = get(kwargs, :if_hopping, true)
-	#if_hand = get(kwargs, :if_hand, false)
+	if_chem = get(kwargs, :if_chem, false)
+	chem_strength = get(kwargs, :chem_strength, 0.0)
 	#
 	if if_hopping
-		interaction = TTNKit.OpSum()
+		hopping = TTNKit.OpSum()
 		lat = TTNKit.Square(edge_length,edge_length)
 		for (s1,s2) in TTNKit.nearest_neighbours(lat,collect(1:TTNKit.number_of_sites(lat)); periodic=if_periodic)
 			s1_coord = TTNKit.coordinate(lat,s1)
@@ -311,18 +312,28 @@ function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi
 			#s2_coord = get_site_number(s2_coord_2d[1],s2_coord_2d[2],edge_length)
 			
 			coeff = get_inter_coeff(s1_coord,s2_coord,edge_length,t_strength,phi)
-			interaction += (coeff,"Adag",s1_coord,"A",s2_coord)
-			interaction += (conj(coeff),"Adag",s2_coord,"A",s1_coord)
+			hopping += (coeff,"Adag",s1_coord,"A",s2_coord)
+			hopping += (conj(coeff),"Adag",s2_coord,"A",s1_coord)
 		end
-		append!(resulting_ham,[interaction])
+		append!(resulting_ham,[hopping])
 	end
 	#
 	for x in 1:edge_length
 		for y in 1:edge_length
 			#site_num = get_site_number(x,y,edge_length)
 			#onsite += (u_strength,"N",site_num,"N - Id",site_num)
-			onsite += (u_strength,"N",(x,y),"N - Id",(x,y))
+			onsite += (u_strength/2,"N",(x,y),"N - Id",(x,y))
 		end
+	end
+	
+	if if_chem
+		chem = TTNKit.OpSum()
+		for x in 1:edge_length
+			for y in 1:edge_length
+				chem -= (chem_strength,"N",(x,y))
+			end
+		end
+		append!(resulting_ham,[chem])
 	end
 	
 	#=
@@ -395,26 +406,26 @@ end
 function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_strength,filling; kwargs...)
 	max_dim = get(kwargs, :max_dim, particle_count+1)
 
-	square = TTNKit.BinaryNetwork((edge_length,edge_length), TTNKit.ITensorNode, "Boson")
+	square = TTNKit.BinaryNetwork((edge_length,edge_length), TTNKit.HardCoreBosonNode, "Boson"; conserve_qns=true)
 	lat = TTNKit.physical_lattice(square)
 	num_sites = length(lat)
-	#println("Finished Building Network")
+	println("Finished Building Network")
 
 	states = fill_states(particle_count,num_sites)
-	#println("Built States Vector")
+	println("Built States Vector")
 	ttn = TTNKit.ProductTreeTensorNetwork(square,states;orthogonalize=true)
 	ttn = TTNKit.increase_dim_tree_tensor_network_zeros(ttn, maxdim = max_dim)
-	#println("Added States")
+	println("Added States")
 
 	
 	phi = particle_count/(filling * (edge_length^2))
-	ham_operator = get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi; if_periodic=get(kwargs, :if_periodic, true),if_hopping=get(kwargs, :if_hopping, true),if_hand=get(kwargs, :if_hand, true))
+	ham_operator = get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi; kwargs...)
 	ham = TTNKit.TPO(ham_operator,lat)
 	#ham = TTNKit.Hamiltonian(ham_operator,lat; mapping=TTNKit.hilbert_curve(lat))
-	#println("Made TPO")
+	println("Made TPO")
 	#return ttn,ham
 	proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
-	#println("Finished Making Hamiltonian")
+	println("Finished Making Hamiltonian")
 	#
 	eigsolve_tol = TTNKit.DEFAULT_TOL_DMRG
 	eigsolve_krylovdim = TTNKit.DEFAULT_KRYLOVDIM_DMRG
@@ -461,7 +472,7 @@ function get_avg_occupancy(avg_count,edge_length,particle_count,u_strength,t_str
 	if_periodic = get(kwargs, :if_periodic, true)
 	avg_occ_mat = zeros(edge_length,edge_length)
 	for i in 1:avg_count
-		ttn = build_full_harperhofstadter(edge_length,particle_count,u_strength,t_strength,filling; num_sweeps=3, if_periodic=if_periodic,max_dim=20)[1]
+		ttn = build_full_harperhofstadter(edge_length,particle_count,u_strength,t_strength,filling; kwargs...)[1]
 		avg_occ_mat += get_occupancy(ttn,edge_length; if_plot=false) ./ avg_count
 	end
 	avg_occ_mat = round.(avg_occ_mat,digits=3)
@@ -566,60 +577,32 @@ end
 
 
 #final_time = 0.1
-if_per = true
+if_per = false
+chemical = true
+mu = 2.0
 bc_string = get_periodic_title_string(if_per)
 edge_sites = 4
 tot_sites = edge_sites^2
-us = 100.0
-ts = 1.0
+us = 1.0
+ts = 0.01
 #phi_val = 1/16
 nu = 1/2
 #for num_particles in [1,5,10]
 num_particles = get_particles_needed(edge_sites; nu=nu)
 mdim = 50
+nswps = 10
 println("Using $num_particles particles on $tot_sites sites")
-howmany = 250
-all_swps = [1 for i in 0:0]
-trackswpvals = zeros(4,length(all_swps))
-start = time()
-for j in 1:length(all_swps)
-	overlaps = []
-	nswps = all_swps[j]
-	for i in 1:howmany
-		gs_ttn1, harphof_ham1, hh_sp1 = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim)
-		gs_ttn2, harphof_ham2, hh_sp2 = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim)
-		overlap = localinner(gs_ttn1,gs_ttn2)
-		println(round(100*(i-1)/howmany,digits=2),"%: ",round(overlap,digits=4))
-		append!(overlaps,[overlap])
-	end
-	fig = figure()
-	dats = hist(overlaps,bins=50; weights=ones(length(overlaps))/length(overlaps));
-	#append!(histdata,[[dats]])
-	title("Degeneracy: MaxDim = $mdim, $bc_string")
-	#=
-	where_overlaps = findall(x -> x != 0.0,dats[1])
-	for k in 1:length(where_overlaps)
-		trackswpvals[k,j] = dats[1][where_overlaps[k]]
-	end
-	=#
-end
-fin = time()
-#=
-fig2 = figure()
-for i in 1:4
-	plot(all_swps,trackswpvals[i,:],"-p",label="$i")
-end
-legend()
-=#
-println("Time = ",fin-start)
-println("Error = ",round(100*sqrt(howmany)/howmany,digits=4))
+
+gs_ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim, if_chem=chemical, chem_strength=mu)
+
+get_occupancy(gs_ttn,edge_sites)
 #
-#=
 rez = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
 rez2 = get_xdir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
 rez3 = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string", direction="rev")
 rez4 = get_xdir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string", direction="rev")
-=#
+#
+#
 #rez3 = get_current_yfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
 #rez4 = get_current_xfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
 
