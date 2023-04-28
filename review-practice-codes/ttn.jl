@@ -510,7 +510,8 @@ function find_likely_path(ttn,starting_site; kwargs...)
 	edge_length = Int(sqrt(TTNKit.number_of_sites(lat)))
 	path_length = get(kwargs, :path_length, Int(4*edge_length))
 	path = [starting_site]
-	all_neighbors = TTNKit.nearest_neighbours(lat,collect(1:edge_length^2); kwargs...)
+	if_periodic = get(kwargs, :periodic, false)
+	all_neighbors = TTNKit.nearest_neighbours(lat,collect(1:edge_length^2); periodic=if_periodic)
 	for i in 1:path_length
 		if i == 1
 			current_site_num = get_site_number(starting_site[1],starting_site[2],edge_length)
@@ -551,6 +552,68 @@ function find_likely_path(ttn,starting_site; kwargs...)
 		plot_path(path,edge_length; kwargs...)
 	end
 	return path
+end
+
+function get_path_direction(path,edge_length)
+	corner_index = findfirst(x->x==(edge_length-1,edge_length-1),path)
+	if corner_index == Nothing
+		println("Path never reached the corner")
+		return path
+	end
+	x_changes = [path[i+1][1] - path[i][1] for i in corner_index:corner_index+edge_length-4]
+	y_changes = [path[i+1][2] - path[i][2] for i in corner_index:corner_index+edge_length-4]
+	if all(x_changes.==0.0)
+		return "CW"
+	elseif all(y_changes.==0.0)
+		return "CCW"
+	else
+		println("Not a straight path along the edge")
+		return x_changes,y_changes
+	end
+end
+
+function plot_paths_directions(paths,edge_length; kwargs...)
+	cws_xs = []
+	cws_ys = []
+	ccws_xs = []
+	ccws_ys = []
+	for i in 1:length(paths)
+		dir = get_path_direction(paths[i],edge_length)
+		if dir == "CW"
+			append!(cws_xs,[paths[i][1][1]])
+			append!(cws_ys,[paths[i][1][2]])
+		elseif dir == "CCW"
+			append!(ccws_xs,[paths[i][1][1]])
+			append!(ccws_ys,[paths[i][1][2]])
+		end
+	end
+	fig = figure()
+	plot_grid(edge_length)
+	plot(cws_xs,cws_ys,"pb",markersize=15.0,label="CW")
+	plot(ccws_xs,ccws_ys,"pg",markersize=15.0,label="CCW")
+	xlabel("X")
+	ylabel("Y")
+	legend()
+	xlim((0.5,edge_length+0.5))
+	ylim((0.5,edge_length+0.5))
+	title_string = "Path Direction" * get(kwargs, :plot_title, "")
+	title(title_string)
+	return cws_xs,cws_ys,ccws_xs,ccws_ys
+end
+
+function get_all_sites_paths_and_plot(ttn; kwargs...)
+	if_periodic = get(kwargs, :if_periodic, false)
+	paths = []
+	for i in 1:edge_sites
+		for j in 1:edge_sites
+			start = (i,j)
+			println(start)
+			rez = find_likely_path(ttn,start; periodic=if_periodic, if_plot=false)
+			append!(paths,[rez])
+		end
+	end
+	direction_results = plot_paths_directions(paths,edge_sites)
+	return direction_results
 end
 
 function get_occupancy(ttn,edge_length; kwargs...)
@@ -700,16 +763,10 @@ nswps = 2
 println("Using $num_particles particles on $tot_sites sites")
 
 #for iter in 1:1
-#gs_ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim, if_chem=chemical, chem_strength=mu, no_magF=mag_off, if_sweep=evolve)
+gs_ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim, if_chem=chemical, chem_strength=mu, no_magF=mag_off, if_sweep=evolve)
 
-for i in 1:2*edge_sites
-if i <= edge_sites
-start = (i,edge_sites)#(rand((1:edge_sites)),rand((1:edge_sites)))
-else
-start = (edge_sites,i-edge_sites)
-end
-rez = find_likely_path(gs_ttn,start; periodic=if_per)
-end
+get_all_sites_paths_and_plot(gs_ttn; if_periodic=if_per)
+
 #get_occupancy(gs_ttn,edge_sites)
 #end
 #=
