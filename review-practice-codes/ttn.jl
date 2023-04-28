@@ -276,6 +276,9 @@ function get_xy_coeffs(x,y,edge_length,t_strength,phi,thetax=thetax_1,thetay=the
 end
 
 function get_inter_coeff(s1,s2,edge_length,t_strength,phi; kwargs...)
+	if get(kwargs, :no_magF, false)
+		phi = 0.0
+	end
 	if s1[1] == s2[1]
 		thetay = get(kwargs, :thetay, thetay_2)
 		#=if ==(edge_length,s1[2])
@@ -294,11 +297,11 @@ function get_inter_coeff(s1,s2,edge_length,t_strength,phi; kwargs...)
 end
 
 function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi; kwargs...)
-	onsite = TTNKit.OpSum()
-	resulting_ham = [onsite]
+	resulting_ham = []
 	if_periodic = get(kwargs, :if_periodic, true)
 	if_hopping = get(kwargs, :if_hopping, true)
 	if_chem = get(kwargs, :if_chem, false)
+	no_magF = get(kwargs, :no_magF, false)
 	chem_strength = get(kwargs, :chem_strength, 0.0)
 	#
 	if if_hopping
@@ -311,20 +314,22 @@ function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi
 			#s1_coord = get_site_number(s1_coord_2d[1],s1_coord_2d[2],edge_length)
 			#s2_coord = get_site_number(s2_coord_2d[1],s2_coord_2d[2],edge_length)
 			
-			coeff = get_inter_coeff(s1_coord,s2_coord,edge_length,t_strength,phi)
+			coeff = get_inter_coeff(s1_coord,s2_coord,edge_length,t_strength,phi; kwargs...)
 			hopping += (coeff,"Adag",s1_coord,"A",s2_coord)
 			hopping += (conj(coeff),"Adag",s2_coord,"A",s1_coord)
 		end
 		append!(resulting_ham,[hopping])
 	end
 	#
+	onsite = TTNKit.OpSum()
 	for x in 1:edge_length
 		for y in 1:edge_length
 			#site_num = get_site_number(x,y,edge_length)
 			#onsite += (u_strength,"N",site_num,"N - Id",site_num)
-			onsite += (u_strength/2,"N",(x,y),"N - Id",(x,y))
+			onsite += (u_strength/2,"Adag * Adag * A * A",(x,y))
 		end
 	end
+	append!(resulting_ham,[onsite])
 	
 	if if_chem
 		chem = TTNKit.OpSum()
@@ -370,6 +375,7 @@ function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi
 	end
 	=#
 	if length(resulting_ham) > 1
+		#display(sum(resulting_ham))
 		return sum(resulting_ham)
 	else
 		return resulting_ham[1]
@@ -394,7 +400,7 @@ function fill_states(particle_count,site_count)
 			return states
 		end
 		while count_filled_states(states) < i
-			site = rand((1:site_count))
+			site = rand((1:site_count))#rand([(i-1)*Int(sqrt(site_count))+Int(sqrt(site_count)) for i in 1:Int(sqrt(site_count))])
 			if states[site] != "1"
 				states[site] = "1"
 			end
@@ -405,8 +411,10 @@ end
 
 function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_strength,filling; kwargs...)
 	max_dim = get(kwargs, :max_dim, particle_count+1)
+	num_sweeps = get(kwargs, :num_sweeps, 1)
+	if_sweep = get(kwargs, :if_sweep, true)
 
-	square = TTNKit.BinaryNetwork((edge_length,edge_length), TTNKit.HardCoreBosonNode, "Boson"; conserve_qns=true)
+	square = TTNKit.BinaryNetwork((edge_length,edge_length), TTNKit.ITensorNode, "Boson",conserve_number=false)
 	lat = TTNKit.physical_lattice(square)
 	num_sites = length(lat)
 	println("Finished Building Network")
@@ -417,13 +425,14 @@ function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_str
 	ttn = TTNKit.increase_dim_tree_tensor_network_zeros(ttn, maxdim = max_dim)
 	println("Added States")
 
+	#get_occupancy(ttn,edge_sites; plot_title="Starting")
 	
 	phi = particle_count/(filling * (edge_length^2))
 	ham_operator = get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi; kwargs...)
 	ham = TTNKit.TPO(ham_operator,lat)
 	#ham = TTNKit.Hamiltonian(ham_operator,lat; mapping=TTNKit.hilbert_curve(lat))
 	println("Made TPO")
-	#return ttn,ham
+
 	proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
 	println("Finished Making Hamiltonian")
 	#
@@ -438,10 +447,12 @@ function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_str
 		                    tol=eigsolve_tol,
 		                    krylovdim=eigsolve_krylovdim,
 		                    maxiter=eigsolve_maxiter)
-	num_sweeps = get(kwargs, :num_sweeps, 1)
+	
 	noise = get(kwargs, :noise, 0.0)
 	sp = TTNKit.SimpleSweepHandler(ttn,proj_tpo,func,num_sweeps,[max_dim],[noise],TTNKit.NoExpander())
-	TTNKit.sweep(ttn,sp;outputlevel=0);
+	if if_sweep
+		TTNKit.sweep(ttn,sp;outputlevel=1);
+	end
 	#=
 	fin_time = get(kwargs, :fin_time, 0.1)
 	timestep = get(kwargs, :timestep, fin_time/25)
@@ -451,13 +462,22 @@ function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_str
 	return ttn,ham,sp
 end
 
+function find_likely_path(ttn,starting_site; kwargs...)
+	net = TTNKit.network(ttn)
+	lat = TTNKit.physical_lattice(net)
+	return
+end
+
 function get_occupancy(ttn,edge_length; kwargs...)
+	#=
 	exp_occ = zeros(edge_length,edge_length)
 	for x in 1:edge_length
 		for y in 1:edge_length
 			exp_occ[x,y] = TTNKit.expect(ttn,"N",(x,y))
 		end
 	end
+	=#
+	exp_occ = abs.(TTNKit.expect(ttn,"N"))
 	if get(kwargs, :if_plot, true)
 		fig = figure()
 		imshow(exp_occ)
@@ -575,27 +595,29 @@ function localinner(ttn1::TTNKit.TreeTensorNetwork{N, T}, old_ttn2::TTNKit.TreeT
     return abs2(sres)
 end
 
-
 #final_time = 0.1
-if_per = false
+if_per = true
+mag_off = false
+evolve = true
 chemical = true
-mu = 2.0
+mu = 0.5
 bc_string = get_periodic_title_string(if_per)
-edge_sites = 4
+edge_sites = 8
 tot_sites = edge_sites^2
 us = 1.0
-ts = 0.01
+ts = 0.2
 #phi_val = 1/16
 nu = 1/2
 #for num_particles in [1,5,10]
 num_particles = get_particles_needed(edge_sites; nu=nu)
 mdim = 50
-nswps = 10
+nswps = 2
 println("Using $num_particles particles on $tot_sites sites")
 
-gs_ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim, if_chem=chemical, chem_strength=mu)
-
-get_occupancy(gs_ttn,edge_sites)
+#for iter in 1:1
+gs_ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim, if_chem=chemical, chem_strength=mu, no_magF=mag_off, if_sweep=evolve)
+#get_occupancy(gs_ttn,edge_sites)
+#end
 #
 rez = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
 rez2 = get_xdir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
@@ -603,8 +625,8 @@ rez3 = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_s
 rez4 = get_xdir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string", direction="rev")
 #
 #
-#rez3 = get_current_yfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
-#rez4 = get_current_xfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
+rez3 = get_current_yfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
+rez4 = get_current_xfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
 
 #end
 "fin"
