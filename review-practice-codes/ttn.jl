@@ -16,7 +16,7 @@ function get_xy(site_number,side_length)
 	x = (site_number % side_length)
 	if x == 0
 		return x+1,y-1
-	elseif x > site_length | y > site_length
+	elseif x > side_length | y > side_length
 		println("ERROR: Outside Square")
 		return x,y
 	end
@@ -462,10 +462,95 @@ function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_str
 	return ttn,ham,sp
 end
 
+function plot_grid(edge_length)
+	for i in 1:edge_length
+		constant = [i for j in 1:edge_length]
+		change = [k for k in 1:edge_length]
+		plot(change,constant,"-pr")
+		plot(constant,change,"-pr")
+	end
+	return
+end
+
+function plot_path(path,edge_length; kwargs...)
+	path_length = length(path)
+	xs = zeros(path_length)
+	ys = zeros(path_length)
+	for i in 1:path_length
+		xs[i] = path[i][1]
+		ys[i] = path[i][2]
+	end
+	fig = figure()
+	plot_grid(edge_length)
+	plot(xs,ys,"-pk";markersize=15.0,linewidth=7.0)
+	plot([xs[1]],[ys[1]],"-pg";markersize=15.0)
+	for i in 1:Int(ceil(length(xs)/2))
+		arrow((xs[i+1]+xs[i])/2,(ys[i+1]+ys[i])/2,(xs[i+1]-xs[i])/4,(ys[i+1]-ys[i])/4,width=0.15)
+	end
+	xlabel("X")
+	ylabel("Y")
+	xlim((0.5,edge_length+0.5))
+	ylim((0.5,edge_length+0.5))
+	title_string = "Likely Path, " * get(kwargs, :plot_title, "")
+	title(title_string)
+	return xs,ys
+end
+
+function get_stop_path_redo(path,allowed=5)
+	if length(path) < allowed + 1
+		return path
+	else
+		return path[end-allowed:end]
+	end
+end
+
 function find_likely_path(ttn,starting_site; kwargs...)
 	net = TTNKit.network(ttn)
 	lat = TTNKit.physical_lattice(net)
-	return
+	edge_length = Int(sqrt(TTNKit.number_of_sites(lat)))
+	path_length = get(kwargs, :path_length, Int(4*edge_length))
+	path = [starting_site]
+	all_neighbors = TTNKit.nearest_neighbours(lat,collect(1:edge_length^2); kwargs...)
+	for i in 1:path_length
+		if i == 1
+			current_site_num = get_site_number(starting_site[1],starting_site[2],edge_length)
+		end
+		#current_site_num = get_site_number(current_site[1],current_site[2],edge_length)
+		all_probs = []
+		next_sites = []
+		stopredo = get_stop_path_redo(path)
+		for (s1,s2) in all_neighbors
+			if s1 == current_site_num
+				if !(TTNKit.coordinate(lat,s2) in stopredo)
+					transition_prob = abs2.(TTNKit.correlation(ttn,"Adag","A",(s1),(s2)))
+					append!(all_probs,[transition_prob])
+					append!(next_sites,[s2])
+				end
+			elseif s2 == current_site_num
+				if !(TTNKit.coordinate(lat,s1) in stopredo)
+					transition_prob = abs2.(TTNKit.correlation(ttn,"Adag","A",(s2),(s1)))
+					append!(all_probs,[transition_prob])
+					append!(next_sites,[s1])
+				end
+			end
+		end
+		if length(all_probs) < 1
+			println("Got Stuck at $i Steps")
+			if get(kwargs, :if_plot, true)
+				plot_path(path,edge_length; kwargs...)
+			end
+			return path
+		end
+		next_site = next_sites[findfirst(x->x==maximum(all_probs),all_probs)]
+		next_coord = TTNKit.coordinate(lat,next_site)
+		#println(next_coord)
+		append!(path,[next_coord])
+		global current_site_num = next_site
+	end
+	if get(kwargs, :if_plot, true)
+		plot_path(path,edge_length; kwargs...)
+	end
+	return path
 end
 
 function get_occupancy(ttn,edge_length; kwargs...)
@@ -596,7 +681,7 @@ function localinner(ttn1::TTNKit.TreeTensorNetwork{N, T}, old_ttn2::TTNKit.TreeT
 end
 
 #final_time = 0.1
-if_per = true
+if_per = false
 mag_off = false
 evolve = true
 chemical = true
@@ -615,10 +700,19 @@ nswps = 2
 println("Using $num_particles particles on $tot_sites sites")
 
 #for iter in 1:1
-gs_ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim, if_chem=chemical, chem_strength=mu, no_magF=mag_off, if_sweep=evolve)
+#gs_ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim, if_chem=chemical, chem_strength=mu, no_magF=mag_off, if_sweep=evolve)
+
+for i in 1:2*edge_sites
+if i <= edge_sites
+start = (i,edge_sites)#(rand((1:edge_sites)),rand((1:edge_sites)))
+else
+start = (edge_sites,i-edge_sites)
+end
+rez = find_likely_path(gs_ttn,start; periodic=if_per)
+end
 #get_occupancy(gs_ttn,edge_sites)
 #end
-#
+#=
 rez = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
 rez2 = get_xdir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
 rez3 = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string", direction="rev")
@@ -627,6 +721,6 @@ rez4 = get_xdir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_s
 #
 rez3 = get_current_yfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
 rez4 = get_current_xfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
-
+=#
 #end
 "fin"
