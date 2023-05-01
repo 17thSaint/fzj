@@ -555,11 +555,16 @@ function find_likely_path(ttn,starting_site; kwargs...)
 end
 
 function get_path_direction(path,edge_length)
-	corner_index = findfirst(x->x==(edge_length-1,edge_length-1),path)
-	if corner_index == Nothing
-		println("Path never reached the corner")
-		return path
+	corner_index_list = findall(x->x==(edge_length-1,edge_length-1),path)
+	if length(corner_index_list) < 1
+		corner_index_list = findall(x->x==(2,2),path)
+		if length(corner_index_list) < 1
+			println("Path never reached the corner")
+			plot_path(path,edge_length; plot_title="Not at Corner")
+			return path
+		end
 	end
+	corner_index = corner_index_list[1]
 	x_changes = [path[i+1][1] - path[i][1] for i in corner_index:corner_index+edge_length-4]
 	y_changes = [path[i+1][2] - path[i][2] for i in corner_index:corner_index+edge_length-4]
 	if all(x_changes.==0.0)
@@ -567,8 +572,22 @@ function get_path_direction(path,edge_length)
 	elseif all(y_changes.==0.0)
 		return "CCW"
 	else
-		println("Not a straight path along the edge")
-		return x_changes,y_changes
+		if corner_index <= edge_length - 3
+			corner_index = corner_index_list[2]
+		end
+		x_changes = []
+		x_changes = [path[i+1][1] - path[i][1] for i in corner_index-edge_length+3:corner_index-1]
+		y_changes = []
+		y_changes = [path[i+1][2] - path[i][2] for i in corner_index-edge_length+3:corner_index-1]
+		if all(y_changes.==0.0)
+			return "CW"
+		elseif all(x_changes.==0.0)
+			return "CCW"
+		else
+			println("Not a straight path along the edge")
+			plot_path(path,edge_length; plot_title="No straight edge path")
+			return x_changes,y_changes
+		end
 	end
 end
 
@@ -601,11 +620,11 @@ function plot_paths_directions(paths,edge_length; kwargs...)
 	return cws_xs,cws_ys,ccws_xs,ccws_ys
 end
 
-function get_all_sites_paths_and_plot(ttn; kwargs...)
+function get_all_sites_paths_and_plot(ttn,edge_length; kwargs...)
 	if_periodic = get(kwargs, :if_periodic, false)
 	paths = []
-	for i in 1:edge_sites
-		for j in 1:edge_sites
+	for i in 1:edge_length
+		for j in 1:edge_length
 			start = (i,j)
 			println(start)
 			rez = find_likely_path(ttn,start; periodic=if_periodic, if_plot=false)
@@ -613,7 +632,7 @@ function get_all_sites_paths_and_plot(ttn; kwargs...)
 		end
 	end
 	direction_results = plot_paths_directions(paths,edge_sites)
-	return direction_results
+	return direction_results,paths
 end
 
 function get_occupancy(ttn,edge_length; kwargs...)
