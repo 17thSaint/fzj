@@ -504,7 +504,26 @@ function get_stop_path_redo(path,allowed=5)
 	end
 end
 
-function find_likely_path(ttn,starting_site; kwargs...)
+function normalize_transition_probs(given_probs)
+	og_sum = sum(given_probs)
+	return (1/og_sum) .* given_probs
+end
+
+function get_rand_next_site(probabilities)
+	normed_probs = normalize_transition_probs(probabilities)
+	x = rand()
+	s = 0.0
+	for i in 1:length(normed_probs)
+        	s += normed_probs[i]
+        	if s >= x
+            		return i
+        	end
+    	end
+    	println("Error: Probabilities didn't work")
+    	return
+end
+
+function find_path(ttn,starting_site; kwargs...)
 	net = TTNKit.network(ttn)
 	lat = TTNKit.physical_lattice(net)
 	edge_length = Int(sqrt(TTNKit.number_of_sites(lat)))
@@ -512,6 +531,8 @@ function find_likely_path(ttn,starting_site; kwargs...)
 	path = [starting_site]
 	if_periodic = get(kwargs, :periodic, false)
 	all_neighbors = TTNKit.nearest_neighbours(lat,collect(1:edge_length^2); periodic=if_periodic)
+	likely_path = get(kwargs, :likely_path, false)
+	rand_path = get(kwargs, :rand_path, !likely_path)
 	for i in 1:path_length
 		if i == 1
 			current_site_num = get_site_number(starting_site[1],starting_site[2],edge_length)
@@ -542,7 +563,11 @@ function find_likely_path(ttn,starting_site; kwargs...)
 			end
 			return path
 		end
-		next_site = next_sites[findfirst(x->x==maximum(all_probs),all_probs)]
+		if likely_path
+			next_site = next_sites[findfirst(x->x==maximum(all_probs),all_probs)]
+		elseif rand_path
+			next_site = next_sites[get_rand_next_site(all_probs)]
+		end
 		next_coord = TTNKit.coordinate(lat,next_site)
 		#println(next_coord)
 		append!(path,[next_coord])
@@ -622,12 +647,13 @@ end
 
 function get_all_sites_paths_and_plot(ttn,edge_length; kwargs...)
 	if_periodic = get(kwargs, :if_periodic, false)
+	likely_path = get(kwargs, :likely_path, false)
 	paths = []
 	for i in 1:edge_length
 		for j in 1:edge_length
 			start = (i,j)
 			println(start)
-			rez = find_likely_path(ttn,start; periodic=if_periodic, if_plot=false)
+			rez = find_path(ttn,start; likely_path=likely_path, periodic=if_periodic, if_plot=false)
 			append!(paths,[rez])
 		end
 	end
@@ -782,9 +808,15 @@ nswps = 2
 println("Using $num_particles particles on $tot_sites sites")
 
 #for iter in 1:1
-gs_ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim, if_chem=chemical, chem_strength=mu, no_magF=mag_off, if_sweep=evolve)
+#gs_ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim, if_chem=chemical, chem_strength=mu, no_magF=mag_off, if_sweep=evolve)
 
-get_all_sites_paths_and_plot(gs_ttn; if_periodic=if_per)
+x = rand((1:edge_sites))
+y = 2
+start = (x,y)
+for i in 1:10
+path_rez = find_path(gs_ttn,start; periodic=if_per, likely_path=false)
+end
+#get_all_sites_paths_and_plot(gs_ttn, edge_sites; if_periodic=if_per, likely_path=false)
 
 #get_occupancy(gs_ttn,edge_sites)
 #end
@@ -793,8 +825,8 @@ rez = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_st
 rez2 = get_xdir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
 rez3 = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string", direction="rev")
 rez4 = get_xdir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string", direction="rev")
-#
-#
+=#
+#=
 rez3 = get_current_yfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
 rez4 = get_current_xfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
 =#
