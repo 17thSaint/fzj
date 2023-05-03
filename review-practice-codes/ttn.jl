@@ -1,4 +1,4 @@
-using TTNKit,PyPlot
+using TTNKit,PyPlot,Statistics
 
 #=
 Need to figure out how sweeps works
@@ -76,14 +76,14 @@ function get_ydir_greenfunc(edge_length,ttn; kwargs...)
 		xlabel("Y")
 		ylabel("Correlation")
 		legend()
-		#
+		#=
 		fig = figure()
 		imshow(all_greens)
 		xlabel("Y")
 		ylabel("X")
 		colorbar()
 		title(title_string)
-		#
+		=#
 	end
 	
 	return all_yvals,all_greens
@@ -414,16 +414,16 @@ function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_str
 	num_sweeps = get(kwargs, :num_sweeps, 1)
 	if_sweep = get(kwargs, :if_sweep, true)
 
-	square = TTNKit.BinaryNetwork((edge_length,edge_length), TTNKit.ITensorNode, "Boson",conserve_number=false)
+	square = TTNKit.BinaryNetwork((edge_length,edge_length), TTNKit.ITensorNode, "Boson",conserve_number=true)
 	lat = TTNKit.physical_lattice(square)
 	num_sites = length(lat)
-	println("Finished Building Network")
+	#println("Finished Building Network")
 
 	states = fill_states(particle_count,num_sites)
-	println("Built States Vector")
+	#println("Built States Vector")
 	ttn = TTNKit.ProductTreeTensorNetwork(square,states;orthogonalize=true)
 	ttn = TTNKit.increase_dim_tree_tensor_network_zeros(ttn, maxdim = max_dim)
-	println("Added States")
+	#println("Added States")
 
 	#get_occupancy(ttn,edge_sites; plot_title="Starting")
 	
@@ -431,10 +431,10 @@ function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_str
 	ham_operator = get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi; kwargs...)
 	ham = TTNKit.TPO(ham_operator,lat)
 	#ham = TTNKit.Hamiltonian(ham_operator,lat; mapping=TTNKit.hilbert_curve(lat))
-	println("Made TPO")
+	#println("Made TPO")
 
 	proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
-	println("Finished Making Hamiltonian")
+	#println("Finished Making Hamiltonian")
 	#
 	eigsolve_tol = TTNKit.DEFAULT_TOL_DMRG
 	eigsolve_krylovdim = TTNKit.DEFAULT_KRYLOVDIM_DMRG
@@ -451,7 +451,7 @@ function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_str
 	noise = get(kwargs, :noise, 0.0)
 	sp = TTNKit.SimpleSweepHandler(ttn,proj_tpo,func,num_sweeps,[max_dim],[noise],TTNKit.NoExpander())
 	if if_sweep
-		TTNKit.sweep(ttn,sp;outputlevel=1);
+		TTNKit.sweep(ttn,sp;outputlevel=0);
 	end
 	#=
 	fin_time = get(kwargs, :fin_time, 0.1)
@@ -616,7 +616,22 @@ function get_path_direction(path,edge_length)
 	end
 end
 
-function plot_paths_directions(paths,edge_length; kwargs...)
+function plot_paths_directions(cws_xs,cws_ys,ccws_xs,ccws_ys,edge_length; kwargs...)
+	fig = figure()
+	plot_grid(edge_length)
+	plot(cws_xs,cws_ys,"pb",markersize=15.0,label="CW")
+	plot(ccws_xs,ccws_ys,"pg",markersize=15.0,label="CCW")
+	xlabel("X")
+	ylabel("Y")
+	legend()
+	xlim((0.5,edge_length+0.5))
+	ylim((0.5,edge_length+0.5))
+	title_string = "Path Direction" * get(kwargs, :plot_title, "")
+	title(title_string)
+	return
+end
+
+function make_paths_directions(paths,edge_length; kwargs...)
 	cws_xs = []
 	cws_ys = []
 	ccws_xs = []
@@ -631,17 +646,9 @@ function plot_paths_directions(paths,edge_length; kwargs...)
 			append!(ccws_ys,[paths[i][1][2]])
 		end
 	end
-	fig = figure()
-	plot_grid(edge_length)
-	plot(cws_xs,cws_ys,"pb",markersize=15.0,label="CW")
-	plot(ccws_xs,ccws_ys,"pg",markersize=15.0,label="CCW")
-	xlabel("X")
-	ylabel("Y")
-	legend()
-	xlim((0.5,edge_length+0.5))
-	ylim((0.5,edge_length+0.5))
-	title_string = "Path Direction" * get(kwargs, :plot_title, "")
-	title(title_string)
+	if get(kwargs, :if_plot, true)
+		plot_paths_directions(cws_xs,cws_ys,ccws_xs,ccws_ys,edge_length; kwargs...)
+	end
 	return cws_xs,cws_ys,ccws_xs,ccws_ys
 end
 
@@ -657,7 +664,7 @@ function get_all_sites_paths_and_plot(ttn,edge_length; kwargs...)
 			append!(paths,[rez])
 		end
 	end
-	direction_results = plot_paths_directions(paths,edge_sites)
+	direction_results = make_paths_directions(paths,edge_sites; kwargs...)
 	return direction_results,paths
 end
 
@@ -735,7 +742,7 @@ function localinner(ttn1::TTNKit.TreeTensorNetwork{N, T}, old_ttn2::TTNKit.TreeT
 
     net = TTNKit.network(ttn1)
     
-    ttn2 = rewrite_inds(old_ttn2,ttn1)
+    ttn2 = rewrite_inds(copy(old_ttn2),ttn1)
 
     elT = promote_type(eltype(ttn1), eltype(ttn2))
     # check in case if symmetric the Top node for qn correspondence
@@ -788,35 +795,86 @@ function localinner(ttn1::TTNKit.TreeTensorNetwork{N, T}, old_ttn2::TTNKit.TreeT
     return abs2(sres)
 end
 
+function get_phase_diag_MISF(ts_start,ts_end,ts_count,chem_start,chem_end,chem_count,edge_length,particles_count,us,nu; kwargs...)
+	tss = [ts_start + (i-1)*(ts_end-ts_start)/ts_count for i in 1:ts_count+1]
+	mus = [chem_start + (i-1)*(chem_end-chem_start)/chem_count for i in 1:chem_count+1]
+	mis_m = []
+	mis_t = []
+	sfs_m = []
+	sfs_t = []
+	for i in 1:length(tss)
+		ts = ts[i]
+		for j in 1:length(mus)
+			chem = mus[i]
+			ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_length,particles_count,us,ts,nu; chem_strength=chem, kwargs...)
+			rez = get_ydir_greenfunc(edge_length,ttn; if_plot=false)
+			if all(rez[2][:,2:end] .< 10^-20)
+				append!(mis_m,[mu])
+				append!(mis_t,[ts])
+			else
+				append!(sfs_m,[mu])
+				append!(sfs_t,[ts])
+			end
+		end
+	end
+	fig = figure()
+	scatter(mis_t,mis_m,c="b",label="MI")
+	scatter(sfs_t,sfs_m,c="g",label="SF")
+	xlabel("hopping strength")
+	ylabel("chemical strength")
+	legend()
+	return mis_m,mis_t,sfs_m,sfs_t
+end
+
 #final_time = 0.1
 if_per = false
-mag_off = false
+mag_off = true
 evolve = true
 chemical = true
-mu = 0.5
+mu = 1.0
 bc_string = get_periodic_title_string(if_per)
 edge_sites = 8
 tot_sites = edge_sites^2
 us = 1.0
-ts = 0.2
+ts = 5.0
 #phi_val = 1/16
 nu = 1/2
 #for num_particles in [1,5,10]
-num_particles = get_particles_needed(edge_sites; nu=nu)
+#num_particles = get_particles_needed(edge_sites; nu=nu)
 mdim = 50
 nswps = 2
-println("Using $num_particles particles on $tot_sites sites")
+#println("Using $num_particles particles on $tot_sites sites")
 
-#for iter in 1:1
-#gs_ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim, if_chem=chemical, chem_strength=mu, no_magF=mag_off, if_sweep=evolve)
-
-x = rand((1:edge_sites))
-y = 2
-start = (x,y)
-for i in 1:10
-path_rez = find_path(gs_ttn,start; periodic=if_per, likely_path=false)
+iters = 5
+densities = [0.1 + (i-1)*(0.99 - 0.1)/iters for i in 1:iters+1]
+for i in 3:3length(densities)
+num_particles = Int(ceil(tot_sites * densities[i]))
+println(round(100*i/length(densities),digits=1),"%")
+gs_ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim, if_chem=chemical, chem_strength=mu, no_magF=mag_off, if_sweep=evolve)
+rez = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles")
+rez2 = get_occupancy(gs_ttn,edge_sites; plot_title="N=$num_particles")
 end
-#get_all_sites_paths_and_plot(gs_ttn, edge_sites; if_periodic=if_per, likely_path=false)
+#=
+howmany = 3
+all_ttns = []
+path_dirs = []
+for i in 1:howmany
+	gs_ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim, if_chem=chemical, chem_strength=mu, no_magF=mag_off, if_sweep=evolve)
+	append!(all_ttns,[gs_ttn])
+	path_dir_data = get_all_sites_paths_and_plot(gs_ttn, edge_sites; if_periodic=if_per, likely_path=true)
+	append!(path_dirs,[path_dir_data])
+end
+
+for i in 1:howmany
+	for j in 1:howmany
+		overlap = localinner(all_ttns[i],all_ttns[j])
+		println("$i, $j: ",overlap)
+	end
+end
+=#
+
+#start = (rand((1:edge_sites)),rand((1:edge_sites)))
+#path_rez = find_path(gs_ttn,start; periodic=if_per, likely_path=false)
 
 #get_occupancy(gs_ttn,edge_sites)
 #end
