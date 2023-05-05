@@ -392,22 +392,25 @@ function count_filled_states(states_vector)
 	return count
 end
 
-function fill_states(particle_count,site_count)
+function fill_states(particle_count,site_count,max_occupation)
 	states = fill("0",site_count)
 	for i in 1:particle_count
 		#
-		if i > site_count
-			println("Too Many Particles, stopping at $site_count")
+		if i > site_count * max_occupation
+			println("Too Many Particles, stopping at $site_count each with $max_occupation particles")
 			return states
 		end
 		#
 		while count_filled_states(states) < i
 			site = rand((1:site_count))#rand([(i-1)*Int(sqrt(site_count))+Int(sqrt(site_count)) for i in 1:Int(sqrt(site_count))])
-			if states[site] != "1"
-				states[site] = "1"
-			end
+			#if states[site] != "1"
+			#	states[site] = "1"
+			#end
 			#
-			#states[site] = string(parse(Int64,states[site]) + 1)
+			current_occupation = parse(Int64,states[site])
+			if current_occupation < max_occupation
+				states[site] = string(current_occupation + 1)
+			end
 		end
 	end
 	return states
@@ -419,19 +422,20 @@ function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_str
 	if_sweep = get(kwargs, :if_sweep, true)
 	noise = get(kwargs, :noise, 0.0)
 	expander = get(kwargs, :expander, TTNKit.NoExpander())
+	max_occ = get(kwargs, :max_occ, 4)
 
-	square = TTNKit.BinaryNetwork((edge_length,edge_length), TTNKit.ITensorNode, "Boson",conserve_number=true)
+	square = TTNKit.BinaryNetwork((edge_length,edge_length), TTNKit.ITensorNode, "Boson",conserve_number=true,dim=max_occ+1)
 	lat = TTNKit.physical_lattice(square)
 	num_sites = length(lat)
 	#println("Finished Building Network")
 
-	states = fill_states(particle_count,num_sites)
+	states = fill_states(particle_count,num_sites,max_occ)
 	#println("Built States Vector")
 	old_ttn = TTNKit.ProductTreeTensorNetwork(square,states;orthogonalize=true)
 	#ttn = TTNKit.increase_dim_tree_tensor_network_zeros(ttn, maxdim = max_dim)
 	ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
 	#println("Added States")
-
+	
 	#get_occupancy(ttn,edge_sites; plot_title="Starting")
 	
 	phi = particle_count/(filling * (edge_length^2))
@@ -463,7 +467,7 @@ function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_str
 	
 	sp = TTNKit.SimpleSweepHandler(ttn,proj_tpo,func,num_sweeps,[max_dim],[noise],TTNKit.NoExpander())
 	if if_sweep
-		TTNKit.sweep(ttn,sp;outputlevel=1);
+		TTNKit.sweep(ttn,sp;outputlevel=0);
 	end
 	#
 	#=
@@ -839,51 +843,125 @@ function get_phase_diag_MISF(ts_start,ts_end,ts_count,chem_start,chem_end,chem_c
 	return mis_m,mis_t,sfs_m,sfs_t
 end
 
-function get_mu_minus(ts,edge_length; kwargs...)
-	#gs_ttn_full, harphof_ham_full, hh_sp_full = build_full_harperhofstadter(edge_length,edge_length^2,1.0,ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
-	energy_full = 0.0#hh_sp_full.current_energy
+function get_mu_transitions(ts,edge_length,n=1; kwargs...)
+	if get(kwargs, :max_occ, 4) < n + 1
+		println("Max Occupation not larger enough for $n particle filling")
+		return
+	end
+	if_mm = get(kwargs, :mm, true)
+	if_mp = get(kwargs, :mp, true)
+	if if_mm && if_mp
+		results = [0.0,0.0]
+	else
+		results = [0.0]
+	end
 	
-	gs_ttn_minus, harphof_ham_minus, hh_sp_minus = build_full_harperhofstadter(edge_length,edge_length^2-1,1.0,ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
-	energy_minus = hh_sp_minus.current_energy
-	mu_minus = energy_full - energy_minus
-	return mu_minus
+	gs_ttn_full, harphof_ham_full, hh_sp_full = build_full_harperhofstadter(edge_length,n*edge_length^2,1.0,ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
+	energy_full = hh_sp_full.current_energy
+	
+	Threads.@threads for i in 1:2
+		if i == 1
+			if if_mm
+				gs_ttn_minus, harphof_ham_minus, hh_sp_minus = build_full_harperhofstadter(edge_length,n*edge_length^2-1,1.0,ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
+				energy_minus = hh_sp_minus.current_energy
+				mu_minus = energy_full - energy_minus
+				results[1] = mu_minus
+			end
+		else
+			if if_mp
+				gs_ttn_plus, harphof_ham_plus, hh_sp_plus = build_full_harperhofstadter(edge_length,n*edge_length^2+1,1.0,ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
+				energy_plus = hh_sp_plus.current_energy
+				mu_plus = energy_plus - energy_full
+				if length(results) > 1
+					results[2] = mu_plus
+				else
+					results[1] = mu_plus
+				end
+			end	
+		end
+	end	
+	return results
 end
 
-function get_mm_range_t(ts_start,ts_end,ts_count,edge_length; kwargs...)
+function get_mu_trans_range_t(ts_start,ts_end,ts_count,edge_length,n=1; kwargs...)
 	tss = [ts_start + i*(ts_end-ts_start)/ts_count for i in 0:ts_count]
-	mms = []
-	for i in 1:length(tss)
+	if_mm = get(kwargs, :mm, true)
+	if_mp = get(kwargs, :mp, true)
+	mms = [0.0 for i in 1:length(tss)]
+	mps = [0.0 for i in 1:length(tss)]
+	Threads.@threads for i in 1:length(tss)
+	#for i in 1:length(tss)
+		#println(round(100*i/length(tss),digits=2),"%")
 		ts = tss[i]
-		mm = get_mu_minus(ts,edge_length; kwargs...)
-		append!(mms,[mm])
+		results = get_mu_transitions(ts,edge_length,n; mm=true, mp=true, kwargs...)
+		if if_mm
+			mms[i] = results[1]
+			if if_mp
+				mps[i] = results[2]
+			end
+		elseif if_mp
+			mps[i] = results[1]
+		end
 	end
 	if get(kwargs, :if_plot, true)
 		fig = figure()
-		plot(tss,mms,"-p")
+		if if_mm
+			plot(tss,mms,"-p",label="Minus")
+		end
+		if if_mp
+			plot(tss,mps,"-p",label="Plus")
+		end
 		xlabel("Hopping Strength, t")
 		ylabel("Chemical Potential, mu")
-		title_string = "Mu Minus, " * get(kwargs, :plot_title, "")
+		title_string = "Mott Transition, " * get(kwargs, :plot_title, "")
 		title(title_string)
 	end
-	return mms,tss
+	if length(mms) < 1
+		return mps,tss
+	elseif length(mps) < 1
+		return mms,tss
+	else
+		return mms,mps,tss
+	end
 end
 
-function get_mm_range_N(ts,edge_start,edge_count; kwargs...)
+function get_mu_trans_range_N(ts,edge_start,edge_count,n=1; kwargs...)
 	edges = [edge_start*(2^i) for i in 0:edge_count-1]
+	if_mm = get(kwargs, :mm, true)
+	if_mp = get(kwargs, :mp, true)
 	mms = []
+	mps = []
 	for j in 1:length(edges)
-		mm = get_mu_minus(ts,edges[j]; kwargs...)
-		append!(mms,[mm])
+		results = get_mu_transitions(ts,edges[j],n; mm=true, mp=true, kwargs...)
+		if if_mm
+			append!(mms,[results[1]])
+			if if_mp
+				append!(mps,[results[2]])
+			end
+		elseif if_mp
+			append!(mps,[results[1]])
+		end
 	end
 	if get(kwargs, :if_plot, true)
 		fig = figure()
-		plot(1 ./ edges,mms,"-p")
+		if if_mm
+			plot(1 ./ edges,mms,"-p",label="Minus")
+		end
+		if if_mp
+			plot(1 ./ edges,mps,"-p",label="Plus")
+		end
 		xlabel("1/Nsites")
 		ylabel("Chemical Potential, mu")
-		title_string = "Mu Minus, " * get(kwargs, :plot_title, "")
+		title_string = "Mu Transitions, " * get(kwargs, :plot_title, "")
 		title(title_string)
 	end
-	return mms,edges
+	if length(mms) < 1
+		return mps,tss
+	elseif length(mps) < 1
+		return mms,tss
+	else
+		return mms,mps,tss
+	end
 end
 
 
@@ -894,35 +972,75 @@ mag_off = true
 evolve = true
 chemical = false
 mu = 1.0
+max_occupation = 3
 bc_string = get_periodic_title_string(if_per)
-#edge_sites = 4
-#tot_sites = edge_sites^2
+edge_sites = 8
+tot_sites = edge_sites^2
 #expan = TTNKit.DefaultExpander(0.2)
 us = 1.0
-#ts = 0.05
+ts = 0.05
 #phi_val = 1/16
 nu = 1/2
 #for num_particles in [1,5,10]
 #num_particles = get_particles_needed(edge_sites; nu=nu)
-mdim = 50
-nswps = 2
+mdim = 200
+nswps = 3
 
 #iters = 5
-#densities = [0.1 + (i-1)*(0.99 - 0.1)/iters for i in 1:iters+1]
-#i = 3
-#num_particles = tot_sites-1#Int(ceil(tot_sites * densities[i]))
+#densities = [0.1 + (i-1)*(1.5 - 0.1)/iters for i in 1:iters+1]
+#i = 4
+#num_particles = Int(ceil(tot_sites * densities[i]))
 #println("Using $num_particles particles on $tot_sites sites")
-
+#
+tss_4 = [0.01
+ 0.058
+ 0.106
+ 0.154
+ 0.202
+ 0.25]
+mms_4 = [0.03254019338528626
+  0.19703649980257093
+  0.25692561414112847
+  0.17199211874218
+  0.07003634491795463
+ -0.03184842280289679]
+mps_4 = [0.9348465083634601
+ 0.6006191804880917
+ 0.3561371541875342
+ 0.24636456209103308
+ 0.13452163119783744
+ 0.017517765394721607]
+#=mms_8_wrong = [-3.6311507468020685
+  1.149919854403895
+  0.3030289434795632
+  0.2527676999269648
+  0.07099006370710725
+ -0.03191784541613529]
+mps_8_wrong = [0.9251634445295182
+ -0.42042475058129636
+  0.31883040164750476
+  0.24849753112928852
+  0.20708694335753464
+  0.7156735884706755]
+=#
+#
 t_count = 5
 t_start = 0.01
-t_end = 0.5
-for edge_sites in [2,4,8]
-	mms,tss = get_mm_range_t(t_start,t_end,t_count,edge_sites; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim, if_plot=false)
-	plot(tss,mms,"-p",label="$edge_sites")
-	xlabel("Hopping Strength, t")
-	ylabel("Chemical Potential, mu")
-end
+t_end = 0.25
+#for edge_sites in [4]
+#st = time()
+mms,mps,tss = get_mu_trans_range_t(t_start,t_end,t_count,edge_sites; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim, max_occ=max_occupation, if_plot=false)
+#en = time()
+#println("Time = ",en-st)
+plot(tss,mms,"-p",label="Minus")
+plot(tss,mps,"-p",label="Plus")
+xlabel("Hopping Strength, t")
+ylabel("Chemical Potential, mu")
+#end
 legend()
+plot(tss_4,mms_4,"-p",label="Minus")
+plot(tss_4,mps_4,"-p",label="Plus")
+
 #rez = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles")
 
 #end
