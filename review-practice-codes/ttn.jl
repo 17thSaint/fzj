@@ -1,4 +1,4 @@
-using TTNKit,PyPlot,Statistics
+using TTNKit,PyPlot,Statistics,LsqFit
 
 #=
 Need to figure out how sweeps works
@@ -275,7 +275,8 @@ function get_xy_coeffs(x,y,edge_length,t_strength,phi,thetax=thetax_1,thetay=the
 	return x_coeff, y_coeff
 end
 
-function get_inter_coeff(s1,s2,edge_length,t_strength,phi; kwargs...)
+function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwargs...) 
+	#=
 	if get(kwargs, :no_magF, false)
 		phi = 0.0
 	end
@@ -285,28 +286,31 @@ function get_inter_coeff(s1,s2,edge_length,t_strength,phi; kwargs...)
 			println("Using ThetaY")
 		end
 		=#
-		return -t_strength * exp(im*2*pi*(phi*s1[1] - ==(edge_length,s1[2])*thetay))
+		return -t_strength #* exp(im*2*pi*(phi*s1[1] - ==(edge_length_y,s1[2])*thetay))
 	elseif s1[2] == s2[2]
 		thetax = get(kwargs, :thetax, thetax_2)
 		#=if ==(edge_length,s1[1])
 			println("Using ThetaX")
 		end
 		=#
-		return -t_strength * exp(-im*2*pi* ==(edge_length,s1[1]) *thetax)
+		return -t_strength #* exp(-im*2*pi* ==(edge_length_x,s1[1]) *thetax)
 	end
+	=#
+	return -t_strength
 end
 
-function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi; kwargs...)
+function get_hofstadter_interacting_hamilt(net,u_strength,t_strength,phi; kwargs...)
 	resulting_ham = []
 	if_periodic = get(kwargs, :if_periodic, true)
 	if_hopping = get(kwargs, :if_hopping, true)
 	if_chem = get(kwargs, :if_chem, false)
 	no_magF = get(kwargs, :no_magF, false)
 	chem_strength = get(kwargs, :chem_strength, 0.0)
+	lat = TTNKit.physical_lattice(net)
+	edge_length_x,edge_length_y = size(lat)
 	#
 	if if_hopping
 		hopping = TTNKit.OpSum()
-		lat = TTNKit.Square(edge_length,edge_length)
 		for (s1,s2) in TTNKit.nearest_neighbours(lat,collect(1:TTNKit.number_of_sites(lat)); periodic=if_periodic)
 			s1_coord = TTNKit.coordinate(lat,s1)
 			s2_coord = TTNKit.coordinate(lat,s2)
@@ -314,7 +318,7 @@ function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi
 			#s1_coord = get_site_number(s1_coord_2d[1],s1_coord_2d[2],edge_length)
 			#s2_coord = get_site_number(s2_coord_2d[1],s2_coord_2d[2],edge_length)
 			
-			coeff = get_inter_coeff(s1_coord,s2_coord,edge_length,t_strength,phi; kwargs...)
+			coeff = get_inter_coeff(s1_coord,s2_coord,t_strength,phi,edge_length_x,edge_length_y; kwargs...)
 			hopping += (coeff,"Adag",s1_coord,"A",s2_coord)
 			hopping += (conj(coeff),"Adag",s2_coord,"A",s1_coord)
 		end
@@ -322,6 +326,10 @@ function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi
 	end
 	#
 	onsite = TTNKit.OpSum()
+	for i in TTNKit.eachindex(lat)
+		onsite += (u_strength/2,"Adag * Adag * A * A",TTNKit.coordinate(lat,i))
+	end
+	#=
 	for x in 1:edge_length
 		for y in 1:edge_length
 			#site_num = get_site_number(x,y,edge_length)
@@ -329,15 +337,21 @@ function get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi
 			onsite += (u_strength/2,"Adag * Adag * A * A",(x,y))
 		end
 	end
+	=#
 	append!(resulting_ham,[onsite])
 	
 	if if_chem
 		chem = TTNKit.OpSum()
+		for i in TTNKit.eachindex(lat)
+			chem -= (chem_strength,"N",TTNKit.coordinate(lat,i))
+		end
+		#=
 		for x in 1:edge_length
 			for y in 1:edge_length
 				chem -= (chem_strength,"N",(x,y))
 			end
 		end
+		=#
 		append!(resulting_ham,[chem])
 	end
 	
@@ -416,67 +430,72 @@ function fill_states(particle_count,site_count,max_occupation)
 	return states
 end
 
-function build_full_harperhofstadter(edge_length,particle_count,u_strength,t_strength,filling; kwargs...)
+function do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
+
+	opl = get(kwargs, :output_level, 1)
+	max_dim = get(kwargs, :max_dim, particle_count+1)
+	num_sweeps = get(kwargs, :num_sweeps, 1)
+	noise = get(kwargs, :noise, 0.0)
+	expander = get(kwargs, :expander, TTNKit.NoExpander())
+	
+	if sweep_type == "dmrg"
+		sp = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl)
+	elseif sweep_type == "simple"
+		proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
+		#println("Finished Making Hamiltonian")
+		eigsolve_tol = TTNKit.DEFAULT_TOL_DMRG
+		eigsolve_krylovdim = TTNKit.DEFAULT_KRYLOVDIM_DMRG
+		eigsolve_maxiter = TTNKit.DEFAULT_MAXITER_DMRG
+		ishermitian = TTNKit.DEFAULT_ISHERMITIAN_DMRG
+		eigsolve_which_eigenvalue = TTNKit.DEFAULT_WHICH_EIGENVALUE_DMRG
+		func = (action,T) -> TTNKit.eigsolve(action, T, 1,
+					    eigsolve_which_eigenvalue;
+					    ishermitian=ishermitian,
+					    tol=eigsolve_tol,
+					    krylovdim=eigsolve_krylovdim,
+					    maxiter=eigsolve_maxiter)
+		
+		sp = TTNKit.SimpleSweepHandler(ttn,proj_tpo,func,num_sweeps,[max_dim],[noise],expander)
+		TTNKit.sweep(ttn,sp;outputlevel=opl);
+	end
+	return ttn,ham,sp
+end
+
+function build_full_harperhofstadter(num_layers,particle_count,u_strength,t_strength,filling; kwargs...)
+	num_sites = 2^num_layers
 	max_dim = get(kwargs, :max_dim, particle_count+1)
 	num_sweeps = get(kwargs, :num_sweeps, 1)
 	if_sweep = get(kwargs, :if_sweep, true)
+	sweep_type = get(kwargs, :sweep_type, "simple")
 	noise = get(kwargs, :noise, 0.0)
 	expander = get(kwargs, :expander, TTNKit.NoExpander())
-	max_occ = get(kwargs, :max_occ, 4)
+	max_occ = get(kwargs, :max_occ, Int(ceil(particle_count/(num_sites))+1) )
 
-	square = TTNKit.BinaryNetwork((edge_length,edge_length), TTNKit.ITensorNode, "Boson",conserve_number=true,dim=max_occ+1)
-	lat = TTNKit.physical_lattice(square)
-	num_sites = length(lat)
-	#println("Finished Building Network")
+	net = TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, "Boson",conserve_number=true,dim=max_occ+1)
+	lat = TTNKit.physical_lattice(net)
+
+	println("Finished Building Network")
 
 	states = fill_states(particle_count,num_sites,max_occ)
-	#println("Built States Vector")
-	old_ttn = TTNKit.ProductTreeTensorNetwork(square,states;orthogonalize=true)
+	println("Built States Vector")
+	old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
 	#ttn = TTNKit.increase_dim_tree_tensor_network_zeros(ttn, maxdim = max_dim)
 	ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
-	#println("Added States")
+	println("Added States")
 	
 	#get_occupancy(ttn,edge_sites; plot_title="Starting")
 	
-	phi = particle_count/(filling * (edge_length^2))
-	ham_operator = get_hofstadter_interacting_hamilt(edge_length,u_strength,t_strength,phi; kwargs...)
+	phi = particle_count/(filling * (num_sites))
+	ham_operator = get_hofstadter_interacting_hamilt(net,u_strength,t_strength,phi; kwargs...)
 	
 	ham = TTNKit.TPO(ham_operator,lat)
-	#=
+	println("Built Hamiltonian")
 	if if_sweep
-		sp = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=1)
+		ttn, ham, sp = do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
+		return ttn,ham,sp
 	end
-	=#
-	#ham = TTNKit.Hamiltonian(ham_operator,lat; mapping=TTNKit.hilbert_curve(lat))
-	#println("Made TPO")
-	#
-	proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
-	#println("Finished Making Hamiltonian")
-	#
-	eigsolve_tol = TTNKit.DEFAULT_TOL_DMRG
-	eigsolve_krylovdim = TTNKit.DEFAULT_KRYLOVDIM_DMRG
-	eigsolve_maxiter = TTNKit.DEFAULT_MAXITER_DMRG
-	ishermitian = TTNKit.DEFAULT_ISHERMITIAN_DMRG
-	eigsolve_which_eigenvalue = TTNKit.DEFAULT_WHICH_EIGENVALUE_DMRG
-	func = (action,T) -> TTNKit.eigsolve(action, T, 1,
-		                    eigsolve_which_eigenvalue;
-		                    ishermitian=ishermitian,
-		                    tol=eigsolve_tol,
-		                    krylovdim=eigsolve_krylovdim,
-		                    maxiter=eigsolve_maxiter)
-	
-	sp = TTNKit.SimpleSweepHandler(ttn,proj_tpo,func,num_sweeps,[max_dim],[noise],TTNKit.NoExpander())
-	if if_sweep
-		TTNKit.sweep(ttn,sp;outputlevel=0);
-	end
-	#
-	#=
-	fin_time = get(kwargs, :fin_time, 0.1)
-	timestep = get(kwargs, :timestep, fin_time/25)
-	sp = TTNKit.tdvp(ttn,ham; timestep=timestep, finaltime=fin_time)
-	=#
 
-	return ttn,ham,sp
+	return ttn,ham,"no sweep"
 end
 
 function plot_grid(edge_length)
@@ -685,7 +704,7 @@ function get_all_sites_paths_and_plot(ttn,edge_length; kwargs...)
 	return direction_results,paths
 end
 
-function get_occupancy(ttn,edge_length; kwargs...)
+function get_occupancy(ttn; kwargs...)
 	#=
 	exp_occ = zeros(edge_length,edge_length)
 	for x in 1:edge_length
@@ -728,11 +747,25 @@ function rewrite_inds(tensor,ref_tensor)
 		for j in 1:num_tensors
 			old_inds = TTNKit.inds(tensor.data[i][j])
 			new_inds = TTNKit.inds(ref_tensor.data[i][j])
-			if all([TTNKit.tags(old_inds[i1])==TTNKit.tags(new_inds[i1]) for i1 in 1:length(old_inds)])
+			for k in new_inds
+				matching = findfirst(x->x==k,old_inds)
+				if matching != nothing
+					tensor.data[i][j] = TTNKit.replaceinds(tensor.data[i][j],old_inds[matching],k)
+				end
+			end
+			#=
+			do_inds_match = [TTNKit.tags(old_inds[i1])==TTNKit.tags(new_inds[i1]) for i1 in 1:length(old_inds)]
+			if all(do_inds_match)
 				tensor.data[i][j] = TTNKit.replaceinds(tensor.data[i][j],old_inds,new_inds)
 			else
+				nonmatching_sites = findall(x->x==false,do_inds_match)
+				nonmatching_old = [TTNKit.tags(old_inds[i1]) for i1 in nonmatching_sites]
+				nonmatching_new = [TTNKit.tags(new_inds[i1]) for i1 in nonmatching_sites]
 				println("Index Tags Don't Match")
+				display(nonmatching_old)
+				display(nonmatching_new)
 			end
+			=#
 		end
 	end
 	return tensor
@@ -764,8 +797,8 @@ function localinner(ttn1::TTNKit.TreeTensorNetwork{N, T}, old_ttn2::TTNKit.TreeT
     elT = promote_type(eltype(ttn1), eltype(ttn2))
     # check in case if symmetric the Top node for qn correspondence
     if !(TTNKit.sectortype(net) == Int64)
-        fl1 = flux(ttn1[TTNKit.number_of_layers(net), 1])
-        fl2 = flux(ttn2[TTNKit.number_of_layers(net), 2])
+        fl1 = TTNKit.flux(ttn1[TTNKit.number_of_layers(net), 1])
+        fl2 = TTNKit.flux(ttn2[TTNKit.number_of_layers(net), 1])
         if fl1 != fl2
         	println("Flux issue")
         	return zero(elT)
@@ -843,7 +876,7 @@ function get_phase_diag_MISF(ts_start,ts_end,ts_count,chem_start,chem_end,chem_c
 	return mis_m,mis_t,sfs_m,sfs_t
 end
 
-function get_mu_transitions(ts,edge_length,n=1; kwargs...)
+function get_mu_transitions(ts,num_layers,n=1; kwargs...)
 	if get(kwargs, :max_occ, 4) < n + 1
 		println("Max Occupation not larger enough for $n particle filling")
 		return
@@ -856,20 +889,20 @@ function get_mu_transitions(ts,edge_length,n=1; kwargs...)
 		results = [0.0]
 	end
 	
-	gs_ttn_full, harphof_ham_full, hh_sp_full = build_full_harperhofstadter(edge_length,n*edge_length^2,1.0,ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
+	gs_ttn_full, harphof_ham_full, hh_sp_full = build_full_harperhofstadter(num_layers,n*(2^num_layers),1.0,ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
 	energy_full = hh_sp_full.current_energy
 	
-	Threads.@threads for i in 1:2
-		if i == 1
+	#Threads.@threads for i in 1:2
+	#	if i == 1
 			if if_mm
-				gs_ttn_minus, harphof_ham_minus, hh_sp_minus = build_full_harperhofstadter(edge_length,n*edge_length^2-1,1.0,ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
+				gs_ttn_minus, harphof_ham_minus, hh_sp_minus = build_full_harperhofstadter(num_layers,n*(2^num_layers)-1,1.0,ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
 				energy_minus = hh_sp_minus.current_energy
 				mu_minus = energy_full - energy_minus
 				results[1] = mu_minus
 			end
-		else
+	#	else
 			if if_mp
-				gs_ttn_plus, harphof_ham_plus, hh_sp_plus = build_full_harperhofstadter(edge_length,n*edge_length^2+1,1.0,ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
+				gs_ttn_plus, harphof_ham_plus, hh_sp_plus = build_full_harperhofstadter(num_layers,n*(2^num_layers)+1,1.0,ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
 				energy_plus = hh_sp_plus.current_energy
 				mu_plus = energy_plus - energy_full
 				if length(results) > 1
@@ -878,22 +911,22 @@ function get_mu_transitions(ts,edge_length,n=1; kwargs...)
 					results[1] = mu_plus
 				end
 			end	
-		end
-	end	
+	#	end
+	#end	
 	return results
 end
 
-function get_mu_trans_range_t(ts_start,ts_end,ts_count,edge_length,n=1; kwargs...)
+function get_mu_trans_range_t(ts_start,ts_end,ts_count,num_layers,n=1; kwargs...)
 	tss = [ts_start + i*(ts_end-ts_start)/ts_count for i in 0:ts_count]
 	if_mm = get(kwargs, :mm, true)
 	if_mp = get(kwargs, :mp, true)
 	mms = [0.0 for i in 1:length(tss)]
 	mps = [0.0 for i in 1:length(tss)]
-	Threads.@threads for i in 1:length(tss)
-	#for i in 1:length(tss)
-		#println(round(100*i/length(tss),digits=2),"%")
+	#Threads.@threads for i in 1:length(tss)
+	for i in 1:length(tss)
+		println(round(100*i/length(tss),digits=2),"%")
 		ts = tss[i]
-		results = get_mu_transitions(ts,edge_length,n; mm=true, mp=true, kwargs...)
+		results = get_mu_transitions(ts,num_layers,n; mm=true, mp=true, kwargs...)
 		if if_mm
 			mms[i] = results[1]
 			if if_mp
@@ -964,6 +997,51 @@ function get_mu_trans_range_N(ts,edge_start,edge_count,n=1; kwargs...)
 	end
 end
 
+function get_linfit(x,y)
+	model(t,p) = p[1] .+ p[2] .* t
+	p0 = [0.5,1.0]
+	fit = curve_fit(model,x,y,p0)
+	#fig = figure()
+	#plot(x,model(x,fit.param))
+	#plot(x,y)
+	return fit.param[1],LsqFit.standard_errors(fit)[1]
+end
+
+function plot_thermo_trans(mm_limits,mm_errors,mp_limits,mp_errors,t_values)
+	fig = figure()
+	errorbar(t_values,mm_limits,yerr=[mm_errors,mm_errors],label="Minus")
+	errorbar(t_values,mp_limits,yerr=[mp_errors,mp_errors],label="Plus")
+	xlabel("Hopping Strength")
+	ylabel("Chemical Strength")
+	title("Thermodynamic Limit of Mott Transition")
+	legend()
+	return
+end
+
+function get_thermodynamic_transitions(mm_data,mp_data,t_values,which_counts; kwargs...)
+	number_sizes = length(which_counts)
+	mm_limits = [0.0 for i in 1:length(t_values)]
+	mm_errors = [0.0 for i in 1:length(t_values)]
+	mp_limits = [0.0 for i in 1:length(t_values)]
+	mp_errors = [0.0 for i in 1:length(t_values)]
+	for i in 1:length(t_values)
+		ts = t_values[i]
+		mm_vals = [mm_data[j][i] for j in 1:number_sizes]
+		mp_vals = [mp_data[j][i] for j in 1:number_sizes]
+		mm_results = get_linfit(1 ./ which_counts,mm_vals)
+		mp_results = get_linfit(1 ./ which_counts,mp_vals)
+		mm_limits[i] = mm_results[1]
+		mm_errors[i] = mm_results[2]
+		mp_limits[i] = mp_results[1]
+		mp_errors[i] = mp_results[2]
+	end
+	
+	if get(kwargs, :if_plot, true)
+		plot_thermo_trans(mm_limits,mm_errors,mp_limits,mp_errors,t_values)
+	end
+	return mm_limits,mm_errors,mp_limits,mp_errors,t_values
+end
+
 
 
 #final_time = 0.1
@@ -974,16 +1052,17 @@ chemical = false
 mu = 1.0
 max_occupation = 3
 bc_string = get_periodic_title_string(if_per)
-edge_sites = 8
-tot_sites = edge_sites^2
-#expan = TTNKit.DefaultExpander(0.2)
+#edge_sites = 4
+layers = 5
+tot_sites = 2^layers
+expan = TTNKit.DefaultExpander(0.2)
 us = 1.0
 ts = 0.05
 #phi_val = 1/16
 nu = 1/2
 #for num_particles in [1,5,10]
-#num_particles = get_particles_needed(edge_sites; nu=nu)
-mdim = 200
+#num_particles = 4#get_particles_needed(edge_sites; nu=nu)
+mdim = 100
 nswps = 3
 
 #iters = 5
@@ -992,24 +1071,74 @@ nswps = 3
 #num_particles = Int(ceil(tot_sites * densities[i]))
 #println("Using $num_particles particles on $tot_sites sites")
 #
-tss_4 = [0.01
+tss_481632 = [0.01
  0.058
  0.106
  0.154
  0.202
  0.25]
-mms_4 = [0.03254019338528626
+mms_4 = [0.019597285308979855
+ 0.09973448905016105
+ 0.14232890602495618
+ 0.13718332590494153
+ 0.09633605749283813
+ 0.03554519252836941]
+mps_4 = [0.9601081057697579
+ 0.7747830829008986
+ 0.6142861108699458
+ 0.4893226701623129
+ 0.3898098288313486
+ 0.3024467384825328]
+mms_8 = [0.028020170740783966
+ 0.15093809212846782
+ 0.20145324605880943
+ 0.1638756557343004
+ 0.0940475955351121
+ 0.01553946950743823]
+mps_8 = [0.9433339216438776
+ 0.672095396026078
+ 0.4588325418432595
+ 0.327936774752418
+ 0.22883907251446822
+ 0.13666815744950922]
+mms_16 = [0.03254019338528626
   0.19703649980257093
   0.25692561414112847
   0.17199211874218
   0.07003634491795463
  -0.03184842280289679]
-mps_4 = [0.9348465083634601
+mps_16 = [0.9348465083634601
  0.6006191804880917
  0.3561371541875342
  0.24636456209103308
  0.13452163119783744
  0.017517765394721607]
+mms_32 = [0.036318170726884216
+  0.23051598746365876
+  0.23122218236976355
+  0.0771115510144007
+  0.06330995679537565
+ -0.5471269253381159]
+mps_32 = [0.9220058804374468
+  0.5024532201536525
+  0.31294511078864806
+  0.18309904403746824
+  0.269504717246825
+ -0.04817915302266762]
+
+short_tss = [0.01
+ 0.046000000000000006
+ 0.064
+ 0.082
+ 0.1]
+mms_short = [[0.019597285308979855, 0.08238431658769785, 0.10753820895283675, 0.12694056272955143, 0.13965652260093675],
+ [0.028020164713347395, 0.12365286242612807, 0.16290616307318054, 0.18981101369162945, 0.20104197724805323],
+ [0.032415983637817135, 0.15139546320878872, 0.20554215818585841, 0.25099490473591235, 0.24322279440222316]]
+mps_short = [ [0.9601081057697576, 0.8196165059618354, 0.7529395769696685, 0.6902185610645795, 0.6323895416971093],
+ [0.9433339216278043, 0.738028530304465, 0.640440528813079, 0.5531944987579545, 0.4800614573933342],
+ [0.9345316801202949, 0.6898897915055255, 0.5657757240566793, 0.4570613970384317, 0.3803231854226724]]
+rez = get_thermodynamic_transitions([mms_4,mms_8,mms_16,mms_32],[mps_4,mps_8,mps_16,mps_32],tss_481632,[4,8,16,32])
+rez2 = get_thermodynamic_transitions(mms_short,mps_short,short_tss,[4,8,16])
 #=mms_8_wrong = [-3.6311507468020685
   1.149919854403895
   0.3030289434795632
@@ -1023,60 +1152,49 @@ mps_8_wrong = [0.9251634445295182
   0.20708694335753464
   0.7156735884706755]
 =#
-#
+#=
 t_count = 5
 t_start = 0.01
-t_end = 0.25
+t_end = 0.1
+tss_here = [t_start + i*(t_end-t_start)/t_count for i in 0:t_count]
 #for edge_sites in [4]
 #st = time()
-mms,mps,tss = get_mu_trans_range_t(t_start,t_end,t_count,edge_sites; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim, max_occ=max_occupation, if_plot=false)
-#en = time()
-#println("Time = ",en-st)
-plot(tss,mms,"-p",label="Minus")
-plot(tss,mps,"-p",label="Plus")
-xlabel("Hopping Strength, t")
-ylabel("Chemical Potential, mu")
-#end
-legend()
-plot(tss_4,mms_4,"-p",label="Minus")
-plot(tss_4,mps_4,"-p",label="Plus")
-
-#rez = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles")
-
-#end
-#=
-howmany = 3
-all_ttns = []
-path_dirs = []
-for i in 1:howmany
-	gs_ttn, harphof_ham, hh_sp = build_full_harperhofstadter(edge_sites,num_particles,us,ts,nu; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim, if_chem=chemical, chem_strength=mu, no_magF=mag_off, if_sweep=evolve)
-	append!(all_ttns,[gs_ttn])
-	path_dir_data = get_all_sites_paths_and_plot(gs_ttn, edge_sites; if_periodic=if_per, likely_path=true)
-	append!(path_dirs,[path_dir_data])
-end
-
-for i in 1:howmany
-	for j in 1:howmany
-		overlap = localinner(all_ttns[i],all_ttns[j])
-		println("$i, $j: ",overlap)
-	end
+mps_shorter = [[0.0 for i in 1:t_count+1] for j in 1:4]
+mms_shorter = [[0.0 for i in 1:t_count+1] for j in 1:4]
+for i in 2:4
+	mms,mps,tss = get_mu_trans_range_t(t_start,t_end,t_count,i; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim, max_occ=max_occupation, if_plot=false)
+	mms_shorter[i-1] = mms
+	mps_shorter[i-1] = mps
 end
 =#
 
-#start = (rand((1:edge_sites)),rand((1:edge_sites)))
-#path_rez = find_path(gs_ttn,start; periodic=if_per, likely_path=false)
 
-#get_occupancy(gs_ttn,edge_sites)
-#end
-#=
-rez = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
-rez2 = get_xdir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
-rez3 = get_ydir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string", direction="rev")
-rez4 = get_xdir_greenfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string", direction="rev")
-=#
-#=
-rez3 = get_current_yfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
-rez4 = get_current_xfunc(edge_sites,gs_ttn; plot_title="N=$num_particles, $bc_string")
-=#
-#end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 "fin"
