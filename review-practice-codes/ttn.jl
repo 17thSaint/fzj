@@ -446,6 +446,15 @@ function fill_states(particle_count,site_count,max_occupation)
 	return states
 end
 
+function check_if_frozen(ttn)
+	occs = get_occupancy(ttn; if_plot=false)
+	if any(occs.==0.0)
+		return true
+	else
+		return false
+	end
+end
+
 function do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
 
 	opl = get(kwargs, :output_level, 2)
@@ -474,7 +483,34 @@ function do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
 		sp = TTNKit.SimpleSweepHandler(ttn,proj_tpo,func,num_sweeps,[max_dim],[noise],expander)
 		TTNKit.sweep(ttn,sp;outputlevel=opl);
 	end
+	
 	return ttn,ham,sp
+end
+
+function warming(ttn,ham,sp,particle_count,warming_limit=3; kwargs...)
+	
+	max_dim = get(kwargs, :max_dim, particle_count+1)
+	num_sweeps = 3#get(kwargs, :num_sweeps, 1)
+	noise = get(kwargs, :noise, 0.0)
+	expander = get(kwargs, :expander, TTNKit.NoExpander())
+	
+	warming_count = 0
+	frozen = true
+	global old_data = [ttn,ham,sp]
+	while frozen && warming_count < warming_limit
+		reexpanded_ttn = TTNKit.adjust_tree_tensor_dimensions(old_data[1],2*max_dim)
+		new_ttn, new_ham, new_sp = do_sweep(reexpanded_ttn,ham,"dmrg",particle_count;output_level=0, kwargs...)
+		if_frozen = check_if_frozen(new_sp.ttn)
+		if if_frozen
+			warming_count += 1
+			global old_data = [new_sp.ttn,new_ham,new_sp]
+		else
+			println("Warmed in $warming_count Attempts")
+			return new_sp.ttn,new_ham,new_sp
+		end
+	end
+	println("Hit warming limit, still frozen")
+	return old_data
 end
 
 function build_full_harperhofstadter(num_layers,particle_count,t_strength,filling; kwargs...)
@@ -487,9 +523,10 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	expander = get(kwargs, :expander, TTNKit.NoExpander())
 	max_occ = get(kwargs, :max_occ, Int(ceil(particle_count/(num_sites))+1) )
 	u_strength = get(kwargs, :u_strength, 1.0)
+	warming_limit = get(kwargs, :warming_limit, 3)
 	phi = get(kwargs, :phi, particle_count/(filling * (num_sites)))
 
-	net = TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, "Boson";conserve_number=true,dim=max_occ+1)
+	net = TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, "Boson";conserve_qns=true,dim=max_occ+1)
 	lat = TTNKit.physical_lattice(net)
 
 	println("Finished Building Network")
@@ -509,10 +546,16 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	println("Built Hamiltonian")
 	if if_sweep
 		ttn, ham, sp = do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
-		return sp
+		if !check_if_frozen(sp.ttn)
+			return sp.ttn, ham, sp
+		else
+			println("Frozen on First Attempt, Starting Warming")
+			warmed_results = warming(ttn,ham,sp,particle_count,warming_limit;output_level=0,kwargs...)
+			return warmed_results
+		end
 	end
 
-	return ttn,ham
+	return ttn,ham,"now sweep"
 end
 
 function plot_grid(edge_length)
@@ -911,20 +954,20 @@ function get_mu_transitions(ts,num_layers,n=1; kwargs...)
 		results = [0.0]
 	end
 	
-	hh_sp_full = build_full_harperhofstadter(num_layers,n*(2^num_layers),ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
+	full_ttn,full_ham,hh_sp_full = build_full_harperhofstadter(num_layers,n*(2^num_layers),ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
 	energy_full = hh_sp_full.current_energy
 	
 	#Threads.@threads for i in 1:2
 	#	if i == 1
 			if if_mm
-				hh_sp_minus = build_full_harperhofstadter(num_layers,n*(2^num_layers)-1,ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
+				minus_ttn,minus_ham,hh_sp_minus = build_full_harperhofstadter(num_layers,n*(2^num_layers)-1,ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
 				energy_minus = hh_sp_minus.current_energy
 				mu_minus = energy_full - energy_minus
 				results[1] = mu_minus
 			end
 	#	else
 			if if_mp
-				hh_sp_plus = build_full_harperhofstadter(num_layers,n*(2^num_layers)+1,ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
+				plus_ttn,plus_ham,hh_sp_plus = build_full_harperhofstadter(num_layers,n*(2^num_layers)+1,ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
 				energy_plus = hh_sp_plus.current_energy
 				mu_plus = energy_plus - energy_full
 				if length(results) > 1
@@ -1074,7 +1117,7 @@ chemical = true
 mu = 0.5
 #max_occupation = 3
 bc_string = get_periodic_title_string(if_per)
-layers = 4
+layers = 6
 tot_sites = 2^layers
 expan = TTNKit.DefaultExpander(0.2)
 #us = 1.0
@@ -1082,12 +1125,12 @@ ts = 0.01
 nu = 1/2
 num_particles = get_particles_needed(layers; nu=nu)
 mdim = 50
-nswps = 5
+nswps = 3
 
 println("Using $num_particles particles on $tot_sites sites")
 #noise = 0.0
 #for ts in [0.01 + (i-1)*(0.2-0.01)/5 for i in 1:6]
-dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps, if_periodic=if_per,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,no_magF=mag_off)
+og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps, if_periodic=if_per,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
 rez2 = get_occupancy(dm_sp.ttn; plot_title="$ts")
 rez = get_ydir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$ts")
 #end
