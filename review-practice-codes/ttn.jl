@@ -54,6 +54,9 @@ function get_ydir_greenfunc(edge_length,ttn; kwargs...)
 			if true
 			norm_reg = TTNKit.correlation(ttn,adag,ahat,(site_left),(site_left))
 			norm_prime = TTNKit.correlation(ttn,adag,ahat,(site_right),(site_right))
+			if norm_reg == 0.0
+				println("Normalization is zero at $x,$y")
+			end
 			all_greens[x,y] /= sqrt(norm_reg * norm_prime)
 			end
 		end
@@ -286,26 +289,38 @@ function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwarg
 			println("Using ThetaY")
 		end
 		=#
-		return -t_strength #* exp(im*2*pi*(phi*s1[1] - ==(edge_length_y,s1[2])*thetay))
+		return -t_strength * exp(im*2*pi*(phi*s1[1] - ==(edge_length_y,s1[2])*thetay))
 	elseif s1[2] == s2[2]
 		thetax = get(kwargs, :thetax, thetax_2)
 		#=if ==(edge_length,s1[1])
 			println("Using ThetaX")
 		end
 		=#
-		return -t_strength #* exp(-im*2*pi* ==(edge_length_x,s1[1]) *thetax)
+		return -t_strength * exp(-im*2*pi* ==(edge_length_x,s1[1]) *thetax)
 	end
 	=#
-	return -t_strength
+	no_magF = get(kwargs, :no_magF, false)
+	if no_magF
+		phi = 0.0
+	end
+	if s1[1] == s2[1]
+		return -t_strength
+	else
+		return -t_strength * exp(im * 2 * pi * phi * s1[1])
+	end
+	#
 end
 
-function get_hofstadter_interacting_hamilt(net,u_strength,t_strength,phi; kwargs...)
+function get_hofstadter_interacting_hamilt(net,t_strength,phi; kwargs...)
 	resulting_ham = []
 	if_periodic = get(kwargs, :if_periodic, true)
 	if_hopping = get(kwargs, :if_hopping, true)
 	if_chem = get(kwargs, :if_chem, false)
+	if_onsite = get(kwargs, :if_onsite, true)
 	no_magF = get(kwargs, :no_magF, false)
 	chem_strength = get(kwargs, :chem_strength, 0.0)
+	u_strength = get(kwargs, :u_strength, 1.0)
+	
 	lat = TTNKit.physical_lattice(net)
 	edge_length_x,edge_length_y = size(lat)
 	#
@@ -324,10 +339,12 @@ function get_hofstadter_interacting_hamilt(net,u_strength,t_strength,phi; kwargs
 		end
 		append!(resulting_ham,[hopping])
 	end
-	#
-	onsite = TTNKit.OpSum()
-	for i in TTNKit.eachindex(lat)
-		onsite += (u_strength/2,"Adag * Adag * A * A",TTNKit.coordinate(lat,i))
+	if if_onsite
+		onsite = TTNKit.OpSum()
+		for i in TTNKit.eachindex(lat)
+			onsite += (u_strength/2,"Adag * Adag * A * A",TTNKit.coordinate(lat,i))
+		end
+		append!(resulting_ham,[onsite])
 	end
 	#=
 	for x in 1:edge_length
@@ -338,7 +355,6 @@ function get_hofstadter_interacting_hamilt(net,u_strength,t_strength,phi; kwargs
 		end
 	end
 	=#
-	append!(resulting_ham,[onsite])
 	
 	if if_chem
 		chem = TTNKit.OpSum()
@@ -432,7 +448,7 @@ end
 
 function do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
 
-	opl = get(kwargs, :output_level, 1)
+	opl = get(kwargs, :output_level, 2)
 	max_dim = get(kwargs, :max_dim, particle_count+1)
 	num_sweeps = get(kwargs, :num_sweeps, 1)
 	noise = get(kwargs, :noise, 0.0)
@@ -461,7 +477,7 @@ function do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
 	return ttn,ham,sp
 end
 
-function build_full_harperhofstadter(num_layers,particle_count,u_strength,t_strength,filling; kwargs...)
+function build_full_harperhofstadter(num_layers,particle_count,t_strength,filling; kwargs...)
 	num_sites = 2^num_layers
 	max_dim = get(kwargs, :max_dim, particle_count+1)
 	num_sweeps = get(kwargs, :num_sweeps, 1)
@@ -470,8 +486,10 @@ function build_full_harperhofstadter(num_layers,particle_count,u_strength,t_stre
 	noise = get(kwargs, :noise, 0.0)
 	expander = get(kwargs, :expander, TTNKit.NoExpander())
 	max_occ = get(kwargs, :max_occ, Int(ceil(particle_count/(num_sites))+1) )
+	u_strength = get(kwargs, :u_strength, 1.0)
+	phi = get(kwargs, :phi, particle_count/(filling * (num_sites)))
 
-	net = TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, "Boson",conserve_number=true,dim=max_occ+1)
+	net = TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, "Boson";conserve_number=true,dim=max_occ+1)
 	lat = TTNKit.physical_lattice(net)
 
 	println("Finished Building Network")
@@ -480,22 +498,21 @@ function build_full_harperhofstadter(num_layers,particle_count,u_strength,t_stre
 	println("Built States Vector")
 	old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
 	#ttn = TTNKit.increase_dim_tree_tensor_network_zeros(ttn, maxdim = max_dim)
-	ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
+	ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,2*max_dim[end])
 	println("Added States")
 	
 	#get_occupancy(ttn,edge_sites; plot_title="Starting")
 	
-	phi = particle_count/(filling * (num_sites))
-	ham_operator = get_hofstadter_interacting_hamilt(net,u_strength,t_strength,phi; kwargs...)
+	ham_operator = get_hofstadter_interacting_hamilt(net,t_strength,phi; kwargs...)
 	
 	ham = TTNKit.TPO(ham_operator,lat)
 	println("Built Hamiltonian")
 	if if_sweep
 		ttn, ham, sp = do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
-		return ttn,ham,sp
+		return sp
 	end
 
-	return ttn,ham,"no sweep"
+	return ttn,ham
 end
 
 function plot_grid(edge_length)
@@ -772,10 +789,15 @@ function rewrite_inds(tensor,ref_tensor)
 end
 
 
-function get_particles_needed(edge_length;kwargs...)
+function get_particles_needed(num_layers;kwargs...)
+	if num_layers % 2 != 0.0
+		edge_length = Int(sqrt(2^(num_layers-1)))
+	else
+		edge_length = Int(sqrt(2^num_layers))
+	end
 	phi = get(kwargs, :phi, 1/edge_length)
 	nu = get(kwargs, :nu, 0.0)
-	parts_needed = Int(ceil(phi * nu * (edge_length^2)))
+	parts_needed = Int(ceil(phi * nu * (2^num_layers)))
 	#min_dim = parts_needed + 1
 	return parts_needed
 end
@@ -889,20 +911,20 @@ function get_mu_transitions(ts,num_layers,n=1; kwargs...)
 		results = [0.0]
 	end
 	
-	gs_ttn_full, harphof_ham_full, hh_sp_full = build_full_harperhofstadter(num_layers,n*(2^num_layers),1.0,ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
+	hh_sp_full = build_full_harperhofstadter(num_layers,n*(2^num_layers),ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
 	energy_full = hh_sp_full.current_energy
 	
 	#Threads.@threads for i in 1:2
 	#	if i == 1
 			if if_mm
-				gs_ttn_minus, harphof_ham_minus, hh_sp_minus = build_full_harperhofstadter(num_layers,n*(2^num_layers)-1,1.0,ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
+				hh_sp_minus = build_full_harperhofstadter(num_layers,n*(2^num_layers)-1,ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
 				energy_minus = hh_sp_minus.current_energy
 				mu_minus = energy_full - energy_minus
 				results[1] = mu_minus
 			end
 	#	else
 			if if_mp
-				gs_ttn_plus, harphof_ham_plus, hh_sp_plus = build_full_harperhofstadter(num_layers,n*(2^num_layers)+1,1.0,ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
+				hh_sp_plus = build_full_harperhofstadter(num_layers,n*(2^num_layers)+1,ts,1/2; if_chem=false, no_magF=true, if_sweep=true, kwargs...)
 				energy_plus = hh_sp_plus.current_energy
 				mu_plus = energy_plus - energy_full
 				if length(results) > 1
@@ -1048,125 +1070,31 @@ end
 if_per = false
 mag_off = true
 evolve = true
-chemical = false
-mu = 1.0
-max_occupation = 3
+chemical = true
+mu = 0.5
+#max_occupation = 3
 bc_string = get_periodic_title_string(if_per)
-#edge_sites = 4
-layers = 5
+layers = 4
 tot_sites = 2^layers
 expan = TTNKit.DefaultExpander(0.2)
-us = 1.0
-ts = 0.05
-#phi_val = 1/16
+#us = 1.0
+ts = 0.01
 nu = 1/2
-#for num_particles in [1,5,10]
-#num_particles = 4#get_particles_needed(edge_sites; nu=nu)
-mdim = 100
-nswps = 3
+num_particles = get_particles_needed(layers; nu=nu)
+mdim = 50
+nswps = 5
 
-#iters = 5
-#densities = [0.1 + (i-1)*(1.5 - 0.1)/iters for i in 1:iters+1]
-#i = 4
-#num_particles = Int(ceil(tot_sites * densities[i]))
-#println("Using $num_particles particles on $tot_sites sites")
-#
-tss_481632 = [0.01
- 0.058
- 0.106
- 0.154
- 0.202
- 0.25]
-mms_4 = [0.019597285308979855
- 0.09973448905016105
- 0.14232890602495618
- 0.13718332590494153
- 0.09633605749283813
- 0.03554519252836941]
-mps_4 = [0.9601081057697579
- 0.7747830829008986
- 0.6142861108699458
- 0.4893226701623129
- 0.3898098288313486
- 0.3024467384825328]
-mms_8 = [0.028020170740783966
- 0.15093809212846782
- 0.20145324605880943
- 0.1638756557343004
- 0.0940475955351121
- 0.01553946950743823]
-mps_8 = [0.9433339216438776
- 0.672095396026078
- 0.4588325418432595
- 0.327936774752418
- 0.22883907251446822
- 0.13666815744950922]
-mms_16 = [0.03254019338528626
-  0.19703649980257093
-  0.25692561414112847
-  0.17199211874218
-  0.07003634491795463
- -0.03184842280289679]
-mps_16 = [0.9348465083634601
- 0.6006191804880917
- 0.3561371541875342
- 0.24636456209103308
- 0.13452163119783744
- 0.017517765394721607]
-mms_32 = [0.036318170726884216
-  0.23051598746365876
-  0.23122218236976355
-  0.0771115510144007
-  0.06330995679537565
- -0.5471269253381159]
-mps_32 = [0.9220058804374468
-  0.5024532201536525
-  0.31294511078864806
-  0.18309904403746824
-  0.269504717246825
- -0.04817915302266762]
+println("Using $num_particles particles on $tot_sites sites")
+#noise = 0.0
+#for ts in [0.01 + (i-1)*(0.2-0.01)/5 for i in 1:6]
+dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps, if_periodic=if_per,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,no_magF=mag_off)
+rez2 = get_occupancy(dm_sp.ttn; plot_title="$ts")
+rez = get_ydir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$ts")
+#end
 
-short_tss = [0.01
- 0.046000000000000006
- 0.064
- 0.082
- 0.1]
-mms_short = [[0.019597285308979855, 0.08238431658769785, 0.10753820895283675, 0.12694056272955143, 0.13965652260093675],
- [0.028020164713347395, 0.12365286242612807, 0.16290616307318054, 0.18981101369162945, 0.20104197724805323],
- [0.032415983637817135, 0.15139546320878872, 0.20554215818585841, 0.25099490473591235, 0.24322279440222316]]
-mps_short = [ [0.9601081057697576, 0.8196165059618354, 0.7529395769696685, 0.6902185610645795, 0.6323895416971093],
- [0.9433339216278043, 0.738028530304465, 0.640440528813079, 0.5531944987579545, 0.4800614573933342],
- [0.9345316801202949, 0.6898897915055255, 0.5657757240566793, 0.4570613970384317, 0.3803231854226724]]
-rez = get_thermodynamic_transitions([mms_4,mms_8,mms_16,mms_32],[mps_4,mps_8,mps_16,mps_32],tss_481632,[4,8,16,32])
-rez2 = get_thermodynamic_transitions(mms_short,mps_short,short_tss,[4,8,16])
-#=mms_8_wrong = [-3.6311507468020685
-  1.149919854403895
-  0.3030289434795632
-  0.2527676999269648
-  0.07099006370710725
- -0.03191784541613529]
-mps_8_wrong = [0.9251634445295182
- -0.42042475058129636
-  0.31883040164750476
-  0.24849753112928852
-  0.20708694335753464
-  0.7156735884706755]
-=#
-#=
-t_count = 5
-t_start = 0.01
-t_end = 0.1
-tss_here = [t_start + i*(t_end-t_start)/t_count for i in 0:t_count]
-#for edge_sites in [4]
-#st = time()
-mps_shorter = [[0.0 for i in 1:t_count+1] for j in 1:4]
-mms_shorter = [[0.0 for i in 1:t_count+1] for j in 1:4]
-for i in 2:4
-	mms,mps,tss = get_mu_trans_range_t(t_start,t_end,t_count,i; num_sweeps=nswps, if_periodic=if_per,max_dim=mdim, max_occ=max_occupation, if_plot=false)
-	mms_shorter[i-1] = mms
-	mps_shorter[i-1] = mps
-end
-=#
+
+
+
 
 
 
