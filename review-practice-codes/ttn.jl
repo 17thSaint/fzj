@@ -79,14 +79,14 @@ function get_ydir_greenfunc(edge_length,ttn; kwargs...)
 		xlabel("Y")
 		ylabel("Correlation")
 		legend()
-		#=
+		#
 		fig = figure()
 		imshow(all_greens)
 		xlabel("Y")
 		ylabel("X")
 		colorbar()
 		title(title_string)
-		=#
+		#
 	end
 	
 	return all_yvals,all_greens
@@ -153,7 +153,7 @@ function get_current_yfunc(edge_length,ttn; kwargs...)
 	adag = "Adag"#"S+"
 	ahat = "A"#"S-"
 	norm_string = "Adag * A"#"S+ * S-"
-	if_periodic = get(kwargs, :if_periodic, true)
+	if_periodic = get(kwargs, :if_periodic, false)
 	if if_periodic
 		all_yvals = zeros(edge_length,edge_length)
 		all_currents = im.*zeros(edge_length,edge_length)
@@ -279,7 +279,7 @@ function get_xy_coeffs(x,y,edge_length,t_strength,phi,thetax=thetax_1,thetay=the
 end
 
 function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwargs...) 
-	#=
+	#
 	if get(kwargs, :no_magF, false)
 		phi = 0.0
 	end
@@ -298,7 +298,7 @@ function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwarg
 		=#
 		return -t_strength * exp(-im*2*pi* ==(edge_length_x,s1[1]) *thetax)
 	end
-	=#
+	#=
 	no_magF = get(kwargs, :no_magF, false)
 	if no_magF
 		phi = 0.0
@@ -308,7 +308,7 @@ function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwarg
 	else
 		return -t_strength * exp(im * 2 * pi * phi * s1[1])
 	end
-	#
+	=#
 end
 
 function get_hofstadter_interacting_hamilt(net,t_strength,phi; kwargs...)
@@ -462,7 +462,7 @@ function do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
 	num_sweeps = get(kwargs, :num_sweeps, 1)
 	noise = get(kwargs, :noise, 0.0)
 	expander = get(kwargs, :expander, TTNKit.NoExpander())
-	
+
 	if sweep_type == "dmrg"
 		sp = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl)
 	elseif sweep_type == "simple"
@@ -494,7 +494,7 @@ function warming(ttn,ham,sp,particle_count,warming_limit=3; kwargs...)
 	noise = get(kwargs, :noise, 0.0)
 	expander = get(kwargs, :expander, TTNKit.NoExpander())
 	
-	warming_count = 0
+	warming_count = 1
 	frozen = true
 	global old_data = [ttn,ham,sp]
 	while frozen && warming_count < warming_limit
@@ -513,6 +513,14 @@ function warming(ttn,ham,sp,particle_count,warming_limit=3; kwargs...)
 	return old_data
 end
 
+function get_excess_particles(part_count,site_count)
+	if part_count > 0.5*site_count
+		return Int(abs(part_count - site_count))
+	else
+		return part_count
+	end
+end
+
 function build_full_harperhofstadter(num_layers,particle_count,t_strength,filling; kwargs...)
 	num_sites = 2^num_layers
 	max_dim = get(kwargs, :max_dim, particle_count+1)
@@ -521,10 +529,11 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	sweep_type = get(kwargs, :sweep_type, "simple")
 	noise = get(kwargs, :noise, 0.0)
 	expander = get(kwargs, :expander, TTNKit.NoExpander())
-	max_occ = get(kwargs, :max_occ, Int(ceil(particle_count/(num_sites))+1) )
+	max_occ = get(kwargs, :max_occ, Int(ceil(particle_count/(num_sites))+0) )
 	u_strength = get(kwargs, :u_strength, 1.0)
 	warming_limit = get(kwargs, :warming_limit, 3)
-	phi = get(kwargs, :phi, particle_count/(filling * (num_sites)))
+	excess_particles = get_excess_particles(particle_count,num_sites)
+	phi = get(kwargs, :phi, excess_particles/(filling * (num_sites)))
 
 	net = TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, "Boson";conserve_qns=true,dim=max_occ+1)
 	lat = TTNKit.physical_lattice(net)
@@ -623,12 +632,15 @@ function find_path(ttn,starting_site; kwargs...)
 	net = TTNKit.network(ttn)
 	lat = TTNKit.physical_lattice(net)
 	edge_length = Int(sqrt(TTNKit.number_of_sites(lat)))
-	path_length = get(kwargs, :path_length, Int(4*edge_length))
 	path = [starting_site]
+	
 	if_periodic = get(kwargs, :periodic, false)
-	all_neighbors = TTNKit.nearest_neighbours(lat,collect(1:edge_length^2); periodic=if_periodic)
 	likely_path = get(kwargs, :likely_path, false)
 	rand_path = get(kwargs, :rand_path, !likely_path)
+	path_length = get(kwargs, :path_length, Int(4*edge_length))	
+	
+	
+	all_neighbors = TTNKit.nearest_neighbours(lat,collect(1:edge_length^2); periodic=if_periodic)
 	for i in 1:path_length
 		if i == 1
 			current_site_num = get_site_number(starting_site[1],starting_site[2],edge_length)
@@ -694,6 +706,7 @@ function get_path_direction(path,edge_length)
 		return "CCW"
 	else
 		if corner_index <= edge_length - 3
+			println(corner_index_list,", ",path)
 			corner_index = corner_index_list[2]
 		end
 		x_changes = []
@@ -760,7 +773,8 @@ function get_all_sites_paths_and_plot(ttn,edge_length; kwargs...)
 			append!(paths,[rez])
 		end
 	end
-	direction_results = make_paths_directions(paths,edge_sites; kwargs...)
+	return paths
+	direction_results = make_paths_directions(paths,edge_length; kwargs...)
 	return direction_results,paths
 end
 
@@ -1107,6 +1121,13 @@ function get_thermodynamic_transitions(mm_data,mp_data,t_values,which_counts; kw
 	return mm_limits,mm_errors,mp_limits,mp_errors,t_values
 end
 
+function get_mag_string(no_magF)
+	if no_magF
+		return "No Mag"
+	else
+		return "Mag On"
+	end	
+end
 
 
 #final_time = 0.1
@@ -1114,28 +1135,36 @@ if_per = false
 mag_off = true
 evolve = true
 chemical = true
-mu = 0.5
+mu = 0.0
 #max_occupation = 3
 bc_string = get_periodic_title_string(if_per)
-layers = 6
+mag_string = get_mag_string(mag_off)
+layers = 4
 tot_sites = 2^layers
+edge_sites = Int(sqrt(2^layers))
 expan = TTNKit.DefaultExpander(0.2)
 #us = 1.0
 ts = 0.01
 nu = 1/2
-num_particles = get_particles_needed(layers; nu=nu)
-mdim = 50
+num_particles = tot_sites - get_particles_needed(layers; nu=nu)
+mdim = 150
 nswps = 3
 
 println("Using $num_particles particles on $tot_sites sites")
 #noise = 0.0
-#for ts in [0.01 + (i-1)*(0.2-0.01)/5 for i in 1:6]
+
 og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps, if_periodic=if_per,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
-rez2 = get_occupancy(dm_sp.ttn; plot_title="$ts")
-rez = get_ydir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$ts")
+#rez2 = get_occupancy(dm_sp.ttn; plot_title="$dens")
+rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn; plot_title="$mag_string")
+#=rez3 = get_ydir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
+rez6 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
+rez5 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
+rez2 = get_current_yfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
+rez4 = get_current_xfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
+=#
 #end
 
-
+#all_paths = get_all_sites_paths_and_plot(dm_sp.ttn,edge_sites; likely_path=true)
 
 
 
