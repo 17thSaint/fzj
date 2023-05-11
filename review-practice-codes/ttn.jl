@@ -62,6 +62,9 @@ function get_ydir_greenfunc(edge_length,ttn; kwargs...)
 		end
 	end
 	all_greens = abs.(all_greens)
+	if any(all_greens.==0.0)
+		println("Probably Bad TTN, reset variables")
+	end
 	if get(kwargs, :if_plot, true)
 		subplot_num = get(kwargs, :subplot_number, 111)
 		if subplot_num > 150
@@ -79,14 +82,14 @@ function get_ydir_greenfunc(edge_length,ttn; kwargs...)
 		xlabel("Y")
 		ylabel("Correlation")
 		legend()
-		#
+		#=
 		fig = figure()
 		imshow(all_greens)
 		xlabel("Y")
 		ylabel("X")
 		colorbar()
 		title(title_string)
-		#
+		=#
 	end
 	
 	return all_yvals,all_greens
@@ -356,7 +359,8 @@ function get_hofstadter_interacting_hamilt(net,t_strength,phi; kwargs...)
 	end
 	=#
 	
-	if if_chem
+	if if_chem && chem_strength != 0.0
+		println("Using Chem")
 		chem = TTNKit.OpSum()
 		for i in TTNKit.eachindex(lat)
 			chem -= (chem_strength,"N",TTNKit.coordinate(lat,i))
@@ -449,9 +453,11 @@ end
 function check_if_frozen(ttn)
 	occs = get_occupancy(ttn; if_plot=false)
 	if any(occs.==0.0)
-		return true
+		return true,"frozen"
+	elseif any(round.(occs,digits=3).==1.0)#sum(occs.==1.0) > length(occs)/3
+		return true,"variables"
 	else
-		return false
+		return false,"none"
 	end
 end
 
@@ -487,25 +493,26 @@ function do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
 	return ttn,ham,sp
 end
 
-function warming(ttn,ham,sp,particle_count,warming_limit=3; kwargs...)
+function warming(ttn,ham,sp,particle_count,warming_limit; kwargs...)
 	
 	max_dim = get(kwargs, :max_dim, particle_count+1)
 	num_sweeps = 3#get(kwargs, :num_sweeps, 1)
 	noise = get(kwargs, :noise, 0.0)
 	expander = get(kwargs, :expander, TTNKit.NoExpander())
-	
+
 	warming_count = 1
 	frozen = true
 	global old_data = [ttn,ham,sp]
 	while frozen && warming_count < warming_limit
 		reexpanded_ttn = TTNKit.adjust_tree_tensor_dimensions(old_data[1],2*max_dim)
 		new_ttn, new_ham, new_sp = do_sweep(reexpanded_ttn,ham,"dmrg",particle_count;output_level=0, kwargs...)
-		if_frozen = check_if_frozen(new_sp.ttn)
+		if_frozen,why = check_if_frozen(new_sp.ttn)
 		if if_frozen
+			#get_occupancy(new_sp.ttn; plot_title="Attempt $warming_count")
 			warming_count += 1
 			global old_data = [new_sp.ttn,new_ham,new_sp]
 		else
-			println("Warmed in $warming_count Attempts")
+			println("Stable Result Found in $warming_count Attempts")
 			return new_sp.ttn,new_ham,new_sp
 		end
 	end
@@ -531,7 +538,7 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	expander = get(kwargs, :expander, TTNKit.NoExpander())
 	max_occ = get(kwargs, :max_occ, Int(ceil(particle_count/(num_sites))+0) )
 	u_strength = get(kwargs, :u_strength, 1.0)
-	warming_limit = get(kwargs, :warming_limit, 3)
+	warming_limit = get(kwargs, :warming_limit, 10)
 	excess_particles = get_excess_particles(particle_count,num_sites)
 	phi = get(kwargs, :phi, excess_particles/(filling * (num_sites)))
 
@@ -555,16 +562,21 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	println("Built Hamiltonian")
 	if if_sweep
 		ttn, ham, sp = do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
-		if !check_if_frozen(sp.ttn)
+		if_frozen,why = check_if_frozen(sp.ttn)
+		if !if_frozen
 			return sp.ttn, ham, sp
 		else
-			println("Frozen on First Attempt, Starting Warming")
+			if why == "frozen"
+				println("Frozen on First Attempt, Starting Warming")
+			elseif why == "variables"
+				println("Bad Variables on First Attempt, Starting Reset")	
+			end
 			warmed_results = warming(ttn,ham,sp,particle_count,warming_limit;output_level=0,kwargs...)
 			return warmed_results
 		end
 	end
 
-	return ttn,ham,"now sweep"
+	return ttn,ham,"no sweep"
 end
 
 function plot_grid(edge_length)
@@ -1154,8 +1166,8 @@ println("Using $num_particles particles on $tot_sites sites")
 #noise = 0.0
 
 og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps, if_periodic=if_per,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
-#rez2 = get_occupancy(dm_sp.ttn; plot_title="$dens")
-rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn; plot_title="$mag_string")
+#rez2 = get_occupancy(dm_sp.ttn; plot_title="Chem=$chemical")
+rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn; plot_title="Chem=$chemical")
 #=rez3 = get_ydir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
 rez6 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
 rez5 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
