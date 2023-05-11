@@ -62,9 +62,9 @@ function get_ydir_greenfunc(edge_length,ttn; kwargs...)
 		end
 	end
 	all_greens = abs.(all_greens)
-	if any(all_greens.==0.0)
-		println("Probably Bad TTN, reset variables")
-	end
+	#if any(all_greens.==0.0)
+	#	println("Probably Bad TTN, reset variables")
+	#end
 	if get(kwargs, :if_plot, true)
 		subplot_num = get(kwargs, :subplot_number, 111)
 		if subplot_num > 150
@@ -82,14 +82,14 @@ function get_ydir_greenfunc(edge_length,ttn; kwargs...)
 		xlabel("Y")
 		ylabel("Correlation")
 		legend()
-		#=
+		#
 		fig = figure()
 		imshow(all_greens)
 		xlabel("Y")
 		ylabel("X")
 		colorbar()
 		title(title_string)
-		=#
+		#
 	end
 	
 	return all_yvals,all_greens
@@ -451,7 +451,7 @@ end
 
 function check_if_frozen(ttn)
 	occs = get_occupancy(ttn; if_plot=false)
-	edge_length = Int(sqrt(TTNKit.number_of_layers(ttn)))
+	edge_length = Int(sqrt(2^TTNKit.number_of_layers(ttn)))
 	if any(occs.==0.0)
 		return true,"frozen"
 	elseif any(round.(get_ydir_greenfunc(edge_length,ttn;if_plot=false)[2],digits=3).==0.0)#sum(occs.==1.0) > length(occs)/3
@@ -509,7 +509,7 @@ function warming(ttn,ham,sp,particle_count,warming_limit; kwargs...)
 		new_ttn, new_ham, new_sp = do_sweep(reexpanded_ttn,ham,sweep_type,particle_count;output_level=0, kwargs...)
 		if_frozen,why = check_if_frozen(new_sp.ttn)
 		if if_frozen
-			get_occupancy(new_sp.ttn; plot_title="Attempt $warming_count")
+			#get_occupancy(new_sp.ttn; plot_title="Attempt $warming_count")
 			warming_count += 1
 			global old_data = [new_sp.ttn,new_ham,new_sp]
 		else
@@ -540,8 +540,9 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	max_occ = get(kwargs, :max_occ, Int(round(particle_count/(num_sites))+1) )
 	u_strength = get(kwargs, :u_strength, 1.0)
 	warming_limit = get(kwargs, :warming_limit, 10)
-	excess_particles = get_excess_particles(particle_count,num_sites)
-	phi = get(kwargs, :phi, excess_particles/(filling * (num_sites)))
+	#excess_particles = get_excess_particles(particle_count,num_sites)
+	#phi = get(kwargs, :phi, excess_particles/(filling * (num_sites)))
+	phi = get(kwargs, :phi, particle_count/(filling * (num_sites)))
 
 	net = TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, "Boson";conserve_qns=true,dim=max_occ+1)
 	lat = TTNKit.physical_lattice(net)
@@ -1171,26 +1172,31 @@ mu = 0.5
 #max_occupation = 3
 bc_string = get_periodic_title_string(if_per)
 mag_string = get_mag_string(mag_off)
-layers = 4
+layers = 6
 tot_sites = 2^layers
 edge_sites = Int(sqrt(2^layers))
 expan = TTNKit.DefaultExpander(0.2)
 #us = 1.0
-#ts = 0.01
+ts = 0.01
 nu = 1/2
-num_particles = tot_sites#get_particles_needed(layers; nu=nu)#tot_sites - 
-mdim = 50
+num_particles = tot_sites-2#get_particles_needed(layers; nu=nu)#tot_sites - 
+mdim = 150
 nswps = 3
 
 #println("Using $num_particles particles on $tot_sites sites")
 #noise = 0.0
 howmany = 5
 all_ttns = []
-for ts in [round(0.01+(i-1)*(0.1-0.01)/(howmany-1),digits=3) for i in 1:howmany]
-	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps, if_periodic=if_per,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
+#for ts in [round(0.01+(i-1)*(0.1-0.01)/(howmany-1),digits=3) for i in 1:howmany]
+for num_particles in [tot_sites-i for i in 0:4]
+	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
 	#rez2 = get_occupancy(dm_sp.ttn; plot_title="Chem=$chemical")
-	rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn; plot_title="$chemical, $ts")
+	rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;if_plot=false)# plot_title="Chemical=$mu, Hopping=$ts")
 	#append!(all_ttns,[dm_sp.ttn])
+	fig = figure()
+	imshow(rez[2][:,2:end])
+	title("Parts=$num_particles")
+	colorbar()
 end
 #
 #=rez3 = get_ydir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
