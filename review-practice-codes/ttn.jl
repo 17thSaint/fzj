@@ -360,7 +360,6 @@ function get_hofstadter_interacting_hamilt(net,t_strength,phi; kwargs...)
 	=#
 	
 	if if_chem && chem_strength != 0.0
-		println("Using Chem")
 		chem = TTNKit.OpSum()
 		for i in TTNKit.eachindex(lat)
 			chem -= (chem_strength,"N",TTNKit.coordinate(lat,i))
@@ -452,9 +451,10 @@ end
 
 function check_if_frozen(ttn)
 	occs = get_occupancy(ttn; if_plot=false)
+	edge_length = Int(sqrt(TTNKit.number_of_layers(ttn)))
 	if any(occs.==0.0)
 		return true,"frozen"
-	elseif any(round.(occs,digits=3).==1.0)#sum(occs.==1.0) > length(occs)/3
+	elseif any(round.(get_ydir_greenfunc(edge_length,ttn;if_plot=false)[2],digits=3).==0.0)#sum(occs.==1.0) > length(occs)/3
 		return true,"variables"
 	else
 		return false,"none"
@@ -499,16 +499,17 @@ function warming(ttn,ham,sp,particle_count,warming_limit; kwargs...)
 	num_sweeps = 3#get(kwargs, :num_sweeps, 1)
 	noise = get(kwargs, :noise, 0.0)
 	expander = get(kwargs, :expander, TTNKit.NoExpander())
+	sweep_type = get(kwargs, :sweep_type, "dmrg")
 
 	warming_count = 1
 	frozen = true
 	global old_data = [ttn,ham,sp]
 	while frozen && warming_count < warming_limit
-		reexpanded_ttn = TTNKit.adjust_tree_tensor_dimensions(old_data[1],2*max_dim)
-		new_ttn, new_ham, new_sp = do_sweep(reexpanded_ttn,ham,"dmrg",particle_count;output_level=0, kwargs...)
+		reexpanded_ttn = TTNKit.adjust_tree_tensor_dimensions(old_data[1],Int((warming_count+10)*max_dim/10))
+		new_ttn, new_ham, new_sp = do_sweep(reexpanded_ttn,ham,sweep_type,particle_count;output_level=0, kwargs...)
 		if_frozen,why = check_if_frozen(new_sp.ttn)
 		if if_frozen
-			#get_occupancy(new_sp.ttn; plot_title="Attempt $warming_count")
+			get_occupancy(new_sp.ttn; plot_title="Attempt $warming_count")
 			warming_count += 1
 			global old_data = [new_sp.ttn,new_ham,new_sp]
 		else
@@ -536,7 +537,7 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	sweep_type = get(kwargs, :sweep_type, "simple")
 	noise = get(kwargs, :noise, 0.0)
 	expander = get(kwargs, :expander, TTNKit.NoExpander())
-	max_occ = get(kwargs, :max_occ, Int(ceil(particle_count/(num_sites))+0) )
+	max_occ = get(kwargs, :max_occ, Int(round(particle_count/(num_sites))+1) )
 	u_strength = get(kwargs, :u_strength, 1.0)
 	warming_limit = get(kwargs, :warming_limit, 10)
 	excess_particles = get_excess_particles(particle_count,num_sites)
@@ -551,7 +552,7 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	println("Built States Vector")
 	old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
 	#ttn = TTNKit.increase_dim_tree_tensor_network_zeros(ttn, maxdim = max_dim)
-	ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,2*max_dim[end])
+	ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
 	println("Added States")
 	
 	#get_occupancy(ttn,edge_sites; plot_title="Starting")
@@ -833,6 +834,7 @@ function rewrite_inds(tensor,ref_tensor)
 		for j in 1:num_tensors
 			old_inds = TTNKit.inds(tensor.data[i][j])
 			new_inds = TTNKit.inds(ref_tensor.data[i][j])
+			#
 			for k in new_inds
 				matching = findfirst(x->x==k,old_inds)
 				if matching != nothing
@@ -917,12 +919,12 @@ function localinner(ttn1::TTNKit.TreeTensorNetwork{N, T}, old_ttn2::TTNKit.TreeT
             tn2 = ttn2[ll,pp]
             rpre1 = res[childs_idx[1]]
             rpre2 = res[childs_idx[2]]
-            #=
+            #
             if prod(size(rpre1)) > 2^5
             	println("Stop here: ",typeof(res))
             	return res
             end
-            =#
+            #
             res_new[pp] = TTNKit._dot_inner(tn1, tn2, rpre1, rpre2)
         end
         res = res_new
@@ -1141,13 +1143,31 @@ function get_mag_string(no_magF)
 	end	
 end
 
+function check_overlaps(all_ttns)
+	count = length(all_ttns)
+	overlaps = zeros(count,count)
+	for i in 1:count
+		for j in 1:count
+			if i == j
+				overlaps[i,j] = 1.0
+				continue
+			end
+			overlaps[i,j] = localinner(all_ttns[i],all_ttns[j])
+		end
+	end
+	fig = figure()
+	imshow(overlaps)
+	colorbar()
+	return overlaps
+end
+
 
 #final_time = 0.1
 if_per = false
 mag_off = true
 evolve = true
 chemical = true
-mu = 0.0
+mu = 0.5
 #max_occupation = 3
 bc_string = get_periodic_title_string(if_per)
 mag_string = get_mag_string(mag_off)
@@ -1156,18 +1176,23 @@ tot_sites = 2^layers
 edge_sites = Int(sqrt(2^layers))
 expan = TTNKit.DefaultExpander(0.2)
 #us = 1.0
-ts = 0.01
+#ts = 0.01
 nu = 1/2
-num_particles = tot_sites - get_particles_needed(layers; nu=nu)
-mdim = 150
+num_particles = tot_sites#get_particles_needed(layers; nu=nu)#tot_sites - 
+mdim = 50
 nswps = 3
 
-println("Using $num_particles particles on $tot_sites sites")
+#println("Using $num_particles particles on $tot_sites sites")
 #noise = 0.0
-
-og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps, if_periodic=if_per,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
-#rez2 = get_occupancy(dm_sp.ttn; plot_title="Chem=$chemical")
-rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn; plot_title="Chem=$chemical")
+howmany = 5
+all_ttns = []
+for ts in [round(0.01+(i-1)*(0.1-0.01)/(howmany-1),digits=3) for i in 1:howmany]
+	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps, if_periodic=if_per,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
+	#rez2 = get_occupancy(dm_sp.ttn; plot_title="Chem=$chemical")
+	rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn; plot_title="$chemical, $ts")
+	#append!(all_ttns,[dm_sp.ttn])
+end
+#
 #=rez3 = get_ydir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
 rez6 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
 rez5 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
@@ -1175,7 +1200,7 @@ rez2 = get_current_yfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
 rez4 = get_current_xfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
 =#
 #end
-
+#
 #all_paths = get_all_sites_paths_and_plot(dm_sp.ttn,edge_sites; likely_path=true)
 
 
