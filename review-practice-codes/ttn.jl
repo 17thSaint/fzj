@@ -66,7 +66,8 @@ function get_ydir_greenfunc(edge_length,ttn; kwargs...)
 	#	println("Probably Bad TTN, reset variables")
 	#end
 	if get(kwargs, :if_plot, true)
-		subplot_num = get(kwargs, :subplot_number, 111)
+		title_string = "Y Spatial Green's Function, " * get(kwargs, :plot_title, "Edge Count = $edge_length")
+		#=subplot_num = get(kwargs, :subplot_number, 111)
 		if subplot_num > 150
 			subplot(subplot_num)
 		else
@@ -77,12 +78,11 @@ function get_ydir_greenfunc(edge_length,ttn; kwargs...)
 			plot(all_yvals[i,:],all_greens[i,:],"-p",label="x=$i")
 		end
 		yscale("log")
-		title_string = "Y Spatial Green's Function, " * get(kwargs, :plot_title, "Edge Count = $edge_length")
 		title(title_string)
 		xlabel("Y")
 		ylabel("Correlation")
 		legend()
-		#
+		=#
 		fig = figure()
 		imshow(all_greens)
 		xlabel("Y")
@@ -123,7 +123,7 @@ function get_xdir_greenfunc(edge_length,ttn; kwargs...)
 	end
 	all_greens = abs.(all_greens)
 	if get(kwargs, :if_plot, true)
-		subplot_num = get(kwargs, :subplot_number, 111)
+		#=subplot_num = get(kwargs, :subplot_number, 111)
 		if subplot_num > 150
 			subplot(subplot_num)
 		else
@@ -139,7 +139,7 @@ function get_xdir_greenfunc(edge_length,ttn; kwargs...)
 		xlabel("Y")
 		ylabel("Correlation")
 		legend()
-		#
+		=#
 		fig = figure()
 		imshow(all_greens)
 		xlabel("Y")
@@ -515,8 +515,8 @@ function do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
 	noise = get(kwargs, :noise, 0.0)
 	expander = get(kwargs, :expander, TTNKit.NoExpander())
 	
-	println("PreSweep Link Dim = ",TTNKit.maxlinkdim(ttn))
-	get_position_dims(ttn)
+	#println("PreSweep Link Dim = ",TTNKit.maxlinkdim(ttn))
+	#get_position_dims(ttn)
 	if sweep_type == "dmrg"
 		sp = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=0, maxdims=max_dim, noise=noise, output_level=opl)
 	elseif sweep_type == "simple"
@@ -535,10 +535,10 @@ function do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
 					    maxiter=eigsolve_maxiter)
 		
 		sp = TTNKit.SimpleSweepHandler(ttn,proj_tpo,func,num_sweeps,[max_dim],[noise],expander)
-		println("Sweep Built Link Dim = ",TTNKit.maxlinkdim(sp.ttn))
-		#localsweep(ttn,sp;outputlevel=opl);
-		println("PostSweep TTN Link Dim = ",TTNKit.maxlinkdim(ttn))
-		println("PostSweep SP-TTN Link Dim = ",TTNKit.maxlinkdim(sp.ttn))
+		#println("Sweep Built Link Dim = ",TTNKit.maxlinkdim(sp.ttn))
+		TTNKit.sweep(ttn,sp;outputlevel=opl);
+		#println("PostSweep TTN Link Dim = ",TTNKit.maxlinkdim(ttn))
+		#println("PostSweep SP-TTN Link Dim = ",TTNKit.maxlinkdim(sp.ttn))
 	end
 	
 	return ttn,ham,sp
@@ -591,13 +591,14 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	noise = get(kwargs, :noise, 0.0)
 	expander = get(kwargs, :expander, TTNKit.NoExpander())
 	max_occ = get(kwargs, :max_occ, Int(round(particle_count/(num_sites))+1) )
-	u_strength = get(kwargs, :u_strength, 1.0)
+	u_strength = get(kwargs, :u_strength, 100.0)
 	warming_limit = get(kwargs, :warming_limit, 10)
+	conserve_qns = get(kwargs, :syms, true)
 	#excess_particles = get_excess_particles(particle_count,num_sites)
 	#phi = get(kwargs, :phi, excess_particles/(filling * (num_sites)))
 	phi = get(kwargs, :phi, particle_count/(filling * (num_sites)))
 
-	net = TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, "Boson";conserve_qns=true,dim=max_occ+1)
+	net = TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, "Boson";conserve_qns=conserve_qns,dim=max_occ+1)
 	lat = TTNKit.physical_lattice(net)
 
 	println("Finished Building Network")
@@ -606,9 +607,9 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	println("Built States Vector")
 	old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
 	#ttn = TTNKit.increase_dim_tree_tensor_network_zeros(ttn, maxdim = max_dim)
-	println("Starting Link Dim = ",TTNKit.maxlinkdim(old_ttn))
+	#println("Starting Link Dim = ",TTNKit.maxlinkdim(old_ttn))
 	ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
-	println("Adjusted Link Dim = ",TTNKit.maxlinkdim(ttn))
+	#println("Adjusted Link Dim = ",TTNKit.maxlinkdim(ttn))
 	println("Added States")
 	
 	#get_occupancy(ttn,edge_sites; plot_title="Starting")
@@ -619,10 +620,10 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	println("Built Hamiltonian")
 	if if_sweep
 		ttn, ham, sp = do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
-		return sp.ttn, ham, sp
+		#return sp.ttn, ham, sp
 		if_frozen,why = check_if_frozen(sp.ttn)
 		if !if_frozen
-			get_position_dims(sp.ttn)
+			#get_position_dims(sp.ttn)
 			return sp.ttn, ham, sp
 		else
 			if why == "frozen"
@@ -1224,33 +1225,34 @@ end
 if_per = false
 mag_off = true
 evolve = true
-chemical = true
+chemical = false
 mu = 0.5
 #max_occupation = 3
 bc_string = get_periodic_title_string(if_per)
 mag_string = get_mag_string(mag_off)
-layers = 4
+layers = 6
 tot_sites = 2^layers
 edge_sites = Int(sqrt(2^layers))
 expan = TTNKit.NoExpander()#DefaultExpander(0.2)
 #us = 1.0
 ts = 0.01
 nu = 1/2
-num_particles = tot_sites-2#get_particles_needed(layers; nu=nu)#tot_sites - 
-mdim = 100
+num_particles = get_particles_needed(layers; nu=nu)#tot_sites - 
+mdim = 50
 nswps = 3
 
-if true
+#if true
 #println("Using $num_particles particles on $tot_sites sites")
 #noise = 0.0
 howmany = 5
 all_ttns = []
-#for ts in [round(0.01+(i-1)*(0.1-0.01)/(howmany-1),digits=3) for i in 1:howmany]
+for ts in [round(0.01+(i-1)*(0.1-0.01)/(howmany-1),digits=3) for i in 1:howmany]
 #for num_particles in [tot_sites-i for i in 1:4]
-	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="simple",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
+	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim,syms=true, num_sweeps=nswps, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="simple",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
 	#rez2 = get_occupancy(dm_sp.ttn; plot_title="Chem=$chemical")
-	rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;if_plot=false)# plot_title="Chemical=$mu, Hopping=$ts")
-	#append!(all_ttns,[dm_sp.ttn])
+	rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;plot_title="Hopping=$ts")
+	rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;direction="reverse",plot_title="Hopping=$ts")
+	append!(all_ttns,[dm_sp.ttn])
 	#=fig = figure()
 	imshow(rez[2][:,2:end])
 	title("Parts=$num_particles")
@@ -1258,26 +1260,6 @@ all_ttns = []
 	=#
 end
 #
-#=
-net1 = TTNKit.network(dm_sp.ttn)
-poses = [pos for pos in TTNKit.NodeIterator(net1)]
-function do_expansion(pos,ttn)
-	net = TTNKit.network(ttn)
-	prnt_node = TTNKit.parent_node(net,pos)
-	if isnothing(prnt_node)
-		println("No Parent")
-		return
-	end
-	tt = ttn[pos]
-	prnt_idx = TTNKit.commonind(tt,ttn[prnt_node])
-	chld_idx = TTNKit.uniqueinds(tt,prnt_idx)
-	tt = TTNKit.ITensors.permute(tt,chld_idx...,prnt_idx)
-	qn_link = TTNKit.Index([TTNKit.flux(tt)=>1], "QNL";dir = TTNKit.ITensors.In)
-	full_link = TTNKit.combinedind(TTNKit.combiner(chld_idx...,qn_link;dir=TTNKit.dir(TTNKit.dag(prnt_idx))))
-	link_complement = TTNKit.complement(TTNKit.dag(full_link),prnt_idx)
-	return	link_complement,
-end
-=#
 #=rez3 = get_ydir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
 rez6 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
 rez5 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
@@ -1287,37 +1269,6 @@ rez4 = get_current_xfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
 #end
 #
 #all_paths = get_all_sites_paths_and_plot(dm_sp.ttn,edge_sites; likely_path=true)
-
-if true
-TTNKit.initialize!(dm_sp);
-	pos = (1,1)
-	ttn = dm_sp.ttn;
-	#TTNKit.move_ortho!(ttn,pos)
-	net = TTNKit.network(ttn);
-	t = ttn[pos];
-	pn = TTNKit.next_position(dm_sp,pos)
-	pth = TTNKit.connecting_path(net,pos,pn)
-	posnext = pth[1]
-	Anext = ttn[posnext];
-	t,Aprime = TTNKit.expand(t,Anext,TTNKit.NoExpander(); reorthogonalize=true);
-	ttn[pos] = t;
-	ttn[posnext] = Aprime;
-	ptpo = TTNKit.update_environments!(dm_sp.pTPO,Aprime,posnext,pos);
-
-	action  = TTNKit.∂A(ptpo, pos);
-	val,tn = dm_sp.func(action,t);
-	dm_sp.current_energy = real(val[1])
-	tn = tn[1]
-
-	A = tn
-	pos = TTNKit.ortho_center(ttn)
-	posnext = TTNKit.connecting_path(net,pos,pn)[1]
-	idx_r = TTNKit.commonind(ttn[pos],ttn[posnext])
-	idx_l = TTNKit.uniqueinds(A,idx_r)
-	Q,R,spec = TTNKit.factorize(A,idx_l;tags=TTNKit.tags(idx_r),normalize=true,maxdim=mdim,eigen_perturbation=nothing);
-	println("OG size = ",size(ttn[pos])," becomes ",size(Q),". OG size ",size(ttn[posnext])," multiplies with ",size(R))
-	println("Trunc Error = ",dm_sp.current_max_truncerr)
-end
 
 
 
