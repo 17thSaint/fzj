@@ -518,7 +518,7 @@ function do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
 	#println("PreSweep Link Dim = ",TTNKit.maxlinkdim(ttn))
 	#get_position_dims(ttn)
 	if sweep_type == "dmrg"
-		sp = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=0, maxdims=max_dim, noise=noise, output_level=opl)
+		sp = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl)
 	elseif sweep_type == "simple"
 		proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
 		#println("Finished Making Hamiltonian")
@@ -534,9 +534,12 @@ function do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
 					    krylovdim=eigsolve_krylovdim,
 					    maxiter=eigsolve_maxiter)
 		
-		sp = TTNKit.SimpleSweepHandler(ttn,proj_tpo,func,num_sweeps,[max_dim],[noise],expander)
+		ttnc = TTNKit.copy(ttn)
+		ttnc = TTNKit.move_ortho!(ttnc,(TTNKit.number_of_layers(TTNKit.network(ttnc)),1))
+		sp = TTNKit.SimpleSweepHandler(ttnc,proj_tpo,func,num_sweeps,[max_dim],[noise],expander)
 		#println("Sweep Built Link Dim = ",TTNKit.maxlinkdim(sp.ttn))
-		TTNKit.sweep(ttn,sp;outputlevel=opl);
+		TTNKit.sweep(ttnc,sp;outputlevel=opl);
+		return ttnc,ham,sp
 		#println("PostSweep TTN Link Dim = ",TTNKit.maxlinkdim(ttn))
 		#println("PostSweep SP-TTN Link Dim = ",TTNKit.maxlinkdim(sp.ttn))
 	end
@@ -562,7 +565,7 @@ function warming(ttn,ham,sp,particle_count,warming_limit; kwargs...)
 		println("Max Dim = ",TTNKit.maxlinkdim(new_sp.ttn),", Expected = $new_maxdim")
 		if_frozen,why = check_if_frozen(new_sp.ttn)
 		if if_frozen
-			#get_occupancy(new_sp.ttn; plot_title="Attempt $warming_count")
+			get_occupancy(new_sp.ttn; plot_title="Attempt $warming_count")
 			warming_count += 1
 			global old_data = [new_sp.ttn,new_ham,new_sp]
 		else
@@ -592,7 +595,7 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	expander = get(kwargs, :expander, TTNKit.NoExpander())
 	max_occ = get(kwargs, :max_occ, Int(round(particle_count/(num_sites))+1) )
 	u_strength = get(kwargs, :u_strength, 100.0)
-	warming_limit = get(kwargs, :warming_limit, 10)
+	warming_limit = get(kwargs, :warming_limit, 100)
 	conserve_qns = get(kwargs, :syms, true)
 	#excess_particles = get_excess_particles(particle_count,num_sites)
 	#phi = get(kwargs, :phi, excess_particles/(filling * (num_sites)))
@@ -707,7 +710,7 @@ function find_path(ttn,starting_site; kwargs...)
 	path = [starting_site]
 	
 	if_periodic = get(kwargs, :periodic, false)
-	likely_path = get(kwargs, :likely_path, false)
+	likely_path = get(kwargs, :likely_path, true)
 	rand_path = get(kwargs, :rand_path, !likely_path)
 	path_length = get(kwargs, :path_length, Int(4*edge_length))	
 	
@@ -1223,7 +1226,7 @@ end
 
 #final_time = 0.1
 if_per = false
-mag_off = true
+mag_off = false
 evolve = true
 chemical = false
 mu = 0.5
@@ -1233,12 +1236,12 @@ mag_string = get_mag_string(mag_off)
 layers = 6
 tot_sites = 2^layers
 edge_sites = Int(sqrt(2^layers))
-expan = TTNKit.NoExpander()#DefaultExpander(0.2)
+expan = TTNKit.DefaultExpander(0.5)
 #us = 1.0
 ts = 0.01
 nu = 1/2
 num_particles = get_particles_needed(layers; nu=nu)#tot_sites - 
-mdim = 50
+mdim = 150
 nswps = 3
 
 #if true
@@ -1246,19 +1249,20 @@ nswps = 3
 #noise = 0.0
 howmany = 5
 all_ttns = []
-for ts in [round(0.01+(i-1)*(0.1-0.01)/(howmany-1),digits=3) for i in 1:howmany]
+#for ts in [round(0.01+(i-1)*(0.1-0.01)/(howmany-1),digits=3) for i in 1:howmany]
 #for num_particles in [tot_sites-i for i in 1:4]
-	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim,syms=true, num_sweeps=nswps, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="simple",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
+	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim,syms=true, num_sweeps=nswps, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
 	#rez2 = get_occupancy(dm_sp.ttn; plot_title="Chem=$chemical")
 	rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;plot_title="Hopping=$ts")
-	rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;direction="reverse",plot_title="Hopping=$ts")
+	#rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;direction="reverse",plot_title="Hopping=$ts")
 	append!(all_ttns,[dm_sp.ttn])
+	get_occupancy(dm_sp.ttn;plot_title="Hopping=$ts")
 	#=fig = figure()
 	imshow(rez[2][:,2:end])
 	title("Parts=$num_particles")
 	colorbar()
 	=#
-end
+#end
 #
 #=rez3 = get_ydir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
 rez6 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
