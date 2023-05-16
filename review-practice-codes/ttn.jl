@@ -565,7 +565,7 @@ function warming(ttn,ham,sp,particle_count,warming_limit; kwargs...)
 		println("Max Dim = ",TTNKit.maxlinkdim(new_sp.ttn),", Expected = $new_maxdim")
 		if_frozen,why = check_if_frozen(new_sp.ttn)
 		if if_frozen
-			get_occupancy(new_sp.ttn; plot_title="Attempt $warming_count")
+			#get_occupancy(new_sp.ttn; plot_title="Attempt $warming_count")
 			warming_count += 1
 			global old_data = [new_sp.ttn,new_ham,new_sp]
 		else
@@ -851,6 +851,11 @@ function get_all_sites_paths_and_plot(ttn,edge_length; kwargs...)
 	return paths
 	direction_results = make_paths_directions(paths,edge_length; kwargs...)
 	return direction_results,paths
+end
+
+function get_2part_corr(ttn,particle_count; kwargs...)
+	corr = sum(abs.(TTNKit.expect(ttn,"N * N - N")))/particle_count
+	return corr
 end
 
 function get_occupancy(ttn; kwargs...)
@@ -1223,7 +1228,6 @@ function check_overlaps(all_ttns)
 	return overlaps
 end
 
-
 #final_time = 0.1
 if_per = false
 mag_off = false
@@ -1233,9 +1237,10 @@ mu = 0.5
 #max_occupation = 3
 bc_string = get_periodic_title_string(if_per)
 mag_string = get_mag_string(mag_off)
-layers = 6
+layers = 4
 tot_sites = 2^layers
 edge_sites = Int(sqrt(2^layers))
+alpha = 1/edge_sites
 expan = TTNKit.DefaultExpander(0.5)
 #us = 1.0
 ts = 0.01
@@ -1249,20 +1254,28 @@ nswps = 3
 #noise = 0.0
 howmany = 5
 all_ttns = []
+parts = [i for i in 1:4]
+fillings = [parts[i]/(alpha*tot_sites) for i in 1:length(parts)]
+corrs = []
 #for ts in [round(0.01+(i-1)*(0.1-0.01)/(howmany-1),digits=3) for i in 1:howmany]
-#for num_particles in [tot_sites-i for i in 1:4]
-	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim,syms=true, num_sweeps=nswps, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
-	#rez2 = get_occupancy(dm_sp.ttn; plot_title="Chem=$chemical")
-	rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;plot_title="Hopping=$ts")
-	#rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;direction="reverse",plot_title="Hopping=$ts")
+for num_particles in parts
+	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=2,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
 	append!(all_ttns,[dm_sp.ttn])
-	get_occupancy(dm_sp.ttn;plot_title="Hopping=$ts")
+	rez1 = get_2part_corr(dm_sp.ttn,num_particles)
+	println(rez1)
+	append!(corrs,[rez1])
+	#=rez2 = get_occupancy(dm_sp.ttn; plot_title="Chem=$chemical")
+	rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;plot_title="Hopping=$ts")
+	rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;direction="reverse",plot_title="Hopping=$ts")
+	get_occupancy(dm_sp.ttn;plot_title="Hopping=$ts")=#
 	#=fig = figure()
 	imshow(rez[2][:,2:end])
 	title("Parts=$num_particles")
 	colorbar()
 	=#
-#end
+end
+fig = figure()
+plot(fillings,corrs)
 #
 #=rez3 = get_ydir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
 rez6 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
