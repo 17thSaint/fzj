@@ -534,8 +534,8 @@ function do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
 					    krylovdim=eigsolve_krylovdim,
 					    maxiter=eigsolve_maxiter)
 		
-		ttnc = TTNKit.copy(ttn)
-		ttnc = TTNKit.move_ortho!(ttnc,(TTNKit.number_of_layers(TTNKit.network(ttnc)),1))
+		#ttnc = TTNKit.copy(ttn)
+		#ttnc = TTNKit.move_ortho!(ttnc,(TTNKit.number_of_layers(TTNKit.network(ttnc)),1))
 		sp = TTNKit.SimpleSweepHandler(ttnc,proj_tpo,func,num_sweeps,[max_dim],[noise],expander)
 		#println("Sweep Built Link Dim = ",TTNKit.maxlinkdim(sp.ttn))
 		TTNKit.sweep(ttnc,sp;outputlevel=opl);
@@ -1228,6 +1228,21 @@ function check_overlaps(all_ttns)
 	return overlaps
 end
 
+function get_part_counts_range_fillings(site_count,phi)
+	starting_count = 0.25 * phi * site_count
+	if starting_count <= 1.0
+		println("Lattice too small")
+		return
+	else
+		starting_count = Int(starting_count)
+	end
+	ending_count = Int(0.75 * phi * site_count)
+	num_points = ending_count - starting_count
+	part_counts = [starting_count + i for i in 0:num_points]
+	nu_values = [part_counts[i]/(phi*site_count) for i in 1:length(part_counts)]
+	return part_counts,nu_values
+end
+
 #final_time = 0.1
 if_per = false
 mag_off = false
@@ -1237,45 +1252,62 @@ mu = 0.5
 #max_occupation = 3
 bc_string = get_periodic_title_string(if_per)
 mag_string = get_mag_string(mag_off)
-layers = 4
+layers = 6
 tot_sites = 2^layers
 edge_sites = Int(sqrt(2^layers))
-alpha = 1/edge_sites
+#alpha = 1/1
 expan = TTNKit.DefaultExpander(0.5)
 #us = 1.0
 ts = 0.01
 nu = 1/2
-num_particles = get_particles_needed(layers; nu=nu)#tot_sites - 
+#num_particles = 4#get_particles_needed(layers; nu=nu)#tot_sites - 
 mdim = 150
 nswps = 3
 
 #if true
 #println("Using $num_particles particles on $tot_sites sites")
 #noise = 0.0
-howmany = 5
-all_ttns = []
-parts = [i for i in 1:4]
-fillings = [parts[i]/(alpha*tot_sites) for i in 1:length(parts)]
-corrs = []
+
+#all_ttns = []
+js = [4,6,8]
+corrs = [[] for i in 1:length(js)]
+fillings = [[] for i in 1:length(js)]
+for j in 1:length(js)
+v = js[j]
+alpha = 1/v
+vals = get_part_counts_range_fillings(tot_sites,alpha)
+if !isnothing(vals)
+parts = vals[1]
+fillings[j] = vals[2] 
 #for ts in [round(0.01+(i-1)*(0.1-0.01)/(howmany-1),digits=3) for i in 1:howmany]
-for num_particles in parts
+for i in 1:length(parts)
+	num_particles = parts[i]#
+	println("Using $num_particles particles on $tot_sites sites for Filling = ",fillings[j][i])
+	#
 	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=2,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
-	append!(all_ttns,[dm_sp.ttn])
+	#append!(all_ttns,[dm_sp.ttn])
 	rez1 = get_2part_corr(dm_sp.ttn,num_particles)
 	println(rez1)
-	append!(corrs,[rez1])
-	#=rez2 = get_occupancy(dm_sp.ttn; plot_title="Chem=$chemical")
-	rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;plot_title="Hopping=$ts")
+	#append!(corrs[j],[rez1])
+	#rez2 = get_occupancy(dm_sp.ttn; plot_title="Chem=$chemical")
+	#=rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;plot_title="Hopping=$ts")
 	rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;direction="reverse",plot_title="Hopping=$ts")
 	get_occupancy(dm_sp.ttn;plot_title="Hopping=$ts")=#
 	#=fig = figure()
 	imshow(rez[2][:,2:end])
 	title("Parts=$num_particles")
 	colorbar()
-	=#
+	=##
 end
-fig = figure()
-plot(fillings,corrs)
+plot(fillings[j],corrs[j],label="1/$j")
+xlabel("Filling Factor")
+ylabel("Sum n(n-1)")
+title("Two Point Correlation Function vs Filling for $edge_sites x $edge_sites Lattice")
+else
+	println("Not possible for phi = 1/$j")
+end
+end
+legend()
 #
 #=rez3 = get_ydir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
 rez6 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
