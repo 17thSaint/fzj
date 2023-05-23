@@ -1,4 +1,7 @@
-using TTNKit,PyPlot,Statistics,LsqFit
+
+using TTNKit,PyPlot,Statistics,LsqFit,NBInclude
+#cd("/home/patrick/Downloads")
+@nbinclude("parton-model-syms.ipynb")
 
 #=
 Need to figure out how sweeps works
@@ -495,6 +498,13 @@ function fill_states(particle_count,site_count,max_occupation)
 	return states
 end
 
+function initialize_ttn(ttn,maxdim)
+	site_count = TTNKit.number_of_sites(TTNKit.network(ttn))
+	wf_coefs = create_wavefunction(Float64,(Int(sqrt(site_count)),Int(sqrt(site_count))))
+	new_ttn = patron_application!(ttn,wf_coefs,"Adag";maxdim=maxdim)
+	return new_ttn
+end
+
 function check_if_frozen(ttn)
 	occs = get_occupancy(ttn; if_plot=false)
 	edge_length = Int(sqrt(2^TTNKit.number_of_layers(ttn)))
@@ -606,12 +616,13 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 
 	println("Finished Building Network")
 
-	states = fill_states(particle_count,num_sites,max_occ)
+	states = fill_states(particle_count-1,num_sites,max_occ)
 	println("Built States Vector")
 	old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
 	#ttn = TTNKit.increase_dim_tree_tensor_network_zeros(ttn, maxdim = max_dim)
+	#ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
 	#println("Starting Link Dim = ",TTNKit.maxlinkdim(old_ttn))
-	ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
+	ttn = initialize_ttn(old_ttn,max_dim)
 	#println("Adjusted Link Dim = ",TTNKit.maxlinkdim(ttn))
 	println("Added States")
 	
@@ -1252,29 +1263,31 @@ mu = 0.5
 #max_occupation = 3
 bc_string = get_periodic_title_string(if_per)
 mag_string = get_mag_string(mag_off)
-layers = 6
+layers = 4
 tot_sites = 2^layers
 edge_sites = Int(sqrt(2^layers))
-#alpha = 1/1
+alpha = 1/1
 expan = TTNKit.DefaultExpander(0.5)
 #us = 1.0
 ts = 0.01
 nu = 1/2
-#num_particles = 4#get_particles_needed(layers; nu=nu)#tot_sites - 
-mdim = 150
+num_particles = 4#get_particles_needed(layers; nu=nu)#tot_sites - 
+mdim = 50
 nswps = 3
 
 #if true
 #println("Using $num_particles particles on $tot_sites sites")
 #noise = 0.0
 
-#all_ttns = []
-js = [4,6,8]
+#=all_ttns = []
+js = [1,2,4,6,8]
 corrs = [[] for i in 1:length(js)]
 fillings = [[] for i in 1:length(js)]
+phis = [[] for i in 1:length(js)]
 for j in 1:length(js)
 v = js[j]
 alpha = 1/v
+append!(phis[j],[alpha])
 vals = get_part_counts_range_fillings(tot_sites,alpha)
 if !isnothing(vals)
 parts = vals[1]
@@ -1283,12 +1296,12 @@ fillings[j] = vals[2]
 for i in 1:length(parts)
 	num_particles = parts[i]#
 	println("Using $num_particles particles on $tot_sites sites for Filling = ",fillings[j][i])
-	#
+	=#
 	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=2,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
-	#append!(all_ttns,[dm_sp.ttn])
+	#=append!(all_ttns,[dm_sp.ttn])
 	rez1 = get_2part_corr(dm_sp.ttn,num_particles)
 	println(rez1)
-	#append!(corrs[j],[rez1])
+	append!(corrs[j],[rez1])
 	#rez2 = get_occupancy(dm_sp.ttn; plot_title="Chem=$chemical")
 	#=rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;plot_title="Hopping=$ts")
 	rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;direction="reverse",plot_title="Hopping=$ts")
@@ -1299,16 +1312,20 @@ for i in 1:length(parts)
 	colorbar()
 	=##
 end
-plot(fillings[j],corrs[j],label="1/$j")
+else
+	println("Not possible for phi = 1/$(Int(round(1/phis[j][1],digits=1)))")
+end
+end
+#
+for j in 1:length(js)
+plot(fillings[j],corrs[j],label="1/$(Int(round(1/phis[j][1],digits=1)))")
+end
 xlabel("Filling Factor")
 ylabel("Sum n(n-1)")
 title("Two Point Correlation Function vs Filling for $edge_sites x $edge_sites Lattice")
-else
-	println("Not possible for phi = 1/$j")
-end
-end
+
 legend()
-#
+=#
 #=rez3 = get_ydir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
 rez6 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
 rez5 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
