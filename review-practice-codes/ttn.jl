@@ -35,7 +35,13 @@ function get_site_number(x, y, side_length)
     return Int(site_number)
 end
 
-function get_ydir_greenfunc(edge_length,ttn; kwargs...)
+function get_site_count(ttn)
+	layers = TTNKit.number_of_layers
+	return 2^layers
+end
+
+function get_ydir_greenfunc(ttn; kwargs...)
+	edge_length = Int(sqrt(get_site_count(ttn)))
 	adag = "Adag"#"S+"
 	ahat = "A"#"S-"
 	direct = get(kwargs, :direction, "norm")
@@ -70,7 +76,7 @@ function get_ydir_greenfunc(edge_length,ttn; kwargs...)
 	#end
 	if get(kwargs, :if_plot, true)
 		title_string = "Y Spatial Green's Function, " * get(kwargs, :plot_title, "Edge Count = $edge_length")
-		#=subplot_num = get(kwargs, :subplot_number, 111)
+		subplot_num = get(kwargs, :subplot_number, 111)
 		if subplot_num > 150
 			subplot(subplot_num)
 		else
@@ -85,7 +91,7 @@ function get_ydir_greenfunc(edge_length,ttn; kwargs...)
 		xlabel("Y")
 		ylabel("Correlation")
 		legend()
-		=#
+		#
 		fig = figure()
 		imshow(all_greens)
 		xlabel("Y")
@@ -98,7 +104,8 @@ function get_ydir_greenfunc(edge_length,ttn; kwargs...)
 	return all_yvals,all_greens
 end
 
-function get_xdir_greenfunc(edge_length,ttn; kwargs...)
+function get_xdir_greenfunc(ttn; kwargs...)
+	edge_length = Int(sqrt(get_site_count(ttn)))
 	adag = "Adag"#"S+"
 	ahat = "A"#"S-"
 	direct = get(kwargs, :direction, "norm")
@@ -155,7 +162,8 @@ function get_xdir_greenfunc(edge_length,ttn; kwargs...)
 	return all_xvals,all_greens
 end
 
-function get_current_yfunc(edge_length,ttn; kwargs...)
+function get_current_yfunc(ttn; kwargs...)
+	edge_length = Int(sqrt(get_site_count(ttn)))
 	adag = "Adag"#"S+"
 	ahat = "A"#"S-"
 	norm_string = "Adag * A"#"S+ * S-"
@@ -205,7 +213,8 @@ function get_current_yfunc(edge_length,ttn; kwargs...)
 	return all_yvals,all_currents
 end
 
-function get_current_xfunc(edge_length,ttn; kwargs...)
+function get_current_xfunc(ttn; kwargs...)
+	edge_length = Int(sqrt(get_site_count(ttn)))
 	adag = "Adag"#"S+"
 	ahat = "A"#"S-"
 	norm_string = "Adag * A"#"S+ * S-"
@@ -498,11 +507,13 @@ function fill_states(particle_count,site_count,max_occupation)
 	return states
 end
 
-function initialize_ttn(ttn,maxdim)
+function initialize_ttn(ttn,maxdim,particle_count)
 	site_count = TTNKit.number_of_sites(TTNKit.network(ttn))
 	wf_coefs = create_wavefunction(Float64,(Int(sqrt(site_count)),Int(sqrt(site_count))))
-	new_ttn = patron_application!(ttn,wf_coefs,"Adag";maxdim=maxdim)
-	return new_ttn
+	for i in 1:particle_count
+		ttn = patron_application!(ttn,wf_coefs,"Adag";maxdim=maxdim)
+	end
+	return ttn
 end
 
 function check_if_frozen(ttn)
@@ -616,13 +627,12 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 
 	println("Finished Building Network")
 
-	states = fill_states(particle_count-1,num_sites,max_occ)
-	println("Built States Vector")
+	states = fill("0", num_sites)#fill_states(particle_count-1,num_sites,max_occ)
 	old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
 	#ttn = TTNKit.increase_dim_tree_tensor_network_zeros(ttn, maxdim = max_dim)
 	#ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
 	#println("Starting Link Dim = ",TTNKit.maxlinkdim(old_ttn))
-	ttn = initialize_ttn(old_ttn,max_dim)
+	ttn = initialize_ttn(old_ttn,max_dim,particle_count)
 	#println("Adjusted Link Dim = ",TTNKit.maxlinkdim(ttn))
 	println("Added States")
 	
@@ -847,7 +857,8 @@ function make_paths_directions(paths,edge_length; kwargs...)
 	return cws_xs,cws_ys,ccws_xs,ccws_ys
 end
 
-function get_all_sites_paths_and_plot(ttn,edge_length; kwargs...)
+function get_all_sites_paths_and_plot(ttn; kwargs...)
+	edge_length = Int(sqrt(get_site_count(ttn)))
 	if_periodic = get(kwargs, :if_periodic, false)
 	likely_path = get(kwargs, :likely_path, false)
 	paths = []
@@ -1263,16 +1274,16 @@ mu = 0.5
 #max_occupation = 3
 bc_string = get_periodic_title_string(if_per)
 mag_string = get_mag_string(mag_off)
-layers = 4
+layers = 6
 tot_sites = 2^layers
 edge_sites = Int(sqrt(2^layers))
-alpha = 1/1
+alpha = 1/edge_sites
 expan = TTNKit.DefaultExpander(0.5)
 #us = 1.0
 ts = 0.01
 nu = 1/2
 num_particles = 4#get_particles_needed(layers; nu=nu)#tot_sites - 
-mdim = 50
+mdim = 250
 nswps = 3
 
 #if true
@@ -1297,20 +1308,20 @@ for i in 1:length(parts)
 	num_particles = parts[i]#
 	println("Using $num_particles particles on $tot_sites sites for Filling = ",fillings[j][i])
 	=#
-	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=2,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
+	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
 	#=append!(all_ttns,[dm_sp.ttn])
 	rez1 = get_2part_corr(dm_sp.ttn,num_particles)
 	println(rez1)
 	append!(corrs[j],[rez1])
-	#rez2 = get_occupancy(dm_sp.ttn; plot_title="Chem=$chemical")
-	#=rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;plot_title="Hopping=$ts")
-	rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;direction="reverse",plot_title="Hopping=$ts")
-	get_occupancy(dm_sp.ttn;plot_title="Hopping=$ts")=#
+	=#
+	rez2 = get_occupancy(dm_sp.ttn)
+	rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn)
+	#rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;direction="reverse",plot_title="Hopping=$ts")
 	#=fig = figure()
 	imshow(rez[2][:,2:end])
 	title("Parts=$num_particles")
 	colorbar()
-	=##
+	=##=
 end
 else
 	println("Not possible for phi = 1/$(Int(round(1/phis[j][1],digits=1)))")
