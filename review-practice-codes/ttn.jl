@@ -551,7 +551,7 @@ end
 
 function do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
 
-	opl = get(kwargs, :output_level, 2)
+	opl = get(kwargs, :output_level, 0)
 	max_dim = get(kwargs, :max_dim, particle_count+1)
 	num_sweeps = get(kwargs, :num_sweeps, 1)
 	noise = get(kwargs, :noise, 0.0)
@@ -1314,81 +1314,56 @@ mu = 0.5
 #max_occupation = 3
 bc_string = get_periodic_title_string(if_per)
 mag_string = get_mag_string(mag_off)
-layers = 4
-tot_sites = 2^layers
-edge_sites = Int(sqrt(2^layers))
-alpha = 1/edge_sites
 expan = TTNKit.DefaultExpander(0.5)
 #us = 1.0
 ts = 0.01
 nu = 1/2
-num_particles = Int(edge_sites/2)#get_particles_needed(layers; nu=nu)#tot_sites - 
-mdim = 100
-nswps = 3
+#num_particles = Int(edge_sites/2)#get_particles_needed(layers; nu=nu)#tot_sites - 
+#mdim = 100
+nswps = 10
 
 #if true
-println("Using $num_particles particles on $tot_sites sites")
-#noise = 0.0
-
-#=all_ttns = []
-js = [1,2,4,6,8]
-corrs = [[] for i in 1:length(js)]
-fillings = [[] for i in 1:length(js)]
-phis = [[] for i in 1:length(js)]
-for j in 1:length(js)
-v = js[j]
-alpha = 1/v
-append!(phis[j],[alpha])
-vals = get_part_counts_range_fillings(tot_sites,alpha)
-if !isnothing(vals)
-parts = vals[1]
-fillings[j] = vals[2] 
-#for ts in [round(0.01+(i-1)*(0.1-0.01)/(howmany-1),digits=3) for i in 1:howmany]
-for i in 1:length(parts)
-	num_particles = parts[i]#
-	println("Using $num_particles particles on $tot_sites sites for Filling = ",fillings[j][i])
-	=#
-	og_ttn, hamilt, dm_sp, all_times = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, sweep_iter=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
-	#og_ttn_pinning, hamilt_pinning, dm_sp_pinning = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_pinning_pot=true,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
-	#=append!(all_ttns,[dm_sp.ttn])
-	rez1 = get_2part_corr(dm_sp.ttn,num_particles)
-	println(rez1)
-	append!(corrs[j],[rez1])
-	=#
-	#rez1 = get_occupancy(dm_sp.ttn)
-	#rez2 = get_occupancy(dm_sp_pinning.ttn;plot_title="With Pinning Potential")
-	#=fig = figure()
-	imshow(rez-rez2)
-	colorbar()
-	title("Difference Between")
-	=#
-	#rez = get_ydir_greenfunc(dm_sp.ttn)
-	#rez2 = get_current_yfunc(dm_sp.ttn)
-	#rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;direction="reverse",plot_title="Hopping=$ts")
-	#=fig = figure()
-	imshow(rez[2][:,2:end])
-	title("Parts=$num_particles")
-	colorbar()
-	=##=
-end
-else
-	println("Not possible for phi = 1/$(Int(round(1/phis[j][1],digits=1)))")
-end
-end
+#println("Using $num_particles particles on $tot_sites sites")
 #
-for j in 1:length(js)
-plot(fillings[j],corrs[j],label="1/$(Int(round(1/phis[j][1],digits=1)))")
+mdcount = 10
+mdims = [Int(ceil(5 + (i-1)*(100-5)/(mdcount-1))) for i in 1:mdcount]
+layer_vals = [2,4,6,8]
+avg_times = zeros(length(layer_vals),length(mdims))
+errors_times = zeros(length(layer_vals),length(mdims))
+for j in length(layer_vals):length(layer_vals)
+	layers = layer_vals[j]
+	tot_sites = 2^layers
+	edge_sites = Int(sqrt(2^layers))
+	alpha = 1/edge_sites
+	num_particles = Int(edge_sites/2)
+	for i in 1:length(mdims)
+		mdim = mdims[i]
+		println("Working on Layers = $layers at MaxDim = $mdim")
+		og_ttn, hamilt, dm_sp, md_times = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, sweep_iter=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
+		avg_times[j,i] = mean(md_times)
+		errors_times[j,i] = std(md_times)
+	end
 end
-xlabel("Filling Factor")
-ylabel("Sum n(n-1)")
-title("Two Point Correlation Function vs Filling for $edge_sites x $edge_sites Lattice")
-
-legend()
-=#
-#=rez3 = get_ydir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
+#	
+for i in [length(layer_vals)]
+	errorbar(mdims,avg_times[i,:],yerr=[errors_times[i,:],errors_times[i,:]])
+	title("Site Count = $(2^layer_vals[i])")
+	xlabel("Max Link Dimension")
+	ylabel("AVG Time per Sweep")
+end
+	
+	
+	
+	
+	
+	
+	
+#=rez1 = get_occupancy(dm_sp.ttn)
+rez3 = get_ydir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
 rez6 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
 rez5 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
 rez4 = get_current_xfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
+rez2 = get_current_yfunc(dm_sp.ttn)
 =#
 #end
 #
