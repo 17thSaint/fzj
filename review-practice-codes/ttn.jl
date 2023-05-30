@@ -36,7 +36,7 @@ function get_site_number(x, y, side_length)
 end
 
 function get_site_count(ttn)
-	layers = TTNKit.number_of_layers
+	layers = Int(TTNKit.number_of_layers(ttn))
 	return 2^layers
 end
 
@@ -326,12 +326,24 @@ function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwarg
 	=#
 end
 
+function v_central(sz, Vj)
+    V = zeros(sz)
+    V[sz[1]÷2, sz[2]÷2] = Vj
+    V[sz[1]÷2, sz[2]÷2 + 1] = Vj
+    V[sz[1]÷2 + 1, sz[2]÷2] = Vj
+    V[sz[1]÷2 + 1, sz[2]÷2 + 1] = Vj
+    return V
+end
+#no_v(sz) = zeros(sz)
+
 function get_hofstadter_interacting_hamilt(net,t_strength,phi; kwargs...)
 	resulting_ham = []
 	if_periodic = get(kwargs, :if_periodic, true)
 	if_hopping = get(kwargs, :if_hopping, true)
 	if_chem = get(kwargs, :if_chem, false)
 	if_onsite = get(kwargs, :if_onsite, true)
+	if_pinning_pot = get(kwargs, :if_pinning_pot, false)
+	vpinning = get(kwargs, :vpinning, 2.5)
 	no_magF = get(kwargs, :no_magF, false)
 	chem_strength = get(kwargs, :chem_strength, 0.0)
 	u_strength = get(kwargs, :u_strength, 1.0)
@@ -384,6 +396,15 @@ function get_hofstadter_interacting_hamilt(net,t_strength,phi; kwargs...)
 		end
 		=#
 		append!(resulting_ham,[chem])
+	end
+	
+	if if_pinning_pot
+		Vj = v_central(size(lat), vpinning)
+		pinning_pot = TTNKit.OpSum()
+		for p in TTNKit.coordinates(lat)
+	    		pinning_pot += (Vj[p[1],p[2]], "N", p)
+		end
+		append!(resulting_ham,[pinning_pot])
 	end
 	
 	#=
@@ -521,7 +542,7 @@ function check_if_frozen(ttn)
 	edge_length = Int(sqrt(2^TTNKit.number_of_layers(ttn)))
 	if any(occs.==0.0)
 		return true,"frozen"
-	elseif any(round.(get_ydir_greenfunc(edge_length,ttn;if_plot=false)[2],digits=3).==0.0)#sum(occs.==1.0) > length(occs)/3
+	elseif any(round.(get_ydir_greenfunc(ttn;if_plot=false)[2],digits=3).==0.0)#sum(occs.==1.0) > length(occs)/3
 		return true,"variables"
 	else
 		return false,"none"
@@ -606,10 +627,19 @@ function get_excess_particles(part_count,site_count)
 	end
 end
 
+function throwout_therm_time(times)
+	if times[1] > 5 * mean(times[2:end])
+		return times[2:end]
+	else
+		return times
+	end
+end
+
 function build_full_harperhofstadter(num_layers,particle_count,t_strength,filling; kwargs...)
 	num_sites = 2^num_layers
 	max_dim = get(kwargs, :max_dim, particle_count+1)
-	num_sweeps = get(kwargs, :num_sweeps, 1)
+	num_sweeps = get(kwargs, :num_sweeps, 3)
+	sweep_iter = get(kwargs, :sweep_iter, 1)
 	if_sweep = get(kwargs, :if_sweep, true)
 	sweep_type = get(kwargs, :sweep_type, "simple")
 	noise = get(kwargs, :noise, 0.0)
@@ -642,22 +672,32 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	
 	ham = TTNKit.TPO(ham_operator,lat)
 	println("Built Hamiltonian")
+	sp = 0
+	times = []
 	if if_sweep
-		ttn, ham, sp = do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
-		#return sp.ttn, ham, sp
-		if_frozen,why = check_if_frozen(sp.ttn)
-		if !if_frozen
-			#get_position_dims(sp.ttn)
-			return sp.ttn, ham, sp
-		else
-			if why == "frozen"
-				println("Frozen on First Attempt, Starting Warming")
-			elseif why == "variables"
-				println("Bad Variables on First Attempt, Starting Reset")	
+		for i in 1:sweep_iter
+			time_start = time()
+			new_ttn, new_ham, new_sp = do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
+			time_end = time()
+			append!(times,[time_end - time_start])
+			#return sp.ttn, ham, sp
+			if_frozen,why = check_if_frozen(new_sp.ttn)
+			if !if_frozen
+				#get_position_dims(sp.ttn)
+				#return new_sp.ttn, new_ham, new_sp
+				ttn,ham,sp = new_ttn,new_ham,new_sp
+			else
+				if why == "frozen"
+					println("Frozen on First Attempt, Starting Warming")
+				elseif why == "variables"
+					println("Bad Variables on First Attempt, Starting Reset")	
+				end
+				warmed_results = warming(new_ttn,new_ham,new_sp,particle_count,warming_limit;kwargs...)
+				#return warmed_results
+				ttn,ham,sp = warmed_results
 			end
-			warmed_results = warming(ttn,ham,sp,particle_count,warming_limit;kwargs...)
-			return warmed_results
 		end
+		return ttn, ham, sp, throwout_therm_time(times)
 	end
 
 	return ttn,ham,"no sweep"
@@ -1274,7 +1314,7 @@ mu = 0.5
 #max_occupation = 3
 bc_string = get_periodic_title_string(if_per)
 mag_string = get_mag_string(mag_off)
-layers = 6
+layers = 4
 tot_sites = 2^layers
 edge_sites = Int(sqrt(2^layers))
 alpha = 1/edge_sites
@@ -1282,12 +1322,12 @@ expan = TTNKit.DefaultExpander(0.5)
 #us = 1.0
 ts = 0.01
 nu = 1/2
-num_particles = 4#get_particles_needed(layers; nu=nu)#tot_sites - 
-mdim = 250
+num_particles = Int(edge_sites/2)#get_particles_needed(layers; nu=nu)#tot_sites - 
+mdim = 100
 nswps = 3
 
 #if true
-#println("Using $num_particles particles on $tot_sites sites")
+println("Using $num_particles particles on $tot_sites sites")
 #noise = 0.0
 
 #=all_ttns = []
@@ -1308,14 +1348,22 @@ for i in 1:length(parts)
 	num_particles = parts[i]#
 	println("Using $num_particles particles on $tot_sites sites for Filling = ",fillings[j][i])
 	=#
-	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
+	og_ttn, hamilt, dm_sp, all_times = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, sweep_iter=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
+	#og_ttn_pinning, hamilt_pinning, dm_sp_pinning = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_pinning_pot=true,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off)
 	#=append!(all_ttns,[dm_sp.ttn])
 	rez1 = get_2part_corr(dm_sp.ttn,num_particles)
 	println(rez1)
 	append!(corrs[j],[rez1])
 	=#
-	rez2 = get_occupancy(dm_sp.ttn)
-	rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn)
+	#rez1 = get_occupancy(dm_sp.ttn)
+	#rez2 = get_occupancy(dm_sp_pinning.ttn;plot_title="With Pinning Potential")
+	#=fig = figure()
+	imshow(rez-rez2)
+	colorbar()
+	title("Difference Between")
+	=#
+	#rez = get_ydir_greenfunc(dm_sp.ttn)
+	#rez2 = get_current_yfunc(dm_sp.ttn)
 	#rez = get_ydir_greenfunc(edge_sites,dm_sp.ttn;direction="reverse",plot_title="Hopping=$ts")
 	#=fig = figure()
 	imshow(rez[2][:,2:end])
@@ -1340,7 +1388,6 @@ legend()
 #=rez3 = get_ydir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
 rez6 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
 rez5 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
-rez2 = get_current_yfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
 rez4 = get_current_xfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
 =#
 #end
