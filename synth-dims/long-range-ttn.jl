@@ -66,6 +66,7 @@ function get_interaction_coords(given_site,inter_dist,lat; kwargs...) # written 
 				elseif new_x > virt_edge_length
 					new_x -= virt_edge_length
 				end
+				#
 
                 		# Check if new coordinates are within lattice dimensions
 				if 1 <= new_x <= virt_edge_length && 1 <= new_y <= phys_edge_length && new_x != x
@@ -159,6 +160,31 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	end
 end
 
+function get_central_densdens_corr(ttn,distance; kwargs...)
+	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
+	lat = TTNKit.physical_lattice(TTNKit.network(ttn))
+	densdens_corr = [0.0 for i in 1:virt_edge_length]
+	for i in 1:length(densdens_corr)
+		next_site = i + distance
+		if next_site > virt_edge_length
+			next_site = next_site % virt_edge_length
+		end
+		value = TTNKit.correlation(ttn,"N","N",TTNKit.linear_ind(lat,(Int(virt_edge_length/2),i)),TTNKit.linear_ind(lat,(Int(virt_edge_length/2),next_site)))
+		densdens_corr[i] = real(value)
+	end
+	if get(kwargs, :if_plot, true)
+		title_string = "DensDens Corr dist=$distance, " * get(kwargs, :plot_title, "Virt Edge Count = $virt_edge_length")
+		fig = figure()
+		plot([i for i in 1:virt_edge_length],densdens_corr,"-p")
+		yscale("log")
+		title(title_string)
+		xlabel("Y")
+		ylabel("Corr")
+		#legend()
+	end
+	return densdens_corr
+end
+
 #
 if_per = false
 mag_off = true
@@ -167,7 +193,7 @@ chemical = false
 mu = 0.5
 #max_occupation = 3
 expan = TTNKit.DefaultExpander(0.5)
-ts = 0.01
+ts = 0.001
 nu = 1/2
 layers = 6
 tot_sites = 2^layers
@@ -187,15 +213,18 @@ nswps = 3
 println("Using $num_particles particles on $tot_sites sites")
 
 if_cliff = true
+sc_type = "flat"
+limit = 0.5
 
 net = build_HH_net(layers; syms=true)
-#=
+#= periodic boundary conditions
+# dens dens correlations for stripes
 all_ttns = []
-for i in 0:2
+for i in 1:2
 	longrange_dist = i
-	title_string = "LR = $longrange_dist"
+	title_string = "LR $sc_type = $longrange_dist, final ST = $limit"
 
-	ham = long_range_HH_ham(net,ts,alpha; scaling="flat",scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
+	ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
 
 	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; ttn_net=net,ham_op=ham,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
 	append!(all_ttns,[dm_sp.ttn])
