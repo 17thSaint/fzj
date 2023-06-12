@@ -160,27 +160,34 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	end
 end
 
-function get_central_densdens_corr(ttn,distance; kwargs...)
+function get_densdens_corrs(ttn,distances; kwargs...)
 	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
 	lat = TTNKit.physical_lattice(TTNKit.network(ttn))
-	densdens_corr = [0.0 for i in 1:virt_edge_length]
-	for i in 1:length(densdens_corr)
-		next_site = i + distance
-		if next_site > virt_edge_length
-			next_site = next_site % virt_edge_length
+	densdens_corr = zeros(length(distances),virt_edge_length)
+	for j in 1:length(distances)
+		distance = distances[j]
+		for i in 1:size(densdens_corr)[2]
+			next_site = i + distance
+			if next_site > virt_edge_length
+				next_site = next_site % virt_edge_length
+			end
+			pos1 = TTNKit.linear_ind(lat,(Int(virt_edge_length/2),i))
+			pos2 = TTNKit.linear_ind(lat,(Int(virt_edge_length/2),next_site))
+			value = TTNKit.correlation(ttn,"N","N",pos1,pos2)
+			densdens_corr[j,i] = real(value)
 		end
-		value = TTNKit.correlation(ttn,"N","N",TTNKit.linear_ind(lat,(Int(virt_edge_length/2),i)),TTNKit.linear_ind(lat,(Int(virt_edge_length/2),next_site)))
-		densdens_corr[i] = real(value)
 	end
 	if get(kwargs, :if_plot, true)
-		title_string = "DensDens Corr dist=$distance, " * get(kwargs, :plot_title, "Virt Edge Count = $virt_edge_length")
+		title_string = "DensDens Corr, " * get(kwargs, :plot_title, "Virt Edge Count = $virt_edge_length")
 		fig = figure()
-		plot([i for i in 1:virt_edge_length],densdens_corr,"-p")
+		for i in 1:length(distances)
+			plot([j for j in 1:virt_edge_length],densdens_corr[i,:],"-p",label="$(distances[i])")
+		end
 		yscale("log")
 		title(title_string)
 		xlabel("Y")
 		ylabel("Corr")
-		#legend()
+		legend()
 	end
 	return densdens_corr
 end
@@ -217,26 +224,27 @@ sc_type = "flat"
 limit = 0.5
 
 net = build_HH_net(layers; syms=true)
-#= periodic boundary conditions
+# periodic boundary conditions
 # dens dens correlations for stripes
 all_ttns = []
-for i in 1:2
+for i in 1:3
 	longrange_dist = i
-	title_string = "LR $sc_type = $longrange_dist, final ST = $limit"
+	title_string = "LR $sc_type = $longrange_dist"
 
 	ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
 
 	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; ttn_net=net,ham_op=ham,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
 	append!(all_ttns,[dm_sp.ttn])
+	rez = get_densdens_corrs(dm_sp.ttn,[1,2,3,4];plot_title=title_string)
 	#
 	rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string)
 	#rez2 = get_current_yfunc(dm_sp.ttn)
 	#rez3_fqh = get_ydir_greenfunc(dm_sp.ttn)
-	rez3_sf = get_ydir_greenfunc(dm_sp.ttn; plot_title=title_string)
-	rez4 = get_xdir_greenfunc(dm_sp.ttn; plot_title=title_string)
+	#rez3_sf = get_ydir_greenfunc(dm_sp.ttn; plot_title=title_string)
+	#rez4 = get_xdir_greenfunc(dm_sp.ttn; plot_title=title_string)
 	#
 end
-=#
+#
 
 
 
