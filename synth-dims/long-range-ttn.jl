@@ -70,19 +70,6 @@ function get_interaction_coords(given_site,inter_dist,lat; kwargs...) # written 
 	return coordinates
 end
 
-function get_lattice_dims(input_data)
-	num_layers = TTNKit.number_of_layers(input_data)
-	if num_layers % 2 != 0
-		physical_edge_length = Int(sqrt(2^(num_layers-1)))
-		virt_edge_length = physical_edge_length * 2
-		return physical_edge_length,virt_edge_length
-		
-	else
-		edge_length = Int(sqrt(2^num_layers))
-		return edge_length,edge_length
-	end
-end
-
 function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	resulting_ham = []
 	phys_edge_length,virt_edge_length = get_lattice_dims(net)
@@ -123,15 +110,13 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 			else
 				local_strength = long_range_strengths[i]
 				if i == 1
-					#=
 					for j in TTNKit.eachindex(lat)
 						interaction += (local_strength/2,"Adag * Adag * A * A",TTNKit.coordinate(lat,j))
 					end
 					append!(resulting_ham,[interaction])
-					=#
 				else
 					for j in TTNKit.eachindex(lat)
-						interaction_sites = get_interaction_coords(TTNKit.coordinate(lat,j),i-1,lat; edges=(phys_edge_length,virt_edge_length))
+						interaction_sites = get_interaction_coords(TTNKit.coordinate(lat,j),i-1,lat; edges=(virt_edge_length,phys_edge_length))
 						for k in interaction_sites
 							interaction += (local_strength/2,"Adag * A",TTNKit.coordinate(lat,j),"Adag * A",Tuple(k))
 							interaction -= (local_strength/2,"Adag * A",TTNKit.coordinate(lat,j))
@@ -169,42 +154,48 @@ end
 
 #
 if_per = false
-mag_off = true
+mag_off = false
 evolve = true
 chemical = false
 mu = 0.5
 #max_occupation = 3
-#bc_string = get_periodic_title_string(if_per)
-#mag_string = get_mag_string(mag_off)
 expan = TTNKit.DefaultExpander(0.5)
-#us = 1.0
 ts = 0.01
 nu = 1/2
-layers = 3
+layers = 4
 tot_sites = 2^layers
 #edge_sites = Int(sqrt(2^layers))
-#alpha = 1/edge_sites
-#num_particles = Int(edge_sites/2)#get_particles_needed(layers; nu=nu)#tot_sites - 
-mdim = 50
+num_particles = 4#Int(edge_sites/2)
+if !mag_off
+	alpha = num_particles/(mu * (tot_sites))
+else
+	alpha = 0.0
+end
+mdim = 150
 nswps = 3
 
 if_cliff = true
-longrange_dist = 1
+longrange_dist = 0
 
-#println("Using $num_particles particles on $tot_sites sites")
-#
+println("Using $num_particles particles on $tot_sites sites")
+
 
 net = build_HH_net(layers; syms=true)
-ham = long_range_HH_ham(net,ts,0.0; scaling="flat",scaling_dist=longrange_dist,cliff=if_cliff,if_hopping=false,if_periodic=if_per,if_chme=chemical,no_magF=mag_off)
-println(ham)
-#og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
+#ham = long_range_HH_ham(net,ts,alpha; scaling="flat",scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
+ham_sf = long_range_HH_ham(net,ts,alpha; scaling="flat",scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=true)
 
-#=
-rez1 = get_occupancy(dm_sp.ttn)
-rez2 = get_current_yfunc(dm_sp.ttn)
-rez3 = get_ydir_greenfunc(dm_sp.ttn)
-rez4 = get_xdir_greenfunc(dm_sp.ttn)
-=#
+#og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; ttn_net=net,ham_op=ham,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
+
+og_ttn_sf, hamilt_sf, dm_sp_sf = build_full_harperhofstadter(layers,num_particles,ts,nu; ttn_net=net,ham_op=ham_sf,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=true,output_level=0)
+
+#
+rez1 = get_occupancy(dm_sp_sf.ttn)
+#rez2 = get_current_yfunc(dm_sp.ttn)
+#rez3_fqh = get_ydir_greenfunc(dm_sp.ttn)
+rez3_sf = get_ydir_greenfunc(dm_sp_sf.ttn)
+rez4_sf = get_xdir_greenfunc(dm_sp_sf.ttn)
+#rez4 = get_xdir_greenfunc(dm_sp.ttn)
+#
 
 
 

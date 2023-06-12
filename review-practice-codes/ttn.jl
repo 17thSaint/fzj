@@ -1,5 +1,4 @@
-
-using TTNKit,PyPlot,Statistics,LsqFit,NBInclude
+using TTNKit,Statistics,NBInclude
 #cd("/home/patrick/Downloads")
 @nbinclude("parton-model-syms.ipynb")
 
@@ -26,6 +25,7 @@ function get_xy(site_number,side_length)
 	return x,y
 end
 
+#=
 function get_site_number(x, y, side_length)
     site_number = (y - 1) * side_length + x
     if site_number > side_length^2
@@ -34,27 +34,44 @@ function get_site_number(x, y, side_length)
     end
     return Int(site_number)
 end
+=#
+
 
 function get_site_count(ttn)
 	layers = Int(TTNKit.number_of_layers(ttn))
 	return 2^layers
 end
 
+function get_lattice_dims(input_data)
+	num_layers = TTNKit.number_of_layers(input_data)
+	if num_layers % 2 != 0
+		physical_edge_length = Int(sqrt(2^(num_layers-1)))
+		virt_edge_length = physical_edge_length * 2
+		return physical_edge_length,virt_edge_length
+		
+	else
+		edge_length = Int(sqrt(2^num_layers))
+		return edge_length,edge_length
+	end
+end
+
 function get_ydir_greenfunc(ttn; kwargs...)
-	edge_length = Int(sqrt(get_site_count(ttn)))
+	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
+	#edge_length = Int(sqrt(get_site_count(ttn)))
 	adag = "Adag"#"S+"
 	ahat = "A"#"S-"
 	direct = get(kwargs, :direction, "norm")
-	all_yvals = zeros(edge_length,edge_length)
-	all_greens = im.*zeros(edge_length,edge_length)
-	for x in 1:edge_length
-		for y in 1:edge_length
+	all_yvals = zeros(phys_edge_length,virt_edge_length)
+	all_greens = im.*zeros(phys_edge_length,virt_edge_length)
+	lat = TTNKit.physical_lattice(TTNKit.network(ttn))
+	for x in 1:phys_edge_length
+		for y in 1:virt_edge_length
 			if direct == "norm"
-				site_left = get_site_number(x,1,edge_length)
-				site_right = get_site_number(x,y,edge_length)
+				site_left = get_site_number(1,x,virt_edge_length,phys_edge_length)
+				site_right = get_site_number(y,x,virt_edge_length,phys_edge_length)
 			else
-				site_left = get_site_number(x,y,edge_length)
-				site_right = get_site_number(x,edge_length,edge_length)
+				site_left = get_site_number(y,x,virt_edge_length,phys_edge_length)
+				site_right = get_site_number(phys_edge_length,x,virt_edge_length,phys_edge_length)
 			end
 			
 			all_greens[x,y] = TTNKit.correlation(ttn,adag,ahat,(site_left),(site_right))
@@ -75,7 +92,7 @@ function get_ydir_greenfunc(ttn; kwargs...)
 	#	println("Probably Bad TTN, reset variables")
 	#end
 	if get(kwargs, :if_plot, true)
-		title_string = "Y Spatial Green's Function, " * get(kwargs, :plot_title, "Edge Count = $edge_length")
+		title_string = "Y Spatial Green's Function, " * get(kwargs, :plot_title, "Virt Edge Count = $virt_edge_length")
 		subplot_num = get(kwargs, :subplot_number, 111)
 		if subplot_num > 150
 			subplot(subplot_num)
@@ -83,7 +100,7 @@ function get_ydir_greenfunc(ttn; kwargs...)
 			fig = figure()
 		end
 		
-		for i in 1:edge_length
+		for i in 1:length(all_yvals[:,1])
 			plot(all_yvals[i,:],all_greens[i,:],"-p",label="x=$i")
 		end
 		yscale("log")
@@ -105,22 +122,22 @@ function get_ydir_greenfunc(ttn; kwargs...)
 end
 
 function get_xdir_greenfunc(ttn; kwargs...)
-	edge_length = Int(sqrt(get_site_count(ttn)))
+	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
+	#edge_length = Int(sqrt(get_site_count(ttn)))
 	adag = "Adag"#"S+"
 	ahat = "A"#"S-"
 	direct = get(kwargs, :direction, "norm")
-	all_xvals = zeros(edge_length,edge_length)
-	all_greens = im.*zeros(edge_length,edge_length)
-	for x in 1:edge_length
-		for y in 1:edge_length
+	all_xvals = zeros(phys_edge_length,virt_edge_length)
+	all_greens = im.*zeros(phys_edge_length,virt_edge_length)
+	for x in 1:phys_edge_length
+		for y in 1:virt_edge_length
 			if direct == "norm"
-				site_left = get_site_number(1,y,edge_length)
-				site_right = get_site_number(x,y,edge_length)
+				site_left = get_site_number(y,1,virt_edge_length,phys_edge_length)
+				site_right = get_site_number(y,x,virt_edge_length,phys_edge_length)
 			else
-				site_left = get_site_number(x,y,edge_length)
-				site_right = get_site_number(edge_length,y,edge_length)
+				site_left = get_site_number(y,x,virt_edge_length,phys_edge_length)
+				site_right = get_site_number(y,virt_edge_length,virt_edge_length,phys_edge_length)
 			end
-			
 			all_greens[x,y] = TTNKit.correlation(ttn,adag,ahat,(site_left),(site_right))
 			all_xvals[x,y] = x
 			
@@ -133,23 +150,23 @@ function get_xdir_greenfunc(ttn; kwargs...)
 	end
 	all_greens = abs.(all_greens)
 	if get(kwargs, :if_plot, true)
-		#=subplot_num = get(kwargs, :subplot_number, 111)
+		subplot_num = get(kwargs, :subplot_number, 111)
 		if subplot_num > 150
 			subplot(subplot_num)
 		else
 			fig = figure()
 		end
 		
-		for i in 1:edge_length
+		for i in 1:length(all_xvals[1,:])
 			plot(all_xvals[:,i],all_greens[:,i],"-p",label="y=$i")
 		end
 		yscale("log")
-		title_string = "X Spatial Green's Function, " * get(kwargs, :plot_title, "Edge Count = $edge_length")
+		title_string = "X Spatial Green's Function, " * get(kwargs, :plot_title, "Virt Edge Count = $virt_edge_length")
 		title(title_string)
 		xlabel("Y")
 		ylabel("Correlation")
 		legend()
-		=#
+		#
 		fig = figure()
 		imshow(all_greens)
 		xlabel("Y")
@@ -163,7 +180,8 @@ function get_xdir_greenfunc(ttn; kwargs...)
 end
 
 function get_current_yfunc(ttn; kwargs...)
-	edge_length = Int(sqrt(get_site_count(ttn)))
+	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
+	#edge_length = Int(sqrt(get_site_count(ttn)))
 	adag = "Adag"#"S+"
 	ahat = "A"#"S-"
 	norm_string = "Adag * A"#"S+ * S-"
@@ -186,8 +204,8 @@ function get_current_yfunc(ttn; kwargs...)
 		end
 		for y in 1:size(all_currents)[2]
 			all_yvals[x,y] = y
-			all_currents[x,y] = TTNKit.correlation(ttn,adag,ahat,(get_site_number(x_upper,y,edge_length)),(get_site_number(x,y,edge_length))) - TTNKit.correlation(ttn,ahat,adag,(get_site_number(x_upper,y,edge_length)),(get_site_number(x,y,edge_length)))
-			norm_left = TTNKit.expect(ttn,norm_string,get_site_number(x,y,edge_length)) + TTNKit.expect(ttn,norm_string,get_site_number(x_upper,y,edge_length))
+			all_currents[x,y] = TTNKit.correlation(ttn,adag,ahat,(get_site_number(y,x_upper,virt_edge_length,phys_edge_length)),(get_site_number(y,x,virt_edge_length,phys_edge_length))) - TTNKit.correlation(ttn,ahat,adag,(get_site_number(y,x_upper,virt_edge_length,phys_edge_length)),(get_site_number(y,x,virt_edge_length,phys_edge_length)))
+			norm_left = TTNKit.expect(ttn,norm_string,get_site_number(y,x,virt_edge_length,phys_edge_length)) + TTNKit.expect(ttn,norm_string,get_site_number(y,x_upper,virt_edge_length,phys_edge_length))
 			all_currents[x,y] *= 1/norm_left
 		end
 	end
@@ -237,8 +255,8 @@ function get_current_xfunc(ttn; kwargs...)
 		end
 		for x in 1:size(all_currents)[1]
 			all_xvals[x,y] = x
-			all_currents[x,y] = TTNKit.correlation(ttn,adag,ahat,(get_site_number(x,y_upper,edge_length)),(get_site_number(x,y,edge_length))) - TTNKit.correlation(ttn,ahat,adag,(get_site_number(x,y_upper,edge_length)),(get_site_number(x,y,edge_length)))
-			norm_left = TTNKit.expect(ttn,norm_string,get_site_number(x,y,edge_length)) + TTNKit.expect(ttn,norm_string,get_site_number(x,y_upper,edge_length))
+			all_currents[x,y] = TTNKit.correlation(ttn,adag,ahat,(get_site_number(y_upper,x,virt_edge_length,phys_edge_length)),(get_site_number(y,x,virt_edge_length,phys_edge_length))) - TTNKit.correlation(ttn,ahat,adag,(get_site_number(y_upper,x,virt_edge_length,phys_edge_length)),(get_site_number(y,x,virt_edge_length,phys_edge_length)))
+			norm_left = TTNKit.expect(ttn,norm_string,get_site_number(y,x,virt_edge_length,phys_edge_length)) + TTNKit.expect(ttn,norm_string,get_site_number(y_upper,x,virt_edge_length,phys_edge_length))
 			all_currents[x,y] *= 1/norm_left
 		end
 	end
@@ -304,14 +322,16 @@ function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwarg
 			println("Using ThetaY")
 		end
 		=#
-		return -t_strength * exp(im*2*pi*(phi*s1[1] - ==(edge_length_y,s1[2])*thetay))
+		return -t_strength * 1 * exp(im*2*pi*(phi*s1[1])) #- ==(edge_length_y,s1[2])*thetay))
 	elseif s1[2] == s2[2]
 		thetax = get(kwargs, :thetax, thetax_2)
 		#=if ==(edge_length,s1[1])
 			println("Using ThetaX")
 		end
 		=#
-		return -t_strength * exp(-im*2*pi* ==(edge_length_x,s1[1]) *thetax)
+		return -t_strength * 1 #* exp(-im*2*pi* ==(edge_length_x,s1[1]) *thetax)
+	else
+		return 0.0
 	end
 	#=
 	no_magF = get(kwargs, :no_magF, false)
@@ -529,8 +549,9 @@ function fill_states(particle_count,site_count,max_occupation)
 end
 
 function initialize_ttn(ttn,maxdim,particle_count)
+	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
 	site_count = TTNKit.number_of_sites(TTNKit.network(ttn))
-	wf_coefs = create_wavefunction(Float64,(Int(sqrt(site_count)),Int(sqrt(site_count))))
+	wf_coefs = create_wavefunction(Float64,size(TTNKit.physical_lattice(TTNKit.network(ttn))))
 	for i in 1:particle_count
 		ttn = patron_application!(ttn,wf_coefs,"Adag";maxdim=maxdim)
 	end
@@ -539,7 +560,6 @@ end
 
 function check_if_frozen(ttn)
 	occs = get_occupancy(ttn; if_plot=false)
-	edge_length = Int(sqrt(2^TTNKit.number_of_layers(ttn)))
 	if any(occs.==0.0)
 		return true,"frozen"
 	elseif any(round.(get_ydir_greenfunc(ttn;if_plot=false)[2],digits=3).==0.0)#sum(occs.==1.0) > length(occs)/3
@@ -651,8 +671,12 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	#excess_particles = get_excess_particles(particle_count,num_sites)
 	#phi = get(kwargs, :phi, excess_particles/(filling * (num_sites)))
 	phi = get(kwargs, :phi, particle_count/(filling * (num_sites)))
+	ham_operator = get(kwargs, :ham_op, nothing)
+	net = get(kwargs, :ttn_net, nothing)
 
-	net = TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, "Boson";conserve_qns=conserve_qns,dim=max_occ+1)
+	if isnothing(net)
+		net = TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, "Boson";conserve_qns=conserve_qns,dim=max_occ+1)
+	end
 	lat = TTNKit.physical_lattice(net)
 
 	println("Finished Building Network")
@@ -668,7 +692,9 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	
 	#get_occupancy(ttn,edge_sites; plot_title="Starting")
 	
-	ham_operator = get_hofstadter_interacting_hamilt(net,t_strength,phi; kwargs...)
+	if isnothing(ham_operator)
+		ham_operator = get_hofstadter_interacting_hamilt(net,t_strength,phi; kwargs...)
+	end
 	
 	ham = TTNKit.TPO(ham_operator,lat)
 	println("Built Hamiltonian")
@@ -697,23 +723,23 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 				ttn,ham,sp = warmed_results
 			end
 		end
-		return ttn, ham, sp, throwout_therm_time(times)
+		return ttn, ham, sp#, throwout_therm_time(times)
 	end
 
 	return ttn,ham,"no sweep"
 end
 
-function plot_grid(edge_length)
-	for i in 1:edge_length
-		constant = [i for j in 1:edge_length]
-		change = [k for k in 1:edge_length]
+function plot_grid(virt_edge_length,phys_edge_length)
+	for i in 1:virt_edge_length
+		constant = [i for j in 1:phys_edge_length]
+		change = [k for k in 1:virt_edge_length]
 		plot(change,constant,"-pr")
 		plot(constant,change,"-pr")
 	end
 	return
 end
 
-function plot_path(path,edge_length; kwargs...)
+function plot_path(path,phys_edge_length,virt_edge_length; kwargs...)
 	path_length = length(path)
 	xs = zeros(path_length)
 	ys = zeros(path_length)
@@ -722,7 +748,7 @@ function plot_path(path,edge_length; kwargs...)
 		ys[i] = path[i][2]
 	end
 	fig = figure()
-	plot_grid(edge_length)
+	plot_grid(virt_edge_length,phys_edge_length)
 	plot(xs,ys,"-pk";markersize=15.0,linewidth=7.0)
 	plot([xs[1]],[ys[1]],"-pg";markersize=15.0)
 	for i in 1:Int(ceil(length(xs)/2))
@@ -730,8 +756,8 @@ function plot_path(path,edge_length; kwargs...)
 	end
 	xlabel("X")
 	ylabel("Y")
-	xlim((0.5,edge_length+0.5))
-	ylim((0.5,edge_length+0.5))
+	xlim((0.5,phys_edge_length+0.5))
+	ylim((0.5,virt_edge_length+0.5))
 	title_string = "Likely Path, " * get(kwargs, :plot_title, "")
 	title(title_string)
 	return xs,ys
@@ -767,19 +793,20 @@ end
 function find_path(ttn,starting_site; kwargs...)
 	net = TTNKit.network(ttn)
 	lat = TTNKit.physical_lattice(net)
-	edge_length = Int(sqrt(TTNKit.number_of_sites(lat)))
+	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
+	#edge_length = Int(sqrt(TTNKit.number_of_sites(lat)))
 	path = [starting_site]
 	
 	if_periodic = get(kwargs, :periodic, false)
 	likely_path = get(kwargs, :likely_path, true)
 	rand_path = get(kwargs, :rand_path, !likely_path)
-	path_length = get(kwargs, :path_length, Int(4*edge_length))	
+	path_length = get(kwargs, :path_length, Int(4*virt_edge_length))	
 	
 	
-	all_neighbors = TTNKit.nearest_neighbours(lat,collect(1:edge_length^2); periodic=if_periodic)
+	all_neighbors = TTNKit.nearest_neighbours(lat,collect(1:phys_edge_length*virt_edge_length); periodic=if_periodic)
 	for i in 1:path_length
 		if i == 1
-			current_site_num = get_site_number(starting_site[1],starting_site[2],edge_length)
+			current_site_num = get_site_number(starting_site[2],starting_site[1],virt_edge_length,phys_edge_length)
 		end
 		#current_site_num = get_site_number(current_site[1],current_site[2],edge_length)
 		all_probs = []
@@ -818,7 +845,7 @@ function find_path(ttn,starting_site; kwargs...)
 		global current_site_num = next_site
 	end
 	if get(kwargs, :if_plot, true)
-		plot_path(path,edge_length; kwargs...)
+		plot_path(path,phys_edge_length,virt_edge_length; kwargs...)
 	end
 	return path
 end
@@ -1304,10 +1331,11 @@ function get_part_counts_range_fillings(site_count,phi)
 	nu_values = [part_counts[i]/(phi*site_count) for i in 1:length(part_counts)]
 	return part_counts,nu_values
 end
+#=
 
 #final_time = 0.1
 if_per = false
-mag_off = false
+mag_off = true
 evolve = true
 chemical = false
 mu = 0.5
@@ -1318,52 +1346,41 @@ expan = TTNKit.DefaultExpander(0.5)
 #us = 1.0
 ts = 0.01
 nu = 1/2
-#num_particles = Int(edge_sites/2)#get_particles_needed(layers; nu=nu)#tot_sites - 
-#mdim = 100
-nswps = 10
+layers = 6
+tot_sites = 2^layers
+edge_sites = Int(sqrt(2^layers))
+alpha = 1/edge_sites
+num_particles = Int(edge_sites/2)#get_particles_needed(layers; nu=nu)#tot_sites - 
+mdim = 70
+nswps = 3
 
-#if true
-#println("Using $num_particles particles on $tot_sites sites")
-#
-mdcount = 10
-mdims = [Int(ceil(5 + (i-1)*(100-5)/(mdcount-1))) for i in 1:mdcount]
-layer_vals = [2,4,6,8]
-avg_times = zeros(length(layer_vals),length(mdims))
-errors_times = zeros(length(layer_vals),length(mdims))
-for j in length(layer_vals):length(layer_vals)
-	layers = layer_vals[j]
-	tot_sites = 2^layers
-	edge_sites = Int(sqrt(2^layers))
-	alpha = 1/edge_sites
-	num_particles = Int(edge_sites/2)
-	for i in 1:length(mdims)
-		mdim = mdims[i]
-		println("Working on Layers = $layers at MaxDim = $mdim")
-		og_ttn, hamilt, dm_sp, md_times = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, sweep_iter=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
-		avg_times[j,i] = mean(md_times)
-		errors_times[j,i] = std(md_times)
-	end
-end
-#	
-for i in [length(layer_vals)]
-	errorbar(mdims,avg_times[i,:],yerr=[errors_times[i,:],errors_times[i,:]])
-	title("Site Count = $(2^layer_vals[i])")
-	xlabel("Max Link Dimension")
-	ylabel("AVG Time per Sweep")
-end
-	
-	
-	
-	
-	
-	
-	
-#=rez1 = get_occupancy(dm_sp.ttn)
-rez3 = get_ydir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
-rez6 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
+println("Using $num_particles particles on $tot_sites sites")
+
+
+og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
+
+rez1 = get_occupancy(dm_sp.ttn)
+rez2 = get_current_yfunc(dm_sp.ttn)
+rez3 = get_ydir_greenfunc(dm_sp.ttn)
+rez4 = get_xdir_greenfunc(dm_sp.ttn)
+=#
+#=
+og_ttn_pin, hamilt_pin, dm_sp_pin = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_pinning_pot=true,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
+
+rez4 = get_occupancy(dm_sp_pin.ttn; plot_title="Pinning")
+rez5 = get_current_yfunc(dm_sp_pin.ttn; plot_title="Pinning")
+rez6 = get_ydir_greenfunc(dm_sp_pin.ttn; plot_title="Pinning")
+
+fig = figure()
+imshow(rez1 - rez4)
+colorbar()
+title("Difference btw Pinning Potential")
+=#
+
+#=rez6 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
 rez5 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
 rez4 = get_current_xfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
-rez2 = get_current_yfunc(dm_sp.ttn)
+
 =#
 #end
 #
