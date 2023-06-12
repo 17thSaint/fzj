@@ -59,6 +59,13 @@ function get_interaction_coords(given_site,inter_dist,lat; kwargs...) # written 
 			if i^2 + j^2 == inter_dist^2
 				new_x = x + i
 				new_y = y + j
+				
+				# Apply periodic boundary conditions along the x-axis
+				if new_x < 1
+					new_x += virt_edge_length
+				elseif new_x > virt_edge_length
+					new_x -= virt_edge_length
+				end
 
                 		# Check if new coordinates are within lattice dimensions
 				if 1 <= new_x <= virt_edge_length && 1 <= new_y <= phys_edge_length && new_x != x
@@ -154,7 +161,7 @@ end
 
 #
 if_per = false
-mag_off = false
+mag_off = true
 evolve = true
 chemical = false
 mu = 0.5
@@ -162,42 +169,45 @@ mu = 0.5
 expan = TTNKit.DefaultExpander(0.5)
 ts = 0.01
 nu = 1/2
-layers = 4
+layers = 6
 tot_sites = 2^layers
-#edge_sites = Int(sqrt(2^layers))
-num_particles = 4#Int(edge_sites/2)
+if layers % 2 == 0
+	edge_sites = Int(sqrt(2^layers))
+	num_particles = Int(edge_sites/2)
+else
+	num_particles = Int(sqrt(2^(layers+1))/2)
+end
 if !mag_off
 	alpha = num_particles/(mu * (tot_sites))
 else
 	alpha = 0.0
 end
-mdim = 150
+mdim = 100
 nswps = 3
-
-if_cliff = true
-longrange_dist = 0
-
 println("Using $num_particles particles on $tot_sites sites")
 
+if_cliff = true
 
 net = build_HH_net(layers; syms=true)
-#ham = long_range_HH_ham(net,ts,alpha; scaling="flat",scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
-ham_sf = long_range_HH_ham(net,ts,alpha; scaling="flat",scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=true)
+#=
+all_ttns = []
+for i in 0:2
+	longrange_dist = i
+	title_string = "LR = $longrange_dist"
 
-#og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; ttn_net=net,ham_op=ham,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
+	ham = long_range_HH_ham(net,ts,alpha; scaling="flat",scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
 
-og_ttn_sf, hamilt_sf, dm_sp_sf = build_full_harperhofstadter(layers,num_particles,ts,nu; ttn_net=net,ham_op=ham_sf,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=true,output_level=0)
-
-#
-rez1 = get_occupancy(dm_sp_sf.ttn)
-#rez2 = get_current_yfunc(dm_sp.ttn)
-#rez3_fqh = get_ydir_greenfunc(dm_sp.ttn)
-rez3_sf = get_ydir_greenfunc(dm_sp_sf.ttn)
-rez4_sf = get_xdir_greenfunc(dm_sp_sf.ttn)
-#rez4 = get_xdir_greenfunc(dm_sp.ttn)
-#
-
-
+	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; ttn_net=net,ham_op=ham,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
+	append!(all_ttns,[dm_sp.ttn])
+	#
+	rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string)
+	#rez2 = get_current_yfunc(dm_sp.ttn)
+	#rez3_fqh = get_ydir_greenfunc(dm_sp.ttn)
+	rez3_sf = get_ydir_greenfunc(dm_sp.ttn; plot_title=title_string)
+	rez4 = get_xdir_greenfunc(dm_sp.ttn; plot_title=title_string)
+	#
+end
+=#
 
 
 
