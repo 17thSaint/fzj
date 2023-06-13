@@ -2,6 +2,7 @@ using PyPlot
 include("../review-practice-codes/ttn.jl")
 
 function long_range_scaling(x_final,virt_edge_length,initial_strength; kwargs...)
+	if_plot = get(kwargs, :if_plot, false)
 	if_hard_cutoff = get(kwargs, :cliff, false)
 	if_rounding = get(kwargs, :rounding, true)
 	if if_hard_cutoff
@@ -31,6 +32,14 @@ function long_range_scaling(x_final,virt_edge_length,initial_strength; kwargs...
 		if !isnothing(final_index)
 			strengths[final_index:end] .= 0.0
 		end
+	end
+	
+	if if_plot
+		fig = figure()
+		plot(range(0,virt_edge_length-1,virt_edge_length),strengths,"-p")
+		xlabel("Distance of Interaction")
+		ylabel("Strength")
+		title("Interaction Strength Distance Scaling")
 	end
 
 	return strengths
@@ -162,26 +171,40 @@ end
 
 function get_densdens_corrs(ttn,distances; kwargs...)
 	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
+	direction = get(kwargs, :direction, "virt")
+	dim_dict = Dict([("virt",virt_edge_length),("phys",phys_edge_length)])
+	chosen_dim = dim_dict[direction]
 	lat = TTNKit.physical_lattice(TTNKit.network(ttn))
-	densdens_corr = zeros(length(distances),virt_edge_length)
+	densdens_corr = zeros(length(distances),chosen_dim)
 	for j in 1:length(distances)
 		distance = distances[j]
-		for i in 1:size(densdens_corr)[2]
+		for i in 1:chosen_dim
 			next_site = i + distance
-			if next_site > virt_edge_length
-				next_site = next_site % virt_edge_length
+			if next_site > chosen_dim
+				next_site = next_site % chosen_dim
+				if next_site == 0
+					next_site = i
+				end
 			end
-			pos1 = TTNKit.linear_ind(lat,(Int(virt_edge_length/2),i))
-			pos2 = TTNKit.linear_ind(lat,(Int(virt_edge_length/2),next_site))
+			if direction == "phys"
+				pos1 = TTNKit.linear_ind(lat,(Int(chosen_dim/2),i))
+				pos2 = TTNKit.linear_ind(lat,(Int(chosen_dim/2),next_site))
+			elseif direction == "virt"
+				pos1 = TTNKit.linear_ind(lat,(i,Int(chosen_dim/2)))
+				pos2 = TTNKit.linear_ind(lat,(next_site,Int(chosen_dim/2)))
+			else
+				println("Bad direction")
+				return
+			end
 			value = TTNKit.correlation(ttn,"N","N",pos1,pos2)
 			densdens_corr[j,i] = real(value)
 		end
 	end
 	if get(kwargs, :if_plot, true)
-		title_string = "DensDens Corr, " * get(kwargs, :plot_title, "Virt Edge Count = $virt_edge_length")
+		title_string = "DensDens Corr, " * get(kwargs, :plot_title, "$direction Edge Count = $chosen_dim")
 		fig = figure()
 		for i in 1:length(distances)
-			plot([j for j in 1:virt_edge_length],densdens_corr[i,:],"-p",label="$(distances[i])")
+			plot([j for j in 1:chosen_dim],densdens_corr[i,:],"-p",label="$(distances[i])")
 		end
 		yscale("log")
 		title(title_string)
@@ -190,6 +213,20 @@ function get_densdens_corrs(ttn,distances; kwargs...)
 		legend()
 	end
 	return densdens_corr
+end
+
+function get_mdim(num_layers,shift=(false,0.5))
+	if num_layers <= 4
+		maxdims = 50
+	elseif 5 <= num_layers <= 6
+		 maxdims = 100
+	elseif 7 <= num_layers <= 8
+		maxdims = 150
+	end
+	if shift[1]
+		maxdims *= 1 + shift[2]
+	end
+	return Int(round(maxdims,digits=0))
 end
 
 #
@@ -202,7 +239,7 @@ mu = 0.5
 expan = TTNKit.DefaultExpander(0.5)
 ts = 0.001
 nu = 1/2
-layers = 6
+layers = 5
 tot_sites = 2^layers
 if layers % 2 == 0
 	edge_sites = Int(sqrt(2^layers))
@@ -215,7 +252,7 @@ if !mag_off
 else
 	alpha = 0.0
 end
-mdim = 100
+mdim = get_mdim(layers)
 nswps = 3
 println("Using $num_particles particles on $tot_sites sites")
 
@@ -227,15 +264,16 @@ net = build_HH_net(layers; syms=true)
 # periodic boundary conditions
 # dens dens correlations for stripes
 all_ttns = []
-for i in 1:3
-	longrange_dist = i
+#for i in 1:3
+	longrange_dist = 2
 	title_string = "LR $sc_type = $longrange_dist"
 
-	ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
+	ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
 
 	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; ttn_net=net,ham_op=ham,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
-	append!(all_ttns,[dm_sp.ttn])
+	#append!(all_ttns,[dm_sp.ttn])
 	rez = get_densdens_corrs(dm_sp.ttn,[1,2,3,4];plot_title=title_string)
+	rez2 = get_densdens_corrs(dm_sp.ttn,[1,2,3,4];plot_title=title_string*" Phys",direction="phys")
 	#
 	rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string)
 	#rez2 = get_current_yfunc(dm_sp.ttn)
@@ -243,7 +281,7 @@ for i in 1:3
 	#rez3_sf = get_ydir_greenfunc(dm_sp.ttn; plot_title=title_string)
 	#rez4 = get_xdir_greenfunc(dm_sp.ttn; plot_title=title_string)
 	#
-end
+#end
 #
 
 

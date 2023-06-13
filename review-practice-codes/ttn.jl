@@ -560,7 +560,7 @@ end
 
 function check_if_frozen(ttn)
 	occs = get_occupancy(ttn; if_plot=false)
-	if any(occs.==0.0)
+	if any(isapprox.(occs,0.0,atol=10^-10))
 		return true,"frozen"
 	elseif any(round.(get_ydir_greenfunc(ttn;if_plot=false)[2],digits=3).==0.0)#sum(occs.==1.0) > length(occs)/3
 		return true,"variables"
@@ -627,7 +627,7 @@ function warming(ttn,ham,sp,particle_count,warming_limit; kwargs...)
 		println("Max Dim = ",TTNKit.maxlinkdim(new_sp.ttn),", Expected = $new_maxdim")
 		if_frozen,why = check_if_frozen(new_sp.ttn)
 		if if_frozen
-			#get_occupancy(new_sp.ttn; plot_title="Attempt $warming_count")
+			get_occupancy(new_sp.ttn; plot_title="Attempt $warming_count")
 			warming_count += 1
 			global old_data = [new_sp.ttn,new_ham,new_sp]
 		else
