@@ -54,35 +54,32 @@ function build_HH_net(num_layers; kwargs...)
 	return net
 end
 
-function get_interaction_coords(given_site,inter_dist,lat; kwargs...) # written by ChatGPT 12.06.2023
-	y, x = given_site
+function get_interaction_coords(given_site,inter_dist,lat) # written by ChatGPT 12.06.2023 then vastly edited 13.06.2023 by me
+	virtual, physical = given_site
 	coordinates = []
     
-	phys_edge_length,virt_edge_length = get(kwargs, :edges, sort(size(lat)))
-	if typeof(given_site) == Int64
-		given_site = TTNKit.coordinate(lat,given_site)
-	end
+	virt_edge_length, phys_edge_length = size(lat)
+	#if typeof(given_site) == Int64
+	#	given_site = TTNKit.coordinate(lat,given_site)
+	#end
 
-	for i = -inter_dist:inter_dist
-		for j = -inter_dist:inter_dist
-			if i^2 + j^2 == inter_dist^2
-				new_x = x + i
-				new_y = y + j
+	for shift in [-inter_dist % virt_edge_length,inter_dist % virt_edge_length]
+		new_virtual = virtual + shift
 				
-				# Apply periodic boundary conditions along the x-axis
-				if new_x < 1
-					new_x += virt_edge_length
-				elseif new_x > virt_edge_length
-					new_x -= virt_edge_length
-				end
-				#
+		# Apply periodic boundary conditions along the virtual-axis
+		if new_virtual < 1
+			new_virtual += virt_edge_length
+		elseif new_virtual > virt_edge_length
+			new_virtual -= virt_edge_length
+		end
 
-                		# Check if new coordinates are within lattice dimensions
-				if 1 <= new_x <= virt_edge_length && 1 <= new_y <= phys_edge_length && new_x != x
-                    			append!(coordinates, [[new_y,new_x]])
-                		end
-            		end
-        	end
+               	# Check if new coordinates are within lattice dimensions
+		if 1 <= new_virtual <= virt_edge_length && new_virtual != virtual
+ 			append!(coordinates, [[new_virtual,physical]])
+ 		else
+ 			println("Still Outside Lattice")
+		end
+
 	end
 	return coordinates
 end
@@ -133,7 +130,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 					append!(resulting_ham,[interaction])
 				else
 					for j in TTNKit.eachindex(lat)
-						interaction_sites = get_interaction_coords(TTNKit.coordinate(lat,j),i-1,lat; edges=(virt_edge_length,phys_edge_length))
+						interaction_sites = get_interaction_coords(TTNKit.coordinate(lat,j),i-1,lat)
 						for k in interaction_sites
 							interaction += (local_strength/2,"Adag * A",TTNKit.coordinate(lat,j),"Adag * A",Tuple(k))
 							interaction -= (local_strength/2,"Adag * A",TTNKit.coordinate(lat,j))
@@ -174,45 +171,69 @@ function get_densdens_corrs(ttn,distances; kwargs...)
 	direction = get(kwargs, :direction, "virt")
 	dim_dict = Dict([("virt",virt_edge_length),("phys",phys_edge_length)])
 	chosen_dim = dim_dict[direction]
+	other_direction = collect(keys(dim_dict))[findfirst(x -> x != direction,collect(keys(dim_dict)))]
+	other_dim = dim_dict[other_direction]
 	lat = TTNKit.physical_lattice(TTNKit.network(ttn))
-	densdens_corr = zeros(length(distances),chosen_dim)
+	densdens_corr = zeros(length(distances),other_dim)
+	corr_errors = zeros(length(distances),other_dim)
 	for j in 1:length(distances)
 		distance = distances[j]
-		for i in 1:chosen_dim
-			next_site = i + distance
-			if next_site > chosen_dim
-				next_site = next_site % chosen_dim
-				if next_site == 0
-					next_site = i
+		for k in 1:other_dim
+			all_values = zeros(chosen_dim)
+			for i in 1:chosen_dim
+				next_site = i + (distance % chosen_dim)
+				if next_site > chosen_dim
+					next_site = next_site % chosen_dim
+					if next_site == 0
+						next_site = i
+					end
 				end
+				if direction == "phys"
+					pos1 = TTNKit.linear_ind(lat,(k,i))
+					pos2 = TTNKit.linear_ind(lat,(k,next_site))
+				elseif direction == "virt"
+					pos1 = TTNKit.linear_ind(lat,(i,k))
+					pos2 = TTNKit.linear_ind(lat,(next_site,k))
+				else
+					println("Bad direction")
+					return
+				end
+				value = TTNKit.correlation(ttn,"N","N",pos1,pos2)
+				all_values[i] = real(value)
 			end
-			if direction == "phys"
-				pos1 = TTNKit.linear_ind(lat,(Int(chosen_dim/2),i))
-				pos2 = TTNKit.linear_ind(lat,(Int(chosen_dim/2),next_site))
-			elseif direction == "virt"
-				pos1 = TTNKit.linear_ind(lat,(i,Int(chosen_dim/2)))
-				pos2 = TTNKit.linear_ind(lat,(next_site,Int(chosen_dim/2)))
-			else
-				println("Bad direction")
-				return
-			end
-			value = TTNKit.correlation(ttn,"N","N",pos1,pos2)
-			densdens_corr[j,i] = real(value)
+			densdens_corr[j,k] = mean(all_values)
+			corr_errors[j,k] = std(all_values)
 		end
 	end
 	if get(kwargs, :if_plot, true)
 		title_string = "DensDens Corr, " * get(kwargs, :plot_title, "$direction Edge Count = $chosen_dim")
 		fig = figure()
 		for i in 1:length(distances)
-			plot([j for j in 1:chosen_dim],densdens_corr[i,:],"-p",label="$(distances[i])")
+			plot([j for j in 1:other_dim],densdens_corr[i,:],"-p",label="$(distances[i])")
 		end
 		yscale("log")
 		title(title_string)
-		xlabel("Y")
+		xlabel("$other_direction Axis")
 		ylabel("Corr")
 		legend()
 	end
-	return densdens_corr
+	return densdens_corr,corr_errors
+end
+
+function get_allAVG_densdenscorr(ttn,distances; kwargs...)
+	all_corrs,all_errors = get_densdens_corrs(ttn,distances; if_plot=false,kwargs...)
+	avg_corrs = [mean(all_corrs[i,:]) for i in 1:length(distances)]
+	avg_errors = [mean(all_errors[i,:]) for i in 1:length(distances)]
+	
+	title_string = "AVG DensDens Corr, " * get(kwargs, :plot_title, "")
+	fig = figure()
+	errorbar(distances,avg_corrs,yerr=[avg_errors,avg_errors])
+	yscale("log")
+	title(title_string)
+	xlabel("Distance")
+	ylabel("AVG Corr")
+	
+	return avg_corrs,avg_errors
 end
 
 function get_mdim(num_layers,shift=(false,0.5))
@@ -239,7 +260,7 @@ mu = 0.5
 expan = TTNKit.DefaultExpander(0.5)
 ts = 0.001
 nu = 1/2
-layers = 5
+layers = 4
 tot_sites = 2^layers
 if layers % 2 == 0
 	edge_sites = Int(sqrt(2^layers))
@@ -252,36 +273,37 @@ if !mag_off
 else
 	alpha = 0.0
 end
-mdim = get_mdim(layers)
+mdim = get_mdim(layers,(false,1))
 nswps = 3
 println("Using $num_particles particles on $tot_sites sites")
 
 if_cliff = true
 sc_type = "flat"
 limit = 0.5
+dists = [i for i in 1:2*edge_sites]
 
 net = build_HH_net(layers; syms=true)
-# periodic boundary conditions
-# dens dens correlations for stripes
 all_ttns = []
-#for i in 1:3
-	longrange_dist = 2
-	title_string = "LR $sc_type = $longrange_dist"
+for i in 1:3
+	longrange_dist = i
+	title_string = "LR $sc_type = $longrange_dist, md = $mdim"
 
 	ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
 
 	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; ttn_net=net,ham_op=ham,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
-	#append!(all_ttns,[dm_sp.ttn])
-	rez = get_densdens_corrs(dm_sp.ttn,[1,2,3,4];plot_title=title_string)
-	rez2 = get_densdens_corrs(dm_sp.ttn,[1,2,3,4];plot_title=title_string*" Phys",direction="phys")
+	append!(all_ttns,[dm_sp.ttn])
+	#rez = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string)
+	#rez2 = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string*" Phys",direction="phys")
+	rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;plot_title=title_string)
 	#
 	rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string)
+	#
 	#rez2 = get_current_yfunc(dm_sp.ttn)
 	#rez3_fqh = get_ydir_greenfunc(dm_sp.ttn)
 	#rez3_sf = get_ydir_greenfunc(dm_sp.ttn; plot_title=title_string)
 	#rez4 = get_xdir_greenfunc(dm_sp.ttn; plot_title=title_string)
 	#
-#end
+end
 #
 
 
