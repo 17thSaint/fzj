@@ -260,7 +260,7 @@ mu = 0.5
 expan = TTNKit.DefaultExpander(0.5)
 ts = 0.001
 nu = 1/2
-layers = 4
+layers = 6
 tot_sites = 2^layers
 if layers % 2 == 0
 	edge_sites = Int(sqrt(2^layers))
@@ -273,7 +273,7 @@ if !mag_off
 else
 	alpha = 0.0
 end
-mdim = get_mdim(layers,(false,1))
+mdim = get_mdim(layers,(true,1))
 nswps = 3
 println("Using $num_particles particles on $tot_sites sites")
 
