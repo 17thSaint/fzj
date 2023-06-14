@@ -180,6 +180,7 @@ end
 
 function get_current_yfunc(ttn; kwargs...)
 	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
+	edge_length = virt_edge_length
 	#edge_length = Int(sqrt(get_site_count(ttn)))
 	adag = "Adag"#"S+"
 	ahat = "A"#"S-"
@@ -209,29 +210,53 @@ function get_current_yfunc(ttn; kwargs...)
 		end
 	end
 	all_currents = real.(round.( 2 .* all_currents,digits=10))
-	if get(kwargs, :if_plot, true)
-		subplot_num = get(kwargs, :subplot_number, 111)
-		if subplot_num > 150 && subplot_num % 10 != 1
-			subplot(subplot_num)
-		else
-			fig = figure()
-		end
-		
-		for i in 1:size(all_currents)[1]
-			plot(all_yvals[i,:],all_currents[i,:],"-p",label="x=$i")
-		end
-		title_string = "Current, " * get(kwargs, :plot_title, "Edge Count = $edge_length")
-		title(title_string)
-		xlabel("Y")
-		ylabel("Current")
-		legend()
-		
-	end
+	
+	if_plot = get(kwargs, :if_plot, true)
+	if_save_data = get(kwargs, :if_save_data, false)
+	if_save_fig = get(kwargs, :if_save_fig, false)
+	
+	if_plot || if_save_fig ? plot_current(all_yvals,all_currents,edge_length,"Y"; kwargs...) : nothing
+	if_save_data ? save_current(all_yvals,all_currents,"Y"; kwargs...) : nothing
+	
 	return all_yvals,all_currents
 end
 
+function plot_current(all_vals,all_currents,edge_length,direction; kwargs...)
+	if direction == "X"
+		all_vals = transpose(all_vals)
+		all_currents = transpose(all_currents)
+	end
+	
+	fig = figure()
+	for i in 1:size(all_currents)[1]
+		plot(all_vals[i,:],all_currents[i,:],"-p",label="x=$i")
+	end
+	title_string = "Current, " * get(kwargs, :plot_title, "Edge Count = $edge_length")
+	title(title_string)
+	xlabel("$direction")
+	ylabel("Current")
+	legend()
+	
+	if get(kwargs, :if_save_fig, false)
+		filename = get(kwargs, :name, "$direction-dir-current")
+		save_figure(filename; kwargs...)
+	end
+	
+	return
+end
+
+function save_current(all_vals,all_currents,direction; kwargs...)
+	filename = get(kwargs, :name, "$direction-dir-current")
+	location = get(kwargs, :location, pwd())
+	current_data = Dict([("coords",all_vals),("currents",all_currents)])
+	write_data_hdf5(filename,current_data,location=location; kwargs...)
+	return
+end
+
 function get_current_xfunc(ttn; kwargs...)
-	edge_length = Int(sqrt(get_site_count(ttn)))
+	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
+	edge_length = phys_edge_length
+	#edge_length = Int(sqrt(get_site_count(ttn)))
 	adag = "Adag"#"S+"
 	ahat = "A"#"S-"
 	norm_string = "Adag * A"#"S+ * S-"
@@ -260,24 +285,14 @@ function get_current_xfunc(ttn; kwargs...)
 		end
 	end
 	all_currents = real.(round.( 2 .* all_currents,digits=10))
-	if get(kwargs, :if_plot, true)
-		subplot_num = get(kwargs, :subplot_number, 111)
-		if subplot_num > 150 && subplot_num % 10 != 1
-			subplot(subplot_num)
-		else
-			fig = figure()
-		end
-		
-		for i in 1:size(all_currents)[2]
-			plot(all_xvals[:,i],all_currents[:,i],"-p",label="y=$i")
-		end
-		title_string = "Current, " * get(kwargs, :plot_title, "Edge Count = $edge_length")
-		title(title_string)
-		xlabel("X")
-		ylabel("Current")
-		legend()
-		
-	end
+	
+	if_plot = get(kwargs, :if_plot, true)
+	if_save_data = get(kwargs, :if_save_data, false)
+	if_save_fig = get(kwargs, :if_save_fig, false)
+	
+	if_plot || if_save_fig ? plot_current(all_xvals,all_currents,edge_length,"X"; kwargs...) : nothing
+	if_save_data ? save_current(all_xvals,all_currents,"X"; kwargs...) : nothing
+	
 	return all_xvals,all_currents
 end
 
