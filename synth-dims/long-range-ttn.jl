@@ -242,8 +242,8 @@ end
 function save_figure(file_name,file_location=pwd())
 	current_location = pwd()
 	cd(file_location)
-	file_name = check_duplicates(file_name)
-	savefig(file_name)
+	file_name = check_duplicates(file_name * ".png")
+	savefig(file_name,format="png")
 	cd(current_location)
 	return
 end
@@ -297,7 +297,7 @@ mu = 0.5
 expan = TTNKit.DefaultExpander(0.5)
 ts = 0.001
 nu = 1/2
-layers = 4
+layers = 4#parse(Int,ARGS[1])
 tot_sites = 2^layers
 if layers % 2 == 0
 	edge_sites = Int(sqrt(2^layers))
@@ -325,16 +325,19 @@ dists = [i for i in 1:2*edge_sites]
 net = build_HH_net(layers; syms=true)
 all_ttns = []
 #for i in 1:3
-	longrange_dist = 1
+	longrange_dist = 1#parse(Int, ARGS[1])
 	title_string = "LR $sc_type = $longrange_dist, md = $mdim"
 
-	ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
+	#ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
 
-	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; ttn_net=net,ham_op=ham,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
+	#og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; ttn_net=net,ham_op=ham,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
 	#append!(all_ttns,[dm_sp.ttn])
 	#rez = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string)
 	#rez2 = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string*" Phys",direction="phys")
-	rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;plot_title=title_string, if_save=saving, name="densdens-test-md-$mdim-n-$tot_sites-lr-$longrange_dist.png",location=loc)
+	datafile_name = "densdens-test-md-$mdim-n-$tot_sites-lr-$longrange_dist"
+	#rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;plot_title=title_string, if_save=saving, name=datafile_name,location=loc)
+	#data_dict = Dict([("vals",rez3[1]),("errors",rez3[2])])
+	write_data_hdf5(datafile_name,data_dict)
 	#
 	#rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string, if_save=true, name="occ-test-md-$mdim-lr-$longrange_dist.png")
 	#

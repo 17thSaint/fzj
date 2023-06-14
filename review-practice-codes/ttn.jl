@@ -1,7 +1,7 @@
 using TTNKit,Statistics,NBInclude
 #cd("/home/patrick/Downloads")
 @nbinclude("parton-model-syms.ipynb")
-
+include("../other-funcs/data-storage-funcs.jl")
 #=
 Need to figure out how sweeps works
 =#
@@ -963,6 +963,12 @@ function get_occupancy(ttn; kwargs...)
 		colorbar()
 		title_string = "Occupancy, " * get(kwargs, :plot_title, "")
 		title(title_string)
+		
+		if get(kwargs, :if_save, false)
+			location = get(kwargs, :location, pwd())
+			fig_name = get(kwargs, :name, "occs-" * plot_title * ".png")
+			save_figure(fig_name,location)
+		end
 	end
 	return exp_occ
 end
