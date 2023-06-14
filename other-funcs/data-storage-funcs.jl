@@ -48,6 +48,7 @@ function save_figure(file_name; kwargs...)
 	file_name = prep_file(file_name,file_type)
 	savefig(file_name)
 	cd(current_location)
+	println("Figure Saved, File Closed: $file_name")
 	return
 end
 

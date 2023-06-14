@@ -3,6 +3,8 @@ include("../review-practice-codes/ttn.jl")
 
 function long_range_scaling(x_final,virt_edge_length,initial_strength; kwargs...)
 	if_plot = get(kwargs, :if_plot, false)
+	if_save_data = get(kwargs, :if_save_data, false)
+	if_save_fig = get(kwargs, :if_save_fig, false)
 	if_hard_cutoff = get(kwargs, :cliff, false)
 	if_rounding = get(kwargs, :rounding, true)
 	if if_hard_cutoff
@@ -34,15 +36,34 @@ function long_range_scaling(x_final,virt_edge_length,initial_strength; kwargs...
 		end
 	end
 	
-	if if_plot
-		fig = figure()
-		plot(range(0,virt_edge_length-1,virt_edge_length),strengths,"-p")
-		xlabel("Distance of Interaction")
-		ylabel("Strength")
-		title("Interaction Strength Distance Scaling")
-	end
+	if_plot ? plot_long_range_scaling(strengths,virt_edge_length; kwargs...) : nothing
+	if_save_data ? save_long_range_scaling(strengths,virt_edge_length; kwargs...) : nothing
 
 	return strengths
+end
+
+function save_long_range_scaling(strengths,virt_edge_length; kwargs...)
+	filename = get(kwargs, :name, "scaling-strength")
+	location = get(kwargs, :location, pwd())
+	xcoord = [i for i in 0:virt_edge_length-1]
+	scaling_data = Dict([("strengths",strengths),("xcoord",xcoord)])
+	write_data_hdf5(filename,scaling_data,location=location; kwargs...)
+	return
+end
+
+function plot_long_range_scaling(strengths,virt_edge_length; kwargs...)
+	fig = figure()
+	xcoord = range(0,virt_edge_length-1,virt_edge_length)
+	plot(xcoord,strengths,"-p")
+	xlabel("Distance of Interaction")
+	ylabel("Strength")
+	title("Interaction Strength Distance Scaling")
+	
+	if get(kwargs, :if_save_fig, false)
+		filename = get(kwargs, :name, "scaling-strength")
+		save_figure(filename; kwargs...)
+	end
+	return
 end
 
 function build_HH_net(num_layers; kwargs...)
@@ -220,6 +241,8 @@ function get_densdens_corrs(ttn,distances; kwargs...)
 	return densdens_corr,corr_errors
 end
 
+
+#=
 function check_duplicates(file_name)
 	file_string,file_type = split(file_name,".")
 	if file_name in readdir()
@@ -247,30 +270,49 @@ function save_figure(file_name,file_location=pwd())
 	cd(current_location)
 	return
 end
+=#
 
 function get_allAVG_densdenscorr(ttn,distances; kwargs...)
-	all_corrs,all_errors = get_densdens_corrs(ttn,distances; if_plot=false,kwargs...)
+	all_corrs,all_errors = get_densdens_corrs(ttn,distances; kwargs...,if_plot=false)
 	avg_corrs = [mean(all_corrs[i,:]) for i in 1:length(distances)]
 	avg_errors = [mean(all_errors[i,:]) for i in 1:length(distances)]
 	
-	if_save = get(kwargs, :if_save, false)
+	if_save_fig = get(kwargs, :if_save_fig, false)
+	if_save_data = get(kwargs, :if_save_data, false)
 	
-	plot_title = get(kwargs, :plot_title, "")
-	title_string = "AVG DensDens Corr, " * plot_title
+	if_plot = get(kwargs, :if_plot, true)
+	if if_plot
+		plot_title = get(kwargs, :plot_title, "")
+		title_string = "AVG DensDens Corr, " * plot_title
+		plot_allAVG_densdenscorr(distances,avg_corrs,avg_errors,title_string; kwargs...)
+	end
 	
+	if_save_data ? save_allAVG_densdenscorr(distances,avg_corrs,avg_errors; kwargs...) : nothing
+	
+	return avg_corrs,avg_errors,distances
+end
+
+function plot_allAVG_densdenscorr(distances,avg_corrs,avg_errors,title_string; kwargs...)
 	fig = figure()
 	errorbar(distances,avg_corrs,yerr=[avg_errors,avg_errors])
 	yscale("log")
 	title(title_string)
 	xlabel("Distance")
 	ylabel("AVG Corr")
-	if if_save
-		location = get(kwargs, :location, pwd())
-		fig_name = get(kwargs, :name, "densdens-" * plot_title * ".png")
-		save_figure(fig_name,location)
-	end
 	
-	return avg_corrs,avg_errors
+	if get(kwargs, :if_save_fig, false)
+		location = get(kwargs, :location, pwd())
+		filename = get(kwargs, :name, "densdens")
+		save_figure(filename;kwargs...)
+	end
+	return
+end
+
+function save_allAVG_densdenscorr(distances,avg_corrs,avg_errors; kwargs...)
+	location = get(kwargs, :location, pwd())
+	filename = get(kwargs, :name, "densdens")
+	avg_data_dict = Dict([("dists",distances),("vals",avg_corrs),("errors",avg_errors)])
+	write_data_hdf5(filename,avg_data_dict,location)
 end
 
 function get_mdim(num_layers,shift=(false,0.5))
@@ -314,8 +356,7 @@ mdim = get_mdim(layers,(true,1))
 nswps = 3
 println("Using $num_particles particles on $tot_sites sites")
 
-saving = true
-loc = "figs"
+loc = pwd()
 
 if_cliff = true
 sc_type = "flat"
@@ -328,17 +369,15 @@ all_ttns = []
 	longrange_dist = 1#parse(Int, ARGS[1])
 	title_string = "LR $sc_type = $longrange_dist, md = $mdim"
 
-	#ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
+	ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
 
-	#og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; ttn_net=net,ham_op=ham,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
+	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; ttn_net=net,ham_op=ham,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
 	#append!(all_ttns,[dm_sp.ttn])
 	#rez = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string)
 	#rez2 = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string*" Phys",direction="phys")
 	datafile_name = "densdens-test-md-$mdim-n-$tot_sites-lr-$longrange_dist"
-	#rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;plot_title=title_string, if_save=saving, name=datafile_name,location=loc)
-	#data_dict = Dict([("vals",rez3[1]),("errors",rez3[2])])
-	write_data_hdf5(datafile_name,data_dict)
-	#
+	rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;if_plot=true,plot_title=title_string, if_save_fig=true, if_save_data=true, name=datafile_name,location=loc)
+	
 	#rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string, if_save=true, name="occ-test-md-$mdim-lr-$longrange_dist.png")
 	#
 	#rez2 = get_current_yfunc(dm_sp.ttn)
