@@ -80,8 +80,6 @@ function write_data_hdf5(file_name,data,location=pwd(),metadata=nothing; kwargs.
 	return
 end
 
-file_name = "densdens-test-md-100-n-16-lr-1.hdf5"
-
 function read_data_hdf5(file_name,location=pwd(); kwargs...)
 	og_location = pwd()
 	cd(location)

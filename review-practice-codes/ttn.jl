@@ -88,37 +88,55 @@ function get_ydir_greenfunc(ttn; kwargs...)
 		end
 	end
 	all_greens = abs.(all_greens)
-	#if any(all_greens.==0.0)
-	#	println("Probably Bad TTN, reset variables")
-	#end
-	if get(kwargs, :if_plot, true)
-		title_string = "Y Spatial Green's Function, " * get(kwargs, :plot_title, "Virt Edge Count = $virt_edge_length")
-		subplot_num = get(kwargs, :subplot_number, 111)
-		if subplot_num > 150
-			subplot(subplot_num)
-		else
-			fig = figure()
-		end
-		
-		for i in 1:length(all_yvals[:,1])
-			plot(all_yvals[i,:],all_greens[i,:],"-p",label="x=$i")
-		end
-		yscale("log")
-		title(title_string)
-		xlabel("Y")
-		ylabel("Correlation")
-		legend()
-		#
-		fig = figure()
-		imshow(all_greens)
-		xlabel("Y")
-		ylabel("X")
-		colorbar()
-		title(title_string)
-		#
-	end
+	
+	if_plot = get(kwargs, :if_plot, true)
+	if_save_data = get(kwargs, :if_save_data, false)
+	if_save_fig = get(kwargs, :if_save_fig, false)
+	
+	if_plot || if_save_fig ? plot_greenfunc(all_yvals,all_greens,virt_edge_length,"Y"; kwargs...) : nothing
+	if_save_data ? save_greenfunc(all_yvals,all_greens,"Y"; kwargs...) : nothing
 	
 	return all_yvals,all_greens
+end
+
+function plot_greenfunc(all_vals,all_greens,virt_edge_length,direction; kwargs...)
+	title_string = "$direction Spatial Green's Function, " * get(kwargs, :plot_title, "Virt Edge Count = $virt_edge_length")
+	other_direction = "X"
+	if direction == "X"
+		all_vals = transpose(all_vals)
+		all_greens = transpose(all_greens)
+		other_direction = "Y"
+	end
+	fig1 = figure()
+	for i in 1:length(all_vals[:,1])
+		plot(all_vals[i,:],all_greens[i,:],"-p",label="x=$i")
+	end
+	yscale("log")
+	title(title_string)
+	xlabel("Y")
+	ylabel("Correlation")
+	legend()
+	#
+	fig2 = figure()
+	imshow(all_greens)
+	xlabel("$direction")
+	ylabel("$other_direction")
+	colorbar()
+	title(title_string)
+	
+	if get(kwargs, :if_save_fig, false)
+		filename = get(kwargs, :name, "$direction-dir-GF")
+		save_figure(filename; kwargs...)
+	end
+	return
+end
+
+function save_greenfunc(all_vals,all_greens,direction; kwargs...)
+	filename = get(kwargs, :name, "$direction-dir-GF")
+	location = get(kwargs, :location, pwd())
+	greenfunc_data = Dict([("coords",all_vals),("greens",all_greens)])
+	write_data_hdf5(filename,greenfunc_data,location=location; kwargs...)
+	return
 end
 
 function get_xdir_greenfunc(ttn; kwargs...)
@@ -149,32 +167,13 @@ function get_xdir_greenfunc(ttn; kwargs...)
 		end
 	end
 	all_greens = abs.(all_greens)
-	if get(kwargs, :if_plot, true)
-		subplot_num = get(kwargs, :subplot_number, 111)
-		if subplot_num > 150
-			subplot(subplot_num)
-		else
-			fig = figure()
-		end
-		
-		for i in 1:length(all_xvals[1,:])
-			plot(all_xvals[:,i],all_greens[:,i],"-p",label="y=$i")
-		end
-		yscale("log")
-		title_string = "X Spatial Green's Function, " * get(kwargs, :plot_title, "Virt Edge Count = $virt_edge_length")
-		title(title_string)
-		xlabel("Y")
-		ylabel("Correlation")
-		legend()
-		#
-		fig = figure()
-		imshow(all_greens)
-		xlabel("Y")
-		ylabel("X")
-		colorbar()
-		title(title_string)
-		#
-	end
+	
+	if_plot = get(kwargs, :if_plot, true)
+	if_save_data = get(kwargs, :if_save_data, false)
+	if_save_fig = get(kwargs, :if_save_fig, false)
+	
+	if_plot || if_save_fig ? plot_greenfunc(all_xvals,all_greens,virt_edge_length,"X"; kwargs...) : nothing
+	if_save_data ? save_greenfunc(all_xvals,all_greens,"X"; kwargs...) : nothing
 	
 	return all_xvals,all_greens
 end
@@ -957,20 +956,40 @@ function get_occupancy(ttn; kwargs...)
 	end
 	=#
 	exp_occ = abs.(TTNKit.expect(ttn,"N"))
-	if get(kwargs, :if_plot, true)
-		fig = figure()
-		imshow(exp_occ)
-		colorbar()
-		title_string = "Occupancy, " * get(kwargs, :plot_title, "")
-		title(title_string)
+	
+	if_save_data = get(kwargs, :if_save_data, false)
+	if_save_fig = get(kwargs, :if_save_fig, false)
+	if_plot = get(kwargs, :if_plot, true)
+	
+	
+	if_plot	|| if_save_fig ? plot_occupancy(exp_occ; kwargs...) : nothing
+	if_save_data ? save_occupancy(exp_occ; kwargs...) : nothing
 		
-		if get(kwargs, :if_save, false)
-			location = get(kwargs, :location, pwd())
-			fig_name = get(kwargs, :name, "occs-" * plot_title * ".png")
-			save_figure(fig_name,location)
-		end
-	end
 	return exp_occ
+end
+
+function save_occupancy(exp_occ; kwargs...)
+	location = get(kwargs, :location, pwd())
+	filename = get(kwargs, :name, "occs")
+	occs_data_dict = Dict([("vals",exp_occ)])
+	write_data_hdf5(filename,occs_data_dict,location)
+	return
+end
+
+function plot_occupancy(exp_occ; kwargs...)
+	fig = figure()
+	imshow(exp_occ)
+	colorbar()
+	plot_title = get(kwargs, :plot_title, "")
+	title_string = "Occupancy, " * plot_title
+	title(title_string)
+	
+	if get(kwargs, :if_save_fig, false)
+		location = get(kwargs, :location, pwd())
+		fig_name = get(kwargs, :name, "occs")
+		save_figure(fig_name; kwargs...)
+	end
+	return
 end
 
 function get_avg_occupancy(avg_count,edge_length,particle_count,u_strength,t_strength,filling; kwargs...)

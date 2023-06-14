@@ -36,7 +36,7 @@ function long_range_scaling(x_final,virt_edge_length,initial_strength; kwargs...
 		end
 	end
 	
-	if_plot ? plot_long_range_scaling(strengths,virt_edge_length; kwargs...) : nothing
+	if_plot || if_save_fig ? plot_long_range_scaling(strengths,virt_edge_length; kwargs...) : nothing
 	if_save_data ? save_long_range_scaling(strengths,virt_edge_length; kwargs...) : nothing
 
 	return strengths
@@ -279,20 +279,17 @@ function get_allAVG_densdenscorr(ttn,distances; kwargs...)
 	
 	if_save_fig = get(kwargs, :if_save_fig, false)
 	if_save_data = get(kwargs, :if_save_data, false)
-	
 	if_plot = get(kwargs, :if_plot, true)
-	if if_plot
-		plot_title = get(kwargs, :plot_title, "")
-		title_string = "AVG DensDens Corr, " * plot_title
-		plot_allAVG_densdenscorr(distances,avg_corrs,avg_errors,title_string; kwargs...)
-	end
-	
+
+	if_plot || if_save_fig ? plot_allAVG_densdenscorr(distances,avg_corrs,avg_errors; kwargs...) : nothing
 	if_save_data ? save_allAVG_densdenscorr(distances,avg_corrs,avg_errors; kwargs...) : nothing
 	
 	return avg_corrs,avg_errors,distances
 end
 
-function plot_allAVG_densdenscorr(distances,avg_corrs,avg_errors,title_string; kwargs...)
+function plot_allAVG_densdenscorr(distances,avg_corrs,avg_errors; kwargs...)
+	plot_title = get(kwargs, :plot_title, "")
+	title_string = "AVG DensDens Corr, " * plot_title
 	fig = figure()
 	errorbar(distances,avg_corrs,yerr=[avg_errors,avg_errors])
 	yscale("log")
@@ -375,8 +372,8 @@ all_ttns = []
 	#append!(all_ttns,[dm_sp.ttn])
 	#rez = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string)
 	#rez2 = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string*" Phys",direction="phys")
-	datafile_name = "densdens-test-md-$mdim-n-$tot_sites-lr-$longrange_dist"
-	rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;if_plot=true,plot_title=title_string, if_save_fig=true, if_save_data=true, name=datafile_name,location=loc)
+	#datafile_name = "densdens-md-$mdim-n-$tot_sites-lr-$longrange_dist"
+	#rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;if_plot=true,plot_title=title_string, if_save_fig=true, if_save_data=true, name=datafile_name,location=loc)
 	
 	#rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string, if_save=true, name="occ-test-md-$mdim-lr-$longrange_dist.png")
 	#
