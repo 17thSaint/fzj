@@ -328,7 +328,7 @@ end
 
 #
 if_per = false
-mag_off = true
+mag_off = false
 evolve = true
 chemical = false
 mu = 0.5
@@ -336,7 +336,7 @@ mu = 0.5
 expan = TTNKit.DefaultExpander(0.5)
 ts = 0.001
 nu = 1/2
-layers = 4#parse(Int,ARGS[1])
+layers = 6#parse(Int,ARGS[1])
 tot_sites = 2^layers
 if layers % 2 == 0
 	edge_sites = Int(sqrt(2^layers))
@@ -353,7 +353,7 @@ mdim = get_mdim(layers,(true,1))
 nswps = 3
 println("Using $num_particles particles on $tot_sites sites")
 
-loc = pwd()
+loc = "local-figs"
 
 if_cliff = true
 sc_type = "flat"
@@ -362,27 +362,28 @@ dists = [i for i in 1:2*edge_sites]
 
 net = build_HH_net(layers; syms=true)
 all_ttns = []
-#for i in 1:3
-	longrange_dist = 1#parse(Int, ARGS[1])
+for i in 1:3
+	longrange_dist = i#parse(Int, ARGS[1])
 	title_string = "LR $sc_type = $longrange_dist, md = $mdim"
 
 	ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
 
 	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; ttn_net=net,ham_op=ham,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
-	#append!(all_ttns,[dm_sp.ttn])
+	append!(all_ttns,[dm_sp.ttn])
 	#rez = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string)
 	#rez2 = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string*" Phys",direction="phys")
-	#datafile_name = "densdens-md-$mdim-n-$tot_sites-lr-$longrange_dist"
-	#rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;if_plot=true,plot_title=title_string, if_save_fig=true, if_save_data=true, name=datafile_name,location=loc)
+	datafile_name = "mag-ON-md-$mdim-n-$tot_sites-lr-$longrange_dist"
 	
-	#rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string, if_save=true, name="occ-test-md-$mdim-lr-$longrange_dist.png")
+	rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;if_plot=true,plot_title=title_string, if_save_fig=true, if_save_data=true, name="densdens-"*datafile_name,location=loc)
+	
+	rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string,if_plot=true,if_save_fig=true,if_save_data=true, name="occs-"*datafile_name,location=loc)
 	#
 	#rez2 = get_current_yfunc(dm_sp.ttn)
 	#rez3_fqh = get_ydir_greenfunc(dm_sp.ttn)
 	#rez3_sf = get_ydir_greenfunc(dm_sp.ttn; plot_title=title_string)
 	#rez4 = get_xdir_greenfunc(dm_sp.ttn; plot_title=title_string)
 	#
-#end
+end
 #
 
 
