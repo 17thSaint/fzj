@@ -220,18 +220,55 @@ function get_densdens_corrs(ttn,distances; kwargs...)
 	return densdens_corr,corr_errors
 end
 
+function check_duplicates(file_name)
+	file_string,file_type = split(file_name,".")
+	if file_name in readdir()
+		println("Found Duplicate File, renaming")
+	end
+	while file_name in readdir()
+		string_elems = split(file_string,"-")
+		if "mk" in string_elems
+			mk_number_loc = findfirst(x -> x == "mk",string_elems) + 1
+			string_elems[mk_number_loc] = string(parse(Int,string_elems[mk_number_loc]) + 1)
+		else
+			append!(string_elems,["mk","2"])
+		end
+		file_string = join(string_elems,"-")
+		file_name = file_string * "." * file_type
+	end
+	return file_name
+end
+
+function save_figure(file_name,file_location=pwd())
+	current_location = pwd()
+	cd(file_location)
+	file_name = check_duplicates(file_name)
+	savefig(file_name)
+	cd(current_location)
+	return
+end
+
 function get_allAVG_densdenscorr(ttn,distances; kwargs...)
 	all_corrs,all_errors = get_densdens_corrs(ttn,distances; if_plot=false,kwargs...)
 	avg_corrs = [mean(all_corrs[i,:]) for i in 1:length(distances)]
 	avg_errors = [mean(all_errors[i,:]) for i in 1:length(distances)]
 	
-	title_string = "AVG DensDens Corr, " * get(kwargs, :plot_title, "")
+	if_save = get(kwargs, :if_save, false)
+	
+	plot_title = get(kwargs, :plot_title, "")
+	title_string = "AVG DensDens Corr, " * plot_title
+	
 	fig = figure()
 	errorbar(distances,avg_corrs,yerr=[avg_errors,avg_errors])
 	yscale("log")
 	title(title_string)
 	xlabel("Distance")
 	ylabel("AVG Corr")
+	if if_save
+		location = get(kwargs, :location, pwd())
+		fig_name = get(kwargs, :name, "densdens-" * plot_title * ".png")
+		save_figure(fig_name,location)
+	end
 	
 	return avg_corrs,avg_errors
 end
@@ -260,7 +297,7 @@ mu = 0.5
 expan = TTNKit.DefaultExpander(0.5)
 ts = 0.001
 nu = 1/2
-layers = 6
+layers = 4
 tot_sites = 2^layers
 if layers % 2 == 0
 	edge_sites = Int(sqrt(2^layers))
@@ -277,6 +314,9 @@ mdim = get_mdim(layers,(true,1))
 nswps = 3
 println("Using $num_particles particles on $tot_sites sites")
 
+saving = true
+loc = "figs"
+
 if_cliff = true
 sc_type = "flat"
 limit = 0.5
@@ -284,26 +324,26 @@ dists = [i for i in 1:2*edge_sites]
 
 net = build_HH_net(layers; syms=true)
 all_ttns = []
-for i in 1:3
-	longrange_dist = i
+#for i in 1:3
+	longrange_dist = 1
 	title_string = "LR $sc_type = $longrange_dist, md = $mdim"
 
 	ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
 
 	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; ttn_net=net,ham_op=ham,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
-	append!(all_ttns,[dm_sp.ttn])
+	#append!(all_ttns,[dm_sp.ttn])
 	#rez = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string)
 	#rez2 = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string*" Phys",direction="phys")
-	rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;plot_title=title_string)
+	rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;plot_title=title_string, if_save=saving, name="densdens-test-md-$mdim-n-$tot_sites-lr-$longrange_dist.png",location=loc)
 	#
-	rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string)
+	#rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string, if_save=true, name="occ-test-md-$mdim-lr-$longrange_dist.png")
 	#
 	#rez2 = get_current_yfunc(dm_sp.ttn)
 	#rez3_fqh = get_ydir_greenfunc(dm_sp.ttn)
 	#rez3_sf = get_ydir_greenfunc(dm_sp.ttn; plot_title=title_string)
 	#rez4 = get_xdir_greenfunc(dm_sp.ttn; plot_title=title_string)
 	#
-end
+#end
 #
 
 
