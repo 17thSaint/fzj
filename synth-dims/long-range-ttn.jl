@@ -308,8 +308,9 @@ end
 function save_allAVG_densdenscorr(distances,avg_corrs,avg_errors; kwargs...)
 	location = get(kwargs, :location, pwd())
 	filename = get(kwargs, :name, "densdens")
+	metadata = get(kwargs, :metadata, nothing)
 	avg_data_dict = Dict([("dists",distances),("vals",avg_corrs),("errors",avg_errors)])
-	write_data_hdf5(filename,avg_data_dict,location)
+	write_data_hdf5(filename,avg_data_dict,location,metadata)
 end
 
 function get_mdim(num_layers,shift=(false,0.5))
@@ -326,9 +327,13 @@ function get_mdim(num_layers,shift=(false,0.5))
 	return Int(round(maxdims,digits=0))
 end
 
+# usually in params: mag_off, layers, mdim, longrange_dist
+params_dict = make_args_dict(ARGS)
 #
+sweep_type = "dmrg"
+max_occ = 1
 if_per = false
-mag_off = false
+mag_off = get(params_dict, "magoff", true)
 evolve = true
 chemical = false
 mu = 0.5
@@ -336,7 +341,7 @@ mu = 0.5
 expan = TTNKit.DefaultExpander(0.5)
 ts = 0.001
 nu = 1/2
-layers = 6#parse(Int,ARGS[1])
+layers = get(params_dict, "layers", 4)
 tot_sites = 2^layers
 if layers % 2 == 0
 	edge_sites = Int(sqrt(2^layers))
@@ -349,41 +354,45 @@ if !mag_off
 else
 	alpha = 0.0
 end
-mdim = get_mdim(layers,(true,1))
+mdim = get(params_dict, :mdim, get_mdim(layers,(true,1)))
 nswps = 3
-println("Using $num_particles particles on $tot_sites sites")
 
-loc = "local-figs"
-
+loc = pwd()
 if_cliff = true
 sc_type = "flat"
 limit = 0.5
 dists = [i for i in 1:2*edge_sites]
+longrange_dist = get(params_dict, "lr", 0)
+
+metadata_dict = Dict([("if_per",if_per),("mag_off",mag_off),("chemical",chemical),("mu",mu),("ts",ts),("nu",nu),("layers",layers),("num_particles",num_particles),("alpha",alpha),("mdim",mdim),("nswps",nswps),("if_cliff",if_cliff),("sc_type",sc_type),("longrange_dist",longrange_dist),("max_occ",max_occ),("sweep_type",sweep_type)])
+
+if length(keys(params_dict)) == 0
+	datafile_name = "layers-$layers-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
+else
+	datafile_name = make_parameters_filename(params_dict)
+end
+title_string = "LR $sc_type = $longrange_dist, md = $mdim"
+
+
+
+println("Starting Script using $num_particles particles on $tot_sites sites with $(!mag_off) Mag Field, Bond Dim = $mdim, and Long Range Dist = $longrange_dist")
 
 net = build_HH_net(layers; syms=true)
-all_ttns = []
-for i in 1:3
-	longrange_dist = i#parse(Int, ARGS[1])
-	title_string = "LR $sc_type = $longrange_dist, md = $mdim"
+ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
+og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; ttn_net=net,ham_op=ham,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=max_occ,if_sweep=evolve,sweep_type=sweep_type,expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
 
-	ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
-
-	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; ttn_net=net,ham_op=ham,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
-	append!(all_ttns,[dm_sp.ttn])
 	#rez = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string)
 	#rez2 = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string*" Phys",direction="phys")
-	datafile_name = "mag-ON-md-$mdim-n-$tot_sites-lr-$longrange_dist"
 	
-	rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;if_plot=true,plot_title=title_string, if_save_fig=true, if_save_data=true, name="densdens-"*datafile_name,location=loc)
-	
-	rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string,if_plot=true,if_save_fig=true,if_save_data=true, name="occs-"*datafile_name,location=loc)
+rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;if_plot=true,plot_title=title_string, if_save_fig=true, if_save_data=true, name="densdens-"*datafile_name,location=loc,metadata=metadata_dict)
+rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string,if_plot=true,if_save_fig=true,if_save_data=true, name="occs-"*datafile_name,location=loc,metadata=metadata_dict)
 	#
 	#rez2 = get_current_yfunc(dm_sp.ttn)
 	#rez3_fqh = get_ydir_greenfunc(dm_sp.ttn)
 	#rez3_sf = get_ydir_greenfunc(dm_sp.ttn; plot_title=title_string)
 	#rez4 = get_xdir_greenfunc(dm_sp.ttn; plot_title=title_string)
 	#
-end
+#end
 #
 
 

@@ -2,6 +2,7 @@ using TTNKit,Statistics,NBInclude
 #cd("/home/patrick/Downloads")
 @nbinclude("parton-model-syms.ipynb")
 include("../other-funcs/data-storage-funcs.jl")
+include("../other-funcs/cluster-execution-funcs.jl")
 #=
 Need to figure out how sweeps works
 =#
@@ -986,8 +987,9 @@ end
 function save_occupancy(exp_occ; kwargs...)
 	location = get(kwargs, :location, pwd())
 	filename = get(kwargs, :name, "occs")
+	metadata = get(kwargs, :metadata, nothing)
 	occs_data_dict = Dict([("vals",exp_occ)])
-	write_data_hdf5(filename,occs_data_dict,location)
+	write_data_hdf5(filename,occs_data_dict,location,metadata)
 	return
 end
 

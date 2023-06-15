@@ -41,7 +41,7 @@ function prep_file(file_name,desired_type)
 end
 
 function save_figure(file_name; kwargs...)
-	file_location = get(kwargs, :file_location, pwd())
+	file_location = get(kwargs, :location, pwd())
 	file_type = get(kwargs, :file_type, "png")
 	current_location = pwd()
 	cd(file_location)
