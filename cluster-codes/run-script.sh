@@ -18,7 +18,7 @@ done
 
 JOBNAME=${JOBNAME%-}
 
-OUTPUTFILENAME="output-$JOBNAME.txt"
+OUTPUTFILENAME="../cluster-data/output-$JOBNAME.txt"
 
 # written by ChatGPT 15.06.2023
 extension="${OUTPUTFILENAME##*.}"
@@ -31,5 +31,5 @@ do
         iter=$((iter + 1))
 done
 
-julia "$@" > "${../cluster-data/OUTPUTFILENAME}"
+julia "$@" > "${OUTPUTFILENAME}"
 

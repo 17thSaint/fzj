@@ -1,4 +1,4 @@
-#using PyPlot
+using PyPlot
 include("../review-practice-codes/ttn.jl")
 
 function long_range_scaling(x_final,virt_edge_length,initial_strength; kwargs...)
@@ -347,21 +347,22 @@ ts = 0.001
 nu = 1/2
 layer_count = get(params_dict, "layers", 4)
 tot_sites = 2^layer_count
+
 if layer_count % 2 == 0
 	edge_sites = Int(sqrt(2^layer_count))
-	num_particles = Int(edge_sites/2)
+	num_particles = get(params_dict, "particles", Int(edge_sites/2))
 else
-	num_particles = Int(sqrt(2^(layer_count+1))/2)
+	num_particles = get(params_dict, "particles", Int(sqrt(2^(layer_count+1))/2))
 end
 if !mag_off
 	alpha = num_particles/(mu * (tot_sites))
 else
 	alpha = 0.0
 end
-mdim = get(params_dict, :mdim, get_mdim(layer_count,(true,1)))
+mdim = get(params_dict, "mdim", get_mdim(layer_count,(true,1)))
 nswps = 3
 #
-loc = "../cluster-data"
+loc = "local-figs"
 if_cliff = true
 sc_type = "flat"
 limit = 0.5
@@ -380,16 +381,17 @@ title_string = "LR $sc_type = $longrange_dist, md = $mdim"
 
 
 println("Starting Script using $num_particles particles on $tot_sites sites with $(!mag_off) Mag Field, Bond Dim = $mdim, and Long Range Dist = $longrange_dist")
-
+starting = time()
 net = build_HH_net(layer_count; syms=true)
 ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
 og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layer_count,num_particles,ts,nu; ttn_net=net,ham_op=ham,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=max_occ,if_sweep=evolve,sweep_type=sweep_type,expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
-
+total_time = time() - starting
+println("Running time = $total_time")
 	#rez = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string)
 	#rez2 = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string*" Phys",direction="phys")
 	
-rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;if_plot=false,plot_title=title_string, if_save_fig=false, if_save_data=true, name="densdens-"*datafile_name,location=loc,metadata=metadata_dict)
-rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string,if_plot=false,if_save_fig=false,if_save_data=true, name="occs-"*datafile_name,location=loc,metadata=metadata_dict)
+rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;if_plot=true,plot_title=title_string, if_save_fig=true, if_save_data=true, name="densdens-"*datafile_name,location=loc,metadata=metadata_dict)
+rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string,if_plot=true,if_save_fig=true,if_save_data=true, name="occs-"*datafile_name,location=loc,metadata=metadata_dict)
 	#
 	#rez2 = get_current_yfunc(dm_sp.ttn)
 	#rez3_fqh = get_ydir_greenfunc(dm_sp.ttn)
