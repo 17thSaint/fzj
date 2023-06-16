@@ -357,7 +357,7 @@ end
 mdim = get(params_dict, :mdim, get_mdim(layer_count,(true,1)))
 nswps = 3
 
-loc = pwd()
+loc = "../cluster-data"
 if_cliff = true
 sc_type = "flat"
 limit = 0.5

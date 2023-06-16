@@ -8,5 +8,6 @@ then
 	unison -ignorearchives -prefer ~/fzj/main-git/review-practice-codes "${which_node}"-review.prf
 	unison -ignorearchives -prefer ~/fzj/main-git/synth-dims "${which_node}"-synthdims.prf
 	unison -ignorearchives -prefer newer "${which_node}"-clustercodes.prf
+	unison -ignorearchives -prefer ssh://"${which_node}"//local/geraghty/cluster-data "${which_node}"-clusterdata.prf
 fi
 
