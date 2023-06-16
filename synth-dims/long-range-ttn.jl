@@ -288,6 +288,10 @@ function get_allAVG_densdenscorr(ttn,distances; kwargs...)
 end
 
 function plot_allAVG_densdenscorr(distances,avg_corrs,avg_errors; kwargs...)
+	data_dict = get(kwargs, :data_dict, nothing)
+	if !isnothing(data_dict)
+		distances,avg_corrs,avg_errors = data_dict["dists"], data_dict["vals"], data_dict["errors"]
+	end
 	plot_title = get(kwargs, :plot_title, "")
 	title_string = "AVG DensDens Corr, " * plot_title
 	fig = figure()
@@ -356,7 +360,7 @@ else
 end
 mdim = get(params_dict, :mdim, get_mdim(layer_count,(true,1)))
 nswps = 3
-
+#
 loc = "../cluster-data"
 if_cliff = true
 sc_type = "flat"

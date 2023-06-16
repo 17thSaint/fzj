@@ -101,6 +101,10 @@ function get_ydir_greenfunc(ttn; kwargs...)
 end
 
 function plot_greenfunc(all_vals,all_greens,virt_edge_length,direction; kwargs...)
+	data_dict = get(kwargs, :data_dict, nothing)
+	if !isnothing(data_dict)
+		all_vals,all_greens = data_dict["coords"],data_dict["greens"]
+	end
 	title_string = "$direction Spatial Green's Function, " * get(kwargs, :plot_title, "Virt Edge Count = $virt_edge_length")
 	other_direction = "X"
 	if direction == "X"
@@ -223,6 +227,10 @@ function get_current_yfunc(ttn; kwargs...)
 end
 
 function plot_current(all_vals,all_currents,edge_length,direction; kwargs...)
+	data_dict = get(kwargs, :data_dict, nothing)
+	if !isnothing(data_dict)
+		all_vals,all_currents = data_dict["coords"],data_dict["currents"]
+	end
 	if direction == "X"
 		all_vals = transpose(all_vals)
 		all_currents = transpose(all_currents)
@@ -994,6 +1002,10 @@ function save_occupancy(exp_occ; kwargs...)
 end
 
 function plot_occupancy(exp_occ; kwargs...)
+	data_dict = get(kwargs, :data_dict, nothing)
+	if !isnothing(data_dict)
+		exp_occ = data_dict["vals"]
+	end
 	fig = figure()
 	imshow(exp_occ)
 	colorbar()

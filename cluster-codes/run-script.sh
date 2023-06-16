@@ -31,5 +31,5 @@ do
         iter=$((iter + 1))
 done
 
-julia "$@" > "$OUTPUTFILENAME"
+julia "$@" > "${../cluster-data/OUTPUTFILENAME}"
 
