@@ -1,4 +1,4 @@
-using PyPlot
+#using PyPlot
 include("../review-practice-codes/ttn.jl")
 
 function long_range_scaling(x_final,virt_edge_length,initial_strength; kwargs...)
@@ -384,8 +384,8 @@ og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; 
 	#rez = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string)
 	#rez2 = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string*" Phys",direction="phys")
 	
-rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;if_plot=true,plot_title=title_string, if_save_fig=true, if_save_data=true, name="densdens-"*datafile_name,location=loc,metadata=metadata_dict)
-rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string,if_plot=true,if_save_fig=true,if_save_data=true, name="occs-"*datafile_name,location=loc,metadata=metadata_dict)
+rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;if_plot=false,plot_title=title_string, if_save_fig=false, if_save_data=true, name="densdens-"*datafile_name,location=loc,metadata=metadata_dict)
+rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string,if_plot=false,if_save_fig=false,if_save_data=true, name="occs-"*datafile_name,location=loc,metadata=metadata_dict)
 	#
 	#rez2 = get_current_yfunc(dm_sp.ttn)
 	#rez3_fqh = get_ydir_greenfunc(dm_sp.ttn)
