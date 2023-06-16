@@ -341,20 +341,20 @@ mu = 0.5
 expan = TTNKit.DefaultExpander(0.5)
 ts = 0.001
 nu = 1/2
-layers = get(params_dict, "layers", 4)
-tot_sites = 2^layers
-if layers % 2 == 0
-	edge_sites = Int(sqrt(2^layers))
+layer_count = get(params_dict, "layers", 4)
+tot_sites = 2^layer_count
+if layer_count % 2 == 0
+	edge_sites = Int(sqrt(2^layer_count))
 	num_particles = Int(edge_sites/2)
 else
-	num_particles = Int(sqrt(2^(layers+1))/2)
+	num_particles = Int(sqrt(2^(layer_count+1))/2)
 end
 if !mag_off
 	alpha = num_particles/(mu * (tot_sites))
 else
 	alpha = 0.0
 end
-mdim = get(params_dict, :mdim, get_mdim(layers,(true,1)))
+mdim = get(params_dict, :mdim, get_mdim(layer_count,(true,1)))
 nswps = 3
 
 loc = pwd()
@@ -364,10 +364,10 @@ limit = 0.5
 dists = [i for i in 1:2*edge_sites]
 longrange_dist = get(params_dict, "lr", 0)
 
-metadata_dict = Dict([("if_per",if_per),("mag_off",mag_off),("chemical",chemical),("mu",mu),("ts",ts),("nu",nu),("layers",layers),("num_particles",num_particles),("alpha",alpha),("mdim",mdim),("nswps",nswps),("if_cliff",if_cliff),("sc_type",sc_type),("longrange_dist",longrange_dist),("max_occ",max_occ),("sweep_type",sweep_type)])
+metadata_dict = Dict([("if_per",if_per),("mag_off",mag_off),("chemical",chemical),("mu",mu),("ts",ts),("nu",nu),("layers",layer_count),("num_particles",num_particles),("alpha",alpha),("mdim",mdim),("nswps",nswps),("if_cliff",if_cliff),("sc_type",sc_type),("longrange_dist",longrange_dist),("max_occ",max_occ),("sweep_type",sweep_type)])
 
 if length(keys(params_dict)) == 0
-	datafile_name = "layers-$layers-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
+	datafile_name = "layers-$layer_count-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
 else
 	datafile_name = make_parameters_filename(params_dict)
 end
@@ -377,9 +377,9 @@ title_string = "LR $sc_type = $longrange_dist, md = $mdim"
 
 println("Starting Script using $num_particles particles on $tot_sites sites with $(!mag_off) Mag Field, Bond Dim = $mdim, and Long Range Dist = $longrange_dist")
 
-net = build_HH_net(layers; syms=true)
+net = build_HH_net(layer_count; syms=true)
 ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
-og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; ttn_net=net,ham_op=ham,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=max_occ,if_sweep=evolve,sweep_type=sweep_type,expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
+og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layer_count,num_particles,ts,nu; ttn_net=net,ham_op=ham,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=max_occ,if_sweep=evolve,sweep_type=sweep_type,expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
 
 	#rez = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string)
 	#rez2 = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string*" Phys",direction="phys")
