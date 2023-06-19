@@ -1,4 +1,4 @@
-using PyPlot
+#using PyPlot
 include("../review-practice-codes/ttn.jl")
 
 function long_range_scaling(x_final,virt_edge_length,initial_strength; kwargs...)
@@ -241,37 +241,6 @@ function get_densdens_corrs(ttn,distances; kwargs...)
 	return densdens_corr,corr_errors
 end
 
-
-#=
-function check_duplicates(file_name)
-	file_string,file_type = split(file_name,".")
-	if file_name in readdir()
-		println("Found Duplicate File, renaming")
-	end
-	while file_name in readdir()
-		string_elems = split(file_string,"-")
-		if "mk" in string_elems
-			mk_number_loc = findfirst(x -> x == "mk",string_elems) + 1
-			string_elems[mk_number_loc] = string(parse(Int,string_elems[mk_number_loc]) + 1)
-		else
-			append!(string_elems,["mk","2"])
-		end
-		file_string = join(string_elems,"-")
-		file_name = file_string * "." * file_type
-	end
-	return file_name
-end
-
-function save_figure(file_name,file_location=pwd())
-	current_location = pwd()
-	cd(file_location)
-	file_name = check_duplicates(file_name * ".png")
-	savefig(file_name,format="png")
-	cd(current_location)
-	return
-end
-=#
-
 function get_allAVG_densdenscorr(ttn,distances; kwargs...)
 	all_corrs,all_errors = get_densdens_corrs(ttn,distances; kwargs...,if_plot=false)
 	avg_corrs = [mean(all_corrs[i,:]) for i in 1:length(distances)]
@@ -281,8 +250,8 @@ function get_allAVG_densdenscorr(ttn,distances; kwargs...)
 	if_save_data = get(kwargs, :if_save_data, false)
 	if_plot = get(kwargs, :if_plot, true)
 
-	if_plot || if_save_fig ? plot_allAVG_densdenscorr(distances,avg_corrs,avg_errors; kwargs...) : nothing
 	if_save_data ? save_allAVG_densdenscorr(distances,avg_corrs,avg_errors; kwargs...) : nothing
+	if_plot || if_save_fig ? plot_allAVG_densdenscorr(distances,avg_corrs,avg_errors; kwargs...) : nothing
 	
 	return avg_corrs,avg_errors,distances
 end
@@ -362,7 +331,10 @@ end
 mdim = get(params_dict, "mdim", get_mdim(layer_count,(true,1)))
 nswps = 3
 #
-loc = "local-figs"
+
+plotting = false
+
+loc = "../cluster-data/"
 if_cliff = true
 sc_type = "flat"
 limit = 0.5
@@ -384,14 +356,14 @@ println("Starting Script using $num_particles particles on $tot_sites sites with
 starting = time()
 net = build_HH_net(layer_count; syms=true)
 ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
-og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layer_count,num_particles,ts,nu; ttn_net=net,ham_op=ham,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=max_occ,if_sweep=evolve,sweep_type=sweep_type,expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
+og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layer_count,num_particles,ts,nu; ttn_net=net,ham_op=ham,if_save_data=true,name="ttn-"*datafile_name,location=loc,metadata=metadata_dict,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=max_occ,if_sweep=evolve,sweep_type=sweep_type,expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
 total_time = time() - starting
 println("Running time = $total_time")
 	#rez = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string)
 	#rez2 = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string*" Phys",direction="phys")
 	
-rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;if_plot=true,plot_title=title_string, if_save_fig=true, if_save_data=true, name="densdens-"*datafile_name,location=loc,metadata=metadata_dict)
-rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string,if_plot=true,if_save_fig=true,if_save_data=true, name="occs-"*datafile_name,location=loc,metadata=metadata_dict)
+#rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;if_plot=plotting,plot_title=title_string, if_save_fig=plotting, if_save_data=true, name="densdens-"*datafile_name,location=loc,metadata=metadata_dict)
+#rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string,if_plot=plotting,if_save_fig=plotting,if_save_data=true, name="occs-"*datafile_name,location=loc,metadata=metadata_dict)
 	#
 	#rez2 = get_current_yfunc(dm_sp.ttn)
 	#rez3_fqh = get_ydir_greenfunc(dm_sp.ttn)

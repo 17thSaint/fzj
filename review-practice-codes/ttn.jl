@@ -94,8 +94,8 @@ function get_ydir_greenfunc(ttn; kwargs...)
 	if_save_data = get(kwargs, :if_save_data, false)
 	if_save_fig = get(kwargs, :if_save_fig, false)
 	
-	if_plot || if_save_fig ? plot_greenfunc(all_yvals,all_greens,virt_edge_length,"Y"; kwargs...) : nothing
 	if_save_data ? save_greenfunc(all_yvals,all_greens,"Y"; kwargs...) : nothing
+	if_plot || if_save_fig ? plot_greenfunc(all_yvals,all_greens,virt_edge_length,"Y"; kwargs...) : nothing
 	
 	return all_yvals,all_greens
 end
@@ -177,8 +177,8 @@ function get_xdir_greenfunc(ttn; kwargs...)
 	if_save_data = get(kwargs, :if_save_data, false)
 	if_save_fig = get(kwargs, :if_save_fig, false)
 	
-	if_plot || if_save_fig ? plot_greenfunc(all_xvals,all_greens,virt_edge_length,"X"; kwargs...) : nothing
 	if_save_data ? save_greenfunc(all_xvals,all_greens,"X"; kwargs...) : nothing
+	if_plot || if_save_fig ? plot_greenfunc(all_xvals,all_greens,virt_edge_length,"X"; kwargs...) : nothing
 	
 	return all_xvals,all_greens
 end
@@ -220,8 +220,8 @@ function get_current_yfunc(ttn; kwargs...)
 	if_save_data = get(kwargs, :if_save_data, false)
 	if_save_fig = get(kwargs, :if_save_fig, false)
 	
-	if_plot || if_save_fig ? plot_current(all_yvals,all_currents,edge_length,"Y"; kwargs...) : nothing
 	if_save_data ? save_current(all_yvals,all_currents,"Y"; kwargs...) : nothing
+	if_plot || if_save_fig ? plot_current(all_yvals,all_currents,edge_length,"Y"; kwargs...) : nothing
 	
 	return all_yvals,all_currents
 end
@@ -299,8 +299,8 @@ function get_current_xfunc(ttn; kwargs...)
 	if_save_data = get(kwargs, :if_save_data, false)
 	if_save_fig = get(kwargs, :if_save_fig, false)
 	
-	if_plot || if_save_fig ? plot_current(all_xvals,all_currents,edge_length,"X"; kwargs...) : nothing
 	if_save_data ? save_current(all_xvals,all_currents,"X"; kwargs...) : nothing
+	if_plot || if_save_fig ? plot_current(all_xvals,all_currents,edge_length,"X"; kwargs...) : nothing
 	
 	return all_xvals,all_currents
 end
@@ -684,6 +684,7 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	num_sweeps = get(kwargs, :num_sweeps, 3)
 	sweep_iter = get(kwargs, :sweep_iter, 1)
 	if_sweep = get(kwargs, :if_sweep, true)
+	if_save_data = get(kwargs, :if_save_data, true)
 	sweep_type = get(kwargs, :sweep_type, "simple")
 	noise = get(kwargs, :noise, 0.0)
 	expander = get(kwargs, :expander, TTNKit.NoExpander())
@@ -744,6 +745,17 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 				warmed_results = warming(new_ttn,new_ham,new_sp,particle_count,warming_limit;kwargs...)
 				#return warmed_results
 				ttn,ham,sp = warmed_results
+			end
+		end
+		if if_save_data
+			try
+			location = get(kwargs, :location, pwd())
+			filename = get(kwargs, :name, "ttn")
+			metadata = get(kwargs, :metadata, nothing)
+			ttn_data_dict = Dict([("ttn",sp.ttn)])
+			write_data_jld2(filename,ttn_data_dict,location,metadata)
+			catch
+				println("Saving Didn't work")
 			end
 		end
 		return ttn, ham, sp#, throwout_therm_time(times)
@@ -985,9 +997,8 @@ function get_occupancy(ttn; kwargs...)
 	if_save_fig = get(kwargs, :if_save_fig, false)
 	if_plot = get(kwargs, :if_plot, true)
 	
-	
-	if_plot	|| if_save_fig ? plot_occupancy(exp_occ; kwargs...) : nothing
 	if_save_data ? save_occupancy(exp_occ; kwargs...) : nothing
+	if_plot	|| if_save_fig ? plot_occupancy(exp_occ; kwargs...) : nothing
 		
 	return exp_occ
 end

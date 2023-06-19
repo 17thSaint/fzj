@@ -1,4 +1,4 @@
-using HDF5
+using JLD2
 
 function make_sure_file_type(file_name,desired_type)
 	split_name = split(file_name,".")
@@ -52,24 +52,27 @@ function save_figure(file_name; kwargs...)
 	return
 end
 
-function write_data_hdf5(file_name,data,location=pwd(),metadata=nothing; kwargs...)
+function write_data_jld2(file_name,data,location=pwd(),metadata=nothing; kwargs...)
 	og_location = pwd()
-	cd(location)
+	try
+		cd(location)
+	catch
+		println("The directory $location is not accessible")
+		location = pwd()
+	end
 
-	file_name = prep_file(file_name,"hdf5")
+	file_name = prep_file(file_name,"jld2")
 	
-	binary_file = h5open(file_name,"w")
+	binary_file = jldopen(file_name,"w")
 	
 	if !isnothing(metadata)
-		create_group(binary_file,"metadata")
-		metadata_var = binary_file["metadata"]
+		metadata_var = JLD2.Group(binary_file,"metadata")
 		for metadatum_key in keys(metadata)
 			metadata_var[metadatum_key] = metadata[metadatum_key]
 		end
 	end
 	
-	create_group(binary_file,"all_data")
-	alldata = binary_file["all_data"]
+	alldata = JLD2.Group(binary_file,"all_data")
 	for datum_key in keys(data)
 		alldata[datum_key] = data[datum_key]
 	end
@@ -80,19 +83,24 @@ function write_data_hdf5(file_name,data,location=pwd(),metadata=nothing; kwargs.
 	return
 end
 
-function read_data_hdf5(file_name,location=pwd(); kwargs...)
+function read_data_jld2(file_name,location=pwd(); kwargs...)
 	og_location = pwd()
-	cd(location)
+	try
+		cd(location)
+	catch
+		println("The directory $location is not accessible")
+		location = pwd()
+	end
 	
-	file_name = make_sure_file_type(file_name,"hdf5")
+	file_name = make_sure_file_type(file_name,"jld2")
 	
 	output = []
-	binary_file = h5open(file_name,"r")
+	binary_file = jldopen(file_name,"r")
 	
 	data = Dict()
 	alldata = binary_file["all_data"]
 	for datum_key in keys(alldata)
-		data[datum_key] = read(alldata,datum_key)
+		data[datum_key] = alldata[datum_key]
 	end
 	push!(output,data)
 	
@@ -100,7 +108,7 @@ function read_data_hdf5(file_name,location=pwd(); kwargs...)
 		metadata = Dict()
 		metadata_vals = binary_file["metadata"]
 		for metadatum_key in keys(metadata_vals)
-			metadata[metadatum_key] = read(metadata_vals,metadatum_key)
+			metadata[metadatum_key] = metadata_vals[metadatum_key]
 		end
 	push!(output,metadata)
 	end
