@@ -140,7 +140,7 @@ function save_greenfunc(all_vals,all_greens,direction; kwargs...)
 	filename = get(kwargs, :name, "$direction-dir-GF")
 	location = get(kwargs, :location, pwd())
 	greenfunc_data = Dict([("coords",all_vals),("greens",all_greens)])
-	write_data_hdf5(filename,greenfunc_data,location=location; kwargs...)
+	write_data_jld2(filename,greenfunc_data,location=location; kwargs...)
 	return
 end
 
@@ -258,7 +258,7 @@ function save_current(all_vals,all_currents,direction; kwargs...)
 	filename = get(kwargs, :name, "$direction-dir-current")
 	location = get(kwargs, :location, pwd())
 	current_data = Dict([("coords",all_vals),("currents",all_currents)])
-	write_data_hdf5(filename,current_data,location=location; kwargs...)
+	write_data_jld2(filename,current_data,location=location; kwargs...)
 	return
 end
 
@@ -585,8 +585,8 @@ function check_if_frozen(ttn)
 	occs = get_occupancy(ttn; if_plot=false)
 	if any(isapprox.(occs,0.0,atol=10^-10))
 		return true,"frozen"
-	elseif any(round.(get_ydir_greenfunc(ttn;if_plot=false)[2],digits=3).==0.0)#sum(occs.==1.0) > length(occs)/3
-		return true,"variables"
+	#elseif any(isapprox.(get_ydir_greenfunc(ttn;if_plot=false)[2],digits=3).==0.0)#sum(occs.==1.0) > length(occs)/3
+		#return true,"variables"
 	else
 		return false,"none"
 	end
@@ -650,7 +650,7 @@ function warming(ttn,ham,sp,particle_count,warming_limit; kwargs...)
 		println("Max Dim = ",TTNKit.maxlinkdim(new_sp.ttn),", Expected = $new_maxdim")
 		if_frozen,why = check_if_frozen(new_sp.ttn)
 		if if_frozen
-			get_occupancy(new_sp.ttn; plot_title="Attempt $warming_count")
+			#get_occupancy(new_sp.ttn; plot_title="Attempt $warming_count")
 			warming_count += 1
 			global old_data = [new_sp.ttn,new_ham,new_sp]
 		else
@@ -705,16 +705,15 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 
 	println("Finished Building Network")
 
-	states = fill("0", num_sites)#fill_states(particle_count-1,num_sites,max_occ)
+	states = fill("0", num_sites)
+	#states = fill_states(particle_count-1,num_sites,max_occ)
 	old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
 	#ttn = TTNKit.increase_dim_tree_tensor_network_zeros(ttn, maxdim = max_dim)
 	#ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
-	#println("Starting Link Dim = ",TTNKit.maxlinkdim(old_ttn))
-	ttn = initialize_ttn(old_ttn,max_dim,particle_count)
-	#println("Adjusted Link Dim = ",TTNKit.maxlinkdim(ttn))
-	println("Added States")
 	
-	#get_occupancy(ttn,edge_sites; plot_title="Starting")
+	ttn = initialize_ttn(old_ttn,max_dim,particle_count)
+	
+	println("Added States")
 	
 	if isnothing(ham_operator)
 		ham_operator = get_hofstadter_interacting_hamilt(net,t_strength,phi; kwargs...)
@@ -1008,7 +1007,7 @@ function save_occupancy(exp_occ; kwargs...)
 	filename = get(kwargs, :name, "occs")
 	metadata = get(kwargs, :metadata, nothing)
 	occs_data_dict = Dict([("vals",exp_occ)])
-	write_data_hdf5(filename,occs_data_dict,location,metadata)
+	write_data_jld2(filename,occs_data_dict,location,metadata)
 	return
 end
 

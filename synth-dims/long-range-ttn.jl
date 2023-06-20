@@ -47,7 +47,7 @@ function save_long_range_scaling(strengths,virt_edge_length; kwargs...)
 	location = get(kwargs, :location, pwd())
 	xcoord = [i for i in 0:virt_edge_length-1]
 	scaling_data = Dict([("strengths",strengths),("xcoord",xcoord)])
-	write_data_hdf5(filename,scaling_data,location=location; kwargs...)
+	write_data_jld2(filename,scaling_data,location=location; kwargs...)
 	return
 end
 
@@ -283,7 +283,7 @@ function save_allAVG_densdenscorr(distances,avg_corrs,avg_errors; kwargs...)
 	filename = get(kwargs, :name, "densdens")
 	metadata = get(kwargs, :metadata, nothing)
 	avg_data_dict = Dict([("dists",distances),("vals",avg_corrs),("errors",avg_errors)])
-	write_data_hdf5(filename,avg_data_dict,location,metadata)
+	write_data_jld2(filename,avg_data_dict,location,metadata)
 end
 
 function get_mdim(num_layers,shift=(false,0.5))
@@ -302,11 +302,22 @@ end
 
 # usually in params: mag_off, layers, mdim, longrange_dist
 params_dict = make_args_dict(ARGS)
+layer_count = get(params_dict, "layers", 4)
+mag_off = get(params_dict, "magoff", true)
+mdim = get(params_dict, "mdim", get_mdim(layer_count,(false,1)))
+longrange_dist = get(params_dict, "lr", 0)
+if layer_count % 2 == 0
+	edge_sites = Int(sqrt(2^layer_count))
+	num_particles = get(params_dict, "particles", Int(edge_sites/2))
+else
+	edge_sites = Int(sqrt(2^(layer_count+1)))
+	num_particles = get(params_dict, "particles", Int(sqrt(2^(layer_count+1))/2))
+end
+
 #
 sweep_type = "dmrg"
 max_occ = 1
 if_per = false
-mag_off = get(params_dict, "magoff", true)
 evolve = true
 chemical = false
 mu = 0.5
@@ -314,56 +325,57 @@ mu = 0.5
 expan = TTNKit.DefaultExpander(0.5)
 ts = 0.001
 nu = 1/2
-layer_count = get(params_dict, "layers", 4)
 tot_sites = 2^layer_count
 
-if layer_count % 2 == 0
-	edge_sites = Int(sqrt(2^layer_count))
-	num_particles = get(params_dict, "particles", Int(edge_sites/2))
-else
-	num_particles = get(params_dict, "particles", Int(sqrt(2^(layer_count+1))/2))
-end
+
 if !mag_off
 	alpha = num_particles/(mu * (tot_sites))
 else
 	alpha = 0.0
 end
-mdim = get(params_dict, "mdim", get_mdim(layer_count,(true,1)))
 nswps = 3
 #
 
 plotting = false
+save_plot = false
+save_data = true
 
-loc = "../cluster-data/"
+loc = "../cluster-data"
 if_cliff = true
 sc_type = "flat"
 limit = 0.5
 dists = [i for i in 1:2*edge_sites]
-longrange_dist = get(params_dict, "lr", 0)
 
 metadata_dict = Dict([("if_per",if_per),("mag_off",mag_off),("chemical",chemical),("mu",mu),("ts",ts),("nu",nu),("layers",layer_count),("num_particles",num_particles),("alpha",alpha),("mdim",mdim),("nswps",nswps),("if_cliff",if_cliff),("sc_type",sc_type),("longrange_dist",longrange_dist),("max_occ",max_occ),("sweep_type",sweep_type)])
 
 if length(keys(params_dict)) == 0
-	datafile_name = "layers-$layer_count-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
+	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
 else
 	datafile_name = make_parameters_filename(params_dict)
 end
-title_string = "LR $sc_type = $longrange_dist, md = $mdim"
+#title_string = "LR $sc_type = $longrange_dist, md = $mdim"
+#all_ttns = []
+#init = 0.2
+#fin = 0.8
+#count = 6
+#for density in [init + (i-1)*(fin - init)/(count-1) for i in 1:count]
+#density = 0.3
+#num_particles = Int(ceil(density * tot_sites))
 
-
-
+#
+title_string = "Np = $num_particles, LR = $longrange_dist"
 println("Starting Script using $num_particles particles on $tot_sites sites with $(!mag_off) Mag Field, Bond Dim = $mdim, and Long Range Dist = $longrange_dist")
 starting = time()
 net = build_HH_net(layer_count; syms=true)
 ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
-og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layer_count,num_particles,ts,nu; ttn_net=net,ham_op=ham,if_save_data=true,name="ttn-"*datafile_name,location=loc,metadata=metadata_dict,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=max_occ,if_sweep=evolve,sweep_type=sweep_type,expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
+og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layer_count,num_particles,ts,nu; ttn_net=net,ham_op=ham,if_save_data=save_data,name="ttn-"*datafile_name,location=loc,metadata=metadata_dict,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=max_occ,if_sweep=evolve,sweep_type=sweep_type,expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
 total_time = time() - starting
 println("Running time = $total_time")
 	#rez = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string)
 	#rez2 = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string*" Phys",direction="phys")
-	
-#rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;if_plot=plotting,plot_title=title_string, if_save_fig=plotting, if_save_data=true, name="densdens-"*datafile_name,location=loc,metadata=metadata_dict)
-#rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string,if_plot=plotting,if_save_fig=plotting,if_save_data=true, name="occs-"*datafile_name,location=loc,metadata=metadata_dict)
+#
+rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;if_plot=plotting,plot_title=title_string, if_save_fig=save_plot, if_save_data=save_data, name="densdens-"*datafile_name,location=loc,metadata=metadata_dict)
+rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string,if_plot=plotting,if_save_fig=save_plot,if_save_data=save_data, name="occs-"*datafile_name,location=loc,metadata=metadata_dict)
 	#
 	#rez2 = get_current_yfunc(dm_sp.ttn)
 	#rez3_fqh = get_ydir_greenfunc(dm_sp.ttn)
@@ -372,7 +384,6 @@ println("Running time = $total_time")
 	#
 #end
 #
-
 
 
 

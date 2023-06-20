@@ -1,5 +1,17 @@
 using JLD2
 
+function find_data_file(params_dict,file_type)
+	og_loc = pwd()
+	cd("../cluster-data")
+	
+	file_choices = readdir()
+	for params in keys(params_dict)
+		println("here")
+	end
+	
+	cd(og_loc)
+end
+
 function make_sure_file_type(file_name,desired_type)
 	split_name = split(file_name,".")
 	if length(split_name) < 2
@@ -124,6 +136,41 @@ function read_data_jld2(file_name,location=pwd(); kwargs...)
 	end
 end
 
+function read_data_hdf5(file_name,location=pwd(); kwargs...)
+	og_location = pwd()
+	cd(location)
+
+	file_name = make_sure_file_type(file_name,"hdf5")
+
+	output = []
+	binary_file = h5open(file_name,"r")
+
+	data = Dict()
+	alldata = binary_file["all_data"]
+	for datum_key in keys(alldata)
+		data[datum_key] = read(alldata,datum_key)
+	end
+	push!(output,data)
+
+	if !isnothing(findfirst(x -> x == "metadata",keys(binary_file)))
+		metadata = Dict()
+		metadata_vals = binary_file["metadata"]
+		for metadatum_key in keys(metadata_vals)
+			metadata[metadatum_key] = read(metadata_vals,metadatum_key)
+		end
+	push!(output,metadata)
+	end
+
+	close(binary_file)
+	cd(og_location)
+	println("Data Extracted, File Closed: $file_name")
+
+	if length(output) < 2
+		return data
+	else
+		return output
+	end
+end
 
 
 
