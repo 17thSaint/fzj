@@ -264,7 +264,8 @@ function plot_allAVG_densdenscorr(distances,avg_corrs,avg_errors; kwargs...)
 	plot_title = get(kwargs, :plot_title, "")
 	title_string = "AVG DensDens Corr, " * plot_title
 	fig = figure()
-	errorbar(distances,avg_corrs,yerr=[avg_errors,avg_errors])
+	#errorbar(distances,avg_corrs,yerr=[avg_errors,avg_errors])
+	plot(distances,avg_corrs,"-p")
 	yscale("log")
 	title(title_string)
 	xlabel("Distance")
@@ -300,7 +301,7 @@ function get_mdim(num_layers,shift=(false,0.5))
 	return Int(round(maxdims,digits=0))
 end
 
-# usually in params: mag_off, layers, mdim, longrange_dist
+#= usually in params: mag_off, layers, mdim, longrange_dist
 params_dict = make_args_dict(ARGS)
 layer_count = get(params_dict, "layers", 4)
 mag_off = get(params_dict, "magoff", true)
@@ -346,7 +347,7 @@ sc_type = "flat"
 limit = 0.5
 dists = [i for i in 1:2*edge_sites]
 
-metadata_dict = Dict([("if_per",if_per),("mag_off",mag_off),("chemical",chemical),("mu",mu),("ts",ts),("nu",nu),("layers",layer_count),("num_particles",num_particles),("alpha",alpha),("mdim",mdim),("nswps",nswps),("if_cliff",if_cliff),("sc_type",sc_type),("longrange_dist",longrange_dist),("max_occ",max_occ),("sweep_type",sweep_type)])
+metadata_dict = Dict([("if_per",if_per),("mag_off",mag_off),("chemical",chemical),("mu",mu),("ts",ts),("nu",nu),("layers",layer_count),("particles",num_particles),("alpha",alpha),("mdim",mdim),("nswps",nswps),("if_cliff",if_cliff),("sc_type",sc_type),("longrange_dist",longrange_dist),("max_occ",max_occ),("sweep_type",sweep_type)])
 
 if length(keys(params_dict)) == 0
 	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
@@ -383,7 +384,7 @@ rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string,if_plot=plotting,if_save
 	#rez4 = get_xdir_greenfunc(dm_sp.ttn; plot_title=title_string)
 	#
 #end
-#
+=#
 
 
 

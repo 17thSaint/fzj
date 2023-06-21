@@ -42,6 +42,33 @@ function make_parameters_filename(param_dict)
 	return param_filename
 end
 
+function get_params_dict_from_filename(filename)
+	params_dict = Dict()
+	
+	file_type = split(filename,".")[end]
+	if file_type == "png" || file_type == "jld2" || file_type == "hdf5"
+		filename = join(split(filename,".")[1:end-1],".")
+	end
+	
+	split_filename = split(filename,"-")[2:end]
+	for i in 1:Int(length(split_filename)/2)
+		key = split_filename[2*i-1]
+		value = split_filename[2*i]
+		get_integer = tryparse(Int,value) 
+		if isnothing(get_integer)
+			get_float = tryparse(Float64,value)
+			if isnothing(get_float)
+				value = turn_string_into_bool(value)
+			else
+				value = get_float
+			end
+		else
+			value = get_integer
+		end
+		params_dict[key] = value
+	end
+	return params_dict
+end
 
 
 

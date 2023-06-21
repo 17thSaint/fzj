@@ -1,15 +1,60 @@
 using JLD2
 
-function find_data_file(params_dict,file_type)
+function change_numparticles_metadata(filename)
+	binary_file = jldopen("../cluster-data/$filename","a+")
+	try
+		metadata = binary_file["metadata"]
+		metadata["particles"] = metadata["num_particles"]
+		delete!(metadata,"num_particles")
+		close(binary_file)
+		println("Completed for $filename")
+		return "yes"
+	catch
+		close(binary_file)
+		println("Had some error for $filename")
+		return "no"
+	end
+end
+
+function find_data_file(params_dict,calc_type,file_type="jld2")
 	og_loc = pwd()
 	cd("../cluster-data")
 	
 	file_choices = readdir()
-	for params in keys(params_dict)
-		println("here")
+	
+	remove_indices = []
+	for i in 1:length(file_choices)
+		split(file_choices[i],".")[end] != file_type ? append!(remove_indices,[i]) : nothing
 	end
+	deleteat!(file_choices,remove_indices)
+	remove_indices = []
+	
+	for i in 1:length(file_choices)
+		split(file_choices[i],"-")[1] != calc_type ? append!(remove_indices,[i]) : nothing
+	end
+	deleteat!(file_choices,remove_indices)
+
+	remove_indices = []
+	for i in 1:length(file_choices)
+		current_file = file_choices[i]
+		current_file_params_dict = get_params_dict_from_filename(current_file)
+		for params in keys(params_dict)
+			try
+				params_dict[params] == current_file_params_dict[params] ? nothing : append!(remove_indices,i)
+			catch
+				try
+					current_file_metadata_dict = read_data_jld2(current_file)[2]
+					params_dict[params] == current_file_metadata_dict[params] ? nothing : append!(remove_indices,i)
+				catch
+					println("Parameter $params could not be found in file $current_file, skipping")
+				end
+			end
+		end
+	end
+	deleteat!(file_choices,unique(remove_indices))
 	
 	cd(og_loc)
+	return file_choices
 end
 
 function make_sure_file_type(file_name,desired_type)
