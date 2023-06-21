@@ -304,7 +304,7 @@ end
 #= usually in params: mag_off, layers, mdim, longrange_dist
 params_dict = make_args_dict(ARGS)
 layer_count = get(params_dict, "layers", 4)
-mag_off = get(params_dict, "magoff", true)
+mag_off = get(params_dict, "mag_off", true)
 mdim = get(params_dict, "mdim", get_mdim(layer_count,(false,1)))
 longrange_dist = get(params_dict, "lr", 0)
 if layer_count % 2 == 0
@@ -341,10 +341,10 @@ plotting = false
 save_plot = false
 save_data = true
 
-loc = "../cluster-data"
+loc = "local-figs"
 if_cliff = true
 sc_type = "flat"
-limit = 0.5
+limit = 1.0
 dists = [i for i in 1:2*edge_sites]
 
 metadata_dict = Dict([("if_per",if_per),("mag_off",mag_off),("chemical",chemical),("mu",mu),("ts",ts),("nu",nu),("layers",layer_count),("particles",num_particles),("alpha",alpha),("mdim",mdim),("nswps",nswps),("if_cliff",if_cliff),("sc_type",sc_type),("longrange_dist",longrange_dist),("max_occ",max_occ),("sweep_type",sweep_type)])
