@@ -301,12 +301,14 @@ function get_mdim(num_layers,shift=(false,0.5))
 	return Int(round(maxdims,digits=0))
 end
 
-#= usually in params: mag_off, layers, mdim, longrange_dist
+# usually in params: mag_off, layers, mdim, longrange_dist
 params_dict = make_args_dict(ARGS)
+limit = get(params_dict, "nn_strength", 1.0)
 layer_count = get(params_dict, "layers", 4)
 mag_off = get(params_dict, "mag_off", true)
 mdim = get(params_dict, "mdim", get_mdim(layer_count,(false,1)))
 longrange_dist = get(params_dict, "lr", 0)
+alpha = get(params_dict, "alpha", nothing)
 if layer_count % 2 == 0
 	edge_sites = Int(sqrt(2^layer_count))
 	num_particles = get(params_dict, "particles", Int(edge_sites/2))
@@ -328,11 +330,12 @@ ts = 0.001
 nu = 1/2
 tot_sites = 2^layer_count
 
-
-if !mag_off
-	alpha = num_particles/(mu * (tot_sites))
-else
-	alpha = 0.0
+if isnothing(alpha)
+	if !mag_off
+		alpha = num_particles/(mu * (tot_sites))
+	else
+		alpha = 0.0
+	end
 end
 nswps = 3
 #
@@ -341,13 +344,14 @@ plotting = false
 save_plot = false
 save_data = true
 
-loc = "local-figs"
+loc = pwd()#"local-figs"
 if_cliff = true
-sc_type = "flat"
-limit = 1.0
+sc_type = "exp"
 dists = [i for i in 1:2*edge_sites]
+lr_scaling = long_range_scaling(longrange_dist,edge_sites,1.0; cliff=if_cliff,limit=limit,scaling=sc_type)
 
-metadata_dict = Dict([("if_per",if_per),("mag_off",mag_off),("chemical",chemical),("mu",mu),("ts",ts),("nu",nu),("layers",layer_count),("particles",num_particles),("alpha",alpha),("mdim",mdim),("nswps",nswps),("if_cliff",if_cliff),("sc_type",sc_type),("longrange_dist",longrange_dist),("max_occ",max_occ),("sweep_type",sweep_type)])
+
+metadata_dict = Dict([("if_per",if_per),("mag_off",mag_off),("chemical",chemical),("mu",mu),("ts",ts),("nu",nu),("layers",layer_count),("particles",num_particles),("alpha",alpha),("mdim",mdim),("nswps",nswps),("if_cliff",if_cliff),("sc_type",sc_type),("longrange_dist",longrange_dist),("max_occ",max_occ),("sweep_type",sweep_type),("limit",limit),("lr_scaling",lr_scaling)])
 
 if length(keys(params_dict)) == 0
 	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
@@ -364,6 +368,7 @@ end
 #num_particles = Int(ceil(density * tot_sites))
 
 #
+println(datafile_name)
 title_string = "Np = $num_particles, LR = $longrange_dist"
 println("Starting Script using $num_particles particles on $tot_sites sites with $(!mag_off) Mag Field, Bond Dim = $mdim, and Long Range Dist = $longrange_dist")
 starting = time()
@@ -375,8 +380,8 @@ println("Running time = $total_time")
 	#rez = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string)
 	#rez2 = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string*" Phys",direction="phys")
 #
-rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;if_plot=plotting,plot_title=title_string, if_save_fig=save_plot, if_save_data=save_data, name="densdens-"*datafile_name,location=loc,metadata=metadata_dict)
-rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string,if_plot=plotting,if_save_fig=save_plot,if_save_data=save_data, name="occs-"*datafile_name,location=loc,metadata=metadata_dict)
+#rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;if_plot=plotting,plot_title=title_string, if_save_fig=save_plot, if_save_data=save_data, name="densdens-"*datafile_name,location=loc,metadata=metadata_dict)
+#rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string,if_plot=plotting,if_save_fig=save_plot,if_save_data=save_data, name="occs-"*datafile_name,location=loc,metadata=metadata_dict)
 	#
 	#rez2 = get_current_yfunc(dm_sp.ttn)
 	#rez3_fqh = get_ydir_greenfunc(dm_sp.ttn)
@@ -384,7 +389,7 @@ rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string,if_plot=plotting,if_save
 	#rez4 = get_xdir_greenfunc(dm_sp.ttn; plot_title=title_string)
 	#
 #end
-=#
+#
 
 
 

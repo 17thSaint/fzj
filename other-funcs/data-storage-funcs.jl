@@ -18,7 +18,7 @@ end
 
 function find_data_file(params_dict,calc_type,file_type="jld2")
 	og_loc = pwd()
-	cd("../cluster-data")
+	cd("/home/patrick/fzj/main-git/cluster-data")
 	
 	file_choices = readdir()
 	
@@ -47,6 +47,7 @@ function find_data_file(params_dict,calc_type,file_type="jld2")
 					params_dict[params] == current_file_metadata_dict[params] ? nothing : append!(remove_indices,i)
 				catch
 					println("Parameter $params could not be found in file $current_file, skipping")
+					append!(remove_indices,i)
 				end
 			end
 		end
@@ -61,9 +62,9 @@ function make_sure_file_type(file_name,desired_type)
 	split_name = split(file_name,".")
 	if length(split_name) < 2
 		file_name *= "." * desired_type
-	elseif split_name[2] != desired_type
-		println("Wrong File Type: changing $(split_name[2]) => $desired_type")
-		file_name = split_name[1] * "." * desired_type
+	elseif split_name[end] != desired_type
+		println("Wrong File Type: changing $(split_name[end]) => $desired_type")
+		file_name = join([split_name[1:end-1];[desired_type]],".")
 	end
 	return file_name
 end
