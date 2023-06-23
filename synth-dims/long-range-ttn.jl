@@ -301,6 +301,7 @@ function get_mdim(num_layers,shift=(false,0.5))
 	return Int(round(maxdims,digits=0))
 end
 
+# Dict([("layers",4),("mdim",22),("nn_strength",0.5),("mag_off",false),("alpha",0.25)])
 # usually in params: mag_off, layers, mdim, longrange_dist
 params_dict = make_args_dict(ARGS)
 limit = get(params_dict, "nn_strength", 1.0)
@@ -344,7 +345,7 @@ plotting = false
 save_plot = false
 save_data = true
 
-loc = pwd()#"local-figs"
+loc = "/local/geraghty/cluster-data"
 if_cliff = true
 sc_type = "exp"
 dists = [i for i in 1:2*edge_sites]
@@ -369,7 +370,7 @@ end
 
 #
 println(datafile_name)
-title_string = "Np = $num_particles, LR = $longrange_dist"
+title_string = "Np = $num_particles, LR = $longrange_dist at $limit"
 println("Starting Script using $num_particles particles on $tot_sites sites with $(!mag_off) Mag Field, Bond Dim = $mdim, and Long Range Dist = $longrange_dist")
 starting = time()
 net = build_HH_net(layer_count; syms=true)

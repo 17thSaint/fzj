@@ -60,17 +60,23 @@ end
 
 function make_sure_file_type(file_name,desired_type)
 	split_name = split(file_name,".")
-	if length(split_name) < 2
+	potential_type = split_name[end]
+	if potential_type in ["png","jld2","hdf5","txt"]
+		if potential_type != desired_type
+			println("Wrong File Type: changing $potential_type => $desired_type")
+			file_name = join(split_name[1:end-1],".") * ".$desired_type"
+		end
+	else
+		println("No File Type: adding $desired_type")
 		file_name *= "." * desired_type
-	elseif split_name[end] != desired_type
-		println("Wrong File Type: changing $(split_name[end]) => $desired_type")
-		file_name = join([split_name[1:end-1];[desired_type]],".")
 	end
 	return file_name
 end
 
 function check_duplicates(file_name)
-	file_string,file_type = split(file_name,".")
+	split_period_name = split(file_name,".")
+	file_type = split_period_name[end]
+	file_string = join(split_period_name[1:end-1],".")
 	rename = false
 	if file_name in readdir()
 		rename = true
