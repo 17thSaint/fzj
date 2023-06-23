@@ -28,7 +28,7 @@ function find_data_file(params_dict,calc_type,file_type="jld2")
 	end
 	deleteat!(file_choices,remove_indices)
 	remove_indices = []
-	
+
 	for i in 1:length(file_choices)
 		split(file_choices[i],"-")[1] != calc_type ? append!(remove_indices,[i]) : nothing
 	end
@@ -69,6 +69,21 @@ function make_sure_file_type(file_name,desired_type)
 	else
 		println("No File Type: adding $desired_type")
 		file_name *= "." * desired_type
+	end
+	return file_name
+end
+
+function check_plot_label(file_name,version)
+	split_name = split(file_name,"-")
+	potential_type = split_name[1]
+	if potential_type in ["densdens","occs","ttn","Y-dir-GF","X-dir-GF","Y-dir-current","X-dir-current"]
+		if potential_type != version
+			println("Wrong Plot Label: changing $potential_type => $version")
+			file_name = "$version-" * join(split_name[2:end],"-")
+		end
+	else
+		println("No File Type: adding $version")
+		file_name = "$version-" * file_name
 	end
 	return file_name
 end

@@ -23,6 +23,7 @@ function long_range_scaling(x_final,virt_edge_length,initial_strength; kwargs...
 		strengths = map(1:virt_edge_length) do x
 			initial_strength * exp(-log(1/final_minimum)*(x-1)/x_final)	
 		end
+		strengths[1] = initial_strength
 	elseif scaling_func == "power"
 		println("Not done power")
 	end
@@ -274,6 +275,7 @@ function plot_allAVG_densdenscorr(distances,avg_corrs,avg_errors; kwargs...)
 	if get(kwargs, :if_save_fig, false)
 		location = get(kwargs, :location, pwd())
 		filename = get(kwargs, :name, "densdens")
+		filename = check_plot_label(filename,"densdens")
 		save_figure(filename;kwargs...)
 	end
 	return
@@ -301,9 +303,29 @@ function get_mdim(num_layers,shift=(false,0.5))
 	return Int(round(maxdims,digits=0))
 end
 
-# Dict([("layers",4),("mdim",22),("nn_strength",0.5),("mag_off",false),("alpha",0.25)])
+function bulk_density(ttn)
+	occ_mat = get_occupancy(ttn;if_plot=false)
+	num_particles = sum(occ_mat)
+	bulk_occ_mat = occ_mat[2:end-1,2:end-1]
+	bulk_density = sum(bulk_occ_mat)/prod(size(bulk_occ_mat))
+	return bulk_density
+end
+
+function deriv_bulk_dens(ttn1,ttn2,alpha_change)
+	bulk_dens_1 = bulk_density(ttn1)
+	bulk_dens_2 = bulk_density(ttn2)
+	deriv = (bulk_dens_1 - bulk_dens_2)/alpha_change
+	return deriv
+end
+#=
+changes = [0.001*i for i in -5:5]
+bds = [0.0 for i in 1:length(changes)]
+all_ttns = []
+for i in 1:length(changes)
+change = changes[i]
+params_dict = Dict([("layers",6),("mdim",70),("nn_strength",0.0),("alpha",0.25+change),("mag_off",false),("lr",0)])
 # usually in params: mag_off, layers, mdim, longrange_dist
-params_dict = make_args_dict(ARGS)
+#params_dict = make_args_dict(ARGS)
 limit = get(params_dict, "nn_strength", 1.0)
 layer_count = get(params_dict, "layers", 4)
 mag_off = get(params_dict, "mag_off", true)
@@ -343,15 +365,15 @@ nswps = 3
 
 plotting = false
 save_plot = false
-save_data = true
+save_data = false
 
 loc = "/local/geraghty/cluster-data"
 if_cliff = true
 sc_type = "exp"
 dists = [i for i in 1:2*edge_sites]
-lr_scaling = long_range_scaling(longrange_dist,edge_sites,1.0; cliff=if_cliff,limit=limit,scaling=sc_type)
+lr_scaling = long_range_scaling(longrange_dist,edge_sites,1.0; cliff=if_cliff,limit=limit,scaling=sc_type,if_plot=false)
 
-
+#
 metadata_dict = Dict([("if_per",if_per),("mag_off",mag_off),("chemical",chemical),("mu",mu),("ts",ts),("nu",nu),("layers",layer_count),("particles",num_particles),("alpha",alpha),("mdim",mdim),("nswps",nswps),("if_cliff",if_cliff),("sc_type",sc_type),("longrange_dist",longrange_dist),("max_occ",max_occ),("sweep_type",sweep_type),("limit",limit),("lr_scaling",lr_scaling)])
 
 if length(keys(params_dict)) == 0
@@ -378,6 +400,9 @@ ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=l
 og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layer_count,num_particles,ts,nu; ttn_net=net,ham_op=ham,if_save_data=save_data,name="ttn-"*datafile_name,location=loc,metadata=metadata_dict,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=max_occ,if_sweep=evolve,sweep_type=sweep_type,expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
 total_time = time() - starting
 println("Running time = $total_time")
+append!(all_ttns,[dm_sp.ttn])
+bd = bulk_density(dm_sp.ttn)
+bds[i] = bd
 	#rez = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string)
 	#rez2 = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string*" Phys",direction="phys")
 #
@@ -389,11 +414,15 @@ println("Running time = $total_time")
 	#rez3_sf = get_ydir_greenfunc(dm_sp.ttn; plot_title=title_string)
 	#rez4 = get_xdir_greenfunc(dm_sp.ttn; plot_title=title_string)
 	#
-#end
-#
+end
+=#
 
-
-
+central_ttn = all_ttns[6]
+pos_derivs = [deriv_bulk_dens(central_ttn,all_ttns[6+i],changes[6+i]) for i in 1:5]
+neg_derivs = reverse([deriv_bulk_dens(central_ttn,all_ttns[i],changes[i]) for i in 1:5])
+plot(changes[7:end],pos_derivs,label="pos")
+plot(changes[7:end],neg_derivs,label="neg")
+legend()
 
 
 

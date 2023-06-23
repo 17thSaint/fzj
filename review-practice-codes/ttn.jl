@@ -131,6 +131,7 @@ function plot_greenfunc(all_vals,all_greens,virt_edge_length,direction; kwargs..
 	
 	if get(kwargs, :if_save_fig, false)
 		filename = get(kwargs, :name, "$direction-dir-GF")
+		filename = check_plot_label(filename,"$direction-dir-GF")
 		save_figure(filename; kwargs...)
 	end
 	return
@@ -248,6 +249,7 @@ function plot_current(all_vals,all_currents,edge_length,direction; kwargs...)
 	
 	if get(kwargs, :if_save_fig, false)
 		filename = get(kwargs, :name, "$direction-dir-current")
+		filename = check_plot_label(filename,"$direction-dir-current")
 		save_figure(filename; kwargs...)
 	end
 	
@@ -1026,9 +1028,25 @@ function plot_occupancy(exp_occ; kwargs...)
 	if get(kwargs, :if_save_fig, false)
 		location = get(kwargs, :location, pwd())
 		fig_name = get(kwargs, :name, "occs")
+		fig_name = check_plot_label(fig_name,"occs")
 		save_figure(fig_name; kwargs...)
 	end
 	return
+end
+
+function expected_position(ttn)
+	occ_mat = get_occupancy(ttn;if_plot=false)
+	num_particles = sum(occ_mat)
+	lat = TTNKit.physical_lattice(TTNKit.network(ttn))
+	phys_edge,virt_edge = get_lattice_dims(ttn)
+	site_number_mat = zeros(virt_edge,phys_edge)
+	for i in 1:virt_edge
+		for j in 1:phys_edge
+			site_number_mat[i,j] = TTNKit.linear_ind(lat,(i,j))
+		end
+	end
+	expected_site_number = sum(site_number_mat .* (occ_mat./num_particles))
+	return expected_site_number
 end
 
 function get_avg_occupancy(avg_count,edge_length,particle_count,u_strength,t_strength,filling; kwargs...)
