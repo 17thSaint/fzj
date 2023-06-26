@@ -39,7 +39,7 @@ layers = 6
 mdim = 150
 lr = 1
 #
-if true
+if false
 params_magOFF = Dict([("lr",lr),("layers",layers),("mdim",mdim),("mag_off",true)])
 all_ttns_magOFF,all_files_magOFF = get_ttns(params_magOFF)
 lr0params_magOFF = Dict([("lr",0),("layers",layers),("mdim",mdim),("mag_off",true),("nn_strength",0.0)])
@@ -47,7 +47,7 @@ lr0_ttn_magOFF = get_ttns(lr0params_magOFF)
 append!(all_ttns_magOFF,[lr0_ttn_magOFF[1][1]])
 append!(all_files_magOFF,[lr0_ttn_magOFF[2][1]])
 end
-if true
+if false
 params_magON = Dict([("lr",lr),("layers",layers),("mdim",mdim),("mag_off",false)])
 all_ttns_magON,all_files_magON = get_ttns(params_magON)
 lr0params_magON = Dict([("lr",0),("layers",layers),("mdim",mdim),("mag_off",false),("nn_strength",0.0)])
@@ -73,31 +73,34 @@ for i in 1:length(all_ttns_magOFF)
 end
 scatter(strengths_off,dist1_corrs_off,label="Mag OFF")
 end
+=#
 
-
-dist1_corrs_on = []
-strengths_on = []
-if true
-for i in 1:length(all_ttns_magON)
-	println(i)
-	ttn = all_ttns_magON[i]["ttn"]
-	filename = all_files_magON[i]
-	stren = get_params_dict_from_filename(filename)["nn_strength"]
-	title_string = "NN Str = $(stren), Mdim=$mdim, Mag ON, Np=4"
-	append!(strengths_on,[stren])
-	rez = get_allAVG_densdenscorr(ttn,[i for i in 1:2*Int(sqrt(2^layers))]; plot_title=title_string,if_save_fig=false,if_plot=false,location=pwd(),name=filename)
-	append!(dist1_corrs_on,[rez[1][1]])
-	#get_occupancy(ttn; plot_title=title_string,if_save_fig=false,location=pwd(),name=filename)
-end
-scatter(strengths_on,dist1_corrs_on,label="Mag On")
-
-legend()
-xlabel("NN Strength")
-ylabel("NN Correlation")
-yscale("log")
-end
 
 #
+bds_on = zeros(3,length(all_ttns_magOFF))
+strengths_on = []
+if true
+for j in [1,2,3]
+for i in 1:length(all_ttns_magOFF)
+	println(i)
+	ttn = all_ttns_magOFF[i]["ttn"]
+	filename = all_files_magOFF[i]
+	if j == 1
+		stren = get_params_dict_from_filename(filename)["nn_strength"]
+		#title_string = "NN Str = $(stren), Mdim=$mdim, Mag ON, Np=4"
+		append!(strengths_on,[stren])
+	end
+	bds_on[j,i] = bulk_density(ttn,j)
+end
+scatter(strengths_on,bds_on[j,:],label="Width=$j")
+legend()
+end
+xlabel("NN Strength")
+ylabel("Bulk Density")
+title("Bulk Density range Bulk Size, Mag OFF, Ns=64")
+end
+
+#=
 on_poses = []
 for i in 1:length(all_ttns_magON)
 	ttn = all_ttns_magON[i]["ttn"]
