@@ -303,35 +303,43 @@ function get_mdim(num_layers,shift=(false,0.5))
 	return Int(round(maxdims,digits=0))
 end
 
-function bulk_density(ttn)
+function bulk_density(ttn,bulk_width=1)
 	occ_mat = get_occupancy(ttn;if_plot=false)
 	num_particles = sum(occ_mat)
-	bulk_occ_mat = occ_mat[2:end-1,2:end-1]
+	bulk_occ_mat = occ_mat[1+bulk_width:end-bulk_width,1+bulk_width:end-bulk_width]
 	bulk_density = sum(bulk_occ_mat)/prod(size(bulk_occ_mat))
 	return bulk_density
 end
 
-function deriv_bulk_dens(ttn1,ttn2,alpha_change)
-	bulk_dens_1 = bulk_density(ttn1)
-	bulk_dens_2 = bulk_density(ttn2)
+function deriv_bulk_dens(ttn1,ttn2,alpha_change,bulk_width=1)
+	bulk_dens_1 = bulk_density(ttn1,bulk_width)
+	bulk_dens_2 = bulk_density(ttn2,bulk_width)
 	deriv = (bulk_dens_1 - bulk_dens_2)/alpha_change
 	return deriv
 end
-#
-changes = [0.0001*i for i in -5:5]
-bds = [0.0 for i in 1:length(changes)]
-all_ttns = []
-for i in 1:length(changes)
-change = changes[i]
-params_dict = Dict([("layers",5),("mdim",70),("nn_strength",0.0),("alpha",0.1+change),("mag_off",false),("lr",0)])
+#=
+
+#params_dict = Dict([("layers",5),("mdim",70),("nn_strength",0.0),("alpha",0.1),("mag_off",false),("lr",0)])
 # usually in params: mag_off, layers, mdim, longrange_dist
-#params_dict = make_args_dict(ARGS)
+params_dict = make_args_dict(ARGS)
+if_change = get(params_dict, "if_change", false)
+change = get(params_dict, "change", 0.0001)
 limit = get(params_dict, "nn_strength", 1.0)
 layer_count = get(params_dict, "layers", 4)
 mag_off = get(params_dict, "mag_off", true)
 mdim = get(params_dict, "mdim", get_mdim(layer_count,(false,1)))
 longrange_dist = get(params_dict, "lr", 0)
-alpha = get(params_dict, "alpha", nothing)
+if if_change in ["pos","neg"]
+	if if_change == "pos"
+		alpha = get(params_dict, "alpha", nothing) + change
+		params_dict["alpha"] = round(alpha,digits=4)
+	elseif if_change == "neg"
+		alpha = get(params_dict, "alpha", nothing) - change
+		params_dict["alpha"] = round(alpha,digits=4)
+	end
+else
+	alpha = get(params_dict, "alpha", nothing)
+end
 if layer_count % 2 == 0
 	edge_sites = Int(sqrt(2^layer_count))
 	num_particles = get(params_dict, "particles", Int(edge_sites/2))
@@ -365,7 +373,7 @@ nswps = 3
 
 plotting = false
 save_plot = false
-save_data = false
+save_data = true
 
 loc = "/local/geraghty/cluster-data"
 if_cliff = true
@@ -374,21 +382,13 @@ dists = [i for i in 1:2*edge_sites]
 lr_scaling = long_range_scaling(longrange_dist,edge_sites,1.0; cliff=if_cliff,limit=limit,scaling=sc_type,if_plot=false)
 
 #
-metadata_dict = Dict([("if_per",if_per),("mag_off",mag_off),("chemical",chemical),("mu",mu),("ts",ts),("nu",nu),("layers",layer_count),("particles",num_particles),("alpha",alpha),("mdim",mdim),("nswps",nswps),("if_cliff",if_cliff),("sc_type",sc_type),("longrange_dist",longrange_dist),("max_occ",max_occ),("sweep_type",sweep_type),("limit",limit),("lr_scaling",lr_scaling)])
+metadata_dict = Dict([("if_per",if_per),("mag_off",mag_off),("chemical",chemical),("mu",mu),("ts",ts),("nu",nu),("layers",layer_count),("particles",num_particles),("alpha",alpha),("mdim",mdim),("nswps",nswps),("if_cliff",if_cliff),("sc_type",sc_type),("longrange_dist",longrange_dist),("max_occ",max_occ),("sweep_type",sweep_type),("limit",limit),("lr_scaling",lr_scaling),("if_change",if_change),("change",change)])
 
 if length(keys(params_dict)) == 0
 	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
 else
 	datafile_name = make_parameters_filename(params_dict)
 end
-#title_string = "LR $sc_type = $longrange_dist, md = $mdim"
-#all_ttns = []
-#init = 0.2
-#fin = 0.8
-#count = 6
-#for density in [init + (i-1)*(fin - init)/(count-1) for i in 1:count]
-#density = 0.3
-#num_particles = Int(ceil(density * tot_sites))
 
 #
 println(datafile_name)
@@ -400,29 +400,8 @@ ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=l
 og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layer_count,num_particles,ts,nu; ttn_net=net,ham_op=ham,if_save_data=save_data,name="ttn-"*datafile_name,location=loc,metadata=metadata_dict,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=max_occ,if_sweep=evolve,sweep_type=sweep_type,expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
 total_time = time() - starting
 println("Running time = $total_time")
-append!(all_ttns,[dm_sp.ttn])
-bd = bulk_density(dm_sp.ttn)
-bds[i] = bd
-	#rez = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string)
-	#rez2 = get_densdens_corrs(dm_sp.ttn,dists;plot_title=title_string*" Phys",direction="phys")
-#
-#rez3 = get_allAVG_densdenscorr(dm_sp.ttn,dists;if_plot=plotting,plot_title=title_string, if_save_fig=save_plot, if_save_data=save_data, name="densdens-"*datafile_name,location=loc,metadata=metadata_dict)
-#rez1 = get_occupancy(dm_sp.ttn; plot_title=title_string,if_plot=plotting,if_save_fig=save_plot,if_save_data=save_data, name="occs-"*datafile_name,location=loc,metadata=metadata_dict)
-	#
-	#rez2 = get_current_yfunc(dm_sp.ttn)
-	#rez3_fqh = get_ydir_greenfunc(dm_sp.ttn)
-	#rez3_sf = get_ydir_greenfunc(dm_sp.ttn; plot_title=title_string)
-	#rez4 = get_xdir_greenfunc(dm_sp.ttn; plot_title=title_string)
-	#
-end
-#
+=#
 
-central_ttn = all_ttns[6]
-pos_derivs = [deriv_bulk_dens(central_ttn,all_ttns[6+i],changes[6+i]) for i in 1:5]
-neg_derivs = reverse([deriv_bulk_dens(central_ttn,all_ttns[i],changes[i]) for i in 1:5])
-plot(changes[7:end],pos_derivs,label="pos")
-plot(changes[7:end],neg_derivs,label="neg")
-legend()
 
 
 

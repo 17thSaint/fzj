@@ -18,7 +18,7 @@ done
 
 JOBNAME=${JOBNAME%-}
 
-OUTPUTFILENAME="../cluster-data/output-$JOBNAME.txt"
+OUTPUTFILENAME="/local/geraghty/cluster-data/output-$JOBNAME.txt"
 
 # written by ChatGPT 15.06.2023
 extension="${OUTPUTFILENAME##*.}"

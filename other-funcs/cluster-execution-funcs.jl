@@ -35,8 +35,12 @@ end
 function make_parameters_filename(param_dict)
 	param_filename = ""
 	for key in keys(param_dict)
-		value = string(param_dict[key])
-		param_filename *= "$key-$value-"
+		if key == "change" || key == "if_change"
+			continue
+		else
+			value = string(param_dict[key])
+			param_filename *= "$key-$value-"
+		end
 	end
 	param_filename = chop(param_filename,tail=1)
 	return param_filename

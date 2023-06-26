@@ -38,7 +38,7 @@ end
 layers = 6
 mdim = 150
 lr = 1
-
+#
 if true
 params_magOFF = Dict([("lr",lr),("layers",layers),("mdim",mdim),("mag_off",true)])
 all_ttns_magOFF,all_files_magOFF = get_ttns(params_magOFF)
@@ -56,6 +56,7 @@ append!(all_ttns_magON,[lr0_ttn_magON[1][1]])
 append!(all_files_magON,[lr0_ttn_magON[2][1]])
 end
 
+#=
 dist1_corrs_off = []
 strengths_off = []
 if true
@@ -96,7 +97,7 @@ ylabel("NN Correlation")
 yscale("log")
 end
 
-#=
+#
 on_poses = []
 for i in 1:length(all_ttns_magON)
 	ttn = all_ttns_magON[i]["ttn"]
