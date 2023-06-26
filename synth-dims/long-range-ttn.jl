@@ -317,13 +317,13 @@ function deriv_bulk_dens(ttn1,ttn2,alpha_change)
 	deriv = (bulk_dens_1 - bulk_dens_2)/alpha_change
 	return deriv
 end
-#=
-changes = [0.001*i for i in -5:5]
+#
+changes = [0.0001*i for i in -5:5]
 bds = [0.0 for i in 1:length(changes)]
 all_ttns = []
 for i in 1:length(changes)
 change = changes[i]
-params_dict = Dict([("layers",6),("mdim",70),("nn_strength",0.0),("alpha",0.25+change),("mag_off",false),("lr",0)])
+params_dict = Dict([("layers",5),("mdim",70),("nn_strength",0.0),("alpha",0.1+change),("mag_off",false),("lr",0)])
 # usually in params: mag_off, layers, mdim, longrange_dist
 #params_dict = make_args_dict(ARGS)
 limit = get(params_dict, "nn_strength", 1.0)
@@ -415,7 +415,7 @@ bds[i] = bd
 	#rez4 = get_xdir_greenfunc(dm_sp.ttn; plot_title=title_string)
 	#
 end
-=#
+#
 
 central_ttn = all_ttns[6]
 pos_derivs = [deriv_bulk_dens(central_ttn,all_ttns[6+i],changes[6+i]) for i in 1:5]
