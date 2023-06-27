@@ -344,7 +344,7 @@ function deriv_bulk_dens(ttn1,ttn2,alpha_change,bulk_width=1)
 	deriv = (bulk_dens_1 - bulk_dens_2)/alpha_change
 	return deriv
 end
-#
+#=
 
 #params_dict = Dict([("layers",5),("mdim",70),("nn_strength",0.0),("alpha",0.1),("mag_off",false),("lr",0)])
 # usually in params: mag_off, layers, mdim, longrange_dist
@@ -427,7 +427,7 @@ ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=l
 og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layer_count,num_particles,ts,nu; ttn_net=net,ham_op=ham,if_save_data=save_data,name="ttn-"*datafile_name,location=loc,metadata=metadata_dict,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=max_occ,if_sweep=evolve,sweep_type=sweep_type,expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
 total_time = time() - starting
 println("Running time = $total_time")
-#
+=#
 
 
 

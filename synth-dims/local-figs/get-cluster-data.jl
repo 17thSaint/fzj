@@ -4,13 +4,18 @@ using PyPlot
 
 function get_ttns(params_desired)
 	data_files = find_data_file(params_desired,"ttn")
-	data_dicts = [Dict() for i in 1:length(data_files)]
-	for i in 1:length(data_files)
-		filename = data_files[i]
-		data_dict = read_data_jld2(filename,"/home/patrick/fzj/main-git/cluster-data")[1]
-		data_dicts[i] = data_dict
+	if length(data_files) == 0
+		println("No Matching Files Found")
+		return nothing,nothing
+	else
+		data_dicts = [Dict() for i in 1:length(data_files)]
+		for i in 1:length(data_files)
+			filename = data_files[i]
+			data_dict = read_data_jld2(filename,"/home/patrick/fzj/main-git/cluster-data")[1]
+			data_dicts[i] = data_dict
+		end
+		return data_dicts,data_files
 	end
-	return data_dicts,data_files
 end
 
 function plot_data(version,params_desired; kwargs...)
@@ -34,26 +39,26 @@ function plot_data(version,params_desired; kwargs...)
 	return data_dicts,data_files
 end
 
-
+#=
 layers = 6
 mdim = 150
-lr = 0
+lr = 1
 #
-if false
-params = Dict([("lr",lr),("layers",layers),("mdim",mdim),("mag_off",false)])
+if true
+params = Dict([("lr",lr),("layers",layers),("mdim",mdim),("mag_off",false),("change",0.0001)])
 all_ttns,all_files = get_ttns(params)
 end
 
 
 #
-if true
+if false
 sizehere = Int(length(all_ttns)/3)
-bds = zeros(3,sizehere)
-avgs = zeros(3,sizehere)
-errs = zeros(3,sizehere)
-alphas = []#zeros(1,Int(length(all_ttns)/3))
+#bds = zeros(3,sizehere)
+#avgs = zeros(3,sizehere)
+#errs = zeros(3,sizehere)
+#alphas = []#zeros(1,Int(length(all_ttns)/3))
 for j in [1,2,3]
-for i in 1:sizehere
+#=for i in 1:sizehere
 	println(i)
 	#
 	ttn_neg = all_ttns[3*(i-1)+1]["ttn"]
@@ -92,12 +97,12 @@ end
 avg = [mean(bds[:,k]) for k in 1:sizehere]
 avgs[j,:] = avg
 errors = [std(bds[:,k]) for k in 1:sizehere]
-errs[j,:] = errors
-errorbar(alphas,avg,yerr=[errors,errors],label="AVG $j")
-end
+errs[j,:] = errors=#
+errorbar(alphas,avgs[j,:],yerr=[errs[j,:],errs[j,:]],marker="o",label="AVG $j")
 end
 legend()
-
+end
+=#
 
 
 

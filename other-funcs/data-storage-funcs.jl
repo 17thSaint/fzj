@@ -43,10 +43,10 @@ function find_data_file(params_dict,calc_type,file_type="jld2")
 				params_dict[params] == current_file_params_dict[params] ? nothing : append!(remove_indices,i)
 			catch
 				try
-					current_file_metadata_dict = read_data_jld2(current_file)[2]
+					current_file_metadata_dict = read_data_jld2(current_file,; output_bool=false)[2]
 					params_dict[params] == current_file_metadata_dict[params] ? nothing : append!(remove_indices,i)
 				catch
-					println("Parameter $params could not be found in file $current_file, skipping")
+					#println("Parameter $params could not be found in file $current_file, skipping")
 					append!(remove_indices,i)
 				end
 			end
@@ -163,6 +163,7 @@ function write_data_jld2(file_name,data,location=pwd(),metadata=nothing; kwargs.
 end
 
 function read_data_jld2(file_name,location=pwd(); kwargs...)
+	output_bool = get(kwargs, :output_bool, true)
 	og_location = pwd()
 	try
 		cd(location)
@@ -194,7 +195,9 @@ function read_data_jld2(file_name,location=pwd(); kwargs...)
 	
 	close(binary_file)
 	cd(og_location)
-	println("Data Extracted, File Closed: $file_name")
+	if output_bool
+		println("Data Extracted, File Closed: $file_name")
+	end
 	
 	if length(output) < 2
 		return data
