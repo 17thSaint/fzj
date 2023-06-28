@@ -35,7 +35,7 @@ end
 function make_parameters_filename(param_dict)
 	param_filename = ""
 	for key in keys(param_dict)
-		if key == "change" || key == "if_change"
+		if key in ["change", "if_change", "open_cores"]
 			continue
 		else
 			value = string(param_dict[key])

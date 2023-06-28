@@ -345,11 +345,16 @@ function deriv_bulk_dens(ttn1,ttn2,alpha_change,bulk_width=1)
 	deriv = (bulk_dens_1 - bulk_dens_2)/alpha_change
 	return deriv
 end
-#
+#=
 
-#params_dict = Dict([("layers",6),("mdim",70),("nn_strength",0.01),("alpha",0.1),("mag_off",false),("lr",4)])
+#params_dict = Dict([("open_cores","all"),("if_gpu",false),("layers",3),("mdim",70),("nn_strength",0.01),("alpha",0.1),("mag_off",false),("lr",0)])
 # usually in params: mag_off, layers, mdim, longrange_dist
 params_dict = make_args_dict(ARGS)
+open_cores = get(params_dict, "open_cores", "all")
+if typeof(open_cores) != String
+	BLAS.set_num_threads(open_cores)	
+end
+if_gpu = get(params_dict, "if_gpu", false)
 if_change = get(params_dict, "if_change", false)
 change = get(params_dict, "change", 0.0001)
 limit = get(params_dict, "nn_strength", 1.0)
@@ -408,7 +413,6 @@ if_cliff = true
 sc_type = "lr_flat"
 dists = [i for i in 1:2*edge_sites]
 lr_scaling = long_range_scaling(longrange_dist,edge_sites,1.0; cliff=if_cliff,limit=limit,scaling=sc_type,if_plot=false)
-display(lr_scaling)
 
 #
 metadata_dict = Dict([("if_per",if_per),("mag_off",mag_off),("chemical",chemical),("mu",mu),("ts",ts),("nu",nu),("layers",layer_count),("particles",num_particles),("alpha",alpha),("mdim",mdim),("nswps",nswps),("if_cliff",if_cliff),("sc_type",sc_type),("longrange_dist",longrange_dist),("max_occ",max_occ),("sweep_type",sweep_type),("limit",limit),("lr_scaling",lr_scaling),("if_change",if_change),("change",change)])
@@ -426,12 +430,13 @@ println("Starting Script using $num_particles particles on $tot_sites sites with
 starting = time()
 net = build_HH_net(layer_count; syms=true)
 ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
-og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layer_count,num_particles,ts,nu; ttn_net=net,ham_op=ham,if_save_data=save_data,name="ttn-"*datafile_name,location=loc,metadata=metadata_dict,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=max_occ,if_sweep=evolve,sweep_type=sweep_type,expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
+og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layer_count,num_particles,ts,nu; ttn_net=net,ham_op=ham,if_save_data=save_data,name="ttn-"*datafile_name,location=loc,metadata=metadata_dict,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=max_occ,if_sweep=evolve,sweep_type=sweep_type,expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,if_gpu=if_gpu,output_level=0)
 total_time = time() - starting
 println("Running time = $total_time")
 #
 
-
+#occs1 = get_occupancy(dm_sp.ttn; if_plot=false,if_save_fig=false,if_save_data=false)
+=#
 
 
 

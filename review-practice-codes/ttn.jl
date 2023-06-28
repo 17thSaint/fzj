@@ -699,6 +699,7 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	phi = get(kwargs, :phi, particle_count/(filling * (num_sites)))
 	ham_operator = get(kwargs, :ham_op, nothing)
 	net = get(kwargs, :ttn_net, nothing)
+	if_gpu = get(kwargs, :if_gpu, false)
 
 	if isnothing(net)
 		net = TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, "Boson";conserve_qns=conserve_qns,dim=max_occ+1)
@@ -714,7 +715,10 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	#ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
 	
 	ttn = initialize_ttn(old_ttn,max_dim,particle_count)
-	
+	if if_gpu
+		println("Doing GPU TTN")
+		ttn = TTNKit.gpu(ttn)
+	end
 	println("Added States")
 	
 	if isnothing(ham_operator)
@@ -722,6 +726,10 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	end
 	
 	ham = TTNKit.TPO(ham_operator,lat)
+	if if_gpu
+		println("Doing GPU Ham TPO")
+		ham = TTNKit.gpu(ham,ttn)
+	end
 	println("Built Hamiltonian")
 	sp = 0
 	times = []

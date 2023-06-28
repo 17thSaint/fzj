@@ -42,16 +42,16 @@ end
 #
 layers = 6
 mdim = 150
-lr = 1
-nnstren = 0.9
+lr = 2
+nnstren = 0.01
 #
 
 if false
 params = Dict([("lr",lr),("layers",layers),("mdim",mdim),("mag_off",false),("change",0.0001),("nn_strength",nnstren)])
 all_ttns,all_files = get_ttns(params)
 end
-
-if false
+#
+if true
 	filename = "derivbulkdens-" * make_parameters_filename(params)
 	println(filename)
 	metadata_dict = Dict([("all_files",all_files)])
@@ -116,12 +116,11 @@ legend()
 end
 #
 
-if false
+if true
 	data_dict = Dict([("avgs",avgs),("errs",errs),("alphas",alphas)])
 	write_data_jld2(filename,data_dict,pwd(),metadata_dict)
 end
-
-
+#
 
 
 

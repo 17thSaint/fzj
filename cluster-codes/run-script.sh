@@ -4,7 +4,7 @@ SCRIPTNAME="$1"
 
 declare -A dictionary
 
-for ((i=2; i<=$#; i+=2)); do
+for ((i=4; i<=$#; i+=2)); do
     key="${!i}"
     eval "value=\${$((i+1))}"
     dictionary["$key"]="$value"
