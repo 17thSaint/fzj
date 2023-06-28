@@ -40,11 +40,11 @@ function find_data_file(params_dict,calc_type,file_type="jld2")
 		current_file_params_dict = get_params_dict_from_filename(current_file)
 		for params in keys(params_dict)
 			try
-				params_dict[params] == current_file_params_dict[params] ? nothing : append!(remove_indices,i)
+				params_dict[params] in current_file_params_dict[params] ? nothing : append!(remove_indices,i)
 			catch
 				try
 					current_file_metadata_dict = read_data_jld2(current_file,; output_bool=false)[2]
-					params_dict[params] == current_file_metadata_dict[params] ? nothing : append!(remove_indices,i)
+					params_dict[params] in current_file_metadata_dict[params] ? nothing : append!(remove_indices,i)
 				catch
 					#println("Parameter $params could not be found in file $current_file, skipping")
 					append!(remove_indices,i)

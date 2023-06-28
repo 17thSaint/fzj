@@ -39,19 +39,26 @@ function plot_data(version,params_desired; kwargs...)
 	return data_dicts,data_files
 end
 
-#=
+#
 layers = 6
 mdim = 150
 lr = 1
+nnstren = 0.9
 #
-if true
-params = Dict([("lr",lr),("layers",layers),("mdim",mdim),("mag_off",false),("change",0.0001)])
+
+if false
+params = Dict([("lr",lr),("layers",layers),("mdim",mdim),("mag_off",false),("change",0.0001),("nn_strength",nnstren)])
 all_ttns,all_files = get_ttns(params)
 end
 
+if false
+	filename = "derivbulkdens-" * make_parameters_filename(params)
+	println(filename)
+	metadata_dict = Dict([("all_files",all_files)])
+end
 
 #
-if false
+if true
 sizehere = Int(length(all_ttns)/3)
 #bds = zeros(3,sizehere)
 #avgs = zeros(3,sizehere)
@@ -98,12 +105,21 @@ avg = [mean(bds[:,k]) for k in 1:sizehere]
 avgs[j,:] = avg
 errors = [std(bds[:,k]) for k in 1:sizehere]
 errs[j,:] = errors=#
-errorbar(alphas,avgs[j,:],yerr=[errs[j,:],errs[j,:]],marker="o",label="AVG $j")
+#errorbar(alphas,avgs[j,:],yerr=[errs[j,:],errs[j,:]],marker="o",label="AVG $j")
+plot(alphas,avgs[j,:],"-p",label="AVG $j")
 end
+plot(alphas,[0.5 for pp in 1:length(alphas)],label="1/2")
+plot(alphas,[2/3 for pp in 1:length(alphas)],label="2/3")
+xlabel("Bulk Density, Alpha")
+title("Derivative Bulk Density wrt Flux Density = Hall Conductance, LR=1 NN=$nnstren")
 legend()
 end
-=#
+#
 
+if false
+	data_dict = Dict([("avgs",avgs),("errs",errs),("alphas",alphas)])
+	write_data_jld2(filename,data_dict,pwd(),metadata_dict)
+end
 
 
 
