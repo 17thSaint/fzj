@@ -40,32 +40,36 @@ function plot_data(version,params_desired; kwargs...)
 end
 
 #
-layers = 6
-mdim = 150
-lr = 2
-nnstren = 0.01
+layers = 8
+mdim = 250
+lr = 0
+central_alpha = 0.18
+change = 0.0001
+alpha_vals = [central_alpha - change, central_alpha, round(central_alpha + change,digits=4)]
+#nnstren = 0.01
 #
 
 if false
-params = Dict([("lr",lr),("layers",layers),("mdim",mdim),("mag_off",false),("change",0.0001),("nn_strength",nnstren)])
+params = Dict([("lr",lr),("layers",layers),("mag_off",false),("alpha",alpha_vals)])
 all_ttns,all_files = get_ttns(params)
 end
 #
-if true
-	filename = "derivbulkdens-" * make_parameters_filename(params)
+params_naming = Dict([("lr",lr),("layers",layers),("mag_off",false),("alpha",central_alpha)])
+if false
+	filename = "derivbulkdens-" * make_parameters_filename(params_naming)
 	println(filename)
 	metadata_dict = Dict([("all_files",all_files)])
 end
 
 #
-if true
+if false
 sizehere = Int(length(all_ttns)/3)
-#bds = zeros(3,sizehere)
-#avgs = zeros(3,sizehere)
-#errs = zeros(3,sizehere)
-#alphas = []#zeros(1,Int(length(all_ttns)/3))
+bds = zeros(3,sizehere)
+avgs = zeros(3,sizehere)
+errs = zeros(3,sizehere)
+alphas = []#zeros(1,Int(length(all_ttns)/3))
 for j in [1,2,3]
-#=for i in 1:sizehere
+for i in 1:sizehere
 	println(i)
 	#
 	ttn_neg = all_ttns[3*(i-1)+1]["ttn"]
@@ -77,9 +81,7 @@ for j in [1,2,3]
 	ttn_mid = all_ttns[3*(i-1)+2]["ttn"]
 	filename_mid = all_files[3*(i-1)+2]
 	alpha_mid = get_params_dict_from_filename(filename_mid)["alpha"]
-	if j == 1
-		append!(alphas,[alpha_mid])
-	end
+	
 	#append!(bds,[bulk_density(ttn_mid,3)])
 	#rads,vals = radial_box_dist(ttn_mid)
 	#plot(rads,vals,"-p",label="$alpha_mid")
@@ -91,6 +93,13 @@ for j in [1,2,3]
 	#append!(alphas,[alpha_pos])
 	#append!(bds,[bulk_density(ttn_pos,3)])
 	#
+	if j == 1
+		get_occupancy(ttn_neg; if_plot=true,plot_title="Alpha=$alpha_neg, LR=$lr, MagON",if_save_fig=true,name=filename_neg)
+		get_occupancy(ttn_pos; if_plot=true,plot_title="Alpha=$alpha_pos, LR=$lr, MagON",if_save_fig=true,name=filename_pos)
+		get_occupancy(ttn_mid; if_plot=true,plot_title="Alpha=$alpha_mid, LR=$lr, MagON",if_save_fig=true,name=filename_mid)
+		append!(alphas,[alpha_mid])
+	end
+	
 	deriv12 = deriv_bulk_dens(ttn_mid,ttn_neg,alpha_mid-alpha_neg,j)
 	deriv13 = deriv_bulk_dens(ttn_pos,ttn_neg,alpha_pos-alpha_neg,j)
 	deriv23 = deriv_bulk_dens(ttn_pos,ttn_mid,alpha_pos-alpha_mid,j)
@@ -104,15 +113,16 @@ end
 avg = [mean(bds[:,k]) for k in 1:sizehere]
 avgs[j,:] = avg
 errors = [std(bds[:,k]) for k in 1:sizehere]
-errs[j,:] = errors=#
+errs[j,:] = errors
+println("Value = $avg with error = $errors for Edge Width = $j")
 #errorbar(alphas,avgs[j,:],yerr=[errs[j,:],errs[j,:]],marker="o",label="AVG $j")
-plot(alphas,avgs[j,:],"-p",label="AVG $j")
+#plot(alphas,avgs[j,:],"-p",label="AVG $j")
 end
-plot(alphas,[0.5 for pp in 1:length(alphas)],label="1/2")
-plot(alphas,[2/3 for pp in 1:length(alphas)],label="2/3")
-xlabel("Bulk Density, Alpha")
-title("Derivative Bulk Density wrt Flux Density = Hall Conductance, LR=1 NN=$nnstren")
-legend()
+#plot(alphas,[0.5 for pp in 1:length(alphas)],label="1/2")
+#plot(alphas,[2/3 for pp in 1:length(alphas)],label="2/3")
+#xlabel("Bulk Density, Alpha")
+#title("Derivative Bulk Density wrt Flux Density = Hall Conductance")
+#legend()
 end
 #
 

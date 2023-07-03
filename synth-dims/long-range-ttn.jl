@@ -133,6 +133,11 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 			s2_coord = TTNKit.coordinate(lat,s2)
 						
 			coeff = get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
+			
+			if s1_coord[1] == s2_coord[1]
+				coeff *= 500
+			end
+			
 			hopping += (coeff,"Adag",s1_coord,"A",s2_coord)
 			hopping += (conj(coeff),"Adag",s2_coord,"A",s1_coord)
 		end
@@ -331,25 +336,36 @@ function radial_box_dist(ttn)
 	return full_rads,combined_vals
 end
 
-function bulk_density(ttn,bulk_width=1)
-	occ_mat = get_occupancy(ttn;if_plot=false)
+function bulk_density(ttn,bulk_width=1; kwargs...)
+	if isnothing(ttn)
+		occ_mat = get(kwargs, :occ_mat, nothing)
+	else
+		occ_mat = get_occupancy(ttn;if_plot=false)
+	end
 	num_particles = sum(occ_mat)
 	bulk_occ_mat = occ_mat[1+bulk_width:end-bulk_width,1+bulk_width:end-bulk_width]
 	bulk_density = sum(bulk_occ_mat)/prod(size(bulk_occ_mat))
 	return bulk_density
 end
 
-function deriv_bulk_dens(ttn1,ttn2,alpha_change,bulk_width=1)
-	bulk_dens_1 = bulk_density(ttn1,bulk_width)
-	bulk_dens_2 = bulk_density(ttn2,bulk_width)
+function deriv_bulk_dens(ttn1,ttn2,alpha_change,bulk_width=1; kwargs...)
+	if isnothing(ttn1) && isnothing(ttn2)
+		occ_mat1 = get(kwargs, :occ_mat1, nothing)
+		occ_mat2 = get(kwargs, :occ_mat2, nothing)
+		bulk_dens_1 = bulk_density(nothing,bulk_width; occ_mat=occ_mat1)
+		bulk_dens_2 = bulk_density(nothing,bulk_width; occ_mat=occ_mat2)
+	else
+		bulk_dens_1 = bulk_density(ttn1,bulk_width)
+		bulk_dens_2 = bulk_density(ttn2,bulk_width)
+	end
 	deriv = (bulk_dens_1 - bulk_dens_2)/alpha_change
 	return deriv
 end
 #=
 
-#params_dict = Dict([("open_cores","all"),("if_gpu",false),("layers",3),("mdim",70),("nn_strength",0.01),("alpha",0.1),("mag_off",false),("lr",0)])
+params_dict = Dict([("open_cores","all"),("if_gpu",false),("layers",6),("mdim",150),("mag_off",false),("lr",0)])
 # usually in params: mag_off, layers, mdim, longrange_dist
-params_dict = make_args_dict(ARGS)
+#params_dict = make_args_dict(ARGS)
 open_cores = get(params_dict, "open_cores", "all")
 if typeof(open_cores) != String
 	BLAS.set_num_threads(open_cores)	
@@ -406,9 +422,9 @@ nswps = 3
 
 plotting = false
 save_plot = false
-save_data = true
+save_data = false
 
-loc = "/local/geraghty/cluster-data"
+loc = pwd()#"../cluster-data"
 if_cliff = true
 sc_type = "lr_flat"
 dists = [i for i in 1:2*edge_sites]
@@ -435,7 +451,7 @@ total_time = time() - starting
 println("Running time = $total_time")
 #
 
-#occs1 = get_occupancy(dm_sp.ttn; if_plot=false,if_save_fig=false,if_save_data=false)
+occs1 = get_occupancy(dm_sp.ttn; if_plot=true,if_save_fig=false,if_save_data=false)
 =#
 
 

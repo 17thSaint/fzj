@@ -40,11 +40,12 @@ function find_data_file(params_dict,calc_type,file_type="jld2")
 		current_file_params_dict = get_params_dict_from_filename(current_file)
 		for params in keys(params_dict)
 			try
-				params_dict[params] in current_file_params_dict[params] ? nothing : append!(remove_indices,i)
+				current_file_params_dict[params] in params_dict[params] ? nothing : append!(remove_indices,i)
 			catch
 				try
+					#println("Error in first Attempt, $current_file")
 					current_file_metadata_dict = read_data_jld2(current_file,; output_bool=false)[2]
-					params_dict[params] in current_file_metadata_dict[params] ? nothing : append!(remove_indices,i)
+					current_file_metadata_dict[params] in params_dict[params] ? nothing : append!(remove_indices,i)
 				catch
 					#println("Parameter $params could not be found in file $current_file, skipping")
 					append!(remove_indices,i)
@@ -76,7 +77,7 @@ end
 function check_plot_label(file_name,version)
 	split_name = split(file_name,"-")
 	potential_type = split_name[1]
-	if potential_type in ["densdens","occs","ttn","Y-dir-GF","X-dir-GF","Y-dir-current","X-dir-current"]
+	if potential_type in ["densdens","occs","ttn","Y-dir-GF","X-dir-GF","Y-dir-current","X-dir-current","mps"]
 		if potential_type != version
 			println("Wrong Plot Label: changing $potential_type => $version")
 			file_name = "$version-" * join(split_name[2:end],"-")
