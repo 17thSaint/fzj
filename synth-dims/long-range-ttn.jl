@@ -194,7 +194,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	end
 end
 
-function get_densdens_corrs(ttn,distances; kwargs...)
+function get_densdens_corrs(ttn::TTNKit.TreeTensorNetwork,distances; kwargs...)
 	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
 	direction = get(kwargs, :direction, "virt")
 	dim_dict = Dict([("virt",virt_edge_length),("phys",phys_edge_length)])

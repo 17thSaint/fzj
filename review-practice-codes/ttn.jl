@@ -2,7 +2,6 @@ using TTNKit,Statistics,NBInclude
 #cd("/home/patrick/Downloads")
 @nbinclude("parton-model-syms.ipynb")
 include("../other-funcs/data-storage-funcs.jl")
-include("../other-funcs/cluster-execution-funcs.jl")
 #=
 Need to figure out how sweeps works
 =#
@@ -991,7 +990,7 @@ function get_2part_corr(ttn,particle_count; kwargs...)
 	return corr
 end
 
-function get_occupancy(ttn; kwargs...)
+function get_occupancy(ttn::TTNKit.TreeTensorNetwork; kwargs...)
 	#=
 	exp_occ = zeros(edge_length,edge_length)
 	for x in 1:edge_length

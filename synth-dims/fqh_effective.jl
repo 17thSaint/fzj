@@ -156,31 +156,83 @@ function make_states(L,nbosons,nflavors)
 	return states
 end
 
-function hamiltonian(; t1, t2, Φ, U1, U2, L, nflavors)
+function hamiltonian(; t1, t2, phi, U1, U2, L, nflavors, kwargs...)
+	if_nn_int = get(kwargs, :if_nn_int, true)
+	if_2ord_pert = get(kwargs, :if_2ord_pert, true)
+	
 	ampo = OpSum()
-
 	for j in 1:L-1
 		for s in 1:nflavors
+			# physical dimension hopping
 			ampo += (-t1, "Cr$s", j, "Anh$s", j+1)
 			ampo += (-t1, "Anh$s", j, "Cr$s", j+1)
 		end
 
-		ampo += (-U1, "N", j, "N", j+1)
-	end
-	for j in 1:L-2
-		for s in nflavors
-			ampo += (-U2, "Cr$s", j, "N", j+1, "Anh$s", j+2)
-			ampo += (-U2, "Anh$s", j, "N", j+1, "Cr$s", j+2)
+		# nearest neighbor density interaction
+		if if_nn_int
+			ampo += (-U1, "N", j, "N", j+1)
 		end
 	end
-	for j in 1:L
-		ampo += (-t2 * exp(im*Φ*j), "S+", j)
-		ampo += (-t2 * exp(-im*Φ*j), "S-", j)
+	
+	if if_2ord_pert
+		for j in 1:L-2
+			for s in nflavors
+				ampo += (-U2, "Cr$s", j, "N", j+1, "Anh$s", j+2)
+				ampo += (-U2, "Anh$s", j, "N", j+1, "Cr$s", j+2)
+			end
+		end
 	end
+	
+	for j in 1:L
+		# synthetic dimension hopping
+		ampo += (-t2 * exp(im*phi*j), "S+", j)
+		ampo += (-t2 * exp(-im*phi*j), "S-", j)
+	end
+	
 	return ampo
 end
 
-function mps_get_occupancy(wavefunc,L,nflavors; kwargs...)
+function execute_mps(; t1, t2, phi, U1, U2, L, nflavors, nbosons, mdim, if_save_data, noise, kwargs...)
+	conserve_qns = get(kwargs, :conserve_qns, true)
+	nsweeps = get(kwargs, :nsweeps, 5)
+	psi0 = get(kwargs, :psi_guess, nothing)
+	#mdim = get(kwargs, :mdim, 100)
+	#noise = get(kwargs, :noise, 0.0)
+	#if_save_data = get(kwargs, :if_save_data, false)
+	
+	if isnothing(psi0)
+		sidx = siteinds("ExtendedHardcore", L; conserve_qns = conserve_qns, nflavors = nflavors)
+	else
+		println("Phi = $phi")
+		sidx = siteinds(psi0)
+	end
+	H = MPO(hamiltonian(; model_paras...), sidx)
+	println("Built Hams")
+	states = make_states(L,nbosons,nflavors)
+	if isnothing(psi0)
+		psi0 = randomMPS(sidx, states)
+	end
+	E, psi = dmrg(H, psi0; maxdim = [Int(floor(mdim/4)),Int(floor(mdim/2)), mdim], nsweeps = nsweeps, noise = noise)
+	
+	if if_save_data
+		location = get(kwargs, :location, pwd())
+		filename = get(kwargs, :name, "mps")
+		metadata = get(kwargs, :metadata, nothing)
+		data_dict = Dict([("mps",psi)])
+		write_data_jld2(filename,data_dict,location,metadata)
+	end
+	
+	return psi
+end
+
+function get_mps_dims(wavefunc::MPS)
+	L = length(wavefunc)
+	nflavors = dim(siteind(wavefunc,1)) - 1
+	return L,nflavors
+end
+
+function get_occupancy(wavefunc::MPS; kwargs...)
+	L,nflavors = get_mps_dims(wavefunc)
 	if_plot = get(kwargs, :if_plot, true)
 	occ_mat = zeros(L,nflavors)
 	for s in 1:nflavors
@@ -188,6 +240,56 @@ function mps_get_occupancy(wavefunc,L,nflavors; kwargs...)
 	end
 	if_plot ? mps_plot_occupancy(occ_mat,L,nflavors) : nothing
 	return occ_mat
+end
+
+function get_densdens_corrs(wavefunc::MPS,distances=nothing; kwargs...)
+	phys_edge_length,virt_edge_length = get_mps_dims(wavefunc)
+	chosen_dim,other_dim = phys_edge_length,virt_edge_length
+	if isnothing(distances)
+		distances = [i for i in 1:chosen_dim-1]
+	end
+	densdens_corr = zeros(length(distances),chosen_dim)
+	corr_errors = zeros(length(distances),chosen_dim)
+	for i in 1:other_dim
+		corr_mat = real.(ITensors.correlation_matrix(wavefunc,"Ns$(i)","Ns$(i)"))
+		fig = figure()
+		imshow(corr_mat)
+		colorbar()
+		densdens_corr[:,i] = [mean(diag(corr_mat,j)) for j in 1:length(distances)]
+		corr_errors[:,i] = [std(diag(corr_mat,j)) for j in 1:length(distances)]
+	end
+	
+	if_plot = get(kwargs, :if_plot, true)
+	get_avgs = get(kwargs, :avgs, true)
+	
+	if get_avgs
+		avg_denscorr = [mean(densdens_corr[i,:]) for i in 1:length(distances)]
+		avg_errs = [mean(corr_errors[i,:]) for i in 1:length(distances)]
+		if_plot ? plot_denscorr(avg_denscorr,avg_errs,distances; kwargs...) : nothing
+		return avg_denscorr,avg_errs,distances
+	else
+		if_plot ? plot_denscorr(densdens_corr,corr_errors,distances; kwargs...) : nothing
+		return densdens_corr,corr_errors,distances
+	end
+end
+
+function plot_denscorr(denscorrs,corr_errors,distances; kwargs...)
+	if length(size(denscorrs)) > 1
+		fig = figure()
+		for i in 1:size(denscorrs)[2]
+			errorbar(distances,denscorrs[:,i],yerr=[corr_errors[:,i],corr_errors[:,i]],label="$i")
+		end
+	else
+		fig = figure()
+		errorbar(distances,denscorrs,yerr=[corr_errors,corr_errors],label="AVG")
+	end
+	title_string = "DensDens Corr, " * get(kwargs, :plot_title, "")
+	legend()
+	xlabel("Distances")
+	yscale("log")
+	ylabel("Corr")
+	title(title_string)
+	return denscorrs,corr_errors
 end
 
 function mps_plot_occupancy(occ_mat,L,nflavors)
