@@ -242,6 +242,62 @@ function get_occupancy(wavefunc::MPS; kwargs...)
 	return occ_mat
 end
 
+function get_greenfunc(wavefunc::MPS,hopping_direction="virt"; kwargs...)
+	if_backward = get(kwargs, :rev, false)
+
+	phys_edge_length,virt_edge_length = get_mps_dims(wavefunc)
+	start_point = 1
+	if if_backward
+		start_point = hopping_direction == "virt" ? virt_edge_length : phys_edge_length
+	end
+	
+	all_greens = zeros(virt_edge_length,phys_edge_length).*im
+	for s in 1:virt_edge_length
+		all_greens[s,:] = hopping_direction == "virt" ? diag(ITensors.correlation_matrix(wavefunc,"Cr$(start_point)","Anh$(s)")) : ITensors.correlation_matrix(wavefunc,"Cr$(s)","Anh$(s)")[start_point,:]
+	end
+	
+	start_norm = hopping_direction == "virt" ? ITensors.expect(wavefunc,"Ns$(start_point)") : [ITensors.expect(wavefunc,"Ns$(i)";sites=start_point) for i in 1:virt_edge_length]
+	all_norms = zeros(virt_edge_length,phys_edge_length)
+	for s in 1:virt_edge_length
+		const_part = hopping_direction == "virt" ? start_norm : [start_norm[s] for i in 1:phys_edge_length]
+		all_norms[s,:] = ITensors.expect(wavefunc,"Ns$(s)") .* const_part
+	end
+	all_greens ./= sqrt.(all_norms)
+	all_greens = abs.(all_greens)
+	
+	if_plot = get(kwargs, :if_plot, true)
+	if_plot ? plot_greenfunc(all_greens,hopping_direction; kwargs...) : nothing
+	
+	return all_greens
+end
+
+function plot_greenfunc(all_greens,hopping_direction; kwargs...)
+	virt_edge_length,phys_edge_length = size(all_greens)
+	title_string = "$hopping_direction Greens Function, " * get(kwargs, :plot_title, "")
+	if_lines = get(kwargs, :if_lines, false)
+	if_backward = get(kwargs, :rev, false)
+	fig = figure()
+	if if_lines
+		if hopping_direction == "virt"
+			for i in 1:phys_edge_length
+				plot(1:virt_edge_length,all_greens[:,i],"-p",label="$i")
+			end
+			xlabel("Virtual Dimension")
+		else
+			for i in 1:virt_edge_length
+				plot(1:phys_edge_length,all_greens[i,:],"-p",label="$i")
+			end
+			xlabel("Physical Dimension")
+		end
+	else
+		imshow(all_greens)
+		colorbar()
+		xlabel("Physical Dim")
+		ylabel("Virtual Dim")
+	end
+	title(title_string)
+end
+
 function get_densdens_corrs(wavefunc::MPS,distances=nothing; kwargs...)
 	phys_edge_length,virt_edge_length = get_mps_dims(wavefunc)
 	chosen_dim,other_dim = phys_edge_length,virt_edge_length
@@ -283,7 +339,7 @@ function plot_denscorr(denscorrs,corr_errors,distances; kwargs...)
 		fig = figure()
 		errorbar(distances,denscorrs,yerr=[corr_errors,corr_errors],label="AVG")
 	end
-	title_string = "DensDens Corr, " * get(kwargs, :plot_title, "")
+	
 	legend()
 	xlabel("Distances")
 	yscale("log")

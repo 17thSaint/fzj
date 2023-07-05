@@ -2,7 +2,7 @@ include("fqh_effective.jl")
 include("long-range-ttn.jl")
 
 
-params_dict = Dict([("L",4),("nflavors",4),("nbosons",4),("alpha",1/8),("if_2ord_pert",true)])
+params_dict = Dict([("L",16),("nflavors",4),("nbosons",8),("alpha",1/8),("if_2ord_pert",true)])
 L = get(params_dict, "L", 4)
 nflavors = get(params_dict, "nflavors", Int(L/2))
 nbosons = get(params_dict, "nbosons", nflavors)
@@ -22,8 +22,8 @@ if_save_data = false
 #
 change = 0.0001
 count = 1
-alpha_start  = 1/8
-alpha_end = 1/8
+alpha_start  = 1/4
+alpha_end = 1/4
 derivs = zeros(3,count)
 errs = zeros(3,count)
 alphas = count == 1 ? [alpha_start] : [alpha_start + (i-1)*(alpha_end-alpha_start)/(count-1) for i in 1:count]
@@ -50,7 +50,7 @@ for i in 1:count
 	
 	#model_paras_left = copy(model_paras)
 	#model_paras_left[:phi] = phi_left
-	psi_left = execute_mps(; model_paras..., phi = phi_left, psi_guess = psi)
+	#psi_left = execute_mps(; model_paras..., phi = phi_left, psi_guess = psi)
 	
 	#E_left,psi_left = dmrg(H_left, psi; maxdim = 100, nsweeps = 3, noise = [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0])
 	
@@ -64,21 +64,13 @@ for i in 1:count
 	#bd_left = bulk_density(nothing; occ_mat=occ_mat_left)
 	#bd_c = bulk_density(nothing; occ_mat=occ_mat_c)
 	#bd_right = bulk_density(nothing; occ_mat=occ_mat_right)
-	#=println("Bulk Densities = $bd_left, $bd_c, $bd_right")
-	for w in 1:2
-		deriv12 = deriv_bulk_dens(nothing,nothing,-change,w; occ_mat1=occ_mat_left,occ_mat2=occ_mat_c)
-		deriv23 = deriv_bulk_dens(nothing,nothing,-change,w; occ_mat1=occ_mat_c,occ_mat2=occ_mat_right)
-		deriv13 = deriv_bulk_dens(nothing,nothing,-2*change,w; occ_mat1=occ_mat_left,occ_mat2=occ_mat_right)
-		deriv = mean([deriv12,deriv23,deriv13])
-		derr = std([deriv12,deriv23,deriv13])
-		derivs[w,i] = deriv
-		errs[w,i] = derr
-		println("Streda Value = $deriv +/- $derr")
-	end
-	=#
 end
 #
-rez = get_densdens_corrs(all_wavefuncs[1]; avgs=false,if_plot=true)
+if_lines = false
+rez = get_greenfunc(all_wavefuncs[1],"virt"; if_plot=true,if_lines=if_lines)
+rez2 = get_greenfunc(all_wavefuncs[1],"phys"; if_plot=true,if_lines=if_lines)
+re3 = get_greenfunc(all_wavefuncs[1],"virt"; if_plot=true,rev=true,if_lines=if_lines)
+rez4 = get_greenfunc(all_wavefuncs[1],"phys"; if_plot=true,rev=true,if_lines=if_lines)
 #println(derivs,", ",errs)
 #for i in 1:2
 #errorbar(alphas,derivs[i,:],yerr=[errs[i,:],errs[i,:]],label="$i")
