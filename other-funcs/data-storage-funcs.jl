@@ -71,8 +71,7 @@ function get_params_dict_from_filename(filename)
 	if file_type == "png" || file_type == "jld2" || file_type == "hdf5"
 		filename = join(split(filename,".")[1:end-1],".")
 	end
-	
-	split_filename = split(filename,"-")[2:end]
+	split(filename,"-")[1] in ["virt","phys","Y","X"] ? split_filename = split(filename,"-")[4:end] : split_filename = split(filename,"-")[2:end]
 	for i in 1:Int(length(split_filename)/2)
 		key = split_filename[2*i-1]
 		value = split_filename[2*i]
@@ -109,9 +108,9 @@ function change_numparticles_metadata(filename)
 	end
 end
 
-function find_data_file(params_dict,calc_type,file_type="jld2")
+function find_data_file(params_dict,calc_type,file_type="jld2",location="/home/patrick/fzj/main-git/cluster-data")
 	og_loc = pwd()
-	cd("/home/patrick/fzj/main-git/cluster-data")
+	cd(location)
 	
 	file_choices = readdir()
 	
@@ -123,7 +122,9 @@ function find_data_file(params_dict,calc_type,file_type="jld2")
 	remove_indices = []
 
 	for i in 1:length(file_choices)
-		split(file_choices[i],"-")[1] != calc_type ? append!(remove_indices,[i]) : nothing
+		current_calc_type = split(file_choices[i],"-")[1]
+		current_calc_type in ["virt","phys","Y","X"] ? current_calc_type = join(split(file_choices[i],"-")[1:3],"-") : nothing
+		current_calc_type != calc_type ? append!(remove_indices,[i]) : nothing
 	end
 	deleteat!(file_choices,remove_indices)
 
@@ -219,7 +220,7 @@ function save_figure(file_name; kwargs...)
 	current_location = pwd()
 	cd(file_location)
 	file_name = prep_file(file_name,file_type)
-	savefig(file_name)
+	PyPlot.savefig(file_name)
 	cd(current_location)
 	println("Figure Saved, File Closed: $file_name")
 	return

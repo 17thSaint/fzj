@@ -1,76 +1,115 @@
 include("fqh_effective.jl")
 include("long-range-ttn.jl")
+using PyPlot
 
+function fix_filling(L,nflavors,nu)
+	prod = L * nu * nflavors
+	for nbosons in 3:L-2
+		inv_alpha = round(prod/nbosons,digits=5)
+		if isinteger(inv_alpha)
+			println("Found Alpha = 1/$inv_alpha")
+			return nbosons,1/inv_alpha
+		end
+	end
+	println("Not Found")
+	return nothing,nothing
+end
 
-params_dict = Dict([("L",16),("nflavors",4),("nbosons",8),("alpha",1/8),("if_2ord_pert",true)])
-L = get(params_dict, "L", 4)
-nflavors = get(params_dict, "nflavors", Int(L/2))
-nbosons = get(params_dict, "nbosons", nflavors)
+save_nothing = false
+params_dict = Dict()
+L = 6#get(params_dict, "L", 4)
+nflavors = 20#get(params_dict, "nflavors", Int(L/2))
+#nbosons = get(params_dict, "nbosons", nflavors)
 t1 = get(params_dict, "t1", 1.0)
 t2 = get(params_dict, "t2", 1.0)
 U = get(params_dict, "U", 100)
 U1 = 4*t1^2/U
 U2 = U1/2
 conserve_qns = true
-if_nn_int = true
-if_2ord_pert = true
-nsweeps = 5
-mdim = get(params_dict, "mdim", 100)
+if_nn_int = false#get(params_dict, "if_nn_int", false)
+if_2ord_pert = false#get(params_dict, "if_2ord_pert", false)
+nsweeps = 13
+mdim = get(params_dict, "mdim", 50)
 noise = [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0]
-if_save_data = false
+if_save_data = save_nothing ? false : true
+data_loc = "/home/patrick/fzj/main-git/synth-dims/local-figs"
+
 
 #
-change = 0.0001
-count = 1
-alpha_start  = 1/4
-alpha_end = 1/4
-derivs = zeros(3,count)
-errs = zeros(3,count)
-alphas = count == 1 ? [alpha_start] : [alpha_start + (i-1)*(alpha_end-alpha_start)/(count-1) for i in 1:count]
+#change = 0.0001
+#count = 1
+#alpha_start  = 1/8
+#alpha_end = 1/8
+#derivs = zeros(3,count)
+#errs = zeros(3,count)
+#alphas = count == 1 ? [alpha_start] : [alpha_start + (i-1)*(alpha_end-alpha_start)/(count-1) for i in 1:count]
 all_wavefuncs = []
-println(alphas)
+#dbds = zeros(length(alphas))
+#bds = []
+#println(alphas)
+#datafile_name = make_parameters_filename(params_dict) * "-alpha-$(round(alpha_start,digits=4))"
 
-phi  = 2π*alpha_start
-model_paras = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L,
-					   nflavors = nflavors, nbosons = nbosons, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, noise = noise, if_save_data = if_save_data)
-other_params_dict = Dict([("nbosons",nbosons),("U",U),("conserve_qns",conserve_qns),("nsweeps",nsweeps),("mdim",mdim),("noise",noise)])
-metadata_dict = merge(named_tuple_to_dict(model_paras),other_params_dict)
-datafile_name = make_parameters_filename(params_dict)
+#phi  = 2π*alpha_start
+other_params_dict = Dict([("U",U),("conserve_qns",conserve_qns),("nsweeps",nsweeps),("mdim",mdim),("noise",noise)])
+savefig_data = save_nothing ? false : true
+savefig = save_nothing ? false : true
+if_lines = false
 
-for i in 1:count
-	alpha = alphas[i]
+fillings = sort([1/6,1/4,1/3,1/2,2/5,1/5])
+
+for i in 1:length(fillings)
+	filling = fillings[i]
+	nbosons,alpha = fix_filling(L,nflavors,filling)
+	isnothing(nbosons) ? continue : nothing
+	#alpha = alphas[i]
+
+	phi  = 2π*alpha
+	#phi_right  = 2π*(alpha+change)
+	#phi_left  = 2π*(alpha-change)
+	#filling = nbosons / (alpha * L * nflavors)
+	println("Nu = $filling with Alpha = $alpha and NBosons = $nbosons")
+	filename_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert)])
+	datafile_name = make_parameters_filename(filename_dict)
+	model_paras = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noise, if_save_data = if_save_data, location = data_loc, name = datafile_name)
+	metadata_dict = merge(named_tuple_to_dict(model_paras),other_params_dict)
+	println(datafile_name)
 	if true
-	#phi  = 2π*alpha
-	phi_right  = 2π*(alpha+change)
-	phi_left  = 2π*(alpha-change)
-
-	psi = execute_mps(; model_paras...)
+	psi = execute_mps(U1,U2,phi,L,nflavors,nbosons; model_paras...,metadata=metadata_dict)
 	append!(all_wavefuncs,[psi])
-	println("Done Center")
+	#println("Done Center")
+	
 	
 	#model_paras_left = copy(model_paras)
 	#model_paras_left[:phi] = phi_left
-	#psi_left = execute_mps(; model_paras..., phi = phi_left, psi_guess = psi)
-	
-	#E_left,psi_left = dmrg(H_left, psi; maxdim = 100, nsweeps = 3, noise = [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0])
-	
-	#E_right,psi_right = dmrg(H_right, psi; maxdim = 100, nsweeps = 3, noise = [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0])
-	
+	#psi_left = execute_mps(U1,U2,phi_left,L,nflavors; model_paras...,psi_guess = psi, if_save_data=false)
+	#psi_right = execute_mps(U1,U2,phi_right,L,nflavors; model_paras...,psi_guess = psi, if_save_data=false)
+	plottitle = "Filling = $filling"
+	rez51 = get_occupancy(psi;if_plot=true, if_save_data=savefig_data,name=datafile_name,location=data_loc,metadata=metadata_dict,if_save_fig=savefig,plot_title=plottitle)
+	rez11 = get_greenfunc(psi,"virt"; if_plot=true,if_lines=if_lines, if_save_data=savefig_data,name=datafile_name,location=data_loc,metadata=metadata_dict,if_save_fig=savefig,plot_title=plottitle)
+	rez21 = get_greenfunc(psi,"phys"; if_plot=true,if_lines=if_lines, if_save_data=savefig_data,name=datafile_name,location=data_loc,metadata=metadata_dict,if_save_fig=savefig,plot_title=plottitle)
 	end
-	occ_mat_c = get_occupancy(psi)
-	#occ_mat_left = get_occupancy(psi_left)
-	#occ_mat_right = get_occupancy(psi_right)
 	
-	#bd_left = bulk_density(nothing; occ_mat=occ_mat_left)
-	#bd_c = bulk_density(nothing; occ_mat=occ_mat_c)
-	#bd_right = bulk_density(nothing; occ_mat=occ_mat_right)
+	#=
+	bd_l = bulk_density(psi_left)
+	append!(bds,[bd_l])
+	bd_c = bulk_density(psi)
+	append!(bds,[bd_c])
+	bd_r = bulk_density(psi_right)
+	append!(bds,[bd_r])
+	
+	dbd = (bd_r - bd_l) / (2*change)
+	println(alpha,", ",dbd)
+	dbds[i] = dbd
+	=#
+	
 end
-#
-if_lines = false
-rez = get_greenfunc(all_wavefuncs[1],"virt"; if_plot=true,if_lines=if_lines)
-rez2 = get_greenfunc(all_wavefuncs[1],"phys"; if_plot=true,if_lines=if_lines)
-re3 = get_greenfunc(all_wavefuncs[1],"virt"; if_plot=true,rev=true,if_lines=if_lines)
-rez4 = get_greenfunc(all_wavefuncs[1],"phys"; if_plot=true,rev=true,if_lines=if_lines)
+#=
+rez5 = get_occupancy(all_wavefuncs[1];)
+rez = get_greenfunc(all_wavefuncs[1],"virt"; if_plot=true,if_lines=if_lines)#, if_save_data=savefig_data,name=datafile_name,location=data_loc,metadata=metadata_dict,if_save_fig=savefig)
+rez2 = get_greenfunc(all_wavefuncs[1],"phys"; if_plot=true,if_lines=if_lines)#, if_save_data=savefig_data,name=datafile_name,location=data_loc,metadata=metadata_dict,if_save_fig=savefig)
+#re3 = get_greenfunc(all_wavefuncs[1],"virt"; if_plot=true,rev=true,if_lines=if_lines)
+#rez4 = get_greenfunc(all_wavefuncs[1],"phys"; if_plot=true,rev=true,if_lines=if_lines)
+=#
 #println(derivs,", ",errs)
 #for i in 1:2
 #errorbar(alphas,derivs[i,:],yerr=[errs[i,:],errs[i,:]],label="$i")

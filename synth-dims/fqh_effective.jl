@@ -156,7 +156,7 @@ function make_states(L,nbosons,nflavors)
 	return states
 end
 
-function hamiltonian(; t1, t2, phi, U1, U2, L, nflavors, kwargs...)
+function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 	if_nn_int = get(kwargs, :if_nn_int, true)
 	if_2ord_pert = get(kwargs, :if_2ord_pert, true)
 	
@@ -164,49 +164,60 @@ function hamiltonian(; t1, t2, phi, U1, U2, L, nflavors, kwargs...)
 	for j in 1:L-1
 		for s in 1:nflavors
 			# physical dimension hopping
-			ampo += (-t1, "Cr$s", j, "Anh$s", j+1)
-			ampo += (-t1, "Anh$s", j, "Cr$s", j+1)
+			ampo += (-t1 * exp(im*phi*s), "Cr$s", j, "Anh$s", j+1)
+			ampo += (-t1 * exp(-im*phi*s), "Anh$s", j, "Cr$s", j+1)
 		end
 
-		# nearest neighbor density interaction
+		# attractive physical nearest neighbor density interaction
 		if if_nn_int
-			ampo += (-U1, "N", j, "N", j+1)
+			for s in nflavors
+				for k in nflavors
+					ampo += (-U1/2, "Ns$(s)", j, "Ns$(k)", j+1)
+				end
+			end
 		end
 	end
 	
 	if if_2ord_pert
 		for j in 1:L-2
 			for s in nflavors
-				ampo += (-U2, "Cr$s", j, "N", j+1, "Anh$s", j+2)
-				ampo += (-U2, "Anh$s", j, "N", j+1, "Cr$s", j+2)
+				for k in nflavors
+					ampo += (-U2, "Cr$(k)", j, "Ns$(s)", j+1, "Anh$(k)", j+2)
+					ampo += (-U2, "Anh$(k)", j, "Ns$(s)", j+1, "Cr$(k)", j+2)
+				end
 			end
 		end
 	end
 	
 	for j in 1:L
-		# synthetic dimension hopping
-		ampo += (-t2 * exp(im*phi*j), "S+", j)
-		ampo += (-t2 * exp(-im*phi*j), "S-", j)
+		for s in 1:nflavors-1
+			# synthetic dimension hopping
+			ampo += (-t2 * 1, "Cr$(s+1) * Anh$(s)", j)
+			ampo += (-t2 * 1, "Cr$(s) * Anh$(s+1)", j)
+		end
 	end
 	
 	return ampo
 end
 
-function execute_mps(; t1, t2, phi, U1, U2, L, nflavors, nbosons, mdim, if_save_data, noise, kwargs...)
+function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	conserve_qns = get(kwargs, :conserve_qns, true)
 	nsweeps = get(kwargs, :nsweeps, 5)
 	psi0 = get(kwargs, :psi_guess, nothing)
-	#mdim = get(kwargs, :mdim, 100)
-	#noise = get(kwargs, :noise, 0.0)
-	#if_save_data = get(kwargs, :if_save_data, false)
+	mdim = get(kwargs, :mdim, 100)
+	noise = get(kwargs, :noise, 0.0)
+	if_save_data = get(kwargs, :if_save_data, false)
+	t1 = 1.0
+	t2 = 1.0
 	
+	println(U1,", ",U2,", ",phi,", ",L,", ",nflavors)
 	if isnothing(psi0)
 		sidx = siteinds("ExtendedHardcore", L; conserve_qns = conserve_qns, nflavors = nflavors)
 	else
 		println("Phi = $phi")
 		sidx = siteinds(psi0)
 	end
-	H = MPO(hamiltonian(; model_paras...), sidx)
+	H = MPO(hamiltonian(t1,t2,phi,U1,U2,L,nflavors; kwargs...), sidx)
 	println("Built Hams")
 	states = make_states(L,nbosons,nflavors)
 	if isnothing(psi0)
@@ -217,6 +228,7 @@ function execute_mps(; t1, t2, phi, U1, U2, L, nflavors, nbosons, mdim, if_save_
 	if if_save_data
 		location = get(kwargs, :location, pwd())
 		filename = get(kwargs, :name, "mps")
+		filename = check_plot_label(filename,"mps")
 		metadata = get(kwargs, :metadata, nothing)
 		data_dict = Dict([("mps",psi)])
 		write_data_jld2(filename,data_dict,location,metadata)
@@ -233,13 +245,43 @@ end
 
 function get_occupancy(wavefunc::MPS; kwargs...)
 	L,nflavors = get_mps_dims(wavefunc)
+	
 	if_plot = get(kwargs, :if_plot, true)
+	if_save_data = get(kwargs, :if_save_data, false)
+	if if_save_data
+		location = get(kwargs, :location, pwd())
+		filename = get(kwargs, :name, "occs")
+		filename = check_plot_label(filename,"occs")
+		metadata = get(kwargs, :metadata, nothing)
+	end
+		
 	occ_mat = zeros(L,nflavors)
 	for s in 1:nflavors
 		occ_mat[:, s] = expect(wavefunc, "Ns$(s)")
 	end
 	if_plot ? mps_plot_occupancy(occ_mat,L,nflavors) : nothing
+	data_dict = Dict([("vals",occ_mat)])
+	if_save_data ? write_data_jld2(filename,data_dict,location,metadata) : nothing
+	
 	return occ_mat
+end
+
+function mps_plot_occupancy(occ_mat,L,nflavors; kwargs...)
+	title_string = "Occupancy, " * get(kwargs, :plot_title, "")
+	fig = figure()
+	plot_surface(1:nflavors,1:L,occ_mat)
+	xlabel("Virtual Dim")
+	ylabel("Physical Dim")
+	title(title_string)
+	
+	if_save_fig = get(kwargs, :if_save_fig, false)
+	if if_save_fig
+		location = get(kwargs, :location, pwd())
+		filename = get(kwargs, :name, "occs")
+		filename = check_plot_label(filename,"occs")
+	end
+	if_save_fig ? save_figure(filename; location=location) : nothing
+	return
 end
 
 function get_greenfunc(wavefunc::MPS,hopping_direction="virt"; kwargs...)
@@ -267,6 +309,17 @@ function get_greenfunc(wavefunc::MPS,hopping_direction="virt"; kwargs...)
 	
 	if_plot = get(kwargs, :if_plot, true)
 	if_plot ? plot_greenfunc(all_greens,hopping_direction; kwargs...) : nothing
+	
+	if_save_data = get(kwargs, :if_save_data, false)
+	if if_save_data
+		location = get(kwargs, :location, pwd())
+		filename = get(kwargs, :name, "$hopping_direction-dir-GF")
+		filename = check_plot_label(filename,"$hopping_direction-dir-GF")
+		metadata = get(kwargs, :metadata, nothing)
+		data_dict = Dict([("vals",all_greens)])
+	end
+	if_save_data ? write_data_jld2(filename,data_dict,location,metadata) : nothing
+	
 	
 	return all_greens
 end
@@ -296,6 +349,14 @@ function plot_greenfunc(all_greens,hopping_direction; kwargs...)
 		ylabel("Virtual Dim")
 	end
 	title(title_string)
+	
+	if_save_fig = get(kwargs, :if_save_fig, false)
+	if if_save_fig
+		location = get(kwargs, :location, pwd())
+		filename = get(kwargs, :name, "$hopping_direction-dir-GF")
+		filename = check_plot_label(filename,"$hopping_direction-dir-GF")
+	end
+	if_save_fig ? save_figure(filename; location=location) : nothing
 end
 
 function get_densdens_corrs(wavefunc::MPS,distances=nothing; kwargs...)
@@ -318,13 +379,26 @@ function get_densdens_corrs(wavefunc::MPS,distances=nothing; kwargs...)
 	if_plot = get(kwargs, :if_plot, true)
 	get_avgs = get(kwargs, :avgs, true)
 	
+	if_save_data = get(kwargs, :if_save_data, false)
+	if if_save_data
+		location = get(kwargs, :location, pwd())
+		filename = get(kwargs, :name, "densdens")
+		filename = check_plot_label(filename,"densdens")
+		metadata = get(kwargs, :metadata, nothing)
+	end
+	
+	
 	if get_avgs
 		avg_denscorr = [mean(densdens_corr[i,:]) for i in 1:length(distances)]
 		avg_errs = [mean(corr_errors[i,:]) for i in 1:length(distances)]
 		if_plot ? plot_denscorr(avg_denscorr,avg_errs,distances; kwargs...) : nothing
+		data_dict = Dict([("vals",avg_denscorr),("errs",avg_errs),("dists",distances)])
+		if_save_data ? write_data_jld2(filename,data_dict,location,metadata) : nothing
 		return avg_denscorr,avg_errs,distances
 	else
 		if_plot ? plot_denscorr(densdens_corr,corr_errors,distances; kwargs...) : nothing
+		data_dict = Dict([("vals",densdens_corr),("errs",corr_errors),("dists",distances)])
+		if_save_data ? write_data_jld2(filename,data_dict,location,metadata) : nothing
 		return densdens_corr,corr_errors,distances
 	end
 end
@@ -345,13 +419,16 @@ function plot_denscorr(denscorrs,corr_errors,distances; kwargs...)
 	yscale("log")
 	ylabel("Corr")
 	title(title_string)
+	
+	if_save_fig = get(kwargs, :if_save_fig, false)
+	if if_save_fig
+		location = get(kwargs, :location, pwd())
+		filename = get(kwargs, :name, "densdens")
+		filename = check_plot_label(filename,"densdens")
+	end
+	if_save_fig ? save_figure(filename; location=location) : nothing
+	
 	return denscorrs,corr_errors
-end
-
-function mps_plot_occupancy(occ_mat,L,nflavors)
-	fig = figure()
-	plot_surface(1:nflavors,1:L,occ_mat)
-	return
 end
 
 # ╔═╡ 12309987-d529-4820-bf06-5c3407a977b3
