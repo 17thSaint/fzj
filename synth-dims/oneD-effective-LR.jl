@@ -4,7 +4,7 @@ using PyPlot
 
 function fix_filling(L,nflavors,nu)
 	prod = L * nu * nflavors
-	for nbosons in 3:L-2
+	for nbosons in L/2-1:L-2
 		inv_alpha = round(prod/nbosons,digits=5)
 		if isinteger(inv_alpha)
 			println("Found Alpha = 1/$inv_alpha")
@@ -17,7 +17,7 @@ end
 
 save_nothing = false
 params_dict = Dict()
-L = 6#get(params_dict, "L", 4)
+L = 40#get(params_dict, "L", 4)
 nflavors = 20#get(params_dict, "nflavors", Int(L/2))
 #nbosons = get(params_dict, "nbosons", nflavors)
 t1 = get(params_dict, "t1", 1.0)
@@ -32,7 +32,7 @@ nsweeps = 13
 mdim = get(params_dict, "mdim", 50)
 noise = [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0]
 if_save_data = save_nothing ? false : true
-data_loc = "/home/patrick/fzj/main-git/synth-dims/local-figs"
+data_loc = "/home/patrick/fzj/main-git/cluster-data"
 
 
 #
@@ -51,11 +51,11 @@ all_wavefuncs = []
 
 #phi  = 2π*alpha_start
 other_params_dict = Dict([("U",U),("conserve_qns",conserve_qns),("nsweeps",nsweeps),("mdim",mdim),("noise",noise)])
-savefig_data = save_nothing ? false : true
-savefig = save_nothing ? false : true
+savefig_data = false#save_nothing ? false : true
+savefig = false#save_nothing ? false : true
 if_lines = false
 
-fillings = sort([1/6,1/4,1/3,1/2,2/5,1/5])
+fillings = [1/2]#sort([1/6,1/4,1/3,1/2,2/5,1/5])
 
 for i in 1:length(fillings)
 	filling = fillings[i]

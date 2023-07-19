@@ -1,19 +1,65 @@
 include("fqh_effective.jl")
 include("long-range-ttn.jl")
 
+if false
 L = 6
 nflavors = 20
-file_params = Dict([("L",L),("nflavors",nflavors),("if_nn_int",true)])
-all_files = find_data_file(file_params,"virt-dir-GF","jld2","/home/patrick/fzj/main-git/synth-dims/local-figs")
+file_params = Dict([("L",L),("nflavors",nflavors),("if_nn_int",false)])
+all_files = find_data_file(file_params,"mps","jld2","/home/patrick/fzj/main-git/cluster-data")
+alphas = []
+wavefuncs = []
+for i in 1:length(all_files)
+	loc_mps = read_data_jld2(all_files[i],"/home/patrick/fzj/main-git/cluster-data")[1]["mps"]
+	append!(wavefuncs,[loc_mps])
+	append!(alphas,get_params_dict_from_filename(all_files[i])["alpha"])
+end
+end
 
+function momentum_occupation(wavefunc::MPS,p_count::Int64,p_end=4.0,p_start=0.0)
+	num_sites = length(siteinds(wavefunc))
+	momenta = [p_start + (i-1)*(p_end - p_start)/(p_count-1) for i in 1:p_count]
+	mom_occ = zeros(p_count)*im
+	for i in 1:p_count
+		momentum = momenta[i]
+		exp_vect =  [cos(2*pi*momentum*j/num_sites) for j in 1:num_sites]
+		pos_occ = expect(wavefunc,"N")
+		mom_occ[i] = sum(exp_vect .* pos_occ) / sqrt(num_sites)
+	end
+	return momenta,mom_occ
+end
 
+function new_mom_occ(wavefunc::MPS,p_count::Int64,p_end=4.0,p_start=0.0)
+	num_sites = length(siteinds(wavefunc))
+	momenta = [pi*i/(num_sites+1) for i in 1:p_count]
+	mom_occ = zeros(p_count)*im
+	for i in 1:p_count
+		momentum = momenta[i]
+		exp_vect = zeros(num_sites,num_sites)
+		pos_occ = zeros(num_sites,num_sites) .* im
+		for j in 1:num_sites
+			exp_vect[:,j] = [-1 * cos(momentum*(l+j)) + cos(momentum*(j-l)) for l in 1:num_sites]
+			pos_occ[:,j] = [correlation_matrix(wavefunc,"Cr$l","Anh$j")[l,j] for l in 1:num_sites]
+		end
+		#return exp_vect,pos_occ
+		#=fig = figure()
+		imshow(exp_vect)
+		colorbar()
+		title("$momentum")
+		=#
+		mom_occ[i] = sum(exp_vect .* pos_occ) / num_sites
+	end
+	return momenta,mom_occ
+end
 
-
-
-
-
-
-
+i = 1
+	mm,oc = momentum_occupation(wavefuncs[i],100)
+	plot(mm,real.(oc),"-p",label="real")
+	#plot(mm,imag.(oc),"-p",label="imag")
+	yscale("log")
+	xscale("log")
+#
+legend()
+#
 
 
 

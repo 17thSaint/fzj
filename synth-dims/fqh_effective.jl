@@ -369,9 +369,6 @@ function get_densdens_corrs(wavefunc::MPS,distances=nothing; kwargs...)
 	corr_errors = zeros(length(distances),chosen_dim)
 	for i in 1:other_dim
 		corr_mat = real.(ITensors.correlation_matrix(wavefunc,"Ns$(i)","Ns$(i)"))
-		fig = figure()
-		imshow(corr_mat)
-		colorbar()
 		densdens_corr[:,i] = [mean(diag(corr_mat,j)) for j in 1:length(distances)]
 		corr_errors[:,i] = [std(diag(corr_mat,j)) for j in 1:length(distances)]
 	end
