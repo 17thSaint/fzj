@@ -17,8 +17,8 @@ end
 
 save_nothing = true
 params_dict = Dict()
-L = 10#get(params_dict, "L", 4)
-nflavors = 3#get(params_dict, "nflavors", Int(L/2))
+L = 20#get(params_dict, "L", 4)
+nflavors = 6#get(params_dict, "nflavors", Int(L/2))
 #nbosons = 5#get(params_dict, "nbosons", nflavors)
 t1 = get(params_dict, "t1", 1.0)
 t2 = get(params_dict, "t2", 1.0)
@@ -28,8 +28,8 @@ U2 = U1/2
 conserve_qns = true
 if_nn_int = false#get(params_dict, "if_nn_int", false)
 if_2ord_pert = false#get(params_dict, "if_2ord_pert", false)
-nsweeps = 13
-mdim = get(params_dict, "mdim", 50)
+nsweeps = 7
+mdim = get(params_dict, "mdim", 100)
 noise = [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0]
 if_save_data = save_nothing ? false : true
 data_loc = "/home/patrick/fzj/main-git/cluster-data"
