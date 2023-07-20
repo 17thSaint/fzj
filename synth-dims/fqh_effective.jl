@@ -141,7 +141,7 @@ md"
 "
 
 # ╔═╡ fa55709d-a20c-47ee-9802-8ea750588c63
-function make_states(L,nbosons,nflavors)
+function make_states(L::Int64,nbosons::Int64,nflavors::Int64)
 	states = fill("0", L)
 
 	jvisit = Int64[]
@@ -154,6 +154,22 @@ function make_states(L,nbosons,nflavors)
 		push!(jvisit, jnext)
 	end
 	return states
+end
+
+function make_states(L::Int64,nflavors::Int64,organization::Vector)
+	states = fill("0", L)
+	for (i,j) in organization
+		states[i] = string(j)
+	end
+	return states
+end
+
+function make_wavefunc(L::Int64,nflavors::Int64,organization::Vector; kwargs...)
+	conserve_qns = get(kwargs, :conserve_qns, true)
+	sidx = siteinds("ExtendedHardcore", L; conserve_qns = conserve_qns, nflavors = nflavors)
+	states = make_states(L,nflavors,organization)
+	psi0 = randomMPS(sidx, states)
+	return psi0
 end
 
 function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
