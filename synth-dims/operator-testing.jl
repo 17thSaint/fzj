@@ -15,30 +15,19 @@ for i in 1:length(all_files)
 end
 end
 
-function momentum_occupation(wavefunc::MPS,p_count::Int64,p_end=4.0,p_start=0.0)
-	num_sites = length(siteinds(wavefunc))
-	momenta = [p_start + (i-1)*(p_end - p_start)/(p_count-1) for i in 1:p_count]
-	mom_occ = zeros(p_count)*im
-	for i in 1:p_count
-		momentum = momenta[i]
-		exp_vect =  [exp(momentum*j*im) for j in 1:num_sites]
-		pos_occ = expect(wavefunc,"N")
-		mom_occ[i] = sum(exp_vect .* pos_occ) / sqrt(num_sites)
-	end
-	return momenta,mom_occ
-end
 
-function new_mom_occ(wavefunc::MPS,p_count::Int64,p_end=4.0,p_start=0.0)
+function momentum_occupation(wavefunc::MPS,p_count::Int64,p_end=4.0,p_start=0.0)
 	num_sites = length(siteinds(wavefunc))
 	dimension = dim(siteinds(wavefunc)[1])
 	momenta = [p_start + (i-1)*(p_end - p_start)/(p_count-1) for i in 1:p_count]#[pi*i/(num_sites+1) for i in 1:p_count]
 	mom_occ = zeros(p_count)*im
 	for i in 1:p_count
 		momentum = momenta[i]
-		exp_vect = zeros(num_sites,num_sites)
+		exp_vect = zeros(num_sites,num_sites) .* im
 		pos_occ = zeros(num_sites,num_sites) .* im
 		for j in 1:num_sites
-			exp_vect[:,j] = [-1 * cos(momentum*(l+j)) + cos(momentum*(j-l)) for l in 1:num_sites]
+			#exp_vect[:,j] = [-1 * cos(momentum*(l+j)) + cos(momentum*(j-l)) for l in 1:num_sites]
+			exp_vect[:,j] = [exp(im*momentum*(j-l)) for l in 1:num_sites]
 			#pos_occ[:,j] = [correlation_matrix(wavefunc,"Cr$l","Anh$j")[l,j] for l in 1:num_sites]
 		end
 		pos_occ = sum([correlation_matrix(wavefunc,"Cr$i1","Anh$j1") for i1 in 1:dimension-1 for j1 in 1:dimension-1])
@@ -53,11 +42,13 @@ function new_mom_occ(wavefunc::MPS,p_count::Int64,p_end=4.0,p_start=0.0)
 	return momenta,mom_occ
 end
 #
+if true
 L = 6
 nflavors = 4
-org = [[2,2]]
+org = [[2,2],[4,3]]
 psi = make_wavefunc(L,nflavors,org)
-mm,oc = new_mom_occ(psi,100)
+end
+mm,oc = momentum_occupation(psi,100)
 plot(mm,real.(oc),"-p")
 yscale("log")
 xscale("log")
