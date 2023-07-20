@@ -175,13 +175,23 @@ end
 function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 	if_nn_int = get(kwargs, :if_nn_int, true)
 	if_2ord_pert = get(kwargs, :if_2ord_pert, true)
+	if_periodic = get(kwargs, :if_periodic, false)
+	
 	
 	ampo = OpSum()
-	for j in 1:L-1
+	for j in 1:L
 		for s in 1:nflavors
 			# physical dimension hopping
-			ampo += (-t1 * exp(im*phi*s), "Cr$s", j, "Anh$s", j+1)
-			ampo += (-t1 * exp(-im*phi*s), "Anh$s", j, "Cr$s", j+1)
+			next_site = j+1
+			if j == L
+				if if_periodic
+					next_site = 1
+				else
+					continue
+				end
+			end
+			ampo += (-t1 * exp(im*phi*s), "Cr$s", j, "Anh$s", next_site)
+			ampo += (-t1 * exp(-im*phi*s), "Anh$s", j, "Cr$s", next_site)
 		end
 
 		# attractive physical nearest neighbor density interaction
@@ -373,6 +383,39 @@ function plot_greenfunc(all_greens,hopping_direction; kwargs...)
 		filename = check_plot_label(filename,"$hopping_direction-dir-GF")
 	end
 	if_save_fig ? save_figure(filename; location=location) : nothing
+end
+
+function momentum_occupation(wavefunc::MPS,p_count::Int64,p_end=8.0,p_start=0.0; kwargs...)
+	num_sites = length(siteinds(wavefunc))
+	dimension = dim(siteinds(wavefunc)[1])
+	momenta = [p_start + (i-1)*(p_end - p_start)/(p_count-1) for i in 1:p_count]#[pi*i/(num_sites+1) for i in 1:p_count]
+	mom_occ = zeros(p_count)*im
+	for i in 1:p_count
+		println(round(100*i/p_count,digits=1),"%")
+		momentum = momenta[i]
+		exp_vect = zeros(num_sites,num_sites) .* im
+		pos_occ = zeros(num_sites,num_sites) .* im
+		for j in 1:num_sites
+			#exp_vect[:,j] = [-1 * cos(momentum*(l+j)) + cos(momentum*(j-l)) for l in 1:num_sites]
+			exp_vect[:,j] = [exp(im*momentum*(j-l)) for l in 1:num_sites]
+		end
+		pos_occ = sum([correlation_matrix(wavefunc,"Cr$i1","Anh$j1") for i1 in 1:dimension-1 for j1 in 1:dimension-1])
+		mom_occ[i] = sum(exp_vect .* pos_occ) / (num_sites*(dimension-1))
+	end
+	
+	if_plot = get(kwargs, :if_plot, true)
+	if_plot ? plot_momentum_occupation(momenta,real.(mom_occ); kwargs...) : nothing
+	
+	return momenta,mom_occ
+end
+
+function plot_momentum_occupation(momenta,mom_occ; kwargs...)
+	title_string = "Momentum Distribution, " * get(kwargs, :plot_title, "")
+	fig = figure()
+	plot(momenta,mom_occ,"-p")
+	yscale("log")
+	title(title_string)
+	
 end
 
 function get_densdens_corrs(wavefunc::MPS,distances=nothing; kwargs...)

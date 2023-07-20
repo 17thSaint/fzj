@@ -8,18 +8,18 @@ function fix_filling(L,nflavors,nu)
 		inv_alpha = round(prod/nbosons,digits=5)
 		if isinteger(inv_alpha)
 			println("Found Alpha = 1/$inv_alpha")
-			return nbosons,1/inv_alpha
+			return Int(nbosons),1/inv_alpha
 		end
 	end
 	println("Not Found")
 	return nothing,nothing
 end
 
-save_nothing = false
+save_nothing = true
 params_dict = Dict()
-L = 40#get(params_dict, "L", 4)
-nflavors = 20#get(params_dict, "nflavors", Int(L/2))
-#nbosons = get(params_dict, "nbosons", nflavors)
+L = 10#get(params_dict, "L", 4)
+nflavors = 3#get(params_dict, "nflavors", Int(L/2))
+#nbosons = 5#get(params_dict, "nbosons", nflavors)
 t1 = get(params_dict, "t1", 1.0)
 t2 = get(params_dict, "t2", 1.0)
 U = get(params_dict, "U", 100)
@@ -55,8 +55,23 @@ savefig_data = false#save_nothing ? false : true
 savefig = false#save_nothing ? false : true
 if_lines = false
 
-fillings = [1/2]#sort([1/6,1/4,1/3,1/2,2/5,1/5])
+#fillings = [1/2]#sort([1/6,1/4,1/3,1/2,2/5,1/5])
 
+
+nbosons,alpha = fix_filling(L,nflavors,1/2)
+phi = 2*pi*alpha
+
+model_paras = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noise, if_save_data = if_save_data, location = data_loc, if_periodic=true)
+
+psi = execute_mps(U1,U2,phi,L,nflavors,nbosons; model_paras...)
+
+
+
+
+
+
+
+#=
 for i in 1:length(fillings)
 	filling = fillings[i]
 	nbosons,alpha = fix_filling(L,nflavors,filling)
@@ -118,7 +133,7 @@ rez2 = get_greenfunc(all_wavefuncs[1],"phys"; if_plot=true,if_lines=if_lines)#, 
 
 
 
-
+=#
 
 
 

@@ -1,7 +1,7 @@
 include("fqh_effective.jl")
 include("long-range-ttn.jl")
 
-if false
+if true
 L = 6
 nflavors = 20
 file_params = Dict([("L",L),("nflavors",nflavors),("if_nn_int",false)])
@@ -15,45 +15,20 @@ for i in 1:length(all_files)
 end
 end
 
-
-function momentum_occupation(wavefunc::MPS,p_count::Int64,p_end=4.0,p_start=0.0)
-	num_sites = length(siteinds(wavefunc))
-	dimension = dim(siteinds(wavefunc)[1])
-	momenta = [p_start + (i-1)*(p_end - p_start)/(p_count-1) for i in 1:p_count]#[pi*i/(num_sites+1) for i in 1:p_count]
-	mom_occ = zeros(p_count)*im
-	for i in 1:p_count
-		momentum = momenta[i]
-		exp_vect = zeros(num_sites,num_sites) .* im
-		pos_occ = zeros(num_sites,num_sites) .* im
-		for j in 1:num_sites
-			#exp_vect[:,j] = [-1 * cos(momentum*(l+j)) + cos(momentum*(j-l)) for l in 1:num_sites]
-			exp_vect[:,j] = [exp(im*momentum*(j-l)) for l in 1:num_sites]
-			#pos_occ[:,j] = [correlation_matrix(wavefunc,"Cr$l","Anh$j")[l,j] for l in 1:num_sites]
-		end
-		pos_occ = sum([correlation_matrix(wavefunc,"Cr$i1","Anh$j1") for i1 in 1:dimension-1 for j1 in 1:dimension-1])
-		#return exp_vect,pos_occ
-		#=fig = figure()
-		imshow(exp_vect)
-		colorbar()
-		title("$momentum")
-		=#
-		mom_occ[i] = sum(exp_vect .* pos_occ) / (num_sites*(dimension-1))
-	end
-	return momenta,mom_occ
+for i in 1:length(all_files)
+	fig = figure()
+	mm,oc = momentum_occupation(wavefuncs[i],50,15.0,-15.0)
+	params = get_params_dict_from_filename(all_files[i])
+	filling = params["nbosons"]/(params["alpha"]*L*nflavors)
+	println(filling)
+	plot(mm,real.(oc),"-p",label="real")
+	#plot(mm,imag.(oc),"-p",label="imag")
+	yscale("log")
+	#xscale("log")
+	title("Mom Dist Filling = $filling")
+	#
+	legend()
 end
-#
-if true
-L = 6
-nflavors = 4
-org = [[2,2],[4,3]]
-psi = make_wavefunc(L,nflavors,org)
-end
-mm,oc = momentum_occupation(psi,100)
-plot(mm,real.(oc),"-p")
-yscale("log")
-xscale("log")
-#
-#legend()
 #
 
 
