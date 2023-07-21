@@ -15,7 +15,7 @@ function fix_filling(L,nflavors,nu)
 	return nothing,nothing
 end
 
-save_nothing = true
+save_nothing = false
 params_dict = Dict()
 L = 20#get(params_dict, "L", 4)
 nflavors = 6#get(params_dict, "nflavors", Int(L/2))
@@ -29,11 +29,11 @@ conserve_qns = true
 if_nn_int = false#get(params_dict, "if_nn_int", false)
 if_2ord_pert = false#get(params_dict, "if_2ord_pert", false)
 nsweeps = 7
-mdim = get(params_dict, "mdim", 100)
+mdim = get(params_dict, "mdim", 200)
 noise = [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0]
 if_save_data = save_nothing ? false : true
 data_loc = "/home/patrick/fzj/main-git/cluster-data"
-
+if_periodic = true
 
 #
 #change = 0.0001
@@ -58,12 +58,27 @@ if_lines = false
 #fillings = [1/2]#sort([1/6,1/4,1/3,1/2,2/5,1/5])
 
 
-nbosons,alpha = fix_filling(L,nflavors,1/2)
+nbosons,alpha = 10,0.0#fix_filling(L,nflavors,1/2)
+nbosons_highdens = 15
 phi = 2*pi*alpha
 
-model_paras = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noise, if_save_data = if_save_data, location = data_loc, if_periodic=true)
 
-psi = execute_mps(U1,U2,phi,L,nflavors,nbosons; model_paras...)
+
+filename_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
+filename_dict_highdens = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons_highdens),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
+
+datafile_name = make_parameters_filename(filename_dict)
+datafile_name_highdens = make_parameters_filename(filename_dict_highdens)
+
+model_paras = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noise, if_save_data = if_save_data, location = data_loc, if_periodic=if_periodic, name=datafile_name)
+
+model_paras_highdens = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons_highdens, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noise, if_save_data = if_save_data, location = data_loc, if_periodic=if_periodic, name=datafile_name_highdens)
+
+metadata_dict_highdens = merge(named_tuple_to_dict(model_paras_highdens),other_params_dict)
+metadata_dict = merge(named_tuple_to_dict(model_paras),other_params_dict)
+
+psi = execute_mps(U1,U2,phi,L,nflavors,nbosons; model_paras...,metadata=metadata_dict)
+psi_highdens = execute_mps(U1,U2,phi,L,nflavors,nbosons_highdens; model_paras_highdens...,metadata=metadata_dict_highdens)
 
 
 

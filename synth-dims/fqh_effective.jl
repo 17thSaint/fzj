@@ -406,6 +406,16 @@ function momentum_occupation(wavefunc::MPS,p_count::Int64,p_end=8.0,p_start=0.0;
 	if_plot = get(kwargs, :if_plot, true)
 	if_plot ? plot_momentum_occupation(momenta,real.(mom_occ); kwargs...) : nothing
 	
+	if_save_data = get(kwargs, :if_save_data, false)
+	if if_save_data
+		location = get(kwargs, :location, pwd())
+		filename = get(kwargs, :name, "momdist")
+		filename = check_plot_label(filename,"momdist")
+		metadata = get(kwargs, :metadata, nothing)
+		data_dict = Dict([("vals",mom_occ),("moms",momenta)])
+	end
+	if_save_data ? write_data_jld2(filename,data_dict,location,metadata) : nothing
+	
 	return momenta,mom_occ
 end
 
@@ -414,6 +424,7 @@ function plot_momentum_occupation(momenta,mom_occ; kwargs...)
 	fig = figure()
 	plot(momenta,mom_occ,"-p")
 	yscale("log")
+	xscale("log")
 	title(title_string)
 	
 end
