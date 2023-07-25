@@ -25,6 +25,26 @@ function log_prod(all_values)
 	return sum(log_version)
 end
 
+function log_add(a,b)
+	if real(a) > real(b)
+		ordered::Vector{typeof(a)} = [b,a]
+	else
+		ordered = [a,b]
+	end
+	result::ComplexF64 = ordered[2] + log(Complex(1 + exp(ordered[1] - ordered[2])))
+	return Complex(result)
+end
+
+function log_sum(all_values)
+	consecutive = [all_values[1],all_values[2]]
+	for i in 3:length(all_values) + 1
+		added_value = log_add(consecutive[1],consecutive[2])
+		consecutive[1] = added_value
+		consecutive[2] = i <= length(all_values) ? all_values[i] : 0.0
+	end
+	return consecutive[1]
+end
+
 function physical_part(particle_dictionary::Dict,L::Int; kwargs...)
 	if_log = get(kwargs, :if_log, true)
 	if_periodic = get(kwargs, :if_periodic, false)
@@ -128,6 +148,11 @@ function exchange_particles(species::String,particle_dictionary::Dict)
     	return exchanged_dict
 end
 
+function normalize_wavefunc(wavefunc; kwargs...)
+	if_log = get(kwargs, :if_log, true)
+	return if_log ? wavefunc / 2 - conj(wavefunc) / 2 : nothing
+end
+
 function get_wavefunc(particle_dictionary::Dict,L::Int; kwargs...)
 	if_log = get(kwargs, :if_log, true)
 	freq = get(kwargs, :freq, 1.0)
@@ -170,49 +195,20 @@ function momentum_dist_1d(position_dist,p_count,p_end,p_start=0.0)
 	return momenta,mom_occ
 end
 
+function normalize_log_occ_vector(full_vector,particle_count)
+	log_of_norm_value = log(particle_count) - log_sum(full_vector)
+	normed_log_vector = full_vector .+ log_of_norm_value
+	return normed_log_vector
+end
 
-L = 40
-n_tot = 21
-n_F = 20
+#
+L = 97
+n_tot = 10
+n_F = 5
 n_B = n_tot - n_F
 if_per = false
 
-cl = 100
-cf = 1000
-#fig = figure()
-evensodds = zeros(2,cl) .* 0.0
-all_counts = [10 + (i-1)*(cf - 10)/(cl-1) for i in 1:cl]
-for j in 1:cl
-println(j)
-counts = all_counts[j]
-val = [1,2]
-for i in 1:counts
-	pd = assign_locations(n_F,n_B,L)
-	wavefunc = get_wavefunc(pd,L; if_periodic=if_per)
-		
-	exch_pd = exchange_particles("M",pd)
-	new_wavefunc = get_wavefunc(exch_pd,L; if_periodic=if_per)
-
-	difference = round(abs(imag(wavefunc) - imag(new_wavefunc))/pi,digits=0)
-	if iseven(difference)
-		evensodds[2,j] += 1/counts
-	else
-		evensodds[1,j] += 1/counts
-	end
-end
-#plot(val,evensodds[:,j],"-p",label="$counts")
-end
-#legend()
-
-errs = [sqrt(all_counts[i])/all_counts[i] for i in 1:cl]
-fig2 = figure()
-errorbar(all_counts,evensodds[1,:],yerr=[errs,errs],label="O")
-errorbar(all_counts,evensodds[2,:],yerr=[errs,errs],label="E")
-#xscale("log")
-legend()
-#println("Phase Difference = $difference pi")
-
-#=
+if true
 samples = 100000
 locB_probs = [0.0 for i in 1:L]
 locF_probs = [0.0 for i in 1:L]
@@ -221,27 +217,44 @@ nothing_counts = 0
 for i in 1:samples
 	
 	pd = assign_locations(n_F,n_B,L)
-	wavefunc = get_wavefunc(pd,L; if_periodic=true)
+	wavefunc = get_wavefunc(pd,L; if_periodic=if_per)
 	loc_prob = wavefunc
-	if isnothing(loc_prob)
-		global nothing_counts += 1
-	else
+	if i != 1
 		for j in 1:n_F
-			locF_probs[pd["F"][j]] += 1/loc_prob
+			locF_probs[pd["F"][j]] = log_add(locF_probs[pd["F"][j]],loc_prob + conj(loc_prob))
 		end
 		for j in 1:n_B
-			locB_probs[pd["B"][j]] += 1/loc_prob
+			locB_probs[pd["B"][j]] = log_add(locB_probs[pd["B"][j]],loc_prob + conj(loc_prob))
+		end
+	else
+		for j in 1:n_F
+			locF_probs[pd["F"][j]] = loc_prob + conj(loc_prob)
+		end
+		for j in 1:n_B
+			locB_probs[pd["B"][j]] = loc_prob + conj(loc_prob)
 		end
 	end
 end
-
-println("Nothing Counts = $nothing_counts")
-plot(sites,locB_probs./locB_probs[1],"-p",label="B")
-plot(sites,locF_probs./locF_probs[1],"-p",label="F")
+norm_locB = normalize_log_occ_vector(locB_probs,n_B)
+norm_locF = normalize_log_occ_vector(locF_probs,n_F)
+#=
+fig = figure()
+plot(sites,exp.(norm_locB),"-p",label="B")
+plot(sites,exp.(norm_locF),"-p",label="F")
+title("Bosons = $n_B,Fermions = $n_F")
 legend()
 =#
+end
 
-
+mcount = 300
+mfinal = 2
+momB = momentum_dist_1d(norm_locB,mcount,mfinal,-2)
+momF = momentum_dist_1d(norm_locF,mcount,mfinal,-2)
+fig2 = figure()
+plot(momB[1]./(pi*1),abs.(momB[2])./n_B,"-p",label="B")
+plot(momF[1]./(pi*1),abs.(momF[2])./n_F,"-p",label="F")
+title("System Size = $L")
+legend()
 
 
 
