@@ -101,17 +101,30 @@ function orbital_part(particle_dictionary::Dict,L::Int; kwargs...)
 end
 
 function exchange_particles(species::String,particle_dictionary::Dict)
-	part_locs = particle_dictionary[species]
-	num1, num2 = rand(1:length(part_locs), 2)
-    	while num1 == num2
-        	num2 = rand(1:length(part_locs))
+	if species == "M"
+		part_locsB = particle_dictionary["B"]
+		part_locsF = particle_dictionary["F"]
+		num1, num2 = rand(1:length(part_locsB)),rand(1:length(part_locsF))
+
+	    	num1_ogloc = particle_dictionary["B"][num1]
+	    	num2_ogloc = particle_dictionary["F"][num2]
+	    	exchanged_dict = particle_dictionary
+	    	exchanged_dict["B"][num1] = num2_ogloc
+    		exchanged_dict["F"][num2] = num1_ogloc
+	else
+		part_locs = particle_dictionary[species]
+		num1, num2 = rand(1:length(part_locs), 2)
+	    	while num1 == num2
+			num2 = rand(1:length(part_locs))
+	    	end
+	    	num1_ogloc = particle_dictionary[species][num1]
+	    	num2_ogloc = particle_dictionary[species][num2]
+	    	exchanged_dict = particle_dictionary
+	    	exchanged_dict[species][num1] = num2_ogloc
+    		exchanged_dict[species][num2] = num1_ogloc
     	end
-    	num1_ogloc = particle_dictionary[species][num1]
-    	num2_ogloc = particle_dictionary[species][num2]
-    	#println("Exchanging $species $num1 at $num1_ogloc with $num2 at $num2_ogloc")
-    	exchanged_dict = particle_dictionary
-    	exchanged_dict[species][num1] = num2_ogloc
-    	exchanged_dict[species][num2] = num1_ogloc
+
+    	
     	return exchanged_dict
 end
 
@@ -159,39 +172,46 @@ end
 
 
 L = 40
-n_tot = 20
-n_F = 10
+n_tot = 21
+n_F = 20
 n_B = n_tot - n_F
 if_per = false
 
-working = false
-final = 100
-attempts = 1
-final_new_wavefunc = 0.0
-final_wavefunc = 0.0
-
-while working == false && attempts < final
+cl = 100
+cf = 1000
+#fig = figure()
+evensodds = zeros(2,cl) .* 0.0
+all_counts = [10 + (i-1)*(cf - 10)/(cl-1) for i in 1:cl]
+for j in 1:cl
+println(j)
+counts = all_counts[j]
+val = [1,2]
+for i in 1:counts
 	pd = assign_locations(n_F,n_B,L)
 	wavefunc = get_wavefunc(pd,L; if_periodic=if_per)
-	
-	exch_pd = exchange_particles("F",pd)
+		
+	exch_pd = exchange_particles("M",pd)
 	new_wavefunc = get_wavefunc(exch_pd,L; if_periodic=if_per)
-	if !isnothing(new_wavefunc) && !isnothing(wavefunc)
-		global final_new_wavefunc = new_wavefunc
-		global final_wavefunc = wavefunc
-		global working = true
+
+	difference = round(abs(imag(wavefunc) - imag(new_wavefunc))/pi,digits=0)
+	if iseven(difference)
+		evensodds[2,j] += 1/counts
 	else
-		global attempts += 1
-	end	
+		evensodds[1,j] += 1/counts
+	end
 end
-if working == true
-	difference = abs(imag(final_wavefunc) - imag(final_new_wavefunc))/pi
-	println("Phase Difference = $difference pi")
-	#println("OG Wavefunc = $final_wavefunc")
-	#println("Exchanged Wavefunc = $final_new_wavefunc")
-else
-	println("Didn't find anything")
+#plot(val,evensodds[:,j],"-p",label="$counts")
 end
+#legend()
+
+errs = [sqrt(all_counts[i])/all_counts[i] for i in 1:cl]
+fig2 = figure()
+errorbar(all_counts,evensodds[1,:],yerr=[errs,errs],label="O")
+errorbar(all_counts,evensodds[2,:],yerr=[errs,errs],label="E")
+#xscale("log")
+legend()
+#println("Phase Difference = $difference pi")
+
 #=
 samples = 100000
 locB_probs = [0.0 for i in 1:L]
