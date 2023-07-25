@@ -97,6 +97,21 @@ function orbital_part(particle_dictionary::Dict,L::Int; kwargs...)
 	return if_log ? log_prod(all_values) : prod(all_values)	
 end
 
+function exchange_particles(species::String,particle_dictionary::Dict)
+	part_locs = particle_dictionary[species]
+	num1, num2 = rand(1:length(part_locs), 2)
+    	while num1 == num2
+        	num2 = rand(1:length(part_locs))
+    	end
+    	num1_ogloc = particle_dictionary[species][num1]
+    	num2_ogloc = particle_dictionary[species][num2]
+    	#println("Exchanging $species $num1 at $num1_ogloc with $num2 at $num2_ogloc")
+    	exchanged_dict = particle_dictionary
+    	exchanged_dict[species][num1] = num2_ogloc
+    	exchanged_dict[species][num2] = num1_ogloc
+    	return exchanged_dict
+end
+
 function get_wavefunc(particle_dictionary::Dict,L::Int; kwargs...)
 	if_log = get(kwargs, :if_log, true)
 	freq = get(kwargs, :freq, 1.0)
@@ -139,15 +154,44 @@ function momentum_dist_1d(position_dist,p_count,p_end,p_start=0.0)
 	return momenta,mom_occ
 end
 
-L = 20
-n_tot = 10
-n_F = 5
+
+L = 40
+n_tot = 20
+n_F = 10
 n_B = n_tot - n_F
+if_per = false
+
+working = false
+final = 100
+attempts = 1
+final_new_wavefunc = 0.0
+final_wavefunc = 0.0
+
+while working == false && attempts < final
+	pd = assign_locations(n_F,n_B,L)
+	wavefunc = get_wavefunc(pd,L; if_periodic=if_per)
+	
+	exch_pd = exchange_particles("B",pd)
+	new_wavefunc = get_wavefunc(exch_pd,L; if_periodic=if_per)
+	if !isnothing(new_wavefunc) && !isnothing(wavefunc)
+		global final_new_wavefunc = new_wavefunc
+		global final_wavefunc = wavefunc
+		global working = true
+	else
+		global attempts += 1
+	end	
+end
+if working == true
+	println("OG Wavefunc = $final_wavefunc")
+	println("Exchanged Wavefunc = $final_new_wavefunc")
+else
+	println("Didn't find anything")
+end
+#=
 samples = 100000
 locB_probs = [0.0 for i in 1:L]
 locF_probs = [0.0 for i in 1:L]
 sites = [i-L/2 for i in 1:L]
-
 nothing_counts = 0
 for i in 1:samples
 	
@@ -165,11 +209,12 @@ for i in 1:samples
 		end
 	end
 end
+
 println("Nothing Counts = $nothing_counts")
 plot(sites,locB_probs./locB_probs[1],"-p",label="B")
 plot(sites,locF_probs./locF_probs[1],"-p",label="F")
 legend()
-
+=#
 
 
 
