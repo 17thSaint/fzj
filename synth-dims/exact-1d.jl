@@ -1,6 +1,7 @@
 using LinearAlgebra,PyPlot,Random
 
 function log_prod(all_values)
+	#=
 	log_version = []
 	all_neg_values = []
 	for i in 1:length(all_values)
@@ -19,7 +20,9 @@ function log_prod(all_values)
 		#println("Negative Wavefunction")
 		return nothing
 	end
-	
+	=#
+	log_version = log.(all_values)
+	return sum(log_version)
 end
 
 function physical_part(particle_dictionary::Dict,L::Int; kwargs...)
@@ -64,7 +67,7 @@ function physical_part(particle_dictionary::Dict,L::Int; kwargs...)
 	num_fermions != 0 ? append!(included_parts,ff_part) : nothing
 	num_bosons != 0 && num_fermions != 0 ? append!(included_parts,bf_part) : nothing
 	
-	full_physical_wavefunc = if_log ? log_prod(included_parts) : prod(included_parts)
+	full_physical_wavefunc = if_log ? log_prod(Complex.(included_parts)) : prod(included_parts)
 	
 	return full_physical_wavefunc,bb_part,ff_part,bf_part
 end
@@ -94,7 +97,7 @@ function orbital_part(particle_dictionary::Dict,L::Int; kwargs...)
 		end
 	end
 	
-	return if_log ? log_prod(all_values) : prod(all_values)	
+	return if_log ? log_prod(Complex.(all_values)) : prod(all_values)	
 end
 
 function exchange_particles(species::String,particle_dictionary::Dict)
@@ -171,7 +174,7 @@ while working == false && attempts < final
 	pd = assign_locations(n_F,n_B,L)
 	wavefunc = get_wavefunc(pd,L; if_periodic=if_per)
 	
-	exch_pd = exchange_particles("B",pd)
+	exch_pd = exchange_particles("F",pd)
 	new_wavefunc = get_wavefunc(exch_pd,L; if_periodic=if_per)
 	if !isnothing(new_wavefunc) && !isnothing(wavefunc)
 		global final_new_wavefunc = new_wavefunc
@@ -182,8 +185,10 @@ while working == false && attempts < final
 	end	
 end
 if working == true
-	println("OG Wavefunc = $final_wavefunc")
-	println("Exchanged Wavefunc = $final_new_wavefunc")
+	difference = abs(imag(final_wavefunc) - imag(final_new_wavefunc))/pi
+	println("Phase Difference = $difference pi")
+	#println("OG Wavefunc = $final_wavefunc")
+	#println("Exchanged Wavefunc = $final_new_wavefunc")
 else
 	println("Didn't find anything")
 end
