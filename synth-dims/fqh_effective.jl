@@ -212,9 +212,17 @@ function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 
 		# attractive physical nearest neighbor density interaction
 		if if_nn_int
+			next_site = j+1
+			if j == L
+				if if_periodic
+					next_site = 1
+				else
+					continue
+				end
+			end
 			for s in nflavors
 				for k in nflavors
-					ampo += (-U1/2, "Ns$(s)", j, "Ns$(k)", j+1)
+					ampo += (-U1/2, "Ns$(s)", j, "Ns$(k)", next_site)
 				end
 			end
 		end
@@ -402,8 +410,6 @@ function plot_greenfunc(all_greens,hopping_direction; kwargs...)
 end
 
 function momentum_occupation(wavefunc::MPS,p_count::Int64,p_end=8.0,p_start=0.0; kwargs...)
-	if_new_op = get(kwargs, :if_new_op, false)
-	
 	num_sites = length(siteinds(wavefunc))
 	dimension = dim(siteinds(wavefunc)[1])
 	momenta = [p_start + (i-1)*(p_end - p_start)/(p_count-1) for i in 1:p_count]#[pi*i/(num_sites+1) for i in 1:p_count]
@@ -441,8 +447,11 @@ function plot_momentum_occupation(momenta,mom_occ; kwargs...)
 	title_string = "Momentum Distribution, " * get(kwargs, :plot_title, "")
 	fig = figure()
 	plot(momenta,mom_occ,"-p")
-	yscale("log")
-	xscale("log")
+	if_log = get(kwargs, :if_log, true)
+	if if_log
+		yscale("log")
+		xscale("log")
+	end
 	title(title_string)
 	
 end

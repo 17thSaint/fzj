@@ -153,7 +153,7 @@ function normalize_wavefunc(wavefunc; kwargs...)
 	return if_log ? wavefunc / 2 - conj(wavefunc) / 2 : nothing
 end
 
-function get_wavefunc(particle_dictionary::Dict,L::Int; kwargs...)
+function get_config_wavefunc(particle_dictionary::Dict,L::Int; kwargs...)
 	if_log = get(kwargs, :if_log, true)
 	freq = get(kwargs, :freq, 1.0)
 	mass = get(kwargs, :mass, 1.0)
@@ -168,6 +168,35 @@ function get_wavefunc(particle_dictionary::Dict,L::Int; kwargs...)
 	end
 end
 
+function config_vector_to_string(config)
+	return join(config,",")	
+end
+
+function config_string_to_vector(config)
+	return parse.(Int64,split(config,","))
+end
+
+function make_config_dictionary(configB::Vector,configF::Vector)
+	return Dict([("B",configB),("F",configF)])
+end
+
+function normalize_wavefunc_dict(wavefunc_dict::Dict)
+	all_vals = collect(values(wavefunc_dict))
+	log_psisquared = log_sum(all_vals .+ conj.(all_vals))
+	norm_factor = -log_psisquared/2
+	normed_wavefunc_dict = Dict(k => v + norm_factor for (k,v) in wavefunc_dict)
+	return normed_wavefunc_dict
+end
+
+function get_wavefunc(configurations,L::Int; kwargs...)
+	config_wavefuncs = Dict()
+	for con in configurations
+		config_dict = make_config_dictionary(con,[])
+		config_wavefuncs[config_vector_to_string(con)] = get_config_wavefunc(config_dict,L; kwargs...)
+	end
+	return normalize_wavefunc_dict(config_wavefuncs)
+end
+
 function assign_locations(n_F::Int, n_B::Int, L::Int) # written by ChatGPT 24.07.2023
     if n_F + n_B > L
         throw(ArgumentError("Total number of particles exceeds the available locations (L)."))
@@ -180,6 +209,49 @@ function assign_locations(n_F::Int, n_B::Int, L::Int) # written by ChatGPT 24.07
     locations_dict = Dict("F" => all_locations[1:n_F], "B" => all_locations[n_F+1:n_F+n_B])
 
     return locations_dict
+end
+
+function configurations(N::Int, L::Int)
+    # Initialize an array to store the current configuration
+    current_config = zeros(Int, N)
+
+    # Initialize an array to store all configurations
+    all_configs = []
+
+    # Recursive function to generate configurations
+    function generate_configs(start_pos::Int, remaining_particles::Int)
+        # Base case: all particles have been placed
+        if remaining_particles == 0
+            push!(all_configs, copy(current_config))
+            return
+        end
+
+        # Recursive step: try all possible positions for the next particle
+        for pos in start_pos:L
+            # Check if the position is already occupied
+            if pos in current_config[N - remaining_particles + 1:end]
+                continue  # Skip this position if it's already occupied
+            end
+
+            current_config[N - remaining_particles + 1] = pos
+            generate_configs(pos + 1, remaining_particles - 1)
+        end
+    end
+
+    # Start the recursive function
+    generate_configs(1, N)
+
+    return all_configs
+end
+
+function cr_anh_pair_configs(all_configurations::Vector,cr_site::Int,anh_site::Int)
+	kept_configs = []
+	for c in all_configurations
+		if cr_site in c && !(anh_site in c)
+			append!(kept_configs,[c])
+		end
+	end
+	return kept_configs
 end
 
 function momentum_dist_1d(position_dist,p_count,p_end,p_start=0.0)
@@ -201,66 +273,77 @@ function normalize_log_occ_vector(full_vector,particle_count)
 	return normed_log_vector
 end
 
-#
-L = 97
-n_tot = 10
-n_F = 5
+#=
+pos_occs = []
+mom_occs = []
+
+#for L in [10,20,30,40,50]
+L = 10
+#println(L)
+n_tot = 5
+n_F = 0
 n_B = n_tot - n_F
 if_per = false
 
 if true
-samples = 100000
 locB_probs = [0.0 for i in 1:L]
-locF_probs = [0.0 for i in 1:L]
+#locF_probs = [0.0 for i in 1:L]
 sites = [i-L/2 for i in 1:L]
 nothing_counts = 0
-for i in 1:samples
-	
-	pd = assign_locations(n_F,n_B,L)
+all_configs = configurations(n_tot,L)
+for i in 1:length(all_configs)
+	local_config = all_configs[i]
+	pd = Dict([("B",local_config),("F",[])])
+	#pd = assign_locations(n_F,n_B,L)
 	wavefunc = get_wavefunc(pd,L; if_periodic=if_per)
 	loc_prob = wavefunc
 	if i != 1
+		#=
 		for j in 1:n_F
 			locF_probs[pd["F"][j]] = log_add(locF_probs[pd["F"][j]],loc_prob + conj(loc_prob))
 		end
+		=#
 		for j in 1:n_B
 			locB_probs[pd["B"][j]] = log_add(locB_probs[pd["B"][j]],loc_prob + conj(loc_prob))
 		end
 	else
+		#=
 		for j in 1:n_F
 			locF_probs[pd["F"][j]] = loc_prob + conj(loc_prob)
 		end
+		=#
 		for j in 1:n_B
 			locB_probs[pd["B"][j]] = loc_prob + conj(loc_prob)
 		end
 	end
 end
 norm_locB = normalize_log_occ_vector(locB_probs,n_B)
-norm_locF = normalize_log_occ_vector(locF_probs,n_F)
+plot(sites,exp.(norm_locB),"-p",label="B")
+append!(pos_occs,[norm_locB])
+#norm_locF = normalize_log_occ_vector(locF_probs,n_F)
 #=
 fig = figure()
-plot(sites,exp.(norm_locB),"-p",label="B")
+
 plot(sites,exp.(norm_locF),"-p",label="F")
 title("Bosons = $n_B,Fermions = $n_F")
 legend()
 =#
 end
-
-mcount = 300
-mfinal = 2
-momB = momentum_dist_1d(norm_locB,mcount,mfinal,-2)
-momF = momentum_dist_1d(norm_locF,mcount,mfinal,-2)
-fig2 = figure()
-plot(momB[1]./(pi*1),abs.(momB[2])./n_B,"-p",label="B")
-plot(momF[1]./(pi*1),abs.(momF[2])./n_F,"-p",label="F")
-title("System Size = $L")
+#=
+mcount = 200
+mfinal = 10
+momB = momentum_dist_1d(norm_locB,mcount,mfinal)
+append!(mom_occs,[momB[2]])
+#momF = momentum_dist_1d(norm_locF,mcount,mfinal,-2)
+#fig2 = figure()
+plot(momB[1]./(pi*1),abs.(momB[2])./n_B,label="$L")
+#plot(momF[1]./(pi*1),abs.(momF[2])./n_F,"-p",label="F")
+end
 legend()
+=#
 
 
-
-
-
-
+=#
 
 
 

@@ -1,20 +1,35 @@
 include("fqh_effective.jl")
 include("long-range-ttn.jl")
 
-if true
-L = 6
-nflavors = 20
-file_params = Dict([("L",L),("nflavors",nflavors),("if_nn_int",false)])
+if false
+nflavors = 2
+file_params = Dict([("nflavors",nflavors),("alpha",0.0),("nbosons",10),("if_nn_int",false)])
 all_files = find_data_file(file_params,"mps","jld2","/home/patrick/fzj/main-git/cluster-data")
-alphas = []
+end
+if true
+Ls = []
 wavefuncs = []
+moms = []
+mom_occs = []
 for i in 1:length(all_files)
-	loc_mps = read_data_jld2(all_files[i],"/home/patrick/fzj/main-git/cluster-data")[1]["mps"]
-	append!(wavefuncs,[loc_mps])
-	append!(alphas,get_params_dict_from_filename(all_files[i])["alpha"])
+	dats = read_data_jld2(all_files[i],"/home/patrick/fzj/main-git/cluster-data")[1]["mps"]
+	append!(wavefuncs,[dats])
+	append!(Ls,get_params_dict_from_filename(all_files[i])["L"])
+	mrez = momentum_occupation(dats,200,10.0;if_log=false,if_plot=false)
+	append!(moms,[mrez[1]])
+	append!(mom_occs,[mrez[2]])
 end
-end
+#end
 
+for i in 1:length(wavefuncs)
+	plot(moms[i]./pi,mom_occs[i]./10,label="$(Ls[i])")
+end
+title("Momentum Distribution range PhysDim NF = 2, 1st Order")
+xlabel("p/pi")
+ylabel("Occupation / nbosons")
+legend()
+end
+#=
 for i in 1:length(all_files)
 	fig = figure()
 	mm,oc = momentum_occupation(wavefuncs[i],50,15.0,-15.0)
@@ -29,7 +44,7 @@ for i in 1:length(all_files)
 	#
 	legend()
 end
-#
+=#
 
 
 
