@@ -36,13 +36,17 @@ function log_add(a,b)
 end
 
 function log_sum(all_values)
-	consecutive = [all_values[1],all_values[2]]
-	for i in 3:length(all_values) + 1
-		added_value = log_add(consecutive[1],consecutive[2])
-		consecutive[1] = added_value
-		consecutive[2] = i <= length(all_values) ? all_values[i] : 0.0
+	if length(all_values) < 2
+		return all_values[1]
+	else
+		consecutive = [all_values[1],all_values[2]]
+		for i in 3:length(all_values) + 1
+			added_value = log_add(consecutive[1],consecutive[2])
+			consecutive[1] = added_value
+			consecutive[2] = i <= length(all_values) ? all_values[i] : 0.0
+		end
+		return consecutive[1]
 	end
-	return consecutive[1]
 end
 
 function physical_part(particle_dictionary::Dict,L::Int; kwargs...)
@@ -189,12 +193,16 @@ function normalize_wavefunc_dict(wavefunc_dict::Dict)
 end
 
 function get_wavefunc(configurations,L::Int; kwargs...)
-	config_wavefuncs = Dict()
-	for con in configurations
-		config_dict = make_config_dictionary(con,[])
-		config_wavefuncs[config_vector_to_string(con)] = get_config_wavefunc(config_dict,L; kwargs...)
+	if length(configurations) == 0
+		return nothing
+	else
+		config_wavefuncs = Dict()
+		for con in configurations
+			config_dict = make_config_dictionary(con,[])
+			config_wavefuncs[config_vector_to_string(con)] = get_config_wavefunc(config_dict,L; kwargs...)
+		end
+		return normalize_wavefunc_dict(config_wavefuncs)
 	end
-	return normalize_wavefunc_dict(config_wavefuncs)
 end
 
 function assign_locations(n_F::Int, n_B::Int, L::Int) # written by ChatGPT 24.07.2023
@@ -254,17 +262,108 @@ function cr_anh_pair_configs(all_configurations::Vector,cr_site::Int,anh_site::I
 	return kept_configs
 end
 
-function momentum_dist_1d(position_dist,p_count,p_end,p_start=0.0)
-	num_sites = length(position_dist)
+function overlap_two_wavefuncs(wavefuncL,wavefuncR; kwargs...)
+	if_log = get(kwargs, :if_log, true)
+	if isnothing(wavefuncL) | isnothing(wavefuncR)
+		return -Inf
+	else
+	
+		overlaps = []
+		for (k,v) in wavefuncL
+			if k in keys(wavefuncR)
+				config_overlap = if_log ? conj(wavefuncL[k]) + wavefuncR[k] : conj(wavefuncL[k]) + wavefuncR[k]
+				append!(overlaps,[config_overlap])
+			end
+		end
+		if if_log
+			base_val = log_sum(overlaps)
+			final_overlap = base_val + conj(base_val)
+		else
+			final_overlap = abs2.(sum(overlaps))
+		end
+		
+		return final_overlap
+	end
+end
+
+function position_occupancy(wavefunc::Dict,L::Int; kwargs...)
+	if_log = get(kwargs, :if_log, true)
+	if_plot = get(kwargs, :if_plot, true)
+	all_sites = [i for i in 1:L]
+	site_occs = [423.0 for i in 1:L]
+	for (k,v) in wavefunc
+		result = if_log ? v + conj(v) : v*conj(v)
+		config = config_string_to_vector(k)
+		for s in config
+			if site_occs[s] == 423.0
+				site_occs[s] = result
+			else
+				site_occs[s] = if_log ? log_add(site_occs[s],result) : site_occs[s] + result
+			end
+		end
+	end
+	
+	if_plot ? plot_position_occupancy(all_sites,if_log ? exp.(site_occs) : site_occs; kwargs...) : nothing
+	
+	return all_sites,site_occs
+end
+
+function plot_position_occupancy(sites,occs; kwargs...)
+	title_string = "Position Occupancy, " * get(kwargs, :plot_title, "")
+	plot(sites,occs,"-p")
+	title(title_string)
+end
+
+function get_CrAnh_correlation(wavefunc,all_configs::Vector,L::Int; kwargs...)
+	all_hops = zeros(L,L)
+	for i in 1:L
+		for j in 1:L
+			println(i/L,", ",j/L)
+			new_configs = cr_anh_pair_configs(all_configs,i,j)
+			hop_wavefunc = get_wavefunc(new_configs,L;kwargs...)
+			overlap_val = overlap_two_wavefuncs(wavefunc,hop_wavefunc; kwargs...)
+			all_hops[i,j] = exp.(overlap_val)
+		end
+	end
+	return all_hops
+end
+
+function momentum_dist_1d(wavefunc::Dict,part_count::Int,L::Int,p_count::Int,p_end::Float64,all_configs::Vector,p_start=0.0;kwargs...)
+	if_plot = get(kwargs, :if_plot, true)
+	num_sites = L
 	mom_occ = [0.0*im for i in 1:p_count]
 	momenta = [p_start + (i-1)*(p_end - p_start)/(p_count-1) for i in 1:p_count]
+	pos_occ = get_CrAnh_correlation(wavefunc,all_configs,L; kwargs...)
+	println("Made Position Occupation Matrix")
 	for i in 1:p_count
+		#println(round(100*i/p_count,digits=1),"%")
 		momentum = momenta[i]
-		exp_vec = [exp(im*momentum*(j - num_sites/2) + position_dist[j]) for j in 1:num_sites]
-		local_value = sum(exp_vec)
-		mom_occ[i] = local_value
+		exp_vect = zeros(num_sites,num_sites) .* im
+		for j in 1:num_sites
+			exp_vect[:,j] = [exp(im*momentum*(j-l)) for l in 1:num_sites]
+		end
+		
+		mom_occ[i] = abs(sum(exp_vect .* pos_occ) / (num_sites))
 	end
+	
+	if_plot ? plot_momentum(momenta,mom_occ,part_count; kwargs...) : nothing
+	
 	return momenta,mom_occ
+end
+
+function plot_momentum(momenta,mom_occ,part_count::Int; kwargs...)
+	title_string = "Momentum Distribution, " * get(kwargs, :plot_title, "")
+	#fig = figure()
+	plot(momenta./pi,mom_occ./part_count,label="$part_count")
+	if_logscale = get(kwargs, :if_logscale, true)
+	if if_logscale
+		yscale("log")
+		xscale("log")
+	end
+	xlabel("p/pi")
+	ylabel("Occupation / nparticles")
+	title(title_string)
+	
 end
 
 function normalize_log_occ_vector(full_vector,particle_count)
@@ -273,77 +372,29 @@ function normalize_log_occ_vector(full_vector,particle_count)
 	return normed_log_vector
 end
 
-#=
-pos_occs = []
-mom_occs = []
-
+#
 #for L in [10,20,30,40,50]
 L = 10
 #println(L)
-n_tot = 5
+for n_tot in [8,7,6,5,4,3]
+#n_tot = 5
 n_F = 0
 n_B = n_tot - n_F
 if_per = false
+model_paras = (if_periodic=if_per,if_log=true,if_logscale=false)
+pcount = 100
 
-if true
-locB_probs = [0.0 for i in 1:L]
-#locF_probs = [0.0 for i in 1:L]
-sites = [i-L/2 for i in 1:L]
-nothing_counts = 0
 all_configs = configurations(n_tot,L)
-for i in 1:length(all_configs)
-	local_config = all_configs[i]
-	pd = Dict([("B",local_config),("F",[])])
-	#pd = assign_locations(n_F,n_B,L)
-	wavefunc = get_wavefunc(pd,L; if_periodic=if_per)
-	loc_prob = wavefunc
-	if i != 1
-		#=
-		for j in 1:n_F
-			locF_probs[pd["F"][j]] = log_add(locF_probs[pd["F"][j]],loc_prob + conj(loc_prob))
-		end
-		=#
-		for j in 1:n_B
-			locB_probs[pd["B"][j]] = log_add(locB_probs[pd["B"][j]],loc_prob + conj(loc_prob))
-		end
-	else
-		#=
-		for j in 1:n_F
-			locF_probs[pd["F"][j]] = loc_prob + conj(loc_prob)
-		end
-		=#
-		for j in 1:n_B
-			locB_probs[pd["B"][j]] = loc_prob + conj(loc_prob)
-		end
-	end
+println("Made Configs, total = ",length(all_configs))
+gs_wavefunc = get_wavefunc(all_configs,L;model_paras...)
+println("Made Wavefunc")
+#position_occupancy(gs_wavefunc,L; model_paras...)
+mrez = momentum_dist_1d(gs_wavefunc,n_tot,L,pcount,10.0,all_configs;model_paras...,plot_title="Nt=$n_tot")
 end
-norm_locB = normalize_log_occ_vector(locB_probs,n_B)
-plot(sites,exp.(norm_locB),"-p",label="B")
-append!(pos_occs,[norm_locB])
-#norm_locF = normalize_log_occ_vector(locF_probs,n_F)
-#=
-fig = figure()
-
-plot(sites,exp.(norm_locF),"-p",label="F")
-title("Bosons = $n_B,Fermions = $n_F")
-legend()
-=#
-end
-#=
-mcount = 200
-mfinal = 10
-momB = momentum_dist_1d(norm_locB,mcount,mfinal)
-append!(mom_occs,[momB[2]])
-#momF = momentum_dist_1d(norm_locF,mcount,mfinal,-2)
-#fig2 = figure()
-plot(momB[1]./(pi*1),abs.(momB[2])./n_B,label="$L")
-#plot(momF[1]./(pi*1),abs.(momF[2])./n_F,"-p",label="F")
-end
-legend()
-=#
 
 
-=#
+
+#
 
 
 
