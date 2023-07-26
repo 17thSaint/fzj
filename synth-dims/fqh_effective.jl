@@ -79,6 +79,22 @@ begin
 		mat[flavor + 1,1] = 1
 		return mat
 	end
+	
+	function _op(::OpName"FullDag", ::SiteType"ExtendedHardcore", d::Int)
+	    mat = zeros(d,d)
+	    for i in 1:d-1
+	    	mat[i + 1,1] = 1
+	    end
+	    return mat
+	end
+	
+	function _op(::OpName"FullHat", ::SiteType"ExtendedHardcore", d::Int)
+	    mat = zeros(d,d)
+	    for i in 1:d-1
+	    	mat[1,i + 1] = 1
+	    end
+	    return mat
+	end
 
 	_op(::OpName"I", ::SiteType"ExtendedHardcore", d::Int) = I(d)
 	_op(::OpName"Id", ::SiteType"ExtendedHardcore", d::Int) = I(d)
@@ -386,6 +402,8 @@ function plot_greenfunc(all_greens,hopping_direction; kwargs...)
 end
 
 function momentum_occupation(wavefunc::MPS,p_count::Int64,p_end=8.0,p_start=0.0; kwargs...)
+	if_new_op = get(kwargs, :if_new_op, false)
+	
 	num_sites = length(siteinds(wavefunc))
 	dimension = dim(siteinds(wavefunc)[1])
 	momenta = [p_start + (i-1)*(p_end - p_start)/(p_count-1) for i in 1:p_count]#[pi*i/(num_sites+1) for i in 1:p_count]
@@ -399,7 +417,7 @@ function momentum_occupation(wavefunc::MPS,p_count::Int64,p_end=8.0,p_start=0.0;
 			#exp_vect[:,j] = [-1 * cos(momentum*(l+j)) + cos(momentum*(j-l)) for l in 1:num_sites]
 			exp_vect[:,j] = [exp(im*momentum*(j-l)) for l in 1:num_sites]
 		end
-		pos_occ = sum([correlation_matrix(wavefunc,"Cr$i1","Anh$j1") for i1 in 1:dimension-1 for j1 in 1:dimension-1])
+		pos_occ = correlation_matrix(wavefunc,"FullDag","FullHat")
 		mom_occ[i] = sum(exp_vect .* pos_occ) / (num_sites*(dimension-1))
 	end
 	
