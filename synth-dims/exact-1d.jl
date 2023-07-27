@@ -309,8 +309,10 @@ function position_occupancy(wavefunc::Dict,L::Int; kwargs...)
 end
 
 function plot_position_occupancy(sites,occs; kwargs...)
+	plot_label = get(kwargs, :plot_label, "")
+	isempty(plot_label) ? fig = figure() : nothing
 	title_string = "Position Occupancy, " * get(kwargs, :plot_title, "")
-	plot(sites,occs,"-p")
+	plot(sites,occs,"-p",label=plot_label)
 	title(title_string)
 end
 
@@ -318,7 +320,7 @@ function get_CrAnh_correlation(wavefunc,all_configs::Vector,L::Int; kwargs...)
 	all_hops = zeros(L,L)
 	for i in 1:L
 		for j in 1:L
-			println(i/L,", ",j/L)
+			#println(i/L,", ",j/L)
 			new_configs = cr_anh_pair_configs(all_configs,i,j)
 			hop_wavefunc = get_wavefunc(new_configs,L;kwargs...)
 			overlap_val = overlap_two_wavefuncs(wavefunc,hop_wavefunc; kwargs...)
@@ -352,9 +354,10 @@ function momentum_dist_1d(wavefunc::Dict,part_count::Int,L::Int,p_count::Int,p_e
 end
 
 function plot_momentum(momenta,mom_occ,part_count::Int; kwargs...)
+	plot_label = get(kwargs, :plot_label, "")
+	isempty(plot_label) ? fig = figure() : nothing
 	title_string = "Momentum Distribution, " * get(kwargs, :plot_title, "")
-	#fig = figure()
-	plot(momenta./pi,mom_occ./part_count,label="$part_count")
+	plot(momenta./pi,mom_occ./part_count,label=plot_label)
 	if_logscale = get(kwargs, :if_logscale, true)
 	if if_logscale
 		yscale("log")
@@ -375,22 +378,26 @@ end
 #
 #for L in [10,20,30,40,50]
 L = 10
-#println(L)
-for n_tot in [8,7,6,5,4,3]
-#n_tot = 5
+n_tot = 5
 n_F = 0
 n_B = n_tot - n_F
 if_per = false
-model_paras = (if_periodic=if_per,if_log=true,if_logscale=false)
 pcount = 100
-
 all_configs = configurations(n_tot,L)
 println("Made Configs, total = ",length(all_configs))
+
+#println(L)
+count = 10
+fs = 0.26
+fe = 0.33
+for omega in [fs + (i-1)*(fe-fs)/(count-1) for i in 1:count]
+model_paras = (freq=omega,if_periodic=if_per,if_log=true,if_logscale=false)
 gs_wavefunc = get_wavefunc(all_configs,L;model_paras...)
 println("Made Wavefunc")
-#position_occupancy(gs_wavefunc,L; model_paras...)
-mrez = momentum_dist_1d(gs_wavefunc,n_tot,L,pcount,10.0,all_configs;model_paras...,plot_title="Nt=$n_tot")
+position_occupancy(gs_wavefunc,L; model_paras...,plot_label="$(round(omega,digits=2))",plot_title="range HarmTrap Frequency, Nbosons=$n_tot")
+#mrez = momentum_dist_1d(gs_wavefunc,n_tot,L,pcount,10.0,all_configs;model_paras...,plot_label="$(round(omega,digits=2))",plot_title="Momentum Dist range HarmTrap Frequency, Nbosons=$n_tot")
 end
+legend()
 
 
 
