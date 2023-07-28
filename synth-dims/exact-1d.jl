@@ -115,7 +115,7 @@ function orbital_part(particle_dictionary::Dict,L::Int; kwargs...)
 	hermite_part = 1.0
 	for (species,locations) in particle_dictionary
 		for loc in locations
-			coeff_part = exp(-0.5*((loc-L/2)/xosc)^2) / sqrt((2^0)*factorial(0)*sqrt(pi)*xosc)
+			coeff_part = exp(-0.5*((loc-(L+1)/2)/xosc)^2) / sqrt((2^0)*factorial(0)*sqrt(pi)*xosc)
 			part = coeff_part * hermite_part
 			append!(all_values,[part])
 		end
@@ -252,6 +252,44 @@ function configurations(N::Int, L::Int)
     return all_configs
 end
 
+function combine_two_vectors(vec1::Vector,vec2::Vector; kwargs...)
+	if_log = get(kwargs, :if_log, true)
+	
+	halfway_vec = [0.0*im for j in 1:length(vec1)]
+	for i in 1:length(vec1)
+		halfway_vec[i] = if_log ? log_sum(vec2 .+ vec1[i]) : sum(vec2 .* vec1[i])
+	end
+	result = if_log ? log_sum(halfway_vec) : sum(halfway_vec)
+	return result
+end
+
+function normalize_densmat(dens_mat::Matrix,part_count::Int; kwargs...)
+	if_log = get(kwargs, :if_log, true)
+end
+
+function density_matrix(wavefunc,L::Int,part_count::Int; kwargs...)
+	if_log = get(kwargs, :if_log, true)
+	
+	dens_mat = zeros(L,L) .* im
+	for x in 1:L
+		psi0s = []
+		for (k,v) in wavefunc
+			if string(x) in collect(split(k,","))
+				append!(psi0s,[v])
+			end
+		end
+		for xp in 1:L
+			psi0ps = []
+			for (k,v) in wavefunc
+				if string(xp) in collect(split(k,","))
+					append!(psi0ps,[conj(v)])
+				end
+			end
+			dens_mat[x,xp] = combine_two_vectors(psi0s,psi0ps; kwargs...)
+		end
+	end
+end
+
 function cr_anh_pair_configs(all_configurations::Vector,cr_site::Int,anh_site::Int)
 	kept_configs = []
 	for c in all_configurations
@@ -354,6 +392,9 @@ function momentum_dist_1d(wavefunc::Dict,part_count::Int,L::Int,p_count::Int,p_e
 end
 
 function plot_momentum(momenta,mom_occ,part_count::Int; kwargs...)
+	freq = get(kwargs, :freq, 1.0)
+	mass = get(kwargs, :mass, 1.0)
+	kosc = 2*pi/sqrt(1/(mass*freq))
 	plot_label = get(kwargs, :plot_label, "")
 	isempty(plot_label) ? fig = figure() : nothing
 	title_string = "Momentum Distribution, " * get(kwargs, :plot_title, "")
@@ -378,7 +419,7 @@ end
 #
 #for L in [10,20,30,40,50]
 L = 10
-n_tot = 5
+n_tot = 10
 n_F = 0
 n_B = n_tot - n_F
 if_per = false
@@ -387,15 +428,17 @@ all_configs = configurations(n_tot,L)
 println("Made Configs, total = ",length(all_configs))
 
 #println(L)
+moms = []
 count = 10
-fs = 0.26
-fe = 0.33
+fs = 0.01
+fe = 2.0
 for omega in [fs + (i-1)*(fe-fs)/(count-1) for i in 1:count]
 model_paras = (freq=omega,if_periodic=if_per,if_log=true,if_logscale=false)
 gs_wavefunc = get_wavefunc(all_configs,L;model_paras...)
 println("Made Wavefunc")
-position_occupancy(gs_wavefunc,L; model_paras...,plot_label="$(round(omega,digits=2))",plot_title="range HarmTrap Frequency, Nbosons=$n_tot")
-#mrez = momentum_dist_1d(gs_wavefunc,n_tot,L,pcount,10.0,all_configs;model_paras...,plot_label="$(round(omega,digits=2))",plot_title="Momentum Dist range HarmTrap Frequency, Nbosons=$n_tot")
+#position_occupancy(gs_wavefunc,L; model_paras...,plot_label="$(round(omega,digits=2))",plot_title="range HarmTrap Frequency, Nbosons=$n_tot")
+mrez = momentum_dist_1d(gs_wavefunc,n_tot,L,pcount,10.0,all_configs;model_paras...,plot_label="$(round(omega,digits=2))",plot_title=" range HarmTrap Frequency, Nbosons=$n_tot")
+append!(moms,[mrez[2]])
 end
 legend()
 
