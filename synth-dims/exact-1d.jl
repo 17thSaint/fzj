@@ -1,4 +1,4 @@
-using LinearAlgebra,PyPlot,Random
+using LinearAlgebra,PyPlot,Random,NumericalIntegration
 
 function log_prod(all_values)
 	#=
@@ -266,7 +266,6 @@ end
 function normalize_densmat(dens_mat::Matrix,part_count::Int; kwargs...)
 	if_log = get(kwargs, :if_log, true)
 	current_trace = if_log ? log_sum(diag(dens_mat)) : tr(dens_mat)
-	println(current_trace)
 	shift_mat = Diagonal([log(part_count) - current_trace for i in 1:L])
 	norm_densmat = dens_mat + shift_mat
 	return norm_densmat
@@ -297,6 +296,9 @@ function density_matrix(wavefunc,L::Int,part_count::Int; kwargs...)
 end
 
 function cr_anh_pair_configs(all_configurations::Vector,cr_site::Int,anh_site::Int)
+	if cr_site == anh_site
+		return all_configurations
+	end
 	kept_configs = []
 	for c in all_configurations
 		if cr_site in c && !(anh_site in c)
@@ -368,18 +370,41 @@ function get_CrAnh_correlation(wavefunc,all_configs::Vector,L::Int; kwargs...)
 			new_configs = cr_anh_pair_configs(all_configs,i,j)
 			hop_wavefunc = get_wavefunc(new_configs,L;kwargs...)
 			overlap_val = overlap_two_wavefuncs(wavefunc,hop_wavefunc; kwargs...)
-			all_hops[i,j] = exp.(overlap_val)
+			all_hops[i,j] = overlap_val
 		end
 	end
 	return all_hops
 end
 
+function momentum_dist_1d(dens_mat::Matrix,part_count::Int,p_count::Int,p_end::Float64,p_start=0.0;kwargs...)
+	if_plot = get(kwargs, :if_plot, true)
+	num_sites = size(dens_mat)[1]
+	mom_occ = [0.0 for i in 1:p_count]
+	momenta = [p_start + (i-1)*(p_end - p_start)/(p_count-1) for i in 1:p_count]
+	for i in 1:p_count
+		#println(round(100*i/p_count,digits=1),"%")
+		momentum = momenta[i]
+		exp_vect = zeros(num_sites,num_sites) .* im
+		for j in 1:num_sites
+			exp_vect[:,j] = [exp(im*momentum*(l-j)) for l in 1:num_sites]
+		end
+		
+		mom_occ[i] = abs(sum(exp_vect .* exp.(dens_mat)) / num_sites)
+	end
+	
+	if_plot ? plot_momentum(momenta,mom_occ,part_count; kwargs...) : nothing
+	
+	return momenta,mom_occ
+end
+
 function momentum_dist_1d(wavefunc::Dict,part_count::Int,L::Int,p_count::Int,p_end::Float64,all_configs::Vector,p_start=0.0;kwargs...)
+	if_log = get(kwargs, :if_log, true)
 	if_plot = get(kwargs, :if_plot, true)
 	num_sites = L
 	mom_occ = [0.0*im for i in 1:p_count]
 	momenta = [p_start + (i-1)*(p_end - p_start)/(p_count-1) for i in 1:p_count]
 	pos_occ = get_CrAnh_correlation(wavefunc,all_configs,L; kwargs...)
+	if_log ? pos_occ = exp.(pos_occ) : nothing
 	println("Made Position Occupation Matrix")
 	for i in 1:p_count
 		#println(round(100*i/p_count,digits=1),"%")
@@ -424,12 +449,16 @@ end
 
 #
 #for L in [10,20,30,40,50]
+suff_momdiff = 2*pi/200
 L = 10
-n_tot = 5
+n_tot = 10
 n_F = 0
 n_B = n_tot - n_F
 if_per = false
-pcount = 100
+pfinal = 3.141592653589
+pinit = 0.0
+pcount = Int(ceil((pfinal-pinit)/suff_momdiff))
+println("Running $pcount Mom Vals")
 all_configs = configurations(n_tot,L)
 println("Made Configs, total = ",length(all_configs))
 
@@ -443,16 +472,16 @@ omega = 1.0
 model_paras = (freq=omega,if_periodic=if_per,if_log=true,if_logscale=false)
 gs_wavefunc = get_wavefunc(all_configs,L;model_paras...)
 println("Made Wavefunc")
-rho = density_matrix(gs_wavefunc,L,n_tot; model_paras...)
-imshow(real.(exp.(rho)))
-colorbar()
+#rho = density_matrix(gs_wavefunc,L,n_tot; model_paras...)
+other_densmat = get_CrAnh_correlation(gs_wavefunc,all_configs,L; model_paras...)
+#plot([i for i in 1:L],exp.(diag(rho)),label="$(round(omega,digits=2))")
 #position_occupancy(gs_wavefunc,L; model_paras...,plot_label="$(round(omega,digits=2))",plot_title="range HarmTrap Frequency, Nbosons=$n_tot")
-#mrez = momentum_dist_1d(gs_wavefunc,n_tot,L,pcount,10.0,all_configs;model_paras...,plot_label="$(round(omega,digits=2))",plot_title=" range HarmTrap Frequency, Nbosons=$n_tot")
+mrez = momentum_dist_1d(gs_wavefunc,n_tot,L,pcount,pfinal,all_configs,pinit;model_paras...,plot_label="$(round(omega,digits=2))",plot_title=" Nbosons=$n_tot")
+mrez2 = momentum_dist_1d(other_densmat,n_tot,pcount,pfinal,pinit;model_paras...,plot_label="DensMat")
+#end
 #append!(moms,[mrez[2]])
 #end
-#legend()
-
-
+legend()
 
 #
 
