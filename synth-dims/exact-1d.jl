@@ -265,6 +265,11 @@ end
 
 function normalize_densmat(dens_mat::Matrix,part_count::Int; kwargs...)
 	if_log = get(kwargs, :if_log, true)
+	current_trace = if_log ? log_sum(diag(dens_mat)) : tr(dens_mat)
+	println(current_trace)
+	shift_mat = Diagonal([log(part_count) - current_trace for i in 1:L])
+	norm_densmat = dens_mat + shift_mat
+	return norm_densmat
 end
 
 function density_matrix(wavefunc,L::Int,part_count::Int; kwargs...)
@@ -288,6 +293,7 @@ function density_matrix(wavefunc,L::Int,part_count::Int; kwargs...)
 			dens_mat[x,xp] = combine_two_vectors(psi0s,psi0ps; kwargs...)
 		end
 	end
+	return normalize_densmat(dens_mat,part_count; kwargs...)
 end
 
 function cr_anh_pair_configs(all_configurations::Vector,cr_site::Int,anh_site::Int)
@@ -419,7 +425,7 @@ end
 #
 #for L in [10,20,30,40,50]
 L = 10
-n_tot = 10
+n_tot = 5
 n_F = 0
 n_B = n_tot - n_F
 if_per = false
@@ -432,15 +438,19 @@ moms = []
 count = 10
 fs = 0.01
 fe = 2.0
-for omega in [fs + (i-1)*(fe-fs)/(count-1) for i in 1:count]
+omega = 1.0
+#for omega in [fs + (i-1)*(fe-fs)/(count-1) for i in 1:count]
 model_paras = (freq=omega,if_periodic=if_per,if_log=true,if_logscale=false)
 gs_wavefunc = get_wavefunc(all_configs,L;model_paras...)
 println("Made Wavefunc")
+rho = density_matrix(gs_wavefunc,L,n_tot; model_paras...)
+imshow(real.(exp.(rho)))
+colorbar()
 #position_occupancy(gs_wavefunc,L; model_paras...,plot_label="$(round(omega,digits=2))",plot_title="range HarmTrap Frequency, Nbosons=$n_tot")
-mrez = momentum_dist_1d(gs_wavefunc,n_tot,L,pcount,10.0,all_configs;model_paras...,plot_label="$(round(omega,digits=2))",plot_title=" range HarmTrap Frequency, Nbosons=$n_tot")
-append!(moms,[mrez[2]])
-end
-legend()
+#mrez = momentum_dist_1d(gs_wavefunc,n_tot,L,pcount,10.0,all_configs;model_paras...,plot_label="$(round(omega,digits=2))",plot_title=" range HarmTrap Frequency, Nbosons=$n_tot")
+#append!(moms,[mrez[2]])
+#end
+#legend()
 
 
 
