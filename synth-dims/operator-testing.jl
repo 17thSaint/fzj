@@ -3,24 +3,36 @@ include("long-range-ttn.jl")
 
 if false
 nflavors = 2
-file_params = Dict([("nflavors",nflavors),("alpha",0.0),("nbosons",10),("if_nn_int",false)])
+file_params = Dict([("nflavors",nflavors),("alpha",0.0),("nbosons",10),("if_nn_int",true)])
 all_files = find_data_file(file_params,"mps","jld2","/home/patrick/fzj/main-git/cluster-data")
 end
 if true
 Ls = []
 wavefuncs = []
-moms = []
-mom_occs = []
+rhos = []
 for i in 1:length(all_files)
 	dats = read_data_jld2(all_files[i],"/home/patrick/fzj/main-git/cluster-data")[1]["mps"]
 	append!(wavefuncs,[dats])
 	append!(Ls,get_params_dict_from_filename(all_files[i])["L"])
-	mrez = momentum_occupation(dats,200,10.0;if_log=false,if_plot=false)
-	append!(moms,[mrez[1]])
-	append!(mom_occs,[mrez[2]])
+	densmat = correlation_matrix(dats,"FullDag","FullHat")
+	append!(rhos,[densmat])
+	#mrez = momentum_occupation(dats,200,10.0;if_log=false,if_plot=false)
+	#append!(moms,[mrez[1]])
+	#append!(mom_occs,[mrez[2]])
 end
-#end
+end
 
+if true
+for i in 1:length(rhos)
+	fig = figure()
+	imshow(rhos[i])
+	colorbar()
+	traceval = round(tr(rhos[i]),digits=3)
+	title("L = $(Ls[i]) with Tr = $traceval")
+end
+end
+
+if false
 for i in 1:length(wavefuncs)
 	plot(moms[i]./pi,mom_occs[i]./10,label="$(Ls[i])")
 end

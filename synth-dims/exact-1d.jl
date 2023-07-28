@@ -356,10 +356,21 @@ function position_occupancy(wavefunc::Dict,L::Int; kwargs...)
 	return all_sites,site_occs
 end
 
-function plot_position_occupancy(sites,occs; kwargs...)
+function plot_position_occupancy(sites::Vector,occs::Vector; kwargs...)
 	plot_label = get(kwargs, :plot_label, "")
 	isempty(plot_label) ? fig = figure() : nothing
 	title_string = "Position Occupancy, " * get(kwargs, :plot_title, "")
+	plot(sites,occs,"-p",label=plot_label)
+	title(title_string)
+end
+
+function plot_position_occupancy(dens_mat::Matrix; kwargs...)
+	if_log = get(kwargs, :if_log, true)
+	plot_label = get(kwargs, :plot_label, "")
+	isempty(plot_label) ? fig = figure() : nothing
+	title_string = "Position Occupancy, " * get(kwargs, :plot_title, "")
+	sites = [i for i in 1:size(dens_mat)[1]]
+	occs = if_log ? diag(exp.(dens_mat)) : diag(dens_mat) 
 	plot(sites,occs,"-p",label=plot_label)
 	title(title_string)
 end
@@ -383,6 +394,7 @@ end
 
 function momentum_dist_1d(dens_mat::Matrix,part_count::Int,p_count::Int,p_end::Float64,p_start=0.0;kwargs...)
 	if_plot = get(kwargs, :if_plot, true)
+	if_norm_mom = get(kwargs, :if_norm_mom, true)
 	num_sites = size(dens_mat)[1]
 	mom_occ = [0.0 for i in 1:p_count]
 	momenta = [p_start + (i-1)*(p_end - p_start)/(p_count-1) for i in 1:p_count]
@@ -396,6 +408,13 @@ function momentum_dist_1d(dens_mat::Matrix,part_count::Int,p_count::Int,p_end::F
 		
 		mom_occ[i] = abs(sum(exp_vect .* exp.(dens_mat)) / num_sites)
 	end
+	#=
+	if if_norm_mom && momenta[end] > pi
+		fin_elem = findfirst(x -> momenta[x] < pi && momenta[x+1] > pi,[i for i in 1:length(momenta)])
+		norm_factor = 2*integrate(momenta[1:fin_elem+1],mom_occ[1:fin_elem+1])
+		mom_occ ./= norm_factor
+	end
+	=#
 	
 	if_plot ? plot_momentum(momenta,mom_occ,part_count; kwargs...) : nothing
 	
@@ -459,31 +478,42 @@ L = 10
 n_tot = 5
 n_F = 0
 n_B = n_tot - n_F
+all_configs = configurations(n_tot,L)
+println("Made Configs, total = ",length(all_configs))
 if_per = false
 pfinal = 10.0
 pinit = 0.0
 pcount = Int(ceil((pfinal-pinit)/suff_momdiff))
 println("Running $pcount Mom Vals")
-all_configs = configurations(n_tot,L)
-println("Made Configs, total = ",length(all_configs))
 
-#println(L)
-moms = []
+
+if false
 count = 10
 fs = 0.01
 fe = 2.0
-#omega = 1.0
-for omega in [fs + (i-1)*(fe-fs)/(count-1) for i in 1:count]
+omegas = [fs + (i-1)*(fe-fs)/(count-1) for i in 1:count]
+rhos = [zeros(L,L) for i in 1:length(omegas)]
+
+for i in 1:length(omegas)
+omega = omegas[i]
 model_paras = (freq=omega,if_periodic=if_per,if_log=true,if_logscale=false)
 gs_wavefunc = get_wavefunc(all_configs,L;model_paras...)
 println("Made Wavefunc")
 rho = density_matrix(gs_wavefunc,all_configs,L; model_paras...)
-#plot([i for i in 1:L],exp.(diag(rho)),label="$(round(omega,digits=2))")
+rhos[i] = rho
 #position_occupancy(gs_wavefunc,L; model_paras...,plot_label="$(round(omega,digits=2))",plot_title="range HarmTrap Frequency, Nbosons=$n_tot")
 #mrez = momentum_dist_1d(gs_wavefunc,n_tot,L,pcount,pfinal,all_configs,pinit;model_paras...,plot_label="$(round(omega,digits=2))",plot_title=" Nbosons=$n_tot")
-mrez = momentum_dist_1d(rho,n_tot,pcount,pfinal,pinit;model_paras...,plot_label="$(round(omega,digits=2))")
+#mrez = momentum_dist_1d(rho,n_tot,pcount,pfinal,pinit;model_paras...,plot_label="$(round(omega,digits=2))")
 #end
-append!(moms,[mrez[2]])
+#append!(moms,[mrez[2]])
+end
+end
+
+for i in 1:length(rhos)
+	rho = rhos[i]
+	omega = omegas[i]
+	#plot_position_occupancy(rho; model_paras...,plot_label="$n_tot",plot_title="L=$L range Density")
+	mrez = momentum_dist_1d(rho,n_tot,pcount,pfinal,pinit;if_periodic=if_per,if_log=true,plot_label="$(round(omega,digits=2))",plot_title="L=$L range HarmTrap Mass",if_logscale=false)
 end
 legend()
 
