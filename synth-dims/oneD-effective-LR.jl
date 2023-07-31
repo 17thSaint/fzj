@@ -15,19 +15,19 @@ function fix_filling(L,nflavors,nu)
 	return nothing,nothing
 end
 
-save_nothing = false
+save_nothing = true
 params_dict = Dict()
-#L = 20#get(params_dict, "L", 4)
+L = 20#get(params_dict, "L", 4)
 #nbosons = 5#get(params_dict, "nbosons", nflavors)
-#nflavors = 2#get(params_dict, "nflavors", Int(L/2))
+nflavors = 10#get(params_dict, "nflavors", Int(L/2))
 t1 = get(params_dict, "t1", 1.0)
 t2 = get(params_dict, "t2", 1.0)
 U = get(params_dict, "U", 100)
 U1 = 4*t1^2/U
 U2 = U1/2
 conserve_qns = true
-if_nn_int = true#get(params_dict, "if_nn_int", false)
-if_2ord_pert = true#get(params_dict, "if_2ord_pert", false)
+if_nn_int = false#get(params_dict, "if_nn_int", false)
+if_2ord_pert = false#get(params_dict, "if_2ord_pert", false)
 nsweeps = 7
 mdim = get(params_dict, "mdim", 100)
 noise = [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0]
@@ -40,18 +40,11 @@ savefig_data = false#save_nothing ? false : true
 savefig = false#save_nothing ? false : true
 if_lines = false
 
-nbosons,alpha = 10,0.0#fix_filling(L,nflavors,1/2)
+wavefuncs = []
+rhos = []
+for (nbosons,alpha) in [(10,0.0),fix_filling(L,nflavors,1/2)]
+#nbosons,alpha = fix_filling(L,nflavors,1/2)
 phi = 2*pi*alpha
-
-allall_wavefuncs = []
-all_mom_occs = []
-virts = [3,5,8,10]
-for nflavors in virts
-all_wavefuncs = []
-mom_occs = []
-Ls = [12,20,30,40,50]
-for L in Ls
-
 
 filename_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
 #filename_dict_highdens = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons_highdens),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
@@ -67,12 +60,16 @@ model_paras = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = 
 metadata_dict = merge(named_tuple_to_dict(model_paras),other_params_dict)
 
 psi = execute_mps(U1,U2,phi,L,nflavors,nbosons; model_paras...,metadata=metadata_dict)
-append!(all_wavefuncs,[psi])
-#psi_highdens = execute_mps(U1,U2,phi,L,nflavors,nbosons_highdens; model_paras_highdens...,metadata=metadata_dict_highdens)
-mrez = momentum_occupation(psi,200,10.0; model_paras...,plot_title="Phys Dim Length = $L",if_log=false,if_plot=false)
-append!(mom_occs,[mrez[2]])
+append!(wavefuncs,[psi])
+densmat = correlation_matrix(psi,"FullDag","FullHat")
+append!(rhos,[densmat])
 
+#append!(all_wavefuncs,[psi])
+#psi_highdens = execute_mps(U1,U2,phi,L,nflavors,nbosons_highdens; model_paras_highdens...,metadata=metadata_dict_highdens)
+mrez = momentum_occupation(psi,nbosons,100,10.0; model_paras...,plot_title="Alpha = $alpha",if_log=false,if_plot=true)
+#append!(mom_occs,[mrez[2]])
 end
+#=end
 
 fig = figure()
 momenta = [0.0 + (i-1)*(10.0 - 0.0)/(200-1) for i in 1:200]
@@ -88,6 +85,7 @@ append!(allall_wavefuncs,[all_wavefuncs])
 append!(all_mom_occs,[mom_occs])
 
 end
+=#
 #=
 for i in 1:length(fillings)
 	filling = fillings[i]

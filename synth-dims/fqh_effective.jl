@@ -334,6 +334,23 @@ function mps_plot_occupancy(occ_mat,L,nflavors; kwargs...)
 	return
 end
 
+function normalize_densmat(dens_mat::Matrix,part_count::Int; kwargs...)
+	if_log = get(kwargs, :if_log, true)
+	L = size(dens_mat)[1]
+	current_trace = if_log ? log_sum(diag(dens_mat)) : tr(dens_mat)
+	if if_log
+		shift_mat = Diagonal([log(part_count) - current_trace for i in 1:L])
+		norm_densmat = dens_mat + shift_mat
+	else
+		shift_mat = ones(L,L)
+		for i in 1:L
+			shift_mat[i,i] = part_count/current_trace
+		end
+		norm_densmat = dens_mat .* shift_mat
+	end
+	return norm_densmat
+end
+
 function get_greenfunc(wavefunc::MPS,hopping_direction="virt"; kwargs...)
 	if_backward = get(kwargs, :rev, false)
 
@@ -409,7 +426,7 @@ function plot_greenfunc(all_greens,hopping_direction; kwargs...)
 	if_save_fig ? save_figure(filename; location=location) : nothing
 end
 
-function momentum_occupation(wavefunc::MPS,p_count::Int64,p_end=8.0,p_start=0.0; kwargs...)
+function momentum_occupation(wavefunc::MPS,part_count::Int,p_count::Int64,p_end=8.0,p_start=0.0; kwargs...)
 	num_sites = length(siteinds(wavefunc))
 	dimension = dim(siteinds(wavefunc)[1])
 	momenta = [p_start + (i-1)*(p_end - p_start)/(p_count-1) for i in 1:p_count]#[pi*i/(num_sites+1) for i in 1:p_count]
@@ -428,7 +445,7 @@ function momentum_occupation(wavefunc::MPS,p_count::Int64,p_end=8.0,p_start=0.0;
 	end
 	
 	if_plot = get(kwargs, :if_plot, true)
-	if_plot ? plot_momentum_occupation(momenta,real.(mom_occ); kwargs...) : nothing
+	if_plot ? plot_momentum_occupation(momenta,real.(mom_occ),part_count; kwargs...) : nothing
 	
 	if_save_data = get(kwargs, :if_save_data, false)
 	if if_save_data
@@ -443,15 +460,18 @@ function momentum_occupation(wavefunc::MPS,p_count::Int64,p_end=8.0,p_start=0.0;
 	return momenta,mom_occ
 end
 
-function plot_momentum_occupation(momenta,mom_occ; kwargs...)
+function plot_momentum_occupation(momenta,mom_occ,part_count::Int; kwargs...)
 	title_string = "Momentum Distribution, " * get(kwargs, :plot_title, "")
-	fig = figure()
-	plot(momenta,mom_occ,"-p")
+	plot_label = get(kwargs, :plot_label, "")
+	isempty(plot_label) ? fig = figure() : nothing
+	plot(momenta./pi,mom_occ./part_count,"-p",label=plot_label)
 	if_log = get(kwargs, :if_log, true)
 	if if_log
 		yscale("log")
 		xscale("log")
 	end
+	xlabel("p/pi")
+	ylabel("Occupation / nparticles")
 	title(title_string)
 	
 end

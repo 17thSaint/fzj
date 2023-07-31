@@ -302,6 +302,7 @@ end
 
 function normalize_densmat(dens_mat::Matrix,part_count::Int; kwargs...)
 	if_log = get(kwargs, :if_log, true)
+	L = size(dens_mat)[1]
 	current_trace = if_log ? log_sum(diag(dens_mat)) : tr(dens_mat)
 	shift_mat = Diagonal([log(part_count) - current_trace for i in 1:L])
 	norm_densmat = dens_mat + shift_mat

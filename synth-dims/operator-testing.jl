@@ -1,19 +1,19 @@
 include("fqh_effective.jl")
 include("long-range-ttn.jl")
 
-if true
+if false
 nflavors = 2
-file_params = Dict([("nflavors",nflavors),("alpha",0.0),("nbosons",10),("if_nn_int",true)])
+file_params = Dict([("alpha",0.0),("nbosons",10),("if_nn_int",true),("L",20)])
 all_files = find_data_file(file_params,"mps","jld2","/home/patrick/fzj/main-git/cluster-data")
 end
 if false
-Ls = []
+flavs = []
 wavefuncs = []
 rhos = []
 for i in 1:length(all_files)
 	dats = read_data_jld2(all_files[i],"/home/patrick/fzj/main-git/cluster-data")[1]["mps"]
 	append!(wavefuncs,[dats])
-	append!(Ls,get_params_dict_from_filename(all_files[i])["L"])
+	append!(flavs,get_params_dict_from_filename(all_files[i])["nflavors"])
 	densmat = correlation_matrix(dats,"FullDag","FullHat")
 	append!(rhos,[densmat])
 	#mrez = momentum_occupation(dats,200,10.0;if_log=false,if_plot=false)
@@ -23,12 +23,20 @@ end
 end
 
 if false
+sites = [i for i in 1:20]
 for i in 1:length(rhos)
-	fig = figure()
-	imshow(rhos[i])
-	colorbar()
-	traceval = round(tr(rhos[i]),digits=3)
-	title("L = $(Ls[i]) with Tr = $traceval")
+	#fig = figure()
+	rho = normalize_densmat(rhos[i],10;if_log=false)
+	occs = round.(diag(exp.(rho)),digits=3)
+	plot(sites,occs,"-p",label="$(flavs[i])")
+	title("Position Occupancy")
+end
+end
+
+if true
+for i in 1:length(wavefuncs)
+	psi = wavefuncs[i]
+	get_greenfunc(psi,"phys"; plot_title="$(flavs[i])")
 end
 end
 
