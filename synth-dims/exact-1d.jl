@@ -112,16 +112,17 @@ function orbital_part(particle_dictionary::Dict,L::Int; kwargs...)
 	num_bosons,num_fermions = length(particle_dictionary["B"]),length(particle_dictionary["F"])
 	all_values = []
 	xosc = sqrt(1/(mass*freq))
-	hermite_part = 1.0
+	#hermite_part = 1.0
 	for (species,locations) in particle_dictionary
 		for loc in locations
-			coeff_part = exp(-0.5*((loc-(L+1)/2)/xosc)^2) / sqrt((2^0)*factorial(0)*sqrt(pi)*xosc)
-			part = coeff_part * hermite_part
+			#coeff_part = exp(-0.5*((loc-(L+1)/2)/xosc)^2) / sqrt((2^0)*factorial(0)*sqrt(pi)*xosc)
+			#part = hermite_part * coeff_part
+			part = if_log ? -0.5 * ((loc-(L+1)/2)/xosc)^2 : exp(-0.5 * ((loc-(L+1)/2)/xosc)^2)
 			append!(all_values,[part])
 		end
 	end
 	
-	return if_log ? log_prod(Complex.(all_values)) : prod(all_values)	
+	return if_log ? sum(Complex.(all_values)) : prod(all_values)	
 end
 
 function exchange_particles(species::String,particle_dictionary::Dict)
@@ -157,14 +158,42 @@ function normalize_wavefunc(wavefunc; kwargs...)
 	return if_log ? wavefunc / 2 - conj(wavefunc) / 2 : nothing
 end
 
+function stirling_formula(n::Int)
+	if n == 0
+		return 0.0
+	end
+	return n*log(n) - n
+end
+
+function get_coeff(num_parts::Int; kwargs...)
+	if_log = get(kwargs, :if_log, true)
+	freq = get(kwargs, :freq, 1.0)
+	mass = get(kwargs, :mass, 1.0)
+	
+	xosc = sqrt(1/(mass*freq))
+	if if_log
+		p1 = 0.25*num_parts*(num_parts-1)*log(2)
+		p2 = -0.5*num_parts*log(xosc)
+		p3 = -0.5 * (0.5*num_parts*log(pi) + sum([log(factorial(i)) for i in 0:num_parts]))
+		return p1+p2+p3
+	else
+		p1 = 2^(0.25*num_parts*(num_parts-1))
+		p2 = xosc^(-0.5*num_parts)
+		p3 = (1/sqrt(factorial(num_parts))) * (1/sqrt(prod([factorial(i)*sqrt(pi) for i in 0:num_parts-1])))
+		return p1*p2*p3
+	end
+end
+
 function get_config_wavefunc(particle_dictionary::Dict,L::Int; kwargs...)
 	if_log = get(kwargs, :if_log, true)
 	freq = get(kwargs, :freq, 1.0)
 	mass = get(kwargs, :mass, 1.0)
 	if_periodic = get(kwargs, :if_periodic, false)
 	
+	num_particles = length(particle_dictionary["B"]) + length(particle_dictionary["F"])
 	phys = physical_part(particle_dictionary,L; kwargs...)[1]
 	orb = orbital_part(particle_dictionary,L; kwargs...)
+	coeff = get_coeff(num_particles; kwargs...)
 	if isnothing(phys) | isnothing(orb)
 		return nothing
 	else
@@ -375,6 +404,12 @@ function plot_position_occupancy(dens_mat::Matrix; kwargs...)
 	title(title_string)
 end
 
+function pair_dist(x1,x2,L::Int; kwargs...)
+	if_log = get(kwargs, :if_log, true)
+	sp_dens_1 = orbital_part(Dict([("B",[x1]),("F",[])]),L; kwargs...)
+	sp_dens_2 = orbital_part(Dict([("B",[x2]),("F",[])]),L; kwargs...)
+end
+
 function density_matrix(wavefunc,all_configs::Vector,L::Int; kwargs...)
 	if_log = get(kwargs, :if_log, true)
 	all_hops = zeros(L,L)
@@ -474,41 +509,51 @@ end
 #
 #for L in [10,20,30,40,50]
 suff_momdiff = 2*pi/200
-L = 10
-n_tot = 5
-n_F = 0
-n_B = n_tot - n_F
-all_configs = configurations(n_tot,L)
-println("Made Configs, total = ",length(all_configs))
+L = 15
 if_per = false
 pfinal = 10.0
 pinit = 0.0
 pcount = Int(ceil((pfinal-pinit)/suff_momdiff))
 println("Running $pcount Mom Vals")
 
-
-if false
+if true
 count = 10
-fs = 0.01
-fe = 2.0
+fs = 1/1000
+fe = 1/100
 omegas = [fs + (i-1)*(fe-fs)/(count-1) for i in 1:count]
 rhos = [zeros(L,L) for i in 1:length(omegas)]
-
-for i in 1:length(omegas)
-omega = omegas[i]
+omega = 1/1000#omegas[i]
 model_paras = (freq=omega,if_periodic=if_per,if_log=true,if_logscale=false)
+
+#for i in 1:length(omegas)
+for n_tot in 3:9
+#n_tot = 7
+n_F = 0
+n_B = n_tot - n_F
+all_configs = configurations(n_tot,L)
+println("Made Configs, total = ",length(all_configs))
 gs_wavefunc = get_wavefunc(all_configs,L;model_paras...)
 println("Made Wavefunc")
 rho = density_matrix(gs_wavefunc,all_configs,L; model_paras...)
-rhos[i] = rho
-#position_occupancy(gs_wavefunc,L; model_paras...,plot_label="$(round(omega,digits=2))",plot_title="range HarmTrap Frequency, Nbosons=$n_tot")
+fig = figure()
+imshow(exp.(rho))
+colorbar()
+#plottitle = "Freq = $(round(omega,digits=2))"
+plottitle = "Part Count = $n_tot"
+title(plottitle)
+#rhos[i] = rho
+#position_occupancy(gs_wavefunc,L; model_paras...,plot_label="$n_tot")
+#legend()
 #mrez = momentum_dist_1d(gs_wavefunc,n_tot,L,pcount,pfinal,all_configs,pinit;model_paras...,plot_label="$(round(omega,digits=2))",plot_title=" Nbosons=$n_tot")
-#mrez = momentum_dist_1d(rho,n_tot,pcount,pfinal,pinit;model_paras...,plot_label="$(round(omega,digits=2))")
+mrez = momentum_dist_1d(rho,n_tot,pcount,pfinal,pinit;model_paras...,plot_title=plottitle)
 #end
 #append!(moms,[mrez[2]])
+#end
 end
 end
+#
 
+#=
 for i in 1:length(rhos)
 	rho = rhos[i]
 	omega = omegas[i]
@@ -517,7 +562,7 @@ for i in 1:length(rhos)
 end
 legend()
 
-#
+=#
 
 
 

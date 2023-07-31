@@ -1,12 +1,12 @@
 include("fqh_effective.jl")
 include("long-range-ttn.jl")
 
-if false
+if true
 nflavors = 2
 file_params = Dict([("nflavors",nflavors),("alpha",0.0),("nbosons",10),("if_nn_int",true)])
 all_files = find_data_file(file_params,"mps","jld2","/home/patrick/fzj/main-git/cluster-data")
 end
-if true
+if false
 Ls = []
 wavefuncs = []
 rhos = []
@@ -22,7 +22,7 @@ for i in 1:length(all_files)
 end
 end
 
-if true
+if false
 for i in 1:length(rhos)
 	fig = figure()
 	imshow(rhos[i])
