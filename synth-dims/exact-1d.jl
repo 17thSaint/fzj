@@ -248,7 +248,7 @@ function assign_locations(n_F::Int, n_B::Int, L::Int) # written by ChatGPT 24.07
     return locations_dict
 end
 
-function configurations(N::Int, L::Int)
+function configurations(N::Int, L::Int; kwargs...)
     # Initialize an array to store the current configuration
     current_config = zeros(Int, N)
 
@@ -277,8 +277,16 @@ function configurations(N::Int, L::Int)
 
     # Start the recursive function
     generate_configs(1, N)
-
-    return all_configs
+    
+    if_limit = get(kwargs, :if_limit, true)
+    limit = get(kwargs, :if_limit, 5000)
+    if if_limit && length(all_configs) > limit
+    	which_keep = randperm(length(all_configs))[1:limit]
+    	kept_configs = [all_configs[i] for i in which_keep]
+    	return kept_configs
+    else
+	return all_configs
+    end
 end
 
 function combine_two_vectors(vec1::Vector,vec2::Vector; kwargs...)
@@ -509,7 +517,7 @@ end
 #
 #for L in [10,20,30,40,50]
 suff_momdiff = 2*pi/200
-L = 15
+L = 20
 if_per = false
 pfinal = 10.0
 pinit = 0.0
@@ -521,13 +529,13 @@ count = 10
 fs = 1/1000
 fe = 1/100
 omegas = [fs + (i-1)*(fe-fs)/(count-1) for i in 1:count]
-rhos = [zeros(L,L) for i in 1:length(omegas)]
-omega = 1/1000#omegas[i]
+rhos = []
+omega = 1/10000.0#omegas[i]
 model_paras = (freq=omega,if_periodic=if_per,if_log=true,if_logscale=false)
-
+densities = [1/i for i in 1:5]
 #for i in 1:length(omegas)
-for n_tot in 3:9
-#n_tot = 7
+for n_tot in [14]
+#n_tot = Int(round(dens*L,digits=0))
 n_F = 0
 n_B = n_tot - n_F
 all_configs = configurations(n_tot,L)
@@ -535,22 +543,23 @@ println("Made Configs, total = ",length(all_configs))
 gs_wavefunc = get_wavefunc(all_configs,L;model_paras...)
 println("Made Wavefunc")
 rho = density_matrix(gs_wavefunc,all_configs,L; model_paras...)
-fig = figure()
-imshow(exp.(rho))
-colorbar()
+#fig = figure()
+#imshow(exp.(rho))
+#colorbar()
 #plottitle = "Freq = $(round(omega,digits=2))"
-plottitle = "Part Count = $n_tot"
-title(plottitle)
-#rhos[i] = rho
+plottitle = "$n_tot"
+plot_position_occupancy(rho; model_paras...,plot_label=plottitle)
+append!(rhos,[rho])
 #position_occupancy(gs_wavefunc,L; model_paras...,plot_label="$n_tot")
 #legend()
 #mrez = momentum_dist_1d(gs_wavefunc,n_tot,L,pcount,pfinal,all_configs,pinit;model_paras...,plot_label="$(round(omega,digits=2))",plot_title=" Nbosons=$n_tot")
-mrez = momentum_dist_1d(rho,n_tot,pcount,pfinal,pinit;model_paras...,plot_title=plottitle)
+#mrez = momentum_dist_1d(rho,n_tot,pcount,pfinal,pinit;model_paras...,plot_title=plottitle)
 #end
 #append!(moms,[mrez[2]])
 #end
 end
 end
+legend()
 #
 
 #=
