@@ -334,8 +334,22 @@ function mps_plot_occupancy(occ_mat,L,nflavors; kwargs...)
 	return
 end
 
+function log_sum(all_values)
+	if length(all_values) < 2
+		return all_values[1]
+	else
+		consecutive = [all_values[1],all_values[2]]
+		for i in 3:length(all_values) + 1
+			added_value = log_add(consecutive[1],consecutive[2])
+			consecutive[1] = added_value
+			consecutive[2] = i <= length(all_values) ? all_values[i] : 0.0
+		end
+		return consecutive[1]
+	end
+end
+
 function normalize_densmat(dens_mat::Matrix,part_count::Int; kwargs...)
-	if_log = get(kwargs, :if_log, true)
+	if_log = get(kwargs, :if_log, false)
 	L = size(dens_mat)[1]
 	current_trace = if_log ? log_sum(diag(dens_mat)) : tr(dens_mat)
 	if if_log

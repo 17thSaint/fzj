@@ -15,11 +15,11 @@ function fix_filling(L,nflavors,nu)
 	return nothing,nothing
 end
 
-save_nothing = true
+save_nothing = false
 params_dict = Dict()
 L = 20#get(params_dict, "L", 4)
-#nbosons = 5#get(params_dict, "nbosons", nflavors)
-nflavors = 10#get(params_dict, "nflavors", Int(L/2))
+nbosons = 10#get(params_dict, "nbosons", nflavors)
+#nflavors = 2#get(params_dict, "nflavors", Int(L/2))
 t1 = get(params_dict, "t1", 1.0)
 t2 = get(params_dict, "t2", 1.0)
 U = get(params_dict, "U", 100)
@@ -36,16 +36,18 @@ data_loc = "/home/patrick/fzj/main-git/cluster-data"
 if_periodic = false
 
 other_params_dict = Dict([("U",U),("conserve_qns",conserve_qns),("nsweeps",nsweeps),("mdim",mdim),("noise",noise)])
-savefig_data = false#save_nothing ? false : true
-savefig = false#save_nothing ? false : true
+savefig_data = true#save_nothing ? false : true
+savefig = true#save_nothing ? false : true
 if_lines = false
+
+#nbosons,alpha = fix_filling(L,nflavors,1/2)
+#alpha = 0.0
 
 wavefuncs = []
 rhos = []
-for (nbosons,alpha) in [(10,0.0),fix_filling(L,nflavors,1/2)]
-#nbosons,alpha = fix_filling(L,nflavors,1/2)
+for nflavors in [i for i in 1:5]
+alpha = 1/nflavors
 phi = 2*pi*alpha
-
 filename_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
 #filename_dict_highdens = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons_highdens),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
 
@@ -61,12 +63,15 @@ metadata_dict = merge(named_tuple_to_dict(model_paras),other_params_dict)
 
 psi = execute_mps(U1,U2,phi,L,nflavors,nbosons; model_paras...,metadata=metadata_dict)
 append!(wavefuncs,[psi])
-densmat = correlation_matrix(psi,"FullDag","FullHat")
+densmat = correlation_matrix(psi,"FullDag","FullHat") ./ 2.0
 append!(rhos,[densmat])
-
+fig = figure()
+imshow(real.(densmat))
+colorbar()
+title("Virt Dim = $nflavors")
 #append!(all_wavefuncs,[psi])
 #psi_highdens = execute_mps(U1,U2,phi,L,nflavors,nbosons_highdens; model_paras_highdens...,metadata=metadata_dict_highdens)
-mrez = momentum_occupation(psi,nbosons,100,10.0; model_paras...,plot_title="Alpha = $alpha",if_log=false,if_plot=true)
+mrez = momentum_occupation(psi,nbosons,100,10.0; model_paras...,plot_title="Virt Dim = $nflavors",if_log=false,if_plot=true)
 #append!(mom_occs,[mrez[2]])
 end
 #=end

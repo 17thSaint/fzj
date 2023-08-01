@@ -248,7 +248,25 @@ function assign_locations(n_F::Int, n_B::Int, L::Int) # written by ChatGPT 24.07
     return locations_dict
 end
 
+function get_random_configurations(N::Int,L::Int,limit::Int)
+	all_configs = []
+	while length(all_configs) < limit
+		next_config = randperm(L)[1:N]
+		if !(next_config in all_configs)
+			append!(all_configs,[next_config])
+		end
+	end
+	return all_configs
+end
+
 function configurations(N::Int, L::Int; kwargs...)
+    # Calculate number of configurations
+    if L < 30
+	    total_length = factorial(L)/factorial(L-N)
+    else
+    	    total_length = 100000.0
+    end
+    
     # Initialize an array to store the current configuration
     current_config = zeros(Int, N)
 
@@ -276,17 +294,30 @@ function configurations(N::Int, L::Int; kwargs...)
     end
 
     # Start the recursive function
-    generate_configs(1, N)
-    
     if_limit = get(kwargs, :if_limit, true)
-    limit = get(kwargs, :if_limit, 5000)
-    if if_limit && length(all_configs) > limit
-    	which_keep = randperm(length(all_configs))[1:limit]
-    	kept_configs = [all_configs[i] for i in which_keep]
-    	return kept_configs
+    limit = get(kwargs, :limit, 5000)
+    if total_length < 2*limit
+    	generate_configs(1, N)
+    	if length(all_configs) > limit
+    		println("More than limit but accessible")
+	    	which_keep = randperm(length(all_configs))[1:limit]
+	    	kept_configs = [all_configs[i] for i in which_keep]
+	    	return kept_configs
+	else
+		println("Less than limit")
+		return all_configs
+	end
     else
-	return all_configs
+    	println("Beyond limit $total_length, random generation")
+    	if if_limit
+    		all_configs = get_random_configurations(N,L,limit)
+    		return all_configs
+    	else
+    		generate_configs(1, N)
+    		return all_configs
+    	end
     end
+    
 end
 
 function combine_two_vectors(vec1::Vector,vec2::Vector; kwargs...)
@@ -497,7 +528,7 @@ function plot_momentum(momenta,mom_occ,part_count::Int; kwargs...)
 	plot_label = get(kwargs, :plot_label, "")
 	isempty(plot_label) ? fig = figure() : nothing
 	title_string = "Momentum Distribution, " * get(kwargs, :plot_title, "")
-	plot(momenta./pi,mom_occ./part_count,label=plot_label)
+	plot(momenta./pi,real.(mom_occ)./part_count,label=plot_label)
 	if_logscale = get(kwargs, :if_logscale, true)
 	if if_logscale
 		yscale("log")
@@ -516,52 +547,112 @@ function normalize_log_occ_vector(full_vector,particle_count)
 end
 
 #
-#for L in [10,20,30,40,50]
+if false
+	include("../other-funcs/data-storage-funcs.jl")
+	effective_datadict = read_data_jld2("allmomdist-alpha-0.0-if_periodic-false-if_nn_int-false.jld2","../cluster-data/")
+end
+
+if false
+params = []
+for k in keys(effective_datadict[1])
+	L,nflavors,nbosons = parse.(Int,split(k,","))
+	append!(params,[[L,nbosons]])
+end
+params = unique(params)
+#=dontkeep = []
+for i in 1:length(params)
+	if params[i][1] > 20
+		append!(dontkeep,[i])
+	end
+end
+deleteat!(params,dontkeep)
+=#
+display(params)
+end
+
+if false
 suff_momdiff = 2*pi/200
-L = 20
+#L = 20
 if_per = false
 pfinal = 10.0
 pinit = 0.0
 pcount = Int(ceil((pfinal-pinit)/suff_momdiff))
 println("Running $pcount Mom Vals")
+#=
 
-if true
+#
 count = 10
 fs = 1/1000
 fe = 1/100
 omegas = [fs + (i-1)*(fe-fs)/(count-1) for i in 1:count]
-rhos = []
+=#
+wavefuncs_dict = Dict()
+moms_dict = Dict()
+rhos_dict = Dict()
 omega = 1/10000.0#omegas[i]
 model_paras = (freq=omega,if_periodic=if_per,if_log=true,if_logscale=false)
-densities = [1/i for i in 1:5]
+#densities = [1/i for i in 1:5]
 #for i in 1:length(omegas)
-for n_tot in [14]
+for i in 1:length(params)
+L,n_tot = params[i]
+keystring = join([string(L),string(n_tot)],",")
+println(keystring)
 #n_tot = Int(round(dens*L,digits=0))
 n_F = 0
 n_B = n_tot - n_F
 all_configs = configurations(n_tot,L)
 println("Made Configs, total = ",length(all_configs))
 gs_wavefunc = get_wavefunc(all_configs,L;model_paras...)
+wavefuncs_dict[keystring] = gs_wavefunc
 println("Made Wavefunc")
 rho = density_matrix(gs_wavefunc,all_configs,L; model_paras...)
+rhos_dict[keystring] = rho
 #fig = figure()
 #imshow(exp.(rho))
 #colorbar()
 #plottitle = "Freq = $(round(omega,digits=2))"
-plottitle = "$n_tot"
-plot_position_occupancy(rho; model_paras...,plot_label=plottitle)
-append!(rhos,[rho])
+#plottitle = "$n_tot"
+#plot_position_occupancy(rho; model_paras...,plot_label=plottitle)
+#append!(rhos,[rho])
 #position_occupancy(gs_wavefunc,L; model_paras...,plot_label="$n_tot")
 #legend()
 #mrez = momentum_dist_1d(gs_wavefunc,n_tot,L,pcount,pfinal,all_configs,pinit;model_paras...,plot_label="$(round(omega,digits=2))",plot_title=" Nbosons=$n_tot")
-#mrez = momentum_dist_1d(rho,n_tot,pcount,pfinal,pinit;model_paras...,plot_title=plottitle)
+mrez = momentum_dist_1d(rho,n_tot,pcount,pfinal,pinit;model_paras...,if_plot=false)
+moms_dict[keystring] = mrez
 #end
 #append!(moms,[mrez[2]])
 #end
 end
 end
-legend()
+
+
+for ke in keys(rhos_dict)
+	phys_len,part_count = parse.(Int,split(ke,","))
+	fig = figure()
+	imshow(real.(rhos_dict[ke]))
+	colorbar()
+	title("Momentum Occupation for Phys Dim = $phys_len and Nbosons = $part_count")
+	#=
+	plot(moms_dict[ke][1]./pi,real.(moms_dict[ke][2])./part_count,label="Exact")
+	exact_first_peak = real.(moms_dict[ke][2])[1]
+	for km in keys(effective_datadict[1])
+		if ke == join([split(km,",")[1],split(km,",")[3]],",")
+			nflavs = parse(Int,split(km,",")[2])
+			mps_first_peak = real.(effective_datadict[1][km][2])[1]
+			plot(effective_datadict[1][km][1]./pi,real.(effective_datadict[1][km][2]).*(exact_first_peak/(mps_first_peak*part_count)),label="$nflavs")
+		end
+	end
+	legend()
+	xlabel("p/pi")
+	ylabel("Occupation / nparticles")
+	title("Momentum Occupation for Phys Dim = $phys_len and Nbosons = $part_count")
+	=#
+end
+
+
 #
+
+#legend()
 
 #=
 for i in 1:length(rhos)
