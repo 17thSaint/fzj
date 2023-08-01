@@ -35,9 +35,22 @@ function log_add(a,b)
 	return Complex(result)
 end
 
+function remove_neg_infs(all_values)
+	to_keep = []
+	for i in all_values
+		if !isinf(i)
+			append!(to_keep,[i])
+		end
+	end
+	return to_keep
+end
+
 function log_sum(all_values)
-	if length(all_values) < 2
+	all_values = remove_neg_infs(all_values)
+	if 1 < length(all_values) < 2
 		return all_values[1]
+	elseif length(all_values) < 1
+		return -Inf
 	else
 		consecutive = [all_values[1],all_values[2]]
 		for i in 3:length(all_values) + 1
@@ -250,11 +263,15 @@ end
 
 function get_random_configurations(N::Int,L::Int,limit::Int)
 	all_configs = []
-	while length(all_configs) < limit
+	repeat_count = 0
+	while length(all_configs) < limit && repeat_count < 50
 		next_config = randperm(L)[1:N]
 		if !(next_config in all_configs)
 			append!(all_configs,[next_config])
+		else
+			repeat_count += 1
 		end
+		
 	end
 	return all_configs
 end
@@ -467,6 +484,76 @@ function density_matrix(wavefunc,all_configs::Vector,L::Int; kwargs...)
 	return all_hops
 end
 
+function get_dm_coeff(part_count::Int; kwargs...)
+	freq = get(kwargs, :freq, 1.0)
+	mass = get(kwargs, :mass, 1.0)
+	
+	xosc = 1/sqrt(mass*freq)
+	p1 = log(part_count) + 0.5*part_count*(part_count-1)*log(2) - log(xosc) - 0.5*part_count*log(pi)
+	p2 = -sum([log(factorial(i)) for i in 0:part_count])
+	return p1+p2
+end
+
+function restrict_configs(all_configs::Vector,sites_not_allowed::Vector)
+	remaining_configs = []
+	for c in all_configs
+		boolean_check = [!(k in c) for k in sites_not_allowed]
+		if all(boolean_check)
+			append!(remaining_configs,[c])
+		end
+	end
+	return remaining_configs
+end
+
+function other_particles_part(config::Vector)
+	all_vals = []
+	for j in 1:length(config)
+		for k in 1:j
+			append!(all_vals,[log((config[j] - config[k])^2)])
+		end
+	end
+	return sum(all_vals)
+end
+
+function matrix_elem_part(config::Vector,x::Float64,xp::Float64)
+	all_vals = []
+	for i in 1:length(config)
+		local_val = -config[i] + log(abs(config[i] - x)) + log(abs(config[i] - xp))
+		append!(all_vals,[local_val])
+	end
+	return sum(all_vals)
+end
+
+# this function will be done entirely in log form
+function direct_density_matrix(all_configs::Vector,L::Int; kwargs...)
+	freq = get(kwargs, :freq, 1.0)
+	mass = get(kwargs, :mass, 1.0)
+	
+	xosc = 1/sqrt(mass*freq)
+	coeff = get_dm_coeff(length(all_configs[1]); kwargs...)
+	front_exps = zeros(L,L)
+	integral_part = zeros(L,L)
+	for x in 1:L
+		for xp in 1:x
+			println(x,", ",xp)
+			all_vals = []
+			front_exps[x,xp] = -((x/xosc)^2 + (xp/xosc)^2)/2
+			front_exps[xp,x] = front_exps[x,xp]
+			restricted_configs = all_configs ./ xosc#restrict_configs(all_configs,[x,xp]) ./ xosc
+			for c in restricted_configs
+				println(c)
+				other_parts_part = other_particles_part(c)
+				mat_elem_part = matrix_elem_part(c,x/xosc,xp/xosc)
+				full_part = other_parts_part + mat_elem_part
+				append!(all_vals,[full_part])
+			end
+			integral_part[x,xp] = log_sum(all_vals)
+			integral_part[xp,x] = integral_part[x,xp]
+		end
+	end
+	return coeff .+ (front_exps + integral_part)
+end
+
 function momentum_dist_1d(dens_mat::Matrix,part_count::Int,p_count::Int,p_end::Float64,p_start=0.0;kwargs...)
 	if_plot = get(kwargs, :if_plot, true)
 	if_norm_mom = get(kwargs, :if_norm_mom, true)
@@ -546,10 +633,10 @@ function normalize_log_occ_vector(full_vector,particle_count)
 	return normed_log_vector
 end
 
-#
-if false
+#=
+if true
 	include("../other-funcs/data-storage-funcs.jl")
-	effective_datadict = read_data_jld2("allmomdist-alpha-0.0-if_periodic-false-if_nn_int-false.jld2","../cluster-data/")
+	#effective_datadict = read_data_jld2("allmomdist-alpha-0.0-if_periodic-false-if_nn_int-false.jld2","../cluster-data/")
 end
 
 if false
@@ -570,7 +657,7 @@ deleteat!(params,dontkeep)
 display(params)
 end
 
-if false
+if true
 suff_momdiff = 2*pi/200
 #L = 20
 if_per = false
@@ -586,46 +673,51 @@ fs = 1/1000
 fe = 1/100
 omegas = [fs + (i-1)*(fe-fs)/(count-1) for i in 1:count]
 =#
-wavefuncs_dict = Dict()
-moms_dict = Dict()
-rhos_dict = Dict()
+L = 30
+#wavefuncs_dict = Dict()
+#moms_dict = Dict()
+#rhos_dict = Dict()
+rhos = []
+ns = [2,10,16,20]
 omega = 1/10000.0#omegas[i]
 model_paras = (freq=omega,if_periodic=if_per,if_log=true,if_logscale=false)
 #densities = [1/i for i in 1:5]
 #for i in 1:length(omegas)
-for i in 1:length(params)
-L,n_tot = params[i]
-keystring = join([string(L),string(n_tot)],",")
-println(keystring)
+for n_tot in ns
+#keystring = join([string(L),string(n_tot)],",")
+#println(keystring)
 #n_tot = Int(round(dens*L,digits=0))
 n_F = 0
 n_B = n_tot - n_F
 all_configs = configurations(n_tot,L)
 println("Made Configs, total = ",length(all_configs))
 gs_wavefunc = get_wavefunc(all_configs,L;model_paras...)
-wavefuncs_dict[keystring] = gs_wavefunc
+#wavefuncs_dict[keystring] = gs_wavefunc
 println("Made Wavefunc")
 rho = density_matrix(gs_wavefunc,all_configs,L; model_paras...)
-rhos_dict[keystring] = rho
+append!(rhos,[rho])
+#rhos_dict[keystring] = rho
 #fig = figure()
-#imshow(exp.(rho))
-#colorbar()
+fig = figure()
+imshow(real.(rho))
+colorbar()
 #plottitle = "Freq = $(round(omega,digits=2))"
-#plottitle = "$n_tot"
+plottitle = "Dens Mat for Phys Dim = $L and Nbosons = $n_tot"
+title(plottitle)
 #plot_position_occupancy(rho; model_paras...,plot_label=plottitle)
 #append!(rhos,[rho])
 #position_occupancy(gs_wavefunc,L; model_paras...,plot_label="$n_tot")
 #legend()
 #mrez = momentum_dist_1d(gs_wavefunc,n_tot,L,pcount,pfinal,all_configs,pinit;model_paras...,plot_label="$(round(omega,digits=2))",plot_title=" Nbosons=$n_tot")
-mrez = momentum_dist_1d(rho,n_tot,pcount,pfinal,pinit;model_paras...,if_plot=false)
-moms_dict[keystring] = mrez
+#mrez = momentum_dist_1d(rho,n_tot,pcount,pfinal,pinit;model_paras...,if_plot=true)
+#moms_dict[keystring] = mrez
 #end
 #append!(moms,[mrez[2]])
 #end
 end
 end
 
-
+if false
 for ke in keys(rhos_dict)
 	phys_len,part_count = parse.(Int,split(ke,","))
 	fig = figure()
@@ -648,7 +740,7 @@ for ke in keys(rhos_dict)
 	title("Momentum Occupation for Phys Dim = $phys_len and Nbosons = $part_count")
 	=#
 end
-
+end
 
 #
 
@@ -667,7 +759,7 @@ legend()
 
 
 
-
+=#
 
 
 
