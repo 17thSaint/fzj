@@ -47,7 +47,7 @@ end
 
 function log_sum(all_values)
 	all_values = remove_neg_infs(all_values)
-	if 1 < length(all_values) < 2
+	if length(all_values) == 1
 		return all_values[1]
 	elseif length(all_values) < 1
 		return -Inf
@@ -279,9 +279,9 @@ end
 function configurations(N::Int, L::Int; kwargs...)
     # Calculate number of configurations
     if L < 30
-	    total_length = factorial(L)/factorial(L-N)
+	    total_length = 0.5*factorial(L)/factorial(L-N)
     else
-    	    total_length = 100000.0
+    	    total_length = 100000000.0
     end
     
     # Initialize an array to store the current configuration
@@ -292,27 +292,27 @@ function configurations(N::Int, L::Int; kwargs...)
 
     # Recursive function to generate configurations
     function generate_configs(start_pos::Int, remaining_particles::Int)
-        # Base case: all particles have been placed
-        if remaining_particles == 0
-            push!(all_configs, copy(current_config))
-            return
-        end
+	    # Base case: all particles have been placed
+	    if remaining_particles == 0
+		push!(all_configs, copy(current_config))
+		return
+	    end
 
-        # Recursive step: try all possible positions for the next particle
-        for pos in start_pos:L
-            # Check if the position is already occupied
-            if pos in current_config[N - remaining_particles + 1:end]
-                continue  # Skip this position if it's already occupied
-            end
+	    # Recursive step: try all possible positions for the next particle
+	    for pos in start_pos:L
+		if pos in current_config
+		    continue  # Skip this position if it's already occupied
+		end
 
-            current_config[N - remaining_particles + 1] = pos
-            generate_configs(pos + 1, remaining_particles - 1)
-        end
+		current_config[N - remaining_particles + 1] = pos
+		generate_configs(pos + 1, remaining_particles - 1)
+		current_config[N - remaining_particles + 1] = 0  # Reset position for backtracking
+	    end
     end
 
     # Start the recursive function
     if_limit = get(kwargs, :if_limit, true)
-    limit = get(kwargs, :limit, 5000)
+    limit = get(kwargs, :limit, 100000)
     if total_length < 2*limit
     	generate_configs(1, N)
     	if length(all_configs) > limit
@@ -322,6 +322,9 @@ function configurations(N::Int, L::Int; kwargs...)
 	    	return kept_configs
 	else
 		println("Less than limit")
+		if length(all_configs) != total_length
+			println("AL = ",length(all_configs),", TL = ",total_length)
+		end
 		return all_configs
 	end
     else
@@ -352,7 +355,7 @@ function normalize_densmat(dens_mat::Matrix,part_count::Int; kwargs...)
 	if_log = get(kwargs, :if_log, true)
 	L = size(dens_mat)[1]
 	current_trace = if_log ? log_sum(diag(dens_mat)) : tr(dens_mat)
-	shift_mat = Diagonal([log(part_count) - current_trace for i in 1:L])
+	shift_mat = (log(part_count) - current_trace) .* ones(L,L)
 	norm_densmat = dens_mat + shift_mat
 	return norm_densmat
 end
@@ -506,52 +509,67 @@ function restrict_configs(all_configs::Vector,sites_not_allowed::Vector)
 end
 
 function other_particles_part(config::Vector)
-	all_vals = []
-	for j in 1:length(config)
-		for k in 1:j
-			append!(all_vals,[log((config[j] - config[k])^2)])
+	if length(config) < 2
+		return 0.0
+	else
+		all_vals = []
+		for j in 1:length(config)
+			for k in 1:j-1
+				append!(all_vals,[log((config[j] - config[k])^2)])
+			end
 		end
+		return sum(all_vals)
 	end
-	return sum(all_vals)
 end
 
-function matrix_elem_part(config::Vector,x::Float64,xp::Float64)
+function matrix_elem_part(config::Vector,x::Float64,xp::Float64,L::Int,xosc::Float64)
 	all_vals = []
 	for i in 1:length(config)
-		local_val = -config[i] + log(abs(config[i] - x)) + log(abs(config[i] - xp))
+		local_val = -(config[i]-((L+1)/2))^2 + log(abs(config[i] - x)) + log(abs(config[i] - xp))
 		append!(all_vals,[local_val])
 	end
 	return sum(all_vals)
 end
 
 # this function will be done entirely in log form
-function direct_density_matrix(all_configs::Vector,L::Int; kwargs...)
+function direct_density_matrix(L::Int,part_count::Int,all_configs=nothing; kwargs...)
 	freq = get(kwargs, :freq, 1.0)
 	mass = get(kwargs, :mass, 1.0)
 	
 	xosc = 1/sqrt(mass*freq)
-	coeff = get_dm_coeff(length(all_configs[1]); kwargs...)
+	
+	if isnothing(all_configs)
+		all_configs = configurations(part_count-1,L)
+	end
+	
+	#restricted_configs = all_configs ./ xosc#restrict_configs(all_configs,[x,xp]) ./ xosc
+	all_configs ./= xosc
+	
+	coeff = get_dm_coeff(part_count; kwargs...)
 	front_exps = zeros(L,L)
 	integral_part = zeros(L,L)
 	for x in 1:L
 		for xp in 1:x
 			println(x,", ",xp)
 			all_vals = []
-			front_exps[x,xp] = -((x/xosc)^2 + (xp/xosc)^2)/2
+			front_exps[x,xp] = -(((x-(L+1)/2)/xosc)^2 + ((xp-(L+1)/2)/xosc)^2)/2
 			front_exps[xp,x] = front_exps[x,xp]
-			restricted_configs = all_configs ./ xosc#restrict_configs(all_configs,[x,xp]) ./ xosc
-			for c in restricted_configs
-				println(c)
-				other_parts_part = other_particles_part(c)
-				mat_elem_part = matrix_elem_part(c,x/xosc,xp/xosc)
-				full_part = other_parts_part + mat_elem_part
-				append!(all_vals,[full_part])
+		
+			for c in all_configs
+				if all([!(k in c) for k in [x/xosc,xp/xosc]])
+					other_parts_part = other_particles_part(c)
+					mat_elem_part = matrix_elem_part(c,x/xosc,xp/xosc,L,xosc)
+					full_part = other_parts_part + mat_elem_part
+					append!(all_vals,[full_part])
+				#else
+					#println("Not Using $c for $x,$xp")
+				end
 			end
 			integral_part[x,xp] = log_sum(all_vals)
 			integral_part[xp,x] = integral_part[x,xp]
 		end
 	end
-	return coeff .+ (front_exps + integral_part)
+	return normalize_densmat(coeff .+ (front_exps + integral_part),part_count; kwargs...)
 end
 
 function momentum_dist_1d(dens_mat::Matrix,part_count::Int,p_count::Int,p_end::Float64,p_start=0.0;kwargs...)
@@ -632,11 +650,17 @@ function normalize_log_occ_vector(full_vector,particle_count)
 	normed_log_vector = full_vector .+ log_of_norm_value
 	return normed_log_vector
 end
-
 #=
-if true
+L = 10
+ntot = 5
+rho = direct_density_matrix(L,ntot)
+plot(diag(exp.(rho)))
+title("Tr = $(tr(exp.(rho))) and Ntot = $ntot")
+=#
+#=
+if false
 	include("../other-funcs/data-storage-funcs.jl")
-	#effective_datadict = read_data_jld2("allmomdist-alpha-0.0-if_periodic-false-if_nn_int-false.jld2","../cluster-data/")
+	effective_datadict = read_data_jld2("allmomdist-alpha-0.0-if_periodic-false-if_nn_int-false.jld2","../cluster-data/")
 end
 
 if false
@@ -673,35 +697,37 @@ fs = 1/1000
 fe = 1/100
 omegas = [fs + (i-1)*(fe-fs)/(count-1) for i in 1:count]
 =#
-L = 30
+#L = 30
 #wavefuncs_dict = Dict()
 #moms_dict = Dict()
-#rhos_dict = Dict()
-rhos = []
-ns = [2,10,16,20]
-omega = 1/10000.0#omegas[i]
+rhos_dict = Dict()
+#rhos = []
+#ns = [2,10,16,20]
+omega = 1.0#1/10000.0#omegas[i]
 model_paras = (freq=omega,if_periodic=if_per,if_log=true,if_logscale=false)
+#for (k,v) in rhos_dict
 #densities = [1/i for i in 1:5]
 #for i in 1:length(omegas)
-for n_tot in ns
-#keystring = join([string(L),string(n_tot)],",")
-#println(keystring)
+for (L,n_tot) in params
+keystring = join([string(L),string(n_tot)],",")
+println(keystring)
 #n_tot = Int(round(dens*L,digits=0))
 n_F = 0
 n_B = n_tot - n_F
-all_configs = configurations(n_tot,L)
-println("Made Configs, total = ",length(all_configs))
-gs_wavefunc = get_wavefunc(all_configs,L;model_paras...)
+#all_configs = configurations(n_tot,L)
+#println("Made Configs, total = ",length(all_configs))
+#gs_wavefunc = get_wavefunc(all_configs,L;model_paras...)
 #wavefuncs_dict[keystring] = gs_wavefunc
-println("Made Wavefunc")
-rho = density_matrix(gs_wavefunc,all_configs,L; model_paras...)
-append!(rhos,[rho])
-#rhos_dict[keystring] = rho
-#fig = figure()
+#println("Made Wavefunc")
+rho = exp.(direct_density_matrix(L,n_tot; model_paras...))
+#append!(rhos,[rho])
+rhos_dict[keystring] = rho
 fig = figure()
-imshow(real.(rho))
+#plot(diag(rho))
+imshow(rho)
 colorbar()
 #plottitle = "Freq = $(round(omega,digits=2))"
+#L,n_tot = parse.(Int,split(k,","))
 plottitle = "Dens Mat for Phys Dim = $L and Nbosons = $n_tot"
 title(plottitle)
 #plot_position_occupancy(rho; model_paras...,plot_label=plottitle)
@@ -709,7 +735,7 @@ title(plottitle)
 #position_occupancy(gs_wavefunc,L; model_paras...,plot_label="$n_tot")
 #legend()
 #mrez = momentum_dist_1d(gs_wavefunc,n_tot,L,pcount,pfinal,all_configs,pinit;model_paras...,plot_label="$(round(omega,digits=2))",plot_title=" Nbosons=$n_tot")
-#mrez = momentum_dist_1d(rho,n_tot,pcount,pfinal,pinit;model_paras...,if_plot=true)
+#mrez = momentum_dist_1d(rho,n_tot,pcount,pfinal,pinit;model_paras...,if_plot=true,plot_title=plottitle)
 #moms_dict[keystring] = mrez
 #end
 #append!(moms,[mrez[2]])
