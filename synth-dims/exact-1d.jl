@@ -202,24 +202,42 @@ function get_config_wavefunc(particle_dictionary::Dict,L::Int; kwargs...)
 	freq = get(kwargs, :freq, 1.0)
 	mass = get(kwargs, :mass, 1.0)
 	if_periodic = get(kwargs, :if_periodic, false)
+	spin_dof = get(kwargs, :spin_dof, 1)
+	spin_dictionary = get(kwargs, :spin_dictionary, nothing)
 	
 	num_particles = length(particle_dictionary["B"]) + length(particle_dictionary["F"])
 	phys = physical_part(particle_dictionary,L; kwargs...)[1]
 	orb = orbital_part(particle_dictionary,L; kwargs...)
+	
+	if !isnothing(spin_dictionary)
+		spin_orb = orbital_part(spin_dictionary,spin_dof; kwargs...,if_periodic=false)
+	else
+		spin_orb = 0.0
+	end
+	
 	coeff = get_coeff(num_particles; kwargs...)
 	if isnothing(phys) | isnothing(orb)
 		return nothing
 	else
-		return if_log ? phys + orb : phys * orb
+		return if_log ? phys + orb + coeff + !isnothing(spin_dictionary) * spin_orb : phys * orb * coeff * !isnothing(spin_dictionary) * spin_orb
 	end
 end
 
 function config_vector_to_string(config)
-	return join(config,",")	
+	if isa(config,Tuple)
+		join([join(config[1],","),join(config[2],",")],"-")
+	else
+		return join(config,",")
+	end
 end
 
 function config_string_to_vector(config)
-	return parse.(Int64,split(config,","))
+	if length(split(config,"-")) == 1
+		return parse.(Int64,split(config,","))
+	else
+		phys_config,spin_config = split(config,"-")
+		return parse.(Int64,split(phys_config,",")),parse.(Int64,split(spin_config,","))
+	end
 end
 
 function make_config_dictionary(configB::Vector,configF::Vector)
@@ -244,6 +262,18 @@ function get_wavefunc(configurations,L::Int; kwargs...)
 			config_wavefuncs[config_vector_to_string(con)] = get_config_wavefunc(config_dict,L; kwargs...)
 		end
 		return normalize_wavefunc_dict(config_wavefuncs)
+	end
+end
+
+function get_wavefunc(phys_configs,spin_configs,L::Int,nflavors::Int; kwargs...)
+	if length(phys_configs) == 0 || length(spin_configs) == 0
+		return nothing
+	else
+		for pcon in phys_configs
+			for scon in spin_configs
+				config_vector_to_string((pcon,scon))
+			end
+		end
 	end
 end
 
