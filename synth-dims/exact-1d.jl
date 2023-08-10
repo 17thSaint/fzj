@@ -1,4 +1,4 @@
-using LinearAlgebra,PyPlot,Random,NumericalIntegration
+using LinearAlgebra,PyPlot,Random,NumericalIntegration,Combinatorics
 
 function log_prod(all_values)
 	#=
@@ -71,6 +71,7 @@ function physical_part(particle_dictionary::Dict,L::Int; kwargs...)
 	bf_part = []
 	
 	num_bosons,num_fermions = length(particle_dictionary["B"]),length(particle_dictionary["F"])
+	total_particles = num_bosons + num_fermions
 	
 	for (species,locations) in particle_dictionary
 		if species == "B"
@@ -104,7 +105,7 @@ function physical_part(particle_dictionary::Dict,L::Int; kwargs...)
 	num_fermions != 0 ? append!(included_parts,ff_part) : nothing
 	num_bosons != 0 && num_fermions != 0 ? append!(included_parts,bf_part) : nothing
 	
-	full_physical_wavefunc = if_log ? log_prod(Complex.(included_parts)) : prod(included_parts)
+	full_physical_wavefunc = if_log ? factorial(total_particles) * log_prod(Complex.(included_parts)) : prod(included_parts)^factorial(total_particles)
 	
 	return full_physical_wavefunc,bb_part,ff_part,bf_part
 end
@@ -123,6 +124,7 @@ function orbital_part(particle_dictionary::Dict,L::Int; kwargs...)
 	end
 	
 	num_bosons,num_fermions = length(particle_dictionary["B"]),length(particle_dictionary["F"])
+	total_particles = num_bosons + num_fermions
 	all_values = []
 	xosc = sqrt(1/(mass*freq))
 	#hermite_part = 1.0
@@ -135,7 +137,7 @@ function orbital_part(particle_dictionary::Dict,L::Int; kwargs...)
 		end
 	end
 	
-	return if_log ? sum(Complex.(all_values)) : prod(all_values)	
+	return if_log ? factorial(total_particles) * sum(Complex.(all_values)) : (prod(all_values))^factorial(total_particles)
 end
 
 function exchange_particles(species::String,particle_dictionary::Dict)
@@ -197,6 +199,7 @@ function get_coeff(num_parts::Int; kwargs...)
 	end
 end
 
+# need to include power to part given number of permutations of configuration
 function get_config_wavefunc(particle_dictionary::Dict,L::Int; kwargs...)
 	if_log = get(kwargs, :if_log, true)
 	freq = get(kwargs, :freq, 1.0)
@@ -269,11 +272,15 @@ function get_wavefunc(phys_configs,spin_configs,L::Int,nflavors::Int; kwargs...)
 	if length(phys_configs) == 0 || length(spin_configs) == 0
 		return nothing
 	else
+		config_wavefuncs = Dict()
 		for pcon in phys_configs
+			pcon_dict = make_config_dictionary(pcon,[])
 			for scon in spin_configs
-				config_vector_to_string((pcon,scon))
+				scon_dict = make_config_dictionary(scon,[])
+				config_wavefuncs[config_vector_to_string((pcon,scon))] = get_config_wavefunc(pcon_dict,L; kwargs...,spin_dictionary=scon_dict,spin_dof=nflavors)
 			end
 		end
+		return normalize_wavefunc_dict(config_wavefuncs)
 	end
 end
 
@@ -306,6 +313,57 @@ function get_random_configurations(N::Int,L::Int,limit::Int)
 	return all_configs
 end
 
+function spin_configurations(N::Int, nflavors::Int; kwargs...) # written by ChatGPT 10.08.2023
+    all_configs = Vector{Vector{Int}}()
+    seen_configs = Set{Vector{Int}}()
+    
+    total_length = N > 30 ? 1000000 : factorial(N)
+    
+    function generate_combs(current_config, remaining_particles)
+        if remaining_particles == 0
+            unique_config = sort(current_config)
+            if unique_config ∉ seen_configs
+                push!(all_configs, unique_config)
+                push!(seen_configs, unique_config)
+            end
+            return
+        end
+        
+        for spin in 1:nflavors
+            generate_combs([current_config..., spin], remaining_particles - 1)
+        end
+    end
+    
+    if_limit = get(kwargs, :if_limit, true)
+    limit = get(kwargs, :limit, 100000)
+    if total_length < 2*limit
+    	generate_combs([], N)
+    	if length(all_configs) > limit
+    		println("More than limit but accessible")
+	    	which_keep = randperm(length(all_configs))[1:limit]
+	    	kept_configs = [all_configs[i] for i in which_keep]
+	    	return kept_configs
+	else
+		println("Less than limit")
+		if length(all_configs) != total_length
+			println("AL = ",length(all_configs),", TL = ",total_length)
+		end
+		return all_configs
+	end
+    else
+    	println("Beyond limit $total_length, random generation")
+    	if if_limit
+    		all_configs = get_random_configurations(N,L,limit)
+    		return all_configs
+    	else
+    		generate_combs([], N)
+    		return all_configs
+    	end
+    end
+    
+    return all_configs
+end
+
 function configurations(N::Int, L::Int; kwargs...)
     # Calculate number of configurations
     if L < 30
@@ -329,7 +387,7 @@ function configurations(N::Int, L::Int; kwargs...)
 	    end
 
 	    # Recursive step: try all possible positions for the next particle
-	    for pos in start_pos:L
+	    for pos in start_pos-1:L
 		if pos in current_config
 		    continue  # Skip this position if it's already occupied
 		end
@@ -342,9 +400,9 @@ function configurations(N::Int, L::Int; kwargs...)
 
     # Start the recursive function
     if_limit = get(kwargs, :if_limit, true)
-    limit = get(kwargs, :limit, 100000)
+    limit = get(kwargs, :limit, 10000)
     if total_length < 2*limit
-    	generate_configs(1, N)
+    	generate_configs(2, N)
     	if length(all_configs) > limit
     		println("More than limit but accessible")
 	    	which_keep = randperm(length(all_configs))[1:limit]
@@ -363,7 +421,7 @@ function configurations(N::Int, L::Int; kwargs...)
     		all_configs = get_random_configurations(N,L,limit)
     		return all_configs
     	else
-    		generate_configs(1, N)
+    		generate_configs(2, N)
     		return all_configs
     	end
     end
@@ -453,26 +511,72 @@ function overlap_two_wavefuncs(wavefuncL,wavefuncR; kwargs...)
 	end
 end
 
-function position_occupancy(wavefunc::Dict,L::Int; kwargs...)
+function position_occupancy_spin(wavefunc::Dict,L::Int; kwargs...)
 	if_log = get(kwargs, :if_log, true)
 	if_plot = get(kwargs, :if_plot, true)
-	all_sites = [i for i in 1:L]
-	site_occs = [423.0 for i in 1:L]
+	nflavors = get(kwargs, :nflavors, 3)
+	
+	site_occs = ones(nflavors,L) .* 423.0
 	for (k,v) in wavefunc
-		result = if_log ? v + conj(v) : v*conj(v)
+		result = if_log ? exp.(v + conj(v)) : v*conj(v)
 		config = config_string_to_vector(k)
-		for s in config
-			if site_occs[s] == 423.0
-				site_occs[s] = result
+		for i in 1:length(config[1])
+			if site_occs[config[2][i],config[1][i]] == 423.0
+				site_occs[config[2][i],config[1][i]] = result
 			else
-				site_occs[s] = if_log ? log_add(site_occs[s],result) : site_occs[s] + result
+				site_occs[config[2][i],config[1][i]] = site_occs[config[2][i],config[1][i]] + result
 			end
 		end
 	end
 	
-	if_plot ? plot_position_occupancy(all_sites,if_log ? exp.(site_occs) : site_occs; kwargs...) : nothing
+	if_plot ? plot_position_occupancy_spin(site_occs;kwargs...) : nothing
 	
-	return all_sites,site_occs
+	return site_occs
+end
+
+function plot_position_occupancy_spin(site_occupation::Matrix; kwargs...)
+	title_string = "Occupancy, " * get(kwargs, :plot_title, "")
+	fig = figure()
+	plot_surface(1:L,1:nflavors,site_occupation)
+	ylabel("Virtual Dim")
+	xlabel("Physical Dim")
+	title(title_string)
+	
+	if_save_fig = get(kwargs, :if_save_fig, false)
+	if if_save_fig
+		location = get(kwargs, :location, pwd())
+		filename = get(kwargs, :name, "occs")
+		filename = check_plot_label(filename,"occs")
+	end
+	# if_save_fig ? save_figure(filename; location=location) : nothing
+	return
+end
+
+function position_occupancy(wavefunc::Dict,L::Int; kwargs...)
+	if_log = get(kwargs, :if_log, true)
+	if_plot = get(kwargs, :if_plot, true)
+	
+	if length(split(collect(keys(wavefunc))[1],"-")) != 1
+		
+	else
+		all_sites = [i for i in 1:L]
+		site_occs = [423.0 for i in 1:L]
+		for (k,v) in wavefunc
+			result = if_log ? v + conj(v) : v*conj(v)
+			config = config_string_to_vector(k)
+			for s in config
+				if site_occs[s] == 423.0
+					site_occs[s] = result
+				else
+					site_occs[s] = if_log ? log_add(site_occs[s],result) : site_occs[s] + result
+				end
+			end
+		end
+		
+		if_plot ? plot_position_occupancy(all_sites,if_log ? exp.(site_occs) : site_occs; kwargs...) : nothing
+		
+		return all_sites,site_occs
+	end
 end
 
 function plot_position_occupancy(sites::Vector,occs::Vector; kwargs...)
@@ -687,7 +791,7 @@ rho = direct_density_matrix(L,ntot)
 plot(diag(exp.(rho)))
 title("Tr = $(tr(exp.(rho))) and Ntot = $ntot")
 =#
-#=
+#
 if false
 	include("../other-funcs/data-storage-funcs.jl")
 	effective_datadict = read_data_jld2("allmomdist-alpha-0.0-if_periodic-false-if_nn_int-false.jld2","../cluster-data/")
@@ -713,7 +817,9 @@ end
 
 if true
 suff_momdiff = 2*pi/200
-#L = 20
+L = 7
+nflavors = 10
+if_spin = true
 if_per = false
 pfinal = 10.0
 pinit = 0.0
@@ -733,33 +839,39 @@ omegas = [fs + (i-1)*(fe-fs)/(count-1) for i in 1:count]
 rhos_dict = Dict()
 #rhos = []
 #ns = [2,10,16,20]
-omega = 1.0#1/10000.0#omegas[i]
-model_paras = (freq=omega,if_periodic=if_per,if_log=true,if_logscale=false)
 #for (k,v) in rhos_dict
 #densities = [1/i for i in 1:5]
 #for i in 1:length(omegas)
-for (L,n_tot) in params
-keystring = join([string(L),string(n_tot)],",")
-println(keystring)
-#n_tot = Int(round(dens*L,digits=0))
+#for (L,n_tot) in params
+#keystring = join([string(L),string(n_tot)],",")
+#println(keystring)
+n_tot = 6
 n_F = 0
 n_B = n_tot - n_F
-#all_configs = configurations(n_tot,L)
+if true
+phys_configs = configurations(n_tot,L)
+spin_configs = spin_configurations(n_tot,nflavors)
+end
+omega = 1/10000.0#omegas[i]
+model_paras = (freq=omega,if_periodic=if_per,if_log=true,if_logscale=false)
+
+
 #println("Made Configs, total = ",length(all_configs))
-#gs_wavefunc = get_wavefunc(all_configs,L;model_paras...)
+gs_wavefunc = get_wavefunc(phys_configs,spin_configs,L,nflavors;model_paras...)
+occ_mat = position_occupancy_spin(gs_wavefunc,L; model_paras...,nflavors=nflavors)
 #wavefuncs_dict[keystring] = gs_wavefunc
 #println("Made Wavefunc")
-rho = exp.(direct_density_matrix(L,n_tot; model_paras...))
+#rho = exp.(direct_density_matrix(L,n_tot; model_paras...))
 #append!(rhos,[rho])
-rhos_dict[keystring] = rho
-fig = figure()
+#rhos_dict[keystring] = rho
+#fig = figure()
 #plot(diag(rho))
-imshow(rho)
-colorbar()
+#imshow(rho)
+#colorbar()
 #plottitle = "Freq = $(round(omega,digits=2))"
 #L,n_tot = parse.(Int,split(k,","))
-plottitle = "Dens Mat for Phys Dim = $L and Nbosons = $n_tot"
-title(plottitle)
+#plottitle = "Dens Mat for Phys Dim = $L and Nbosons = $n_tot"
+#title(plottitle)
 #plot_position_occupancy(rho; model_paras...,plot_label=plottitle)
 #append!(rhos,[rho])
 #position_occupancy(gs_wavefunc,L; model_paras...,plot_label="$n_tot")
@@ -770,7 +882,7 @@ title(plottitle)
 #end
 #append!(moms,[mrez[2]])
 #end
-end
+#end
 end
 
 if false
@@ -815,7 +927,7 @@ legend()
 
 
 
-=#
+#
 
 
 
