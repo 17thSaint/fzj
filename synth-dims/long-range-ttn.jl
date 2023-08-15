@@ -119,6 +119,8 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	if_periodic = get(kwargs, :if_periodic, true)
 	if_hopping = get(kwargs, :if_hopping, true)
 	if_chem = get(kwargs, :if_chem, false)
+	if_nn_int = get(kwargs, :if_nn_int, false)
+	nn_int_strength = get(kwargs, :nn_int_strength, 0.0)
 	if_pinning_pot = get(kwargs, :if_pinning_pot, false)
 	vpinning = get(kwargs, :vpinning, 2.5)
 	no_magF = get(kwargs, :no_magF, false)
@@ -159,6 +161,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 				else
 					for j in TTNKit.eachindex(lat)
 						interaction_sites = get_interaction_coords(TTNKit.coordinate(lat,j),i-1,lat)
+						
 						for k in interaction_sites
 							interaction += (local_strength/2,"Adag * A",TTNKit.coordinate(lat,j),"Adag * A",Tuple(k))
 							interaction -= (local_strength/2,"Adag * A",TTNKit.coordinate(lat,j))
@@ -168,6 +171,15 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 				end
 			end
 		end
+	end
+	
+	if if_nn_int
+		nn_int = TTNKit.OpSum()
+		nns = TTNKit.nearest_neighbours(lat,collect(TTNKit.eachindex(lat));periodic=if_periodic)
+		for (n1,n2) in nns
+			nn_int += (nn_int_strength,"Adag * A",n1,"Adag * A",n2)
+		end
+		append!(resulting_ham,[nn_int])
 	end
 	
 	if if_chem && chem_strength != 0.0
@@ -361,98 +373,113 @@ function deriv_bulk_dens(ttn1,ttn2,alpha_change,bulk_width=1; kwargs...)
 	deriv = (bulk_dens_1 - bulk_dens_2)/alpha_change
 	return deriv
 end
+
 #=
 
-params_dict = Dict([("open_cores","all"),("if_gpu",false),("layers",6),("mdim",150),("mag_off",false),("lr",0)])
-# usually in params: mag_off, layers, mdim, longrange_dist
-#params_dict = make_args_dict(ARGS)
-open_cores = get(params_dict, "open_cores", "all")
-if typeof(open_cores) != String
-	BLAS.set_num_threads(open_cores)	
-end
-if_gpu = get(params_dict, "if_gpu", false)
-if_change = get(params_dict, "if_change", false)
-change = get(params_dict, "change", 0.0001)
-limit = get(params_dict, "nn_strength", 1.0)
-layer_count = get(params_dict, "layers", 4)
-mag_off = get(params_dict, "mag_off", true)
-mdim = get(params_dict, "mdim", get_mdim(layer_count,(false,1)))
-longrange_dist = get(params_dict, "lr", 0)
-if if_change in ["pos","neg"]
-	if if_change == "pos"
-		alpha = get(params_dict, "alpha", nothing) + change
-		params_dict["alpha"] = round(alpha,digits=4)
-	elseif if_change == "neg"
-		alpha = get(params_dict, "alpha", nothing) - change
-		params_dict["alpha"] = round(alpha,digits=4)
+nns_start = 0.01
+nns_end = 1.0
+nns_count = 10
+nn_strens = [nns_start + (i-1)*(nns_end-nns_start)/(nns_count-1) for i in 1:nns_count]
+wavefuncs = []
+
+for nnst in nn_strens
+
+	params_dict = Dict([("layers",4),("mdim",150),("mag_off",false),("lr",0),("if_nn_int",true),("nn_strength",nnst)])
+	# usually in params: mag_off, layers, mdim, longrange_dist
+	#params_dict = make_args_dict(ARGS)
+	open_cores = get(params_dict, "open_cores", "all")
+	if typeof(open_cores) != String
+		BLAS.set_num_threads(open_cores)	
 	end
-else
-	alpha = get(params_dict, "alpha", nothing)
-end
-if layer_count % 2 == 0
-	edge_sites = Int(sqrt(2^layer_count))
-	num_particles = get(params_dict, "particles", Int(edge_sites/2))
-else
-	edge_sites = Int(sqrt(2^(layer_count+1)))
-	num_particles = get(params_dict, "particles", Int(sqrt(2^(layer_count+1))/2))
-end
-
-#
-sweep_type = "dmrg"
-max_occ = 1
-if_per = false
-evolve = true
-chemical = false
-mu = 0.5
-#max_occupation = 3
-expan = TTNKit.DefaultExpander(0.5)
-ts = 0.001
-nu = 1/2
-tot_sites = 2^layer_count
-
-if isnothing(alpha)
-	if !mag_off
-		alpha = num_particles/(mu * (tot_sites))
+	if_NN = get(params_dict, "if_nn_int", false)
+	if_gpu = get(params_dict, "if_gpu", false)
+	if_change = get(params_dict, "if_change", false)
+	change = get(params_dict, "change", 0.0001)
+	limit = get(params_dict, "nn_strength", 1.0)
+	layer_count = get(params_dict, "layers", 4)
+	mag_off = get(params_dict, "mag_off", true)
+	mdim = get(params_dict, "mdim", get_mdim(layer_count,(false,1)))
+	longrange_dist = get(params_dict, "lr", 0)
+	if if_change in ["pos","neg"]
+		if if_change == "pos"
+			alpha = get(params_dict, "alpha", nothing) + change
+			params_dict["alpha"] = round(alpha,digits=4)
+		elseif if_change == "neg"
+			alpha = get(params_dict, "alpha", nothing) - change
+			params_dict["alpha"] = round(alpha,digits=4)
+		end
 	else
-		alpha = 0.0
+		alpha = get(params_dict, "alpha", nothing)
 	end
+	if layer_count % 2 == 0
+		edge_sites = Int(sqrt(2^layer_count))
+		num_particles = get(params_dict, "particles", Int(edge_sites/2))
+	else
+		edge_sites = Int(sqrt(2^(layer_count+1)))
+		num_particles = get(params_dict, "particles", Int(sqrt(2^(layer_count+1))/2))
+	end
+
+	#
+	sweep_type = "dmrg"
+	max_occ = 1
+	if_per = false
+	evolve = true
+	chemical = false
+	mu = 0.5
+	#max_occupation = 3
+	expan = TTNKit.DefaultExpander(0.5)
+	ts = 0.001
+	nu = 1/2
+	tot_sites = 2^layer_count
+
+	if isnothing(alpha)
+		if !mag_off
+			alpha = num_particles/(mu * (tot_sites))
+		else
+			alpha = 0.0
+		end
+	end
+	nswps = 3
+	#
+
+	plotting = false
+	save_plot = false
+	save_data = false
+
+	loc = pwd()#"../cluster-data"
+	if_cliff = true
+	sc_type = "lr_flat"
+	dists = [i for i in 1:2*edge_sites]
+	lr_scaling = long_range_scaling(longrange_dist,edge_sites,0.0; cliff=if_cliff,limit=limit,scaling=sc_type,if_plot=false)
+
+		
+	metadata_dict = Dict([("if_per",if_per),("mag_off",mag_off),("chemical",chemical),("mu",mu),("ts",ts),("nu",nu),("layers",layer_count),("particles",num_particles),("alpha",alpha),("mdim",mdim),("nswps",nswps),("if_cliff",if_cliff),("sc_type",sc_type),("longrange_dist",longrange_dist),("max_occ",max_occ),("sweep_type",sweep_type),("limit",limit),("lr_scaling",lr_scaling),("if_change",if_change),("change",change),("if_nn_int",if_NN),("nn_strength",nnst)])
+
+	if length(keys(params_dict)) == 0
+		datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
+	else
+		datafile_name = make_parameters_filename(params_dict)
+	end
+
+		#
+	println(datafile_name)
+	title_string = "Np = $num_particles, LR = $longrange_dist at $limit"
+	println("Starting Script using $num_particles particles on $tot_sites sites with $(!mag_off) Mag Field, Bond Dim = $mdim, and Long Range Dist = $longrange_dist")
+	if true
+	starting = time()
+	net = build_HH_net(layer_count; syms=true)
+	ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
+	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layer_count,num_particles,ts,nu; ttn_net=net,ham_op=ham,if_save_data=save_data,name="ttn-"*datafile_name,location=loc,metadata=metadata_dict,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=max_occ,if_sweep=evolve,sweep_type=sweep_type,expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,if_gpu=if_gpu,output_level=0)
+	total_time = time() - starting
+	println("Running time = $total_time")
+	append!(wavefuncs,[dm_sp.ttn])
+	end
+	
 end
-nswps = 3
-#
-
-plotting = false
-save_plot = false
-save_data = false
-
-loc = pwd()#"../cluster-data"
-if_cliff = true
-sc_type = "lr_flat"
-dists = [i for i in 1:2*edge_sites]
-lr_scaling = long_range_scaling(longrange_dist,edge_sites,1.0; cliff=if_cliff,limit=limit,scaling=sc_type,if_plot=false)
-
-#
-metadata_dict = Dict([("if_per",if_per),("mag_off",mag_off),("chemical",chemical),("mu",mu),("ts",ts),("nu",nu),("layers",layer_count),("particles",num_particles),("alpha",alpha),("mdim",mdim),("nswps",nswps),("if_cliff",if_cliff),("sc_type",sc_type),("longrange_dist",longrange_dist),("max_occ",max_occ),("sweep_type",sweep_type),("limit",limit),("lr_scaling",lr_scaling),("if_change",if_change),("change",change)])
-
-if length(keys(params_dict)) == 0
-	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
-else
-	datafile_name = make_parameters_filename(params_dict)
-end
-
-#
-println(datafile_name)
-title_string = "Np = $num_particles, LR = $longrange_dist at $limit"
-println("Starting Script using $num_particles particles on $tot_sites sites with $(!mag_off) Mag Field, Bond Dim = $mdim, and Long Range Dist = $longrange_dist")
-starting = time()
-net = build_HH_net(layer_count; syms=true)
-ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
-og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layer_count,num_particles,ts,nu; ttn_net=net,ham_op=ham,if_save_data=save_data,name="ttn-"*datafile_name,location=loc,metadata=metadata_dict,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=max_occ,if_sweep=evolve,sweep_type=sweep_type,expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,if_gpu=if_gpu,output_level=0)
-total_time = time() - starting
-println("Running time = $total_time")
-#
-
-occs1 = get_occupancy(dm_sp.ttn; if_plot=true,if_save_fig=false,if_save_data=false)
 =#
+
+#occs1 = get_occupancy(dm_sp.ttn; if_plot=true,if_save_fig=false,if_save_data=false)
+#
 
 
 

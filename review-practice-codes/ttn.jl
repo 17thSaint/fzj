@@ -346,7 +346,7 @@ function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwarg
 			println("Using ThetaY")
 		end
 		=#
-		return -t_strength * 1 * exp(im*2*pi*(phi*s1[1])) #- ==(edge_length_y,s1[2])*thetay))
+		return round(-t_strength * 1 * exp(im*2*pi*(phi*s1[1])),digits=10) #- ==(edge_length_y,s1[2])*thetay))
 	elseif s1[2] == s2[2]
 		thetax = get(kwargs, :thetax, thetax_2)
 		#=if ==(edge_length,s1[1])
@@ -698,6 +698,7 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	phi = get(kwargs, :phi, particle_count/(filling * (num_sites)))
 	ham_operator = get(kwargs, :ham_op, nothing)
 	net = get(kwargs, :ttn_net, nothing)
+	ttn = get(kwargs, :seed_ttn, nothing)
 	if_gpu = get(kwargs, :if_gpu, false)
 
 	if isnothing(net)
@@ -706,14 +707,17 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	lat = TTNKit.physical_lattice(net)
 
 	println("Finished Building Network")
-
-	states = fill("0", num_sites)
-	#states = fill_states(particle_count-1,num_sites,max_occ)
-	old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
-	#ttn = TTNKit.increase_dim_tree_tensor_network_zeros(ttn, maxdim = max_dim)
-	#ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
 	
-	ttn = initialize_ttn(old_ttn,max_dim,particle_count)
+	if isnothing(ttn)
+		states = fill("0", num_sites)
+		#states = fill_states(particle_count-1,num_sites,max_occ)
+		old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
+		#ttn = TTNKit.increase_dim_tree_tensor_network_zeros(ttn, maxdim = max_dim)
+		#ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
+		
+		ttn = initialize_ttn(old_ttn,max_dim,particle_count)
+	end
+	
 	if if_gpu
 		println("Doing GPU TTN")
 		ttn = TTNKit.gpu(ttn)

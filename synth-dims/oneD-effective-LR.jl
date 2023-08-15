@@ -15,7 +15,7 @@ function fix_filling(L,nflavors,nu)
 	return nothing,nothing
 end
 
-save_nothing = false
+save_nothing = true
 params_dict = Dict()
 L = 20#get(params_dict, "L", 4)
 nbosons = 10#get(params_dict, "nbosons", nflavors)
@@ -33,7 +33,7 @@ mdim = get(params_dict, "mdim", 100)
 noise = [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0]
 if_save_data = save_nothing ? false : true
 data_loc = "/home/patrick/fzj/main-git/cluster-data"
-if_periodic = false
+if_periodic = true
 
 other_params_dict = Dict([("U",U),("conserve_qns",conserve_qns),("nsweeps",nsweeps),("mdim",mdim),("noise",noise)])
 savefig_data = true#save_nothing ? false : true
@@ -45,8 +45,8 @@ if_lines = false
 
 wavefuncs = []
 rhos = []
-for nflavors in [i for i in 1:5]
-alpha = 1/nflavors
+for nflavors in [i for i in 1:4]
+alpha = 0.0#1/nflavors
 phi = 2*pi*alpha
 filename_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
 #filename_dict_highdens = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons_highdens),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
