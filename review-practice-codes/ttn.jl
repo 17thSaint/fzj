@@ -58,8 +58,8 @@ end
 function get_ydir_greenfunc(ttn; kwargs...)
 	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
 	#edge_length = Int(sqrt(get_site_count(ttn)))
-	adag = "Adag"#"S+"
-	ahat = "A"#"S-"
+	adag = "Cdag"#"S+"
+	ahat = "C"#"S-"
 	direct = get(kwargs, :direction, "norm")
 	all_yvals = zeros(phys_edge_length,virt_edge_length)
 	all_greens = im.*zeros(phys_edge_length,virt_edge_length)
@@ -572,12 +572,15 @@ function fill_states(particle_count,site_count,max_occupation)
 	return states
 end
 
-function initialize_ttn(ttn,maxdim,particle_count)
+function initialize_ttn(ttn,maxdim,particle_count; kwargs...)
+	if_fermion = get(kwargs, :if_fermion, false)
+	creation = if_fermion ? "Cdag" : "Adag"
+	
 	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
 	site_count = TTNKit.number_of_sites(TTNKit.network(ttn))
 	wf_coefs = create_wavefunction(Float64,size(TTNKit.physical_lattice(TTNKit.network(ttn))))
 	for i in 1:particle_count
-		ttn = patron_application!(ttn,wf_coefs,"Adag";maxdim=maxdim)
+		ttn = patron_application!(ttn,wf_coefs,creation;maxdim=maxdim)
 	end
 	return ttn
 end
@@ -600,11 +603,17 @@ function do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
 	num_sweeps = get(kwargs, :num_sweeps, 1)
 	noise = get(kwargs, :noise, 0.0)
 	expander = get(kwargs, :expander, TTNKit.NoExpander())
+	etol = get(kwargs, :nrgtol, nothing)
+	if isnothing(etol)
+		observer = NoObserver()
+	else
+		observer = DMRGObserver(;energy_tol=etol)
+	end
 	
 	#println("PreSweep Link Dim = ",TTNKit.maxlinkdim(ttn))
 	#get_position_dims(ttn)
 	if sweep_type == "dmrg"
-		sp = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl)
+		sp = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer)
 	elseif sweep_type == "simple"
 		proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
 		#println("Finished Making Hamiltonian")
@@ -700,22 +709,24 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	net = get(kwargs, :ttn_net, nothing)
 	ttn = get(kwargs, :seed_ttn, nothing)
 	if_gpu = get(kwargs, :if_gpu, false)
+	if_fermion = get(kwargs, :if_fermion, false)
+	particle_type = if_fermion ? "Fermion" : "Boson"
 
 	if isnothing(net)
-		net = TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, "Boson";conserve_qns=conserve_qns,dim=max_occ+1)
+		net = TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, particle_type;conserve_qns=conserve_qns,dim=max_occ+1)
 	end
 	lat = TTNKit.physical_lattice(net)
 
 	println("Finished Building Network")
 	
 	if isnothing(ttn)
-		states = fill("0", num_sites)
-		#states = fill_states(particle_count-1,num_sites,max_occ)
+		#states = fill("0", num_sites)
+		states = fill_states(particle_count,num_sites,1)
 		old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
-		#ttn = TTNKit.increase_dim_tree_tensor_network_zeros(ttn, maxdim = max_dim)
-		#ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
-		
-		ttn = initialize_ttn(old_ttn,max_dim,particle_count)
+		#ttn = TTNKit.increase_dim_tree_tensor_network_zeros(old_ttn, maxdim = max_dim)
+		ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
+		#ttn = old_ttn
+		#ttn = initialize_ttn(old_ttn,max_dim,particle_count; kwargs...)
 	end
 	
 	if if_gpu
@@ -1424,6 +1435,39 @@ function get_part_counts_range_fillings(site_count,phi)
 	nu_values = [part_counts[i]/(phi*site_count) for i in 1:length(part_counts)]
 	return part_counts,nu_values
 end
+
+function density_matrix(ttn; kwargs...)
+	if_fermion = get(kwargs, :if_fermion, false)
+	creation = if_fermion ? "Cdag" : "Adag"
+	annihilation = if_fermion ? "C" : "A"
+	
+	lat = TTNKit.physical_lattice(TTNKit.network(ttn))
+	num_sites = prod(size(lat))
+	densmat = zeros(num_sites,num_sites) .* im
+	for i in 1:num_sites
+		for j in 1:i
+			println(i,", ",j)
+			densmat[i,j] = TTNKit.correlation(ttn,creation,annihilation,i,j)
+			densmat[j,i] = conj(densmat[i,j])
+		end
+	end
+	
+	if_save_data = get(kwargs,:if_save_data, true)
+	if if_save_data
+		try
+			location = get(kwargs, :location, pwd())
+			filename = get(kwargs, :name, "densmat")
+			metadata = get(kwargs, :metadata, nothing)
+			rho_data_dict = Dict([("densmat",densmat)])
+			write_data_jld2(filename,rho_data_dict,location,metadata)
+		catch
+			println("Saving Didn't work")
+		end
+	end
+	
+	return densmat
+end
+
 #=
 
 #final_time = 0.1
