@@ -70,9 +70,11 @@ end
 
 function build_HH_net(num_layers; kwargs...)
 	conserve_qns = get(kwargs, :syms, true)
+	if_fermion = get(kwargs, :if_fermion, false)
+	particle_type = if_fermion ? "Fermion" : "Boson"
 	max_occ = 1
 	
-	net = TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, "Boson";conserve_qns=conserve_qns,dim=max_occ+1)
+	net = if_fermion ? TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, particle_type;conserve_nf=conserve_qns,conserve_nfparity=false) : TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, particle_type;conserve_qns=conserve_qns,dim=max_occ+1)
 	
 	return net
 end

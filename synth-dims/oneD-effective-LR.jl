@@ -14,11 +14,11 @@ function fix_filling(L,nflavors,nu)
 	println("Not Found")
 	return nothing,nothing
 end
-
+if false
 save_nothing = true
 params_dict = Dict()
-L = 20#get(params_dict, "L", 4)
-nbosons = 10#get(params_dict, "nbosons", nflavors)
+L = 24#get(params_dict, "L", 4)
+nbosons = 12#get(params_dict, "nbosons", nflavors)
 #nflavors = 2#get(params_dict, "nflavors", Int(L/2))
 t1 = get(params_dict, "t1", 1.0)
 t2 = get(params_dict, "t2", 1.0)
@@ -28,16 +28,19 @@ U2 = U1/2
 conserve_qns = true
 if_nn_int = false#get(params_dict, "if_nn_int", false)
 if_2ord_pert = false#get(params_dict, "if_2ord_pert", false)
-nsweeps = 7
+nsweeps = 10
 mdim = get(params_dict, "mdim", 100)
 noise = [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0]
 if_save_data = save_nothing ? false : true
-data_loc = "/home/patrick/fzj/main-git/cluster-data"
-if_periodic = true
+data_loc = "/home/patrick/fzj/main-git/synth-dims/local-figs/orsay-sept23"
+if_periodic = false
+nflavors = 9
+
+dmrg_obs = TTNKit.DMRGObserver(;energy_tol=10^-3,minsweeps=3)
 
 other_params_dict = Dict([("U",U),("conserve_qns",conserve_qns),("nsweeps",nsweeps),("mdim",mdim),("noise",noise)])
-savefig_data = true#save_nothing ? false : true
-savefig = true#save_nothing ? false : true
+savefig_data = save_nothing ? false : true
+savefig = save_nothing ? false : true
 if_lines = false
 
 #nbosons,alpha = fix_filling(L,nflavors,1/2)
@@ -45,8 +48,8 @@ if_lines = false
 
 wavefuncs = []
 rhos = []
-for nflavors in [i for i in 1:4]
-alpha = 0.0#1/nflavors
+fillings = ["1/2","2/3","1/3"]
+for alpha in [1/3,1/4,1/2]
 phi = 2*pi*alpha
 filename_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
 #filename_dict_highdens = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons_highdens),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
@@ -54,7 +57,7 @@ filename_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons),("alpha"
 datafile_name = make_parameters_filename(filename_dict)
 #datafile_name_highdens = make_parameters_filename(filename_dict_highdens)
 
-model_paras = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noise, if_save_data = if_save_data, location = data_loc, if_periodic=if_periodic, name=datafile_name)
+model_paras = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noise, if_save_data = if_save_data, location = data_loc, if_periodic=if_periodic, name=datafile_name, observer = dmrg_obs)
 
 #model_paras_highdens = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons_highdens, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noise, if_save_data = if_save_data, location = data_loc, if_periodic=if_periodic, name=datafile_name_highdens)
 
@@ -63,17 +66,26 @@ metadata_dict = merge(named_tuple_to_dict(model_paras),other_params_dict)
 
 psi = execute_mps(U1,U2,phi,L,nflavors,nbosons; model_paras...,metadata=metadata_dict)
 append!(wavefuncs,[psi])
-densmat = correlation_matrix(psi,"FullDag","FullHat") ./ 2.0
+densmat = correlation_matrix(psi,"FullDag","FullHat") #./ 2.0
 append!(rhos,[densmat])
+if false
 fig = figure()
 imshow(real.(densmat))
 colorbar()
-title("Virt Dim = $nflavors")
+title("Virt Dim = $(round(alpha,digits=3))")
+end
 #append!(all_wavefuncs,[psi])
 #psi_highdens = execute_mps(U1,U2,phi,L,nflavors,nbosons_highdens; model_paras_highdens...,metadata=metadata_dict_highdens)
-mrez = momentum_occupation(psi,nbosons,100,10.0; model_paras...,plot_title="Virt Dim = $nflavors",if_log=false,if_plot=true)
+#mrez = momentum_occupation(psi,nbosons,100,10.0; model_paras...,plot_title="Virt Dim = $nflavors",if_log=false,if_plot=true)
 #append!(mom_occs,[mrez[2]])
 end
+#
+end
+for i in 1:3
+	plot(expect(wavefuncs[i],"N"),label=fillings[i])
+end
+legend()
+
 #=end
 
 fig = figure()

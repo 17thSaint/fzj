@@ -107,17 +107,17 @@ end
 
 #
 if true
-layer_count = 4
+layer_count = 6
 if_fermion = true
 
 if layer_count % 2 == 0
 	edge_sites = Int(sqrt(2^layer_count))
-	num_particles = Int(edge_sites/2)
+	num_particles = 10#Int(edge_sites/2)
 else
 	edge_sites = Int(sqrt(2^(layer_count+1)))
 	num_particles = Int(sqrt(2^(layer_count+1))/2)
 end
-nu = 1/3
+nu = 2/5
 tot_sites = 2^layer_count
 ts = 1.0
 mag_off = false
@@ -133,7 +133,7 @@ mu = 0.0
 if_NN = true
 if_onsite = true
 onsite_stren = 10.0
-nswps = 6
+nswps = 4
 expan = TTNKit.DefaultExpander(0.5)
 noise = 0.0#[1E-2,0]
 
@@ -143,7 +143,7 @@ change = if_change ? 0.001 : 0.0
 if_gpu = false
 plotting = false
 save_plot = false
-save_data = false
+save_data = true
 loc = "../cluster-data/"
 end
 
@@ -157,8 +157,7 @@ nns_start = 1.0
 nns_end = 2.0
 nns_count = 5
 nn_strens = [nns_start + (i-1)*(nns_end-nns_start)/(nns_count-1) for i in 1:nns_count]
-wavefuncs = []
-rhos = []
+rhos = [zeros(tot_sites,tot_sites).*im for i in 1:nns_count]
 #append!(nn_strens,[1.4,1.5,1.6,1.7,1.8])
 
 metadata_dict = Dict([("if_per",if_per),("mag_off",mag_off),("chemical",chemical),("mu",mu),("ts",ts),("nu",nu),("layers",layer_count),("particles",num_particles),("alpha",alpha),("mdim",mdim),("nswps",nswps),("max_occ",max_occ),("sweep_type",sweep_type),("if_change",if_change),("change",change),("if_nn_int",if_NN),("if_fermion",if_fermion)])
@@ -168,28 +167,33 @@ net = build_HH_net(layer_count; syms=true,if_fermion=if_fermion)
 old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)		
 seed_ttn = initialize_ttn(old_ttn,mdim,num_particles; if_fermion=if_fermion)
 =#
+
+states1 = fill_states(num_particles,tot_sites,1)
+old_ttn1 = TTNKit.ProductTreeTensorNetwork(net,states1)
+wavefuncs = [old_ttn1 for i in 1:nns_count]
+		
 model_paras = (noise=noise,if_fermion=if_fermion,ttn_net=net,if_nn_int=if_NN,if_onsite_int=if_onsite,onsite_strength=onsite_stren,if_save_data=save_data,location=loc,metadata=metadata_dict,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=max_occ,if_sweep=evolve,sweep_type=sweep_type,expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,if_gpu=if_gpu,output_level=0)
 #fig = figure()
 #xlabel("Nearest-Neighbor Interaction Strength")
 #ylabel("Correlation Length")
 
-for nnst in nn_strens
+Threads.@threads for nnst in nn_strens
 	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-nn_strength-$nnst-ts-$ts-if_fermion-$if_fermion"
 
 	#prev_ttn = read_data_jld2("ttn-"*datafile_name*".jld2",loc)[1]["ttn"]
 	#prev_net = TTNKit.network(prev_ttn)
-	
+	idx = findfirst(x->nn_strens[x]==nnst,[i for i in 1:nns_count])
 	starting = time()
 	ham = nn_HH_ham(net,ts,alpha; model_paras...,nn_int_strength=nnst)
 	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layer_count,num_particles,ts,nu; ham_op=ham,model_paras...,nn_int_strength=nnst,name="ttn-"*datafile_name)
 	total_time = time() - starting
 	println("Running time = $total_time")
-	append!(wavefuncs,[dm_sp.ttn])
+	wavefuncs[idx] = dm_sp.ttn
 	rho = density_matrix(dm_sp.ttn; model_paras...,name="densmat-"*datafile_name)
-	append!(rhos,[rho])
-	fig = figure()
-	imshow(abs.(rho))
-	title("$nnst")
+	rhos[idx] = rho
+	#fig = figure()
+	#imshow(abs.(rho))
+	#title("$nnst")
 
 	#get_ydir_greenfunc(dm_sp.ttn;plot_title="$nnst")
 end
@@ -211,7 +215,7 @@ end
 #nns = [nn_strens[i] for i in nnindexes]
 fig = figure()
 ss = spectra(rhos)
-for i in 1:18
+for i in 1:64
 	plot(nn_strens,-1 .* log.(10,ss[i,:]),"-p")
 end
 #

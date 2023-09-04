@@ -56,10 +56,13 @@ function get_lattice_dims(input_data)
 end
 
 function get_ydir_greenfunc(ttn; kwargs...)
+	if_fermion = get(kwargs, :if_fermion, false)
+	creation = if_fermion ? "Cdag" : "Adag"
+	annihilation = if_fermion ? "C" : "A"
+	adag = creation
+	ahat = annihilation
 	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
 	#edge_length = Int(sqrt(get_site_count(ttn)))
-	adag = "Cdag"#"S+"
-	ahat = "C"#"S-"
 	direct = get(kwargs, :direction, "norm")
 	all_yvals = zeros(phys_edge_length,virt_edge_length)
 	all_greens = im.*zeros(phys_edge_length,virt_edge_length)
@@ -147,8 +150,11 @@ end
 function get_xdir_greenfunc(ttn; kwargs...)
 	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
 	#edge_length = Int(sqrt(get_site_count(ttn)))
-	adag = "Adag"#"S+"
-	ahat = "A"#"S-"
+	if_fermion = get(kwargs, :if_fermion, false)
+	creation = if_fermion ? "Cdag" : "Adag"
+	annihilation = if_fermion ? "C" : "A"
+	adag = creation
+	ahat = annihilation
 	direct = get(kwargs, :direction, "norm")
 	all_xvals = zeros(phys_edge_length,virt_edge_length)
 	all_greens = im.*zeros(phys_edge_length,virt_edge_length)
@@ -187,9 +193,12 @@ function get_current_yfunc(ttn; kwargs...)
 	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
 	edge_length = virt_edge_length
 	#edge_length = Int(sqrt(get_site_count(ttn)))
-	adag = "Adag"#"S+"
-	ahat = "A"#"S-"
-	norm_string = "Adag * A"#"S+ * S-"
+	if_fermion = get(kwargs, :if_fermion, false)
+	creation = if_fermion ? "Cdag" : "Adag"
+	annihilation = if_fermion ? "C" : "A"
+	adag = creation
+	ahat = annihilation
+	norm_string = "N"#"S+ * S-"
 	if_periodic = get(kwargs, :if_periodic, false)
 	if if_periodic
 		all_yvals = zeros(edge_length,edge_length)
@@ -267,9 +276,12 @@ function get_current_xfunc(ttn; kwargs...)
 	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
 	edge_length = phys_edge_length
 	#edge_length = Int(sqrt(get_site_count(ttn)))
-	adag = "Adag"#"S+"
-	ahat = "A"#"S-"
-	norm_string = "Adag * A"#"S+ * S-"
+	if_fermion = get(kwargs, :if_fermion, false)
+	creation = if_fermion ? "Cdag" : "Adag"
+	annihilation = if_fermion ? "C" : "A"
+	adag = creation
+	ahat = annihilation
+	norm_string = "N"#"S+ * S-"
 	if_periodic = get(kwargs, :if_periodic, true)
 	if if_periodic
 		all_xvals = zeros(edge_length,edge_length)

@@ -206,8 +206,8 @@ function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 					continue
 				end
 			end
-			ampo += (-t1 * exp(im*phi*s), "Cr$s", j, "Anh$s", next_site)
-			ampo += (-t1 * exp(-im*phi*s), "Anh$s", j, "Cr$s", next_site)
+			ampo += (-t1 * exp(im*phi*s*0.0), "Cr$s", j, "Anh$s", next_site)
+			ampo += (-t1 * exp(-im*phi*s*0.0), "Anh$s", j, "Cr$s", next_site)
 		end
 
 		# attractive physical nearest neighbor density interaction
@@ -242,8 +242,8 @@ function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 	for j in 1:L
 		for s in 1:nflavors-1
 			# synthetic dimension hopping
-			ampo += (-t2 * 1, "Cr$(s+1) * Anh$(s)", j)
-			ampo += (-t2 * 1, "Cr$(s) * Anh$(s+1)", j)
+			ampo += (-t2 * exp(im*phi*j*0.0), "Cr$(s+1) * Anh$(s)", j)
+			ampo += (-t2 * exp(-im*phi*s*0.0), "Cr$(s) * Anh$(s+1)", j)
 		end
 	end
 	
@@ -252,10 +252,11 @@ end
 
 function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	conserve_qns = get(kwargs, :conserve_qns, true)
-	nsweeps = get(kwargs, :nsweeps, 5)
+	nsweeps = get(kwargs, :nsweeps, 10)
 	psi0 = get(kwargs, :psi_guess, nothing)
 	mdim = get(kwargs, :mdim, 100)
 	noise = get(kwargs, :noise, 0.0)
+	obs = get(kwargs, :observer, TTNKit.NoObserver())
 	if_save_data = get(kwargs, :if_save_data, false)
 	t1 = 1.0
 	t2 = 1.0
@@ -273,7 +274,7 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	if isnothing(psi0)
 		psi0 = randomMPS(sidx, states)
 	end
-	E, psi = dmrg(H, psi0; maxdim = [Int(floor(mdim/4)),Int(floor(mdim/2)), mdim], nsweeps = nsweeps, noise = noise)
+	E, psi = dmrg(H, psi0; maxdim = [Int(floor(mdim/4)),Int(floor(mdim/2)), mdim], nsweeps = nsweeps, noise = noise, observer = obs)
 	
 	if if_save_data
 		location = get(kwargs, :location, pwd())
