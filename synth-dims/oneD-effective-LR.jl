@@ -14,11 +14,11 @@ function fix_filling(L,nflavors,nu)
 	println("Not Found")
 	return nothing,nothing
 end
-if false
-save_nothing = true
+if true
+save_nothing = false
 params_dict = Dict()
-L = 24#get(params_dict, "L", 4)
-nbosons = 12#get(params_dict, "nbosons", nflavors)
+L = 54#get(params_dict, "L", 4)
+#nbosons = 12#get(params_dict, "nbosons", nflavors)
 #nflavors = 2#get(params_dict, "nflavors", Int(L/2))
 t1 = get(params_dict, "t1", 1.0)
 t2 = get(params_dict, "t2", 1.0)
@@ -28,17 +28,19 @@ U2 = U1/2
 conserve_qns = true
 if_nn_int = false#get(params_dict, "if_nn_int", false)
 if_2ord_pert = false#get(params_dict, "if_2ord_pert", false)
-nsweeps = 10
+nsweeps = 20
 mdim = get(params_dict, "mdim", 100)
-noise = [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0]
+noises = [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0.0]
 if_save_data = save_nothing ? false : true
 data_loc = "/home/patrick/fzj/main-git/synth-dims/local-figs/orsay-sept23"
 if_periodic = false
-nflavors = 9
+#nflavors = 9
+alpha = 1/3
+phi = 2*pi*alpha
 
 dmrg_obs = TTNKit.DMRGObserver(;energy_tol=10^-3,minsweeps=3)
 
-other_params_dict = Dict([("U",U),("conserve_qns",conserve_qns),("nsweeps",nsweeps),("mdim",mdim),("noise",noise)])
+other_params_dict = Dict([("U",U),("conserve_qns",conserve_qns),("nsweeps",nsweeps),("mdim",mdim),("noise",noises)])
 savefig_data = save_nothing ? false : true
 savefig = save_nothing ? false : true
 if_lines = false
@@ -48,16 +50,16 @@ if_lines = false
 
 wavefuncs = []
 rhos = []
+nbosons = Int(L/2)
 fillings = ["1/2","2/3","1/3"]
-for alpha in [1/3,1/4,1/2]
-phi = 2*pi*alpha
+for nflavors in [i for i in 2:8]
 filename_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
 #filename_dict_highdens = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons_highdens),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
 
 datafile_name = make_parameters_filename(filename_dict)
 #datafile_name_highdens = make_parameters_filename(filename_dict_highdens)
 
-model_paras = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noise, if_save_data = if_save_data, location = data_loc, if_periodic=if_periodic, name=datafile_name, observer = dmrg_obs)
+model_paras = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noises, if_save_data = if_save_data, location = data_loc, if_periodic=if_periodic, name=datafile_name, observer = dmrg_obs)
 
 #model_paras_highdens = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons_highdens, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noise, if_save_data = if_save_data, location = data_loc, if_periodic=if_periodic, name=datafile_name_highdens)
 
@@ -81,10 +83,12 @@ end
 end
 #
 end
-for i in 1:3
-	plot(expect(wavefuncs[i],"N"),label=fillings[i])
+
+for i in 1:7
+	plot(expect(wavefuncs[i],"N"),label="$(i+1)")
 end
 legend()
+#title("Nflavors = $nflavors")
 
 #=end
 
