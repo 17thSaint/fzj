@@ -732,13 +732,13 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	println("Finished Building Network")
 	
 	if isnothing(ttn)
-		#states = fill("0", num_sites)
-		states = fill_states(particle_count,num_sites,1)
+		states = fill("0", num_sites)
+		#states = fill_states(particle_count,num_sites,1)
 		old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
 		#ttn = TTNKit.increase_dim_tree_tensor_network_zeros(old_ttn, maxdim = max_dim)
-		ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
+		#ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
 		#ttn = old_ttn
-		#ttn = initialize_ttn(old_ttn,max_dim,particle_count; kwargs...)
+		ttn = initialize_ttn(old_ttn,max_dim,particle_count; kwargs...)
 	end
 	
 	if if_gpu

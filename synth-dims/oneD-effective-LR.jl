@@ -14,10 +14,10 @@ function fix_filling(L,nflavors,nu)
 	println("Not Found")
 	return nothing,nothing
 end
-if true
+if false
 save_nothing = false
 params_dict = Dict()
-L = 54#get(params_dict, "L", 4)
+L = 90#get(params_dict, "L", 4)
 #nbosons = 12#get(params_dict, "nbosons", nflavors)
 #nflavors = 2#get(params_dict, "nflavors", Int(L/2))
 t1 = get(params_dict, "t1", 1.0)
@@ -28,12 +28,13 @@ U2 = U1/2
 conserve_qns = true
 if_nn_int = false#get(params_dict, "if_nn_int", false)
 if_2ord_pert = false#get(params_dict, "if_2ord_pert", false)
-nsweeps = 20
+nsweeps = 100
 mdim = get(params_dict, "mdim", 100)
 noises = [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0.0]
 if_save_data = save_nothing ? false : true
 data_loc = "/home/patrick/fzj/main-git/synth-dims/local-figs/orsay-sept23"
-if_periodic = false
+if_periodic_phys = false
+if_periodic_synth = true
 #nflavors = 9
 alpha = 1/3
 phi = 2*pi*alpha
@@ -52,14 +53,14 @@ wavefuncs = []
 rhos = []
 nbosons = Int(L/2)
 fillings = ["1/2","2/3","1/3"]
-for nflavors in [i for i in 2:8]
-filename_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
+for nflavors in [1,2,3,4]
+filename_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic_synth",if_periodic_synth)])
 #filename_dict_highdens = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons_highdens),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
 
 datafile_name = make_parameters_filename(filename_dict)
 #datafile_name_highdens = make_parameters_filename(filename_dict_highdens)
 
-model_paras = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noises, if_save_data = if_save_data, location = data_loc, if_periodic=if_periodic, name=datafile_name, observer = dmrg_obs)
+model_paras = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noises, if_save_data = if_save_data, location = data_loc, if_periodic_synth=if_periodic_synth, if_periodic_phys=if_periodic_phys, name=datafile_name, observer = dmrg_obs)
 
 #model_paras_highdens = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons_highdens, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noise, if_save_data = if_save_data, location = data_loc, if_periodic=if_periodic, name=datafile_name_highdens)
 
@@ -68,8 +69,9 @@ metadata_dict = merge(named_tuple_to_dict(model_paras),other_params_dict)
 
 psi = execute_mps(U1,U2,phi,L,nflavors,nbosons; model_paras...,metadata=metadata_dict)
 append!(wavefuncs,[psi])
-densmat = correlation_matrix(psi,"FullDag","FullHat") #./ 2.0
-append!(rhos,[densmat])
+plot(expect(psi,"N"),label="$nflavors")
+#densmat = correlation_matrix(psi,"FullDag","FullHat") #./ 2.0
+#append!(rhos,[densmat])
 if false
 fig = figure()
 imshow(real.(densmat))
@@ -83,11 +85,31 @@ end
 end
 #
 end
-
-for i in 1:7
-	plot(expect(wavefuncs[i],"N"),label="$(i+1)")
+if true
+L = 90
+bulksize = 20
+dists = [i for i in 1:bulksize]
+for i in 2:length(files)
+	corrs = [0.0 for i in 1:bulksize]
+	corr_errs = [0.0 for i in 1:bulksize]
+	f = files[i]
+	whichone = i
+	ps = get_params_dict_from_filename(f)
+	nf = ps["nflavors"]
+	nb = ps["nbosons"]
+	nuval = "1/" * string(L/nb)
+	for i in 1:bulksize
+		midval = Int(floor((L - i)/2))
+		all_vals = [diag(rhomats[whichone],i)[midval-Int(bulksize/2):midval+Int(bulksize/2)]; diag(rhomats[whichone],-i)[midval-Int(bulksize/2):midval+Int(bulksize/2)]]
+		corrs[i] = mean(real.(all_vals))
+		corr_errs[i] = std(real.(all_vals))
+	end
+	#errorbar(dists,corrs,yerr=corr_errs,label=nuval * ", $nb")
+	plot(dists,corrs,label=nuval * ", $nf")
+	legend()
 end
-legend()
+end
+
 #title("Nflavors = $nflavors")
 
 #=end

@@ -191,7 +191,8 @@ end
 function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 	if_nn_int = get(kwargs, :if_nn_int, true)
 	if_2ord_pert = get(kwargs, :if_2ord_pert, true)
-	if_periodic = get(kwargs, :if_periodic, false)
+	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
+	if_periodic_synth = get(kwargs, :if_periodic_synth, false)
 	
 	
 	ampo = OpSum()
@@ -200,7 +201,7 @@ function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 			# physical dimension hopping
 			next_site = j+1
 			if j == L
-				if if_periodic
+				if if_periodic_phys
 					next_site = 1
 				else
 					continue
@@ -214,7 +215,7 @@ function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 		if if_nn_int
 			next_site = j+1
 			if j == L
-				if if_periodic
+				if if_periodic_phys
 					next_site = 1
 				else
 					continue
@@ -242,8 +243,16 @@ function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 	for j in 1:L
 		for s in 1:nflavors-1
 			# synthetic dimension hopping
-			ampo += (-t2 * exp(im*phi*j*0.0), "Cr$(s+1) * Anh$(s)", j)
-			ampo += (-t2 * exp(-im*phi*s*0.0), "Cr$(s) * Anh$(s+1)", j)
+			next_site = s+1
+			if s == nflavors
+				if if_periodic_synth
+					next_site = 1
+				else
+					continue
+				end
+			end
+			ampo += (-t2 * exp(im*phi*j), "Cr$(next_site) * Anh$(s)", j)
+			ampo += (-t2 * exp(-im*phi*j), "Cr$(s) * Anh$(next_site)", j)
 		end
 	end
 	

@@ -384,9 +384,12 @@ nns_count = 10
 nn_strens = [nns_start + (i-1)*(nns_end-nns_start)/(nns_count-1) for i in 1:nns_count]
 wavefuncs = []
 
-for nnst in nn_strens
+nnst = 1.0
+layers = 6
+lr = Int(sqrt(2^layers)) - 1
+#for nnst in nn_strens
 
-	params_dict = Dict([("layers",4),("mdim",150),("mag_off",false),("lr",0),("if_nn_int",true),("nn_strength",nnst)])
+	params_dict = Dict([("layers",layers),("mdim",150),("mag_off",false),("lr",lr),("if_nn_int",true),("nn_strength",nnst)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
@@ -442,15 +445,17 @@ for nnst in nn_strens
 		end
 	end
 	nswps = 3
+	alpha = 1/2
+	num_particles = Int(alpha * tot_sites / 2)
 	#
 
 	plotting = false
 	save_plot = false
 	save_data = false
 
-	loc = pwd()#"../cluster-data"
-	if_cliff = true
-	sc_type = "lr_flat"
+	loc = "../cluster-data/"
+	if_cliff = false
+	sc_type = "flat"
 	dists = [i for i in 1:2*edge_sites]
 	lr_scaling = long_range_scaling(longrange_dist,edge_sites,0.0; cliff=if_cliff,limit=limit,scaling=sc_type,if_plot=false)
 
@@ -477,11 +482,11 @@ for nnst in nn_strens
 	append!(wavefuncs,[dm_sp.ttn])
 	end
 	
-end
-=#
+#end
+#
 
 #occs1 = get_occupancy(dm_sp.ttn; if_plot=true,if_save_fig=false,if_save_data=false)
-#
+=#
 
 
 
