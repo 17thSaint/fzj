@@ -138,12 +138,13 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 						
 			coeff = get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
 			
-			if s1_coord[1] == s2_coord[1]
-				coeff *= 500
-			end
+			#if s1_coord[1] == s2_coord[1]
+			#	coeff *= 500
+			#end
 			
 			hopping += (coeff,"Adag",s1_coord,"A",s2_coord)
 			hopping += (conj(coeff),"Adag",s2_coord,"A",s1_coord)
+			
 		end
 		append!(resulting_ham,[hopping])
 	end
@@ -389,7 +390,7 @@ layers = 6
 lr = Int(sqrt(2^layers)) - 1
 #for nnst in nn_strens
 
-	params_dict = Dict([("layers",layers),("mdim",150),("mag_off",false),("lr",lr),("if_nn_int",true),("nn_strength",nnst)])
+	params_dict = Dict([("layers",layers),("mdim",200),("mag_off",false),("lr",lr),("if_nn_int",true),("nn_strength",nnst)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
@@ -426,14 +427,14 @@ lr = Int(sqrt(2^layers)) - 1
 
 	#
 	sweep_type = "dmrg"
-	max_occ = 1
+	max_occ = 2
 	if_per = false
 	evolve = true
 	chemical = false
 	mu = 0.5
 	#max_occupation = 3
 	expan = TTNKit.DefaultExpander(0.5)
-	ts = 0.001
+	ts = 0.500
 	nu = 1/2
 	tot_sites = 2^layer_count
 
@@ -451,9 +452,9 @@ lr = Int(sqrt(2^layers)) - 1
 
 	plotting = false
 	save_plot = false
-	save_data = false
+	save_data = true
 
-	loc = "../cluster-data/"
+	loc = "../cluster-data/orsay-sept23"
 	if_cliff = false
 	sc_type = "flat"
 	dists = [i for i in 1:2*edge_sites]
@@ -480,6 +481,7 @@ lr = Int(sqrt(2^layers)) - 1
 	total_time = time() - starting
 	println("Running time = $total_time")
 	append!(wavefuncs,[dm_sp.ttn])
+	
 	end
 	
 #end

@@ -56,7 +56,7 @@ parse_opname(::Type{<:OpName{S}}) where S = string(S)
 function opstring_to_flavor(on::Type{<:OpName})
 	on_str = parse_opname((on))
 
-	sup_op_list = ["Cr", "Anh", "Ns"]
+	sup_op_list = ["Cr", "Anh", "Ns", "Mx", "My", "Mz"]
 	for sup_op in sup_op_list
 		occursin(sup_op, on_str) && return sup_op, parse(Int64, SubString(on_str, (length(sup_op)+1):length(on_str)))
 	end
@@ -127,6 +127,41 @@ begin
 		end
 		return mat
 	end
+	
+	sx_12 = 0.5 .* [0 1; 1 0]
+	sy_12 = (1/(2*1)) .* [0 1; -1 0]
+	sz_12 = (1/(2*1)) .* [1 0; 0 -1]
+			
+	sx_1 = (1/sqrt(2)) .* [0 1 0; 1 0 1; 0 1 0]
+	sy_1 = (1/(sqrt(2)*1)) .* [0 1 0; -1 0 1; 0 -1 0]
+	sz_1 = (1/sqrt(2)) .* [1 0 0; 0 0 0; 0 0 -1]
+		
+	sx_32 = (1/2) .* [0 sqrt(3) 0 0; sqrt(3) 0 2 0; 0 2 0 sqrt(3); 0 0 sqrt(3) 0]
+	sy_32 = (1/(2*1)) .* [0 sqrt(3) 0 0; -sqrt(3) 0 2 0; 0 -2 0 sqrt(3); 0 0 -sqrt(3) 0]
+	sz_32 =  [3/2 0 0 0; 0 1/2 0 0; 0 0 -1/2 0; 0 0 0 -3/2]
+		
+	sx_2 = 0.5 .* [0 2 0 0 0; 2 0 sqrt(6) 0 0; 0 sqrt(6) 0 sqrt(6) 0; 0 0 sqrt(6) 0 2; 0 0 0 2 0]
+	sy_2 = (0.5*1) .* [0 2 0 0 0; -2 0 sqrt(6) 0 0; 0 -sqrt(6) 0 sqrt(6) 0; 0 0 -sqrt(6) 0 2; 0 0 0 -2 0]
+	sz_2 = [2 0 0 0 0; 0 1 0 0 0; 0 0 0 0 0; 0 0 0 -1 0; 0 0 0 0 -2]
+	
+	sx_52 = 0.5 .* [0 sqrt(5) 0 0 0 0; sqrt(5) 0 sqrt(8) 0 0 0; 0 sqrt(8) 0 sqrt(9) 0 0; 0 0 sqrt(9) 0 sqrt(8) 0 ;0 0 0 sqrt(8) 0 sqrt(5); 0 0 0 0 sqrt(5) 0]
+	sy_52 = (0.5) .* [0 sqrt(5) 0 0 0 0; -sqrt(5) 0 sqrt(8) 0 0 0; 0 -sqrt(8) 0 sqrt(9) 0 0; 0 0 -sqrt(9) 0 sqrt(8) 0 ; 0 0 0 -sqrt(8) 0 sqrt(5); 0 0 0 0 -sqrt(5) 0]
+	sz_52 = [5/2 0 0 0 0 0; 0 3/2 0 0 0 0; 0 0 1/2 0 0 0; 0 0 0 -1/2 0 0; 0 0 0 0 -3/2 0; 0 0 0 0 0 -5/2]
+	
+	spin_matrices_dict = Dict([("X,0.5",sx_12),("X,1.0",sx_1),("X,1.5",sx_32),("X,2.0",sx_2),("X,2.5",sx_52),("Y,0.5",sy_12),("Y,1.0",sy_1),("Y,1.5",sy_32),("Y,2.0",sy_2),("Y,2.5",sy_52),("Z,0.5",sz_12),("Z,1.0",sz_1),("Z,1.5",sz_32),("Z,2.0",sz_2),("Z,2.5",sz_52)])
+	
+	function _op(::OpName"Mz", ::SiteType"ExtendedHardcore", d::Int; flavor)
+		spin = round((d-1)/2,digits=1)
+		flavor1 = Int(round(flavor/10,digits=0))
+		flavor2 = Int(flavor - 10*flavor1)
+		spin_part = spin_matrices_dict["Z,"*string(spin)]
+		anh_mat = zeros(d,d)
+		anh_mat[1, flavor2 + 1] = 1
+		cr_mat = zeros(d,d)
+		cr_mat[flavor1 + 1,1] = 1
+		return spin_part .* (cr_mat * anh_mat)
+	end
+	
 	
 	function ITensors.op(opn::OpName, st::SiteType"ExtendedHardcore", d::Int)
 		op, flavor = opstring_to_flavor(typeof(opn))
@@ -567,6 +602,35 @@ function plot_denscorr(denscorrs,corr_errors,distances; kwargs...)
 	if_save_fig ? save_figure(filename; location=location) : nothing
 	
 	return denscorrs,corr_errors
+end
+
+function get_magnetization(wavefunc::MPS,spin_value::Float64,direction::String; kwargs...)
+	magnetization = [0.0 for i in 1:length(wavefunc)]
+	sites = [i for i in 1:length(magnetization)]
+	for j in 1:Int(2*spin_value)
+		for k in 1:Int(2*spin_value)
+			if spin_matrices_dict[direction * "," * string(spin_value)][j,k] != 0.0
+				part = expect(psi,"Cr$(j) * Anh$(k)") .* spin_matrices_dict[direction * "," * string(spin_value)][j,k]
+				magnetization .+= part
+			end
+		end
+	end
+	
+	if_plot = get(kwargs, :if_plot, true)
+	if_plot ? plot_magnetization() : nothing
+	
+	return magnetization,sites
+end
+
+function get_magnetization(mags,sites,direction; kwargs...)
+	title_string = "Magnetization $direction, " * get(kwargs, :plot_title, "")
+	plot_label = get(kwargs, :plot_label, "")
+	isempty(plot_label) ? fig = figure() : nothing
+	plot(sites,magnetization,"-p",label=plot_label)
+	legend()
+	xlabel("Site Number")
+	ylabel("M" * direction)
+	title(title_string)
 end
 
 # ╔═╡ 12309987-d529-4820-bf06-5c3407a977b3

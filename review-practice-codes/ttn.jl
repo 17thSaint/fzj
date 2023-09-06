@@ -358,7 +358,9 @@ function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwarg
 			println("Using ThetaY")
 		end
 		=#
-		return round(-t_strength * 1 * exp(im*2*pi*(phi*s1[1])),digits=10) #- ==(edge_length_y,s1[2])*thetay))
+		stren = -t_strength
+		phase_part = exp(im*2*pi*(phi*s1[1]))
+		return round(stren * phase_part,digits=8) #- ==(edge_length_y,s1[2])*thetay))
 	elseif s1[2] == s2[2]
 		thetax = get(kwargs, :thetax, thetax_2)
 		#=if ==(edge_length,s1[1])
