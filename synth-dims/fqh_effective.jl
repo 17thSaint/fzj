@@ -605,24 +605,25 @@ function plot_denscorr(denscorrs,corr_errors,distances; kwargs...)
 end
 
 function get_magnetization(wavefunc::MPS,spin_value::Float64,direction::String; kwargs...)
-	magnetization = [0.0 for i in 1:length(wavefunc)]
+	magnetization = [0.0*im for i in 1:length(wavefunc)]
 	sites = [i for i in 1:length(magnetization)]
 	for j in 1:Int(2*spin_value)
 		for k in 1:Int(2*spin_value)
 			if spin_matrices_dict[direction * "," * string(spin_value)][j,k] != 0.0
-				part = expect(psi,"Cr$(j) * Anh$(k)") .* spin_matrices_dict[direction * "," * string(spin_value)][j,k]
+				part = expect(wavefunc,"Cr$(j) * Anh$(k)") .* spin_matrices_dict[direction * "," * string(spin_value)][j,k]
+				direction == "Y" ? part ./= im : nothing
 				magnetization .+= part
 			end
 		end
 	end
 	
 	if_plot = get(kwargs, :if_plot, true)
-	if_plot ? plot_magnetization() : nothing
+	if_plot ? plot_magnetization(magnetization,sites,direction; kwargs...) : nothing
 	
 	return magnetization,sites
 end
 
-function get_magnetization(mags,sites,direction; kwargs...)
+function plot_magnetization(mags,sites,direction; kwargs...)
 	title_string = "Magnetization $direction, " * get(kwargs, :plot_title, "")
 	plot_label = get(kwargs, :plot_label, "")
 	isempty(plot_label) ? fig = figure() : nothing

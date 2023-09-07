@@ -377,7 +377,7 @@ function deriv_bulk_dens(ttn1,ttn2,alpha_change,bulk_width=1; kwargs...)
 	return deriv
 end
 
-#=
+#
 
 nns_start = 0.01
 nns_end = 1.0
@@ -390,13 +390,14 @@ layers = 6
 lr = Int(sqrt(2^layers)) - 1
 #for nnst in nn_strens
 
-	params_dict = Dict([("layers",layers),("mdim",200),("mag_off",false),("lr",lr),("if_nn_int",true),("nn_strength",nnst)])
+	params_dict = Dict([("layers",layers),("mdim",20),("mag_off",false),("lr",lr),("if_nn_int",true),("nn_strength",nnst)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
-	open_cores = get(params_dict, "open_cores", "all")
+	#=open_cores = get(params_dict, "open_cores", "all")
 	if typeof(open_cores) != String
 		BLAS.set_num_threads(open_cores)	
 	end
+	=#
 	if_NN = get(params_dict, "if_nn_int", false)
 	if_gpu = get(params_dict, "if_gpu", false)
 	if_change = get(params_dict, "if_change", false)
@@ -428,7 +429,7 @@ lr = Int(sqrt(2^layers)) - 1
 	#
 	sweep_type = "dmrg"
 	max_occ = 2
-	if_per = false
+	if_per = true
 	evolve = true
 	chemical = false
 	mu = 0.5
@@ -452,7 +453,7 @@ lr = Int(sqrt(2^layers)) - 1
 
 	plotting = false
 	save_plot = false
-	save_data = true
+	save_data = false
 
 	loc = "../cluster-data/orsay-sept23"
 	if_cliff = false
@@ -488,7 +489,7 @@ lr = Int(sqrt(2^layers)) - 1
 #
 
 #occs1 = get_occupancy(dm_sp.ttn; if_plot=true,if_save_fig=false,if_save_data=false)
-=#
+#
 
 
 

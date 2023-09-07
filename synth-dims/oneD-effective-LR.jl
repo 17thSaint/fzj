@@ -36,7 +36,7 @@ data_loc = "/home/patrick/fzj/main-git/synth-dims/local-figs/orsay-sept23"
 if_periodic_phys = false
 if_periodic_synth = true
 #nflavors = 9
-alpha = 1/4
+alpha = 1/8
 phi = 2*pi*alpha
 
 dmrg_obs = TTNKit.DMRGObserver(;energy_tol=10^-3,minsweeps=3)
@@ -49,13 +49,13 @@ if_lines = false
 #nbosons,alpha = fix_filling(L,nflavors,1/2)
 #alpha = 0.0
 
-#wavefuncs = []
+wavefuncs = []
 rhos = []
 #nbosons = Int(L/2)
 fillings = ["1/2","2/3","1/3"]
-for nflavors in [6]
-nbosons = Int(2*L*alpha*nflavors/3)
-filename_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic_synth",if_periodic_synth)])
+for nflavors in [2,3,4,5]
+nbosons = Int(L*alpha*nflavors)
+filename_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons),("alpha",round(alpha,digits=4)),("if_periodic_synth",if_periodic_synth),("if_periodic_phys",if_periodic_phys)])
 #filename_dict_highdens = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons_highdens),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
 
 datafile_name = make_parameters_filename(filename_dict)
@@ -112,40 +112,31 @@ end
 end
 
 if true
+	#
 	all_mx = []
 	all_my = []
 	all_mz = []
+	all_mt = []
+	#
 	sites = [i for i in 1:L]
 	spins = [1.0,1.5,2.0,2.5,3.0] .- 0.5
 	for i in 1:length(wavefuncs)
 		psi = wavefuncs[i]
-		mx = [0.0*im for ll in 1:L]
-		my = [0.0*im for ll in 1:L]
-		mz = [0.0*im for ll in 1:L]
-		for j in 1:Int(2*spins[i])
-			for k in 1:Int(2*spins[i])
-				if spin_matrices_dict["X," * string(spins[i])][j,k] != 0.0
-					part_x = expect(psi,"Cr$(j) * Anh$(k)") .* spin_matrices_dict["X," * string(spins[i])][j,k]
-					mx .+= part_x
-				end
-				if spin_matrices_dict["Y," * string(spins[i])][j,k] != 0.0
-					part_y = expect(psi,"Cr$(j) * Anh$(k)") .* spin_matrices_dict["Y," * string(spins[i])][j,k]
-					my .+= part_y ./ im
-				end
-				if spin_matrices_dict["Z," * string(spins[i])][j,k] != 0.0
-					part_z = expect(psi,"Cr$(j) * Anh$(k)") .* spin_matrices_dict["Z," * string(spins[i])][j,k]
-					println(length(part_z))
-					mz .+= part_z
-				end
-			end
-		end
+		mx = get_magnetization(psi,spins[i],"X"; if_plot=false)[1]
+		my = get_magnetization(psi,spins[i],"Y"; if_plot=false)[1]
+		mz = get_magnetization(psi,spins[i],"Z"; if_plot=false)[1]
+		mt = sqrt.(mx .^ 2 + my .^ 2 + mz .^ 2)
+		
 		append!(all_mx,[mx])
 		append!(all_my,[my])
 		append!(all_mz,[mz])
+		append!(all_mt,[mt])
+		#
 		fig = figure()
-		plot(sites .+ 0.1,real.(mx),"-p",label="Mx")
-		plot(sites,real.(my),"-p",label="My")
-		plot(sites,real.(mz),"-p",label="Mz")
+		plot(sites .+ 0.1,real.(all_mx[i]),"-p",label="Mx")
+		plot(sites,real.(all_my[i]),"-p",label="My")
+		plot(sites,real.(all_mz[i]),"-p",label="Mz")
+		plot(sites .- 0.1,real.(all_mt[i]),"-p",label="MT")
 		legend()
 		title("Magnetization for Spin-" * string(spins[i]))
 		#=fig2 = figure()
@@ -159,11 +150,31 @@ if true
 end
 
 if true
-for i in 1:4
+for i in 1:3
 	ig = figure()
-	plot(real.(all_mx[i])[Int(L/2)-10:Int(L/2)+10],real.(all_my[i])[Int(L/2)-10:Int(L/2)+10],"-p")
+	plot3D(real.(all_mx[i])[Int(L/2)-20:Int(L/2)+20],real.(all_my[i])[Int(L/2)-20:Int(L/2)+20],[j for j in 1:41],"-p")
        title("Spin $(spins[i])")
 end
+end
+
+if true
+	count1 = 20
+	left = Int(L/2)-count1
+	right = Int(L/2)+count1
+	spacing = 0.5
+	for i in 1:3
+		fig3 = figure()
+		for j in Int(L/2)-count1:Int(L/2)+count1
+			plot3D([j/10,j/10+real(all_mx[i][j])],[0,real(all_my[i][j])],[0,real(all_mz[i][j])])
+			title("Magnetization for Spin-" * string(spins[i]))
+		end
+		#=
+		plot3D([j+real.(all_mx[i][j]) for j in left:right],[real.(all_my[i][j]) for j in left:right],[real.(all_mz[i][j]) for j in left:right],"-p")
+		title("Magnetization for Spin-" * string(spins[i]))
+		ylim((-1.0,1.0))
+		zlim((0.05,0.1))
+		=#
+	end
 end
 
 #title("Nflavors = $nflavors")
