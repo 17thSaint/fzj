@@ -15,9 +15,9 @@ function fix_filling(L,nflavors,nu)
 	return nothing,nothing
 end
 if false
-save_nothing = false
+save_nothing = true
 params_dict = Dict()
-L = 96#get(params_dict, "L", 4)
+L = 24#get(params_dict, "L", 4)
 #nbosons = 12#get(params_dict, "nbosons", nflavors)
 #nflavors = 2#get(params_dict, "nflavors", Int(L/2))
 t1 = get(params_dict, "t1", 1.0)
@@ -36,7 +36,7 @@ data_loc = "/home/patrick/fzj/main-git/synth-dims/local-figs/orsay-sept23"
 if_periodic_phys = false
 if_periodic_synth = true
 #nflavors = 9
-alpha = 1/8
+alpha = 23/(24^2)
 phi = 2*pi*alpha
 
 dmrg_obs = TTNKit.DMRGObserver(;energy_tol=10^-3,minsweeps=3)
@@ -53,7 +53,7 @@ wavefuncs = []
 rhos = []
 #nbosons = Int(L/2)
 fillings = ["1/2","2/3","1/3"]
-for nflavors in [2,3,4,5]
+for nflavors in [24]
 nbosons = Int(L*alpha*nflavors)
 filename_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons),("alpha",round(alpha,digits=4)),("if_periodic_synth",if_periodic_synth),("if_periodic_phys",if_periodic_phys)])
 #filename_dict_highdens = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons_highdens),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
@@ -112,6 +112,7 @@ end
 end
 
 if true
+	#L = get_params_dict_from_filename(files[1])["L"]
 	#
 	all_mx = []
 	all_my = []
@@ -119,7 +120,7 @@ if true
 	all_mt = []
 	#
 	sites = [i for i in 1:L]
-	spins = [1.0,1.5,2.0,2.5,3.0] .- 0.5
+	spins = [4.0]#[0.5,1.0,1.5,2.0,2.5]
 	for i in 1:length(wavefuncs)
 		psi = wavefuncs[i]
 		mx = get_magnetization(psi,spins[i],"X"; if_plot=false)[1]
@@ -149,7 +150,7 @@ if true
 	end
 end
 
-if true
+if false
 for i in 1:3
 	ig = figure()
 	plot3D(real.(all_mx[i])[Int(L/2)-20:Int(L/2)+20],real.(all_my[i])[Int(L/2)-20:Int(L/2)+20],[j for j in 1:41],"-p")
@@ -157,7 +158,7 @@ for i in 1:3
 end
 end
 
-if true
+if false
 	count1 = 20
 	left = Int(L/2)-count1
 	right = Int(L/2)+count1

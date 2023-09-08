@@ -1,6 +1,71 @@
 #using PyPlot
 include("../review-practice-codes/ttn.jl")
 
+function spin_matrix_element(m1,m2,spin,direction::String)
+	if direction == "X"
+		return ((m1 == m2+1) + (m1+1 == m2)) * 0.5 * sqrt(spin*(spin+1) - m1*m2)
+	elseif direction == "Y"
+		return ((m1 == m2+1) - (m1+1 == m2)) * 0.5 * sqrt(spin*(spin+1) - m1*m2)
+	elseif direction == "Z"
+		return (m1 == m2) * m1 * -1
+	end
+end
+	
+function spin_matrix_full(spin,direction::String)
+	spin_mat = zeros(Int(2*spin+1),Int(2*spin+1))
+	for i in -spin:spin
+		for j in -spin:spin
+			spin_mat[Int(i+spin+1),Int(j+spin+1)] = spin_matrix_element(j,i,spin,direction)
+		end
+	end
+	return spin_mat
+end
+
+function get_magnetization(wavefunc,spin_value::Float64,direction::String; kwargs...)
+	phys_dim_length = typeof(wavefunc) == MPS ? length(wavefunc) : get_lattice_dims(wavefunc)[1]
+	magnetization = [0.0*im for i in 1:phys_dim_length]
+	sites = [i for i in 1:length(magnetization)]
+	for j in 1:Int(2*spin_value)
+		for k in 1:Int(2*spin_value)
+			spin_matrix_value = spin_matrix_element(k-spin_value-1,j-spin_value-1,spin_value,direction)
+			#=
+			if spin_matrix_value != dict_spin_version
+				println("Different values: ",dict_spin_version,", ",spin_matrix_value,". Probably should be ",spin_matrix_element(j,k,spin_value,direction))
+				spin_matrix_value = dict_spin_version
+			end
+			=#
+			if spin_matrix_value != 0.0
+				if typeof(wavefunc) != MPS
+					part = round(TTNKit.correlation(wavefunc,"Adag","A",j,k) .* spin_matrix_value,digits=8)
+				else
+					part = round.(expect(wavefunc,"Cr$(j) * Anh$(k)") .* spin_matrix_value,digits=8)
+				end
+				if direction == "Y"
+					magnetization .+= part / im
+				else
+					magnetization .+= part
+				end
+			end
+		end
+	end
+	
+	if_plot = get(kwargs, :if_plot, true)
+	if_plot ? plot_magnetization(magnetization,sites,direction; kwargs...) : nothing
+	
+	return magnetization,sites
+end
+
+function plot_magnetization(mags,sites,direction; kwargs...)
+	title_string = "Magnetization $direction, " * get(kwargs, :plot_title, "")
+	plot_label = get(kwargs, :plot_label, "")
+	isempty(plot_label) ? fig = figure() : nothing
+	plot(sites,mags,"-p",label=plot_label)
+	legend()
+	xlabel("Site Number")
+	ylabel("M" * direction)
+	title(title_string)
+end
+
 function long_range_scaling(x_final,virt_edge_length,initial_strength; kwargs...)
 	if_plot = get(kwargs, :if_plot, false)
 	if_save_data = get(kwargs, :if_save_data, false)
@@ -376,8 +441,8 @@ function deriv_bulk_dens(ttn1,ttn2,alpha_change,bulk_width=1; kwargs...)
 	deriv = (bulk_dens_1 - bulk_dens_2)/alpha_change
 	return deriv
 end
-
-#
+#=
+if true
 
 nns_start = 0.01
 nns_end = 1.0
@@ -385,9 +450,9 @@ nns_count = 10
 nn_strens = [nns_start + (i-1)*(nns_end-nns_start)/(nns_count-1) for i in 1:nns_count]
 wavefuncs = []
 
-nnst = 1.0
+nnst = 100.0
 layers = 6
-lr = Int(sqrt(2^layers)) - 1
+lr = Int(sqrt(2^layers)/2)
 #for nnst in nn_strens
 
 	params_dict = Dict([("layers",layers),("mdim",20),("mag_off",false),("lr",lr),("if_nn_int",true),("nn_strength",nnst)])
@@ -436,7 +501,6 @@ lr = Int(sqrt(2^layers)) - 1
 	#max_occupation = 3
 	expan = TTNKit.DefaultExpander(0.5)
 	ts = 0.500
-	nu = 1/2
 	tot_sites = 2^layer_count
 
 	if isnothing(alpha)
@@ -446,9 +510,10 @@ lr = Int(sqrt(2^layers)) - 1
 			alpha = 0.0
 		end
 	end
-	nswps = 3
-	alpha = 1/2
-	num_particles = Int(alpha * tot_sites / 2)
+	nswps = 5
+	nu = 1/1
+	alpha = 7/64
+	num_particles = Int(alpha * tot_sites * nu)
 	#
 
 	plotting = false
@@ -463,12 +528,15 @@ lr = Int(sqrt(2^layers)) - 1
 
 		
 	metadata_dict = Dict([("if_per",if_per),("mag_off",mag_off),("chemical",chemical),("mu",mu),("ts",ts),("nu",nu),("layers",layer_count),("particles",num_particles),("alpha",alpha),("mdim",mdim),("nswps",nswps),("if_cliff",if_cliff),("sc_type",sc_type),("longrange_dist",longrange_dist),("max_occ",max_occ),("sweep_type",sweep_type),("limit",limit),("lr_scaling",lr_scaling),("if_change",if_change),("change",change),("if_nn_int",if_NN),("nn_strength",nnst)])
+	
+	filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("nu",round(nu,digits=4)),("if_periodic",if_per),("nn_strength",nnst),("mdim",mdim)])
 
-	if length(keys(params_dict)) == 0
-		datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
-	else
-		datafile_name = make_parameters_filename(params_dict)
-	end
+
+	#if length(keys(params_dict)) == 0
+	#	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
+	#else
+		datafile_name = make_parameters_filename(filename_dict)
+	#end
 
 		#
 	println(datafile_name)
@@ -484,9 +552,22 @@ lr = Int(sqrt(2^layers)) - 1
 	append!(wavefuncs,[dm_sp.ttn])
 	
 	end
-	
+
+end
+
+if true
+	occs = get_occupancy(wavefuncs[1];if_plot=false)
+	fig = figure()
+	plot([sum(occs[i,:]) for i in 1:Int(sqrt(tot_sites))])
+
+	spin = Int(sqrt(tot_sites)/2)
+	fig2 = figure()
+	my,sites = get_magnetization(wavefuncs[1],sqrt(tot_sites)/2,"Y";plot_label="My")
+	mz,sites = get_magnetization(wavefuncs[1],sqrt(tot_sites)/2,"Z";plot_label="Mz")
+	mx,sites = get_magnetization(wavefuncs[1],sqrt(tot_sites)/2,"Y";plot_label="Mx",plot_title="U=$nnst, S=$spin")
+end
 #end
-#
+=#
 
 #occs1 = get_occupancy(dm_sp.ttn; if_plot=true,if_save_fig=false,if_save_data=false)
 #
