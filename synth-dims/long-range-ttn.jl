@@ -416,24 +416,25 @@ function radial_box_dist(ttn)
 	return full_rads,combined_vals
 end
 
-function bulk_density(ttn,bulk_width=1; kwargs...)
+function bulk_density(ttn,bulk_width_phys=1,bulk_width_virt=1; kwargs...)
 	if isnothing(ttn)
 		occ_mat = get(kwargs, :occ_mat, nothing)
 	else
 		occ_mat = get_occupancy(ttn;if_plot=false)
 	end
+	size(occ_mat)[1] == size(occ_mat)[2] ? bulk_width_virt = bulk_width_phys : nothing
 	num_particles = sum(occ_mat)
-	bulk_occ_mat = occ_mat[1+bulk_width:end-bulk_width,1+bulk_width:end-bulk_width]
+	bulk_occ_mat = occ_mat[1+bulk_width_phys:end-bulk_width_phys,1+bulk_width_virt:end-bulk_width_virt]
 	bulk_density = sum(bulk_occ_mat)/prod(size(bulk_occ_mat))
 	return bulk_density
 end
 
-function deriv_bulk_dens(ttn1,ttn2,alpha_change,bulk_width=1; kwargs...)
+function deriv_bulk_dens(ttn1,ttn2,alpha_change,bulk_width_phys=1,bulk_width_virt=1; kwargs...)
 	if isnothing(ttn1) && isnothing(ttn2)
 		occ_mat1 = get(kwargs, :occ_mat1, nothing)
 		occ_mat2 = get(kwargs, :occ_mat2, nothing)
-		bulk_dens_1 = bulk_density(nothing,bulk_width; occ_mat=occ_mat1)
-		bulk_dens_2 = bulk_density(nothing,bulk_width; occ_mat=occ_mat2)
+		bulk_dens_1 = bulk_density(nothing,bulk_width_phys,bulk_width_virt; occ_mat=occ_mat1)
+		bulk_dens_2 = bulk_density(nothing,bulk_width_phys,bulk_width_virt; occ_mat=occ_mat2)
 	else
 		bulk_dens_1 = bulk_density(ttn1,bulk_width)
 		bulk_dens_2 = bulk_density(ttn2,bulk_width)
@@ -442,7 +443,7 @@ function deriv_bulk_dens(ttn1,ttn2,alpha_change,bulk_width=1; kwargs...)
 	return deriv
 end
 #=
-if true
+if false
 
 nns_start = 0.01
 nns_end = 1.0
@@ -458,11 +459,11 @@ lr = Int(sqrt(2^layers)/2)
 	params_dict = Dict([("layers",layers),("mdim",20),("mag_off",false),("lr",lr),("if_nn_int",true),("nn_strength",nnst)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
-	#=open_cores = get(params_dict, "open_cores", "all")
+	open_cores = get(params_dict, "open_cores", "all")
 	if typeof(open_cores) != String
 		BLAS.set_num_threads(open_cores)	
 	end
-	=#
+	#
 	if_NN = get(params_dict, "if_nn_int", false)
 	if_gpu = get(params_dict, "if_gpu", false)
 	if_change = get(params_dict, "if_change", false)
@@ -555,7 +556,7 @@ lr = Int(sqrt(2^layers)/2)
 
 end
 
-if true
+if false
 	occs = get_occupancy(wavefuncs[1];if_plot=false)
 	fig = figure()
 	plot([sum(occs[i,:]) for i in 1:Int(sqrt(tot_sites))])
@@ -567,10 +568,10 @@ if true
 	mx,sites = get_magnetization(wavefuncs[1],sqrt(tot_sites)/2,"Y";plot_label="Mx",plot_title="U=$nnst, S=$spin")
 end
 #end
-=#
+#
 
 #occs1 = get_occupancy(dm_sp.ttn; if_plot=true,if_save_fig=false,if_save_data=false)
-#
+=#
 
 
 

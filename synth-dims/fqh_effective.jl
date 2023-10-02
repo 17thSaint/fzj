@@ -303,10 +303,11 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	noise = get(kwargs, :noise, 0.0)
 	obs = get(kwargs, :observer, TTNKit.NoObserver())
 	if_save_data = get(kwargs, :if_save_data, false)
+	if_gpu = get(kwargs, :if_gpu, false)
 	t1 = 1.0
 	t2 = 1.0
 	
-	println(U1,", ",U2,", ",phi,", ",L,", ",nflavors)
+	println(U1,", ",U2,", ",phi/(2*pi),", ",L,", ",nflavors)
 	if isnothing(psi0)
 		sidx = siteinds("ExtendedHardcore", L; conserve_qns = conserve_qns, nflavors = nflavors)
 	else
@@ -318,6 +319,10 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	states = make_states(L,nbosons,nflavors)
 	if isnothing(psi0)
 		psi0 = randomMPS(sidx, states)
+	end
+	if if_gpu
+		H = ITensorsGPU.gpu(H)
+		psi0 = ITensorsGPU.gpu(psi0)
 	end
 	E, psi = dmrg(H, psi0; maxdim = [Int(floor(mdim/4)),Int(floor(mdim/2)), mdim], nsweeps = nsweeps, noise = noise, observer = obs)
 	
@@ -331,6 +336,21 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	end
 	
 	return psi
+end
+
+function run_mps_new_variable(seed_wavefunc,seed_params_dict,new_params_dict)
+	newname = rewrite_filename(seed_params_dict["name"],new_params_dict)
+	new_params_dict["name"] = newname
+	new_execution_dict = merge(seed_params_dict,new_params_dict)
+	new_wavefunc = execute_mps(new_execution_dict["U1"],new_execution_dict["U2"],new_execution_dict["phi"],new_execution_dict["L"], new_execution_dict["nflavors"],new_execution_dict["nbosons"]; dict_to_symbols(new_execution_dict)...,metadata=new_execution_dict)
+	return new_wavefunc
+end
+
+function varied_alpha_wavefuncs(seed_wavefunc,seed_params_dict,change=0.001)
+	og_alpha = seed_params_dict["phi"] / (2*pi)
+	plus_psi = run_mps_new_variable(seed_wavefunc,seed_params_dict,Dict([("phi",2*pi*(og_alpha+change)),("psi_guess",seed_wavefunc)]))
+	minus_psi = run_mps_new_variable(seed_wavefunc,seed_params_dict,Dict([("phi",2*pi*(og_alpha-change)),("psi_guess",seed_wavefunc)]))
+	return minus_psi,plus_psi
 end
 
 function get_mps_dims(wavefunc::MPS)
@@ -431,7 +451,7 @@ function get_greenfunc(wavefunc::MPS,hopping_direction="virt"; kwargs...)
 		const_part = hopping_direction == "virt" ? start_norm : [start_norm[s] for i in 1:phys_edge_length]
 		all_norms[s,:] = ITensors.expect(wavefunc,"Ns$(s)") .* const_part
 	end
-	all_greens ./= sqrt.(all_norms)
+	#all_greens ./= sqrt.(all_norms)
 	all_greens = abs.(all_greens)
 	
 	if_plot = get(kwargs, :if_plot, true)

@@ -111,7 +111,7 @@ for i in 2:length(files)
 end
 end
 
-if true
+if false
 	#L = get_params_dict_from_filename(files[1])["L"]
 	#
 	all_mx = []
