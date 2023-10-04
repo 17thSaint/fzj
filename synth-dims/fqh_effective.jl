@@ -342,6 +342,9 @@ function run_mps_new_variable(seed_wavefunc,seed_params_dict,new_params_dict)
 	newname = rewrite_filename(seed_params_dict["name"],new_params_dict)
 	new_params_dict["name"] = newname
 	new_execution_dict = merge(seed_params_dict,new_params_dict)
+	if "alpha" in keys(new_params_dict)
+		new_execution_dict["phi"] = 2*pi*new_params_dict["alpha"]
+	end
 	new_wavefunc = execute_mps(new_execution_dict["U1"],new_execution_dict["U2"],new_execution_dict["phi"],new_execution_dict["L"], new_execution_dict["nflavors"],new_execution_dict["nbosons"]; dict_to_symbols(new_execution_dict)...,metadata=new_execution_dict)
 	return new_wavefunc
 end
@@ -414,6 +417,24 @@ function log_sum(all_values)
 	end
 end
 
+function density_matrix(wavefunc::MPS; kwargs...)
+	L,nflavors = get_mps_dims(wavefunc)
+	densmat = zeros(L*nflavors,L*nflavors) .* im
+	for s in 1:nflavors
+		for sp in 1:nflavors
+			println(s,", ",sp)
+			local_mat = correlation_matrix(wavefunc,"Cr$(s)","Anh$(sp)")
+			densmat[L*(s-1)+1:L*s,L*(sp-1)+1:L*sp] = local_mat
+			#=fig = figure()
+			imshow(abs.(densmat))
+			colorbar()
+			title("s=$s, s'=$sp")
+			=#
+		end
+	end
+	return densmat
+end
+
 function normalize_densmat(dens_mat::Matrix,part_count::Int; kwargs...)
 	if_log = get(kwargs, :if_log, false)
 	L = size(dens_mat)[1]
@@ -451,7 +472,7 @@ function get_greenfunc(wavefunc::MPS,hopping_direction="virt"; kwargs...)
 		const_part = hopping_direction == "virt" ? start_norm : [start_norm[s] for i in 1:phys_edge_length]
 		all_norms[s,:] = ITensors.expect(wavefunc,"Ns$(s)") .* const_part
 	end
-	#all_greens ./= sqrt.(all_norms)
+	all_greens ./= sqrt.(all_norms)
 	all_greens = abs.(all_greens)
 	
 	if_plot = get(kwargs, :if_plot, true)
