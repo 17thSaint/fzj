@@ -25,47 +25,16 @@ deleteat!(all_files,findall(i->split(all_files[i],"-")[1] != "mps",1:length(all_
 display(all_files)
 end
 
-to_remove = []
-if false
-for (idx,f) in enumerate(all_files)
-	file = jldopen(f, "r")
-	if length(keys(file)) > 1
-		append!(to_remove,[idx])
-	end
-	close(f)
-end
-deleteat!(all_files,to_remove)
-display(all_files)
-end
-
-if false
-for (idx,f) in enumerate(all_files)
-	name_dict = get_params_dict_from_filename(f)
-	if name_dict["nbosons"] != 60
-		append!(to_remove,[idx])
-	end
-end
-deleteat!(all_files,to_remove)
-display(all_files)
-end
-
 if true
 for (idx,f) in enumerate(all_files)
-	name_dict = get_params_dict_from_filename(f)
-	new_metadata = merge(ogmetadata,name_dict)
-	new_metadata["phi"] = new_metadata["alpha"] * 2 * pi
-	file = jldopen(f,"a+")
-	#display(keys(file))
-	try
-		metadata_var = JLD2.Group(file,"metadata")
-		for metadatum_key in keys(new_metadata)
-			metadata_var[metadatum_key] = new_metadata[metadatum_key]
-		end
+	file = jldopen(f,"r+")
+	#try
+		file["metadata"]["location"] =  "/home/patrick/fzj/main-git/cluster-data/orsay-sept23/"
 		close(file)
-	catch
-		println("Didnt work on file ",f)
-		close(file)
-	end
+	#catch
+	#	println("Didnt work on file ",f)
+	#	close(file)
+	#end
 	
 end
 end
