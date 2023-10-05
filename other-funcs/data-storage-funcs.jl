@@ -71,7 +71,13 @@ function get_params_dict_from_filename(filename)
 	if file_type == "png" || file_type == "jld2" || file_type == "hdf5"
 		filename = join(split(filename,".")[1:end-1],".")
 	end
-	split(filename,"-")[1] in ["virt","phys","Y","X"] ? split_filename = split(filename,"-")[4:end] : split_filename = split(filename,"-")[2:end]
+	if split(filename,"-")[1] in ["virt","phys","Y","X"]
+		split_filename = split(filename,"-")[4:end]
+	elseif split(filename,"-")[1] in ["mps","ttn"]
+		split_filename = split(filename,"-")[2:end]
+	else
+		split_filename = split(filename,"-")
+	end
 	for i in 1:Int(length(split_filename)/2)
 		key = split_filename[2*i-1]
 		value = split_filename[2*i]
@@ -91,6 +97,22 @@ function get_params_dict_from_filename(filename)
 	return params_dict
 end
 
+function rewrite_filename(old_name,new_params_dict)
+	old_name_dict = get_params_dict_from_filename(old_name)
+	params_to_keep = Dict()
+	for (k,v) in new_params_dict
+		if k in keys(old_name_dict)
+			params_to_keep[k] = v
+		end
+	end
+	
+	if "phi" in keys(new_params_dict) && "alpha" in keys(old_name_dict)
+		params_to_keep["alpha"] = round(new_params_dict["phi"] / (2*pi),digits=4)
+	end
+	new_name_dict = merge(old_name_dict,params_to_keep)
+	new_name = make_parameters_filename(new_name_dict)
+	return new_name
+end
 
 function change_numparticles_metadata(filename)
 	binary_file = jldopen("../cluster-data/$filename","a+")

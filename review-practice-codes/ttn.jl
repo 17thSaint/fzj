@@ -789,7 +789,7 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 			location = get(kwargs, :location, pwd())
 			filename = get(kwargs, :name, "ttn")
 			metadata = get(kwargs, :metadata, nothing)
-			ttn_data_dict = Dict([("ttn",sp.ttn)])
+			ttn_data_dict = if_gpu ? Dict([("ttn",TTNKit.cpu(sp.ttn))]) : Dict([("ttn",sp.ttn)])
 			write_data_jld2(filename,ttn_data_dict,location,metadata)
 			catch
 				println("Saving Didn't work")

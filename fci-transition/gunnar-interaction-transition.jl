@@ -108,21 +108,24 @@ end
 #
 if true
 layer_count = 6
-if_fermion = true
-
+if_fermion = false
+#
 if layer_count % 2 == 0
 	edge_sites = Int(sqrt(2^layer_count))
-	num_particles = 10#Int(edge_sites/2)
+	#num_particles = 10#Int(edge_sites/2)
 else
 	edge_sites = Int(sqrt(2^(layer_count+1)))
-	num_particles = Int(sqrt(2^(layer_count+1))/2)
+	#num_particles = Int(sqrt(2^(layer_count+1))/2)
 end
-nu = 2/5
+#
+nu = 1/2
+density = 1/7
 tot_sites = 2^layer_count
+num_particles = Int(round(tot_sites*density))
 ts = 1.0
 mag_off = false
-alpha = num_particles/(nu * (tot_sites))
-mdim = 100
+alpha = density/nu#num_particles/(nu * (tot_sites))
+mdim = 20
 
 sweep_type = "dmrg"
 max_occ = 1
@@ -133,7 +136,7 @@ mu = 0.0
 if_NN = true
 if_onsite = true
 onsite_stren = 10.0
-nswps = 4
+nswps = 6
 expan = TTNKit.DefaultExpander(0.5)
 noise = 0.0#[1E-2,0]
 
@@ -143,7 +146,7 @@ change = if_change ? 0.001 : 0.0
 if_gpu = false
 plotting = false
 save_plot = false
-save_data = true
+save_data = false
 loc = "../cluster-data/"
 end
 
@@ -154,7 +157,7 @@ end
 
 #
 nns_start = 1.0
-nns_end = 2.0
+nns_end = 3.0
 nns_count = 5
 nn_strens = [nns_start + (i-1)*(nns_end-nns_start)/(nns_count-1) for i in 1:nns_count]
 rhos = [zeros(tot_sites,tot_sites).*im for i in 1:nns_count]
@@ -177,7 +180,7 @@ model_paras = (noise=noise,if_fermion=if_fermion,ttn_net=net,if_nn_int=if_NN,if_
 #xlabel("Nearest-Neighbor Interaction Strength")
 #ylabel("Correlation Length")
 
-Threads.@threads for nnst in nn_strens
+for nnst in nn_strens
 	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-nn_strength-$nnst-ts-$ts-if_fermion-$if_fermion"
 
 	#prev_ttn = read_data_jld2("ttn-"*datafile_name*".jld2",loc)[1]["ttn"]
@@ -213,12 +216,13 @@ for i in nnindexes
 end
 =#
 #nns = [nn_strens[i] for i in nnindexes]
-fig = figure()
+#fig = figure()
 ss = spectra(rhos)
-for i in 1:64
-	plot(nn_strens,-1 .* log.(10,ss[i,:]),"-p")
+for i in 1:16
+	plot(nn_strens,log.(10,ss[i,:]))
 end
 #
+
 
 
 
