@@ -14,12 +14,12 @@ function fix_filling(L,nflavors,nu)
 	println("Not Found")
 	return nothing,nothing
 end
-if false
-save_nothing = true
+if true
+save_nothing = false
 params_dict = Dict()
-L = 24#get(params_dict, "L", 4)
-#nbosons = 12#get(params_dict, "nbosons", nflavors)
-#nflavors = 2#get(params_dict, "nflavors", Int(L/2))
+#L = 24#get(params_dict, "L", 4)
+#nbosons = 5#get(params_dict, "nbosons", nflavors)
+nflavors = 5#get(params_dict, "nflavors", Int(L/2))
 t1 = get(params_dict, "t1", 1.0)
 t2 = get(params_dict, "t2", 1.0)
 U = get(params_dict, "U", 100)
@@ -32,12 +32,12 @@ nsweeps = 100
 mdim = get(params_dict, "mdim", 100)
 noises = [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0.0]
 if_save_data = save_nothing ? false : true
-data_loc = "/home/patrick/fzj/main-git/synth-dims/local-figs/orsay-sept23"
+data_loc = "/home/patrick/fzj/main-git/cluster-data/orsay-sept23"
 if_periodic_phys = false
 if_periodic_synth = true
 #nflavors = 9
-alpha = 23/(24^2)
-phi = 2*pi*alpha
+#alpha = 23/(24^2)
+
 
 dmrg_obs = TTNKit.DMRGObserver(;energy_tol=10^-3,minsweeps=3)
 
@@ -49,40 +49,47 @@ if_lines = false
 #nbosons,alpha = fix_filling(L,nflavors,1/2)
 #alpha = 0.0
 
+density = 5/40
+Ls = [8,24,40,56,72,88]
+
+
 wavefuncs = []
 rhos = []
 #nbosons = Int(L/2)
-fillings = ["1/2","2/3","1/3"]
-for nflavors in [24]
-nbosons = Int(L*alpha*nflavors)
-filename_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons),("alpha",round(alpha,digits=4)),("if_periodic_synth",if_periodic_synth),("if_periodic_phys",if_periodic_phys)])
-#filename_dict_highdens = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons_highdens),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
+#fillings = ["1/2","2/3","1/3"]
+for (idx,L) in enumerate(Ls)
+	nbosons = Int(L*nflavors*density)
+	alpha = nbosons/((L-1)*nflavors)
+	phi = 2*pi*alpha
+	filename_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons),("alpha",round(alpha,digits=4)),("if_periodic_synth",if_periodic_synth),("if_periodic_phys",if_periodic_phys)])
+	#filename_dict_highdens = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons_highdens),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
 
-datafile_name = make_parameters_filename(filename_dict)
-#datafile_name_highdens = make_parameters_filename(filename_dict_highdens)
+	datafile_name = make_parameters_filename(filename_dict)
+	println(datafile_name)
+	#datafile_name_highdens = make_parameters_filename(filename_dict_highdens)
 
-model_paras = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noises, if_save_data = if_save_data, location = data_loc, if_periodic_synth=if_periodic_synth, if_periodic_phys=if_periodic_phys, name=datafile_name, observer = dmrg_obs)
+	model_paras = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noises, if_save_data = if_save_data, location = data_loc, if_periodic_synth=if_periodic_synth, if_periodic_phys=if_periodic_phys, name=datafile_name, observer = dmrg_obs)
 
-#model_paras_highdens = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons_highdens, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noise, if_save_data = if_save_data, location = data_loc, if_periodic=if_periodic, name=datafile_name_highdens)
+	#model_paras_highdens = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons_highdens, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noise, if_save_data = if_save_data, location = data_loc, if_periodic=if_periodic, name=datafile_name_highdens)
 
-#metadata_dict_highdens = merge(named_tuple_to_dict(model_paras_highdens),other_params_dict)
-metadata_dict = merge(named_tuple_to_dict(model_paras),other_params_dict)
+	#metadata_dict_highdens = merge(named_tuple_to_dict(model_paras_highdens),other_params_dict)
+	metadata_dict = merge(named_tuple_to_dict(model_paras),other_params_dict)
 
-psi = execute_mps(U1,U2,phi,L,nflavors,nbosons; model_paras...,metadata=metadata_dict)
-append!(wavefuncs,[psi])
-plot(expect(psi,"N"),label="$nflavors")
-#densmat = correlation_matrix(psi,"FullDag","FullHat") #./ 2.0
-#append!(rhos,[densmat])
-if false
-fig = figure()
-imshow(real.(densmat))
-colorbar()
-title("Virt Dim = $(round(alpha,digits=3))")
-end
-#append!(all_wavefuncs,[psi])
-#psi_highdens = execute_mps(U1,U2,phi,L,nflavors,nbosons_highdens; model_paras_highdens...,metadata=metadata_dict_highdens)
-#mrez = momentum_occupation(psi,nbosons,100,10.0; model_paras...,plot_title="Virt Dim = $nflavors",if_log=false,if_plot=true)
-#append!(mom_occs,[mrez[2]])
+	psi = execute_mps(U1,U2,phi,L,nflavors,nbosons; model_paras...,metadata=metadata_dict)
+	append!(wavefuncs,[psi])
+	#plot(expect(psi,"N"),label="$nflavors")
+	#densmat = correlation_matrix(psi,"FullDag","FullHat") #./ 2.0
+	#append!(rhos,[densmat])
+	#=if false
+	fig = figure()
+	imshow(real.(densmat))
+	colorbar()
+	title("Virt Dim = $(round(alpha,digits=3))")
+	end=#
+	#append!(all_wavefuncs,[psi])
+	#psi_highdens = execute_mps(U1,U2,phi,L,nflavors,nbosons_highdens; model_paras_highdens...,metadata=metadata_dict_highdens)
+	#mrez = momentum_occupation(psi,nbosons,100,10.0; model_paras...,plot_title="Virt Dim = $nflavors",if_log=false,if_plot=true)
+	#append!(mom_occs,[mrez[2]])
 end
 #
 end

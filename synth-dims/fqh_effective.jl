@@ -306,6 +306,8 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	if_gpu = get(kwargs, :if_gpu, false)
 	t1 = 1.0
 	t2 = 1.0
+	if_nrg = get(kwargs, :if_nrg, false)
+	#if_nrg ? nsweeps = 1 : nothing
 	
 	println(U1,", ",U2,", ",phi/(2*pi),", ",L,", ",nflavors)
 	if isnothing(psi0)
@@ -326,11 +328,17 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	end
 	E, psi = dmrg(H, psi0; maxdim = [Int(floor(mdim/4)),Int(floor(mdim/2)), mdim], nsweeps = nsweeps, noise = noise, observer = obs)
 	
+	if if_nrg
+		return E
+	end
+	
 	if if_save_data
 		location = get(kwargs, :location, pwd())
 		filename = get(kwargs, :name, "mps")
 		filename = check_plot_label(filename,"mps")
 		metadata = get(kwargs, :metadata, nothing)
+		metadata["final_energy"] = E
+		metadata["maxlinkdim"] = maxlinkdim(psi)
 		data_dict = Dict([("mps",psi)])
 		write_data_jld2(filename,data_dict,location,metadata)
 	end
@@ -338,15 +346,25 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	return psi
 end
 
-function run_mps_new_variable(seed_wavefunc,seed_params_dict,new_params_dict)
+function run_mps_new_variable(seed_wavefunc,seed_params_dict,new_params_dict,location="../cluster-data/orsay-sept23")
 	newname = rewrite_filename(seed_params_dict["name"],new_params_dict)
-	new_params_dict["name"] = newname
-	new_execution_dict = merge(seed_params_dict,new_params_dict)
-	if "alpha" in keys(new_params_dict)
-		new_execution_dict["phi"] = 2*pi*new_params_dict["alpha"]
+	
+	current_loc = pwd()
+	cd(location)
+		if_dup = check_duplicates("mps-" * newname * ".jld2") != "mps-" * newname * ".jld2"
+	cd(current_loc)
+	if if_dup
+		println("Data file already exists, returning previously found data")
+		return read_data_jld2("mps-" * newname * ".jld2",location)[1]["mps"]
+	else
+		new_params_dict["name"] = newname
+		new_execution_dict = merge(seed_params_dict,new_params_dict)
+		if "alpha" in keys(new_params_dict)
+			new_execution_dict["phi"] = 2*pi*new_params_dict["alpha"]
+		end
+		new_wavefunc = execute_mps(new_execution_dict["U1"],new_execution_dict["U2"],new_execution_dict["phi"],new_execution_dict["L"], new_execution_dict["nflavors"],new_execution_dict["nbosons"]; dict_to_symbols(new_execution_dict)...,metadata=new_execution_dict)
+		return new_wavefunc
 	end
-	new_wavefunc = execute_mps(new_execution_dict["U1"],new_execution_dict["U2"],new_execution_dict["phi"],new_execution_dict["L"], new_execution_dict["nflavors"],new_execution_dict["nbosons"]; dict_to_symbols(new_execution_dict)...,metadata=new_execution_dict)
-	return new_wavefunc
 end
 
 function varied_alpha_wavefuncs(seed_wavefunc,seed_params_dict,change=0.001)
@@ -378,7 +396,7 @@ function get_occupancy(wavefunc::MPS; kwargs...)
 	for s in 1:nflavors
 		occ_mat[:, s] = expect(wavefunc, "Ns$(s)")
 	end
-	if_plot ? mps_plot_occupancy(occ_mat,L,nflavors) : nothing
+	if_plot ? mps_plot_occupancy(occ_mat,L,nflavors; kwargs...) : nothing
 	data_dict = Dict([("vals",occ_mat)])
 	if_save_data ? write_data_jld2(filename,data_dict,location,metadata) : nothing
 	

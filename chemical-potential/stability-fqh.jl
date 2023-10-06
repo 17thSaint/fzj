@@ -13,10 +13,10 @@ noise = [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0.0]
 u_strength = 1.0
 syms = false
 max_occ = get(params_dict, :max_occ, 1)
-if_gpu = false
+if_gpu = true
 seed_ttn = get(params_dict, :seed_ttn, nothing)
 net = TTNKit.BinaryRectangularNetwork(layers, TTNKit.ITensorNode, "Boson";conserve_qns=syms,dim=max_occ+1)
-dataloc = "/home/patrick/fzj/main-git/cluster-data/chemical-potential"
+dataloc = "../cluster-data/chemical-potential"
 
 if_periodic = false
 if_chem = true
@@ -24,15 +24,15 @@ no_magF = false
 
 #t_strength = get(params_dict, :t_strength, 0.02)
 #chem_strength = get(params_dict, :chem_strength, 0.0)
-alpha = get(params_dict, :alpha, 2/sqrt(num_sites))
+alpha = get(params_dict, :alpha, 1/4)
 num_particles = Int(round(filling*alpha*num_sites,digits=0))
 
 naming_dict = Dict([("layers",layers),("alpha",alpha),("maxocc",max_occ)])
-#=
-ts_count = 10
-mu_count = 5
-mus = [(i-1)/(mu_count-1) for i in 1:mu_count]
-ts = [0.31 + (i-1)*(0.5-0.31)/(ts_count-1) for i in 1:ts_count]
+#
+ts_count = 1
+mu_count = 1
+mus = [(i-1)*2/(mu_count-1) for i in 1:mu_count]
+ts = [0.001 + (i-1)*(0.5-0.001)/(ts_count-1) for i in 1:ts_count]
 denses = zeros(mu_count,ts_count)
 
 for (idt,t_strength) in enumerate(ts)
@@ -55,19 +55,20 @@ for (idt,t_strength) in enumerate(ts)
 	end
 end
 
-imshow(denses)
-colorbar()
-=#
-
+#imshow(denses)
+#colorbar()
+#=
+all_files = find_data_file(Dict([("alpha",0.25)]),"ttn","jld2",dataloc)
 for f in all_files
 	psi = read_data_jld2(f,dataloc)[1]["ttn"]
 	dens = sum(get_occupancy(psi; if_plot=false))/num_sites
 	params = get_params_dict_from_filename(f)
-	scatter3D([params["t"]],[params["chem"]],[dens*0.5*sqrt(num_sites)],c="b")
+	scatter3D([params["t"]],[params["chem"]],[dens*0.25*sqrt(num_sites)],c="b")
 end
 xlabel("Hopping Strength, t")
 ylabel("Chemical Potential, mu")
 zlabel("LLL Filling")
+=#
 
 
 
