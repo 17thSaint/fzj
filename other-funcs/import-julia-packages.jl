@@ -1,6 +1,10 @@
 import Pkg
 allpacks = split(ARGS[1],",")
 for pack in allpacks
-	Pkg.add(pack)
-	println("Added $pack")
+	try
+		Pkg.add(pack)
+		println("Added $pack")
+	catch
+		println("Couldn't add $pack")
+	end
 end
