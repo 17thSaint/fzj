@@ -1,4 +1,8 @@
-using TTNKit,Statistics,NBInclude
+using Statistics
+using NBInclude
+println(VERSION)
+using TTNKit
+exit()
 #cd("/home/patrick/Downloads")
 @nbinclude("parton-model-syms.ipynb")
 include("../other-funcs/data-storage-funcs.jl")
