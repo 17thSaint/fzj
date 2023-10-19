@@ -1,10 +1,7 @@
 using Statistics
-using NBInclude
-println(VERSION)
 using TTNKit
-exit()
 #cd("/home/patrick/Downloads")
-@nbinclude("parton-model-syms.ipynb")
+include("parton-model-syms.jl")
 include("../other-funcs/data-storage-funcs.jl")
 #=
 Need to figure out how sweeps works
