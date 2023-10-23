@@ -1,9 +1,42 @@
-using SpecialMatrices
+using SpecialMatrices,LinearAlgebra
+
+function start_rand_config(num_parts::Int, m::Int)
+    # Calculate the filling fraction
+    filling = 1 / m
+
+    # Calculate the characteristic length scale
+    rm = sqrt(2 * num_parts / filling)
+
+    # Generate random real and imaginary parts in one step
+    real_parts = rand(Float64, num_parts) .* rand(-1:2:1, num_parts) .* rm
+    imag_parts = rand(Float64, num_parts) .* rand(-1:2:1, num_parts) .* rm
+
+    # Combine real and imaginary parts to create complex numbers
+    config = real_parts .- im .* imag_parts
+
+    return config
+end
 
 function trace_part(config,which_particle=1)
 	vdm_deriv = [(i-1)*config[which_particle]^(i-2) for i in 1:length(config)]
 	return ( conj(Vandermonde(config)') \ vdm_deriv )[which_particle]
 	#return  -1 * det(Vandermonde(config)) * (( conj(Vandermonde(config)') \ vdm_deriv )[which_particle])
+end
+
+function get_log_add(a,b)
+	if real(a) > real(b)
+		ordered::Vector{typeof(a)} = [b,a]
+	else
+		ordered = [a,b]
+	end
+	result::ComplexF64 = ordered[2] + log(Complex(1 + exp(ordered[1] - ordered[2])))
+	return Complex(result)
+end
+
+function get_log_subtract(a,b)
+	ordered = [a,b]
+	result::ComplexF64 = ordered[1] + log(Complex(1 - exp(ordered[2] - ordered[1])))
+	return Complex(result)
 end
 
 function get_log_det(matrix::Matrix{ComplexF64},reg_input=false)
@@ -80,21 +113,119 @@ function test_3parts(z,m=3)
 	dz[2] = 2*p*dist_btw(z,1,3,2*p) * (-dist_btw(z,1,2,2*p-1)*dist_btw(z,2,3,2*p) + dist_btw(z,1,2,2*p)*dist_btw(z,2,3,2*p-1))
 	dz[3] = 2*p*dist_btw(z,1,2,2*p) * (-dist_btw(z,1,3,2*p-1)*dist_btw(z,2,3,2*p) - dist_btw(z,1,3,2*p)*dist_btw(z,2,3,2*p-1))
 	
-	result = 1.0
+	result = 0.0
 	for j in 1:num_parts
 		for i in 1:j-1
-			result *= -2*(dz[i] - dz[j])
+			result += log(Complex(-2*(dz[i] - dz[j])))
 		end
 	end
-	
+	#
 	for i in 1:num_parts
-		result *= exp(-0.25*abs2(z[i]))
+		result += -0.25*abs2(z[i])
 	end
+	#
 	
 	return result
 end
 
+function test_4parts(z,m=3)
+	num_parts = length(z)
+	p = Int((m+1)/2)
+	
+	dz = im .* zeros(4)
+	dz[1] = log(Complex(2*p*dist_btw(z,2,3,2*p)*dist_btw(z,2,4,2*p)*dist_btw(z,3,4,2*p))) + log(Complex(dist_btw(z,1,2,2*p-1)*dist_btw(z,1,3,2*p)*dist_btw(z,1,4,2*p) + dist_btw(z,1,2,2*p)*dist_btw(z,1,3,2*p-1)*dist_btw(z,1,4,2*p) + dist_btw(z,1,2,2*p)*dist_btw(z,1,3,2*p)*dist_btw(z,1,4,2*p-1)))
+	dz[2] = log(Complex(2*p*dist_btw(z,1,3,2*p)*dist_btw(z,1,4,2*p)*dist_btw(z,3,4,2*p))) + log(Complex(-dist_btw(z,1,2,2*p-1)*dist_btw(z,2,3,2*p)*dist_btw(z,2,4,2*p) + dist_btw(z,1,2,2*p)*dist_btw(z,2,3,2*p-1)*dist_btw(z,2,4,2*p) + dist_btw(z,1,2,2*p)*dist_btw(z,2,3,2*p)*dist_btw(z,2,4,2*p-1)))
+	dz[3] = log(Complex(2*p*dist_btw(z,1,2,2*p)*dist_btw(z,1,4,2*p)*dist_btw(z,2,4,2*p))) + log(Complex(-dist_btw(z,1,3,2*p-1)*dist_btw(z,2,3,2*p)*dist_btw(z,3,4,2*p) - dist_btw(z,1,3,2*p)*dist_btw(z,2,3,2*p-1)*dist_btw(z,3,4,2*p) - dist_btw(z,1,3,2*p)*dist_btw(z,2,3,2*p)*dist_btw(z,3,4,2*p-1)))
+	dz[4] = log(Complex(2*p*dist_btw(z,1,2,2*p)*dist_btw(z,1,3,2*p)*dist_btw(z,2,3,2*p))) + log(Complex(-dist_btw(z,1,4,2*p-1)*dist_btw(z,2,4,2*p)*dist_btw(z,3,4,2*p) - dist_btw(z,1,4,2*p)*dist_btw(z,2,4,2*p-1)*dist_btw(z,3,4,2*p) - dist_btw(z,1,4,2*p)*dist_btw(z,2,4,2*p)*dist_btw(z,3,4,2*p-1)))
+	
+	result = 0.0
+	for j in 1:num_parts
+		for i in 1:j-1
+			result += log(Complex(-2)) + get_log_subtract(dz[i],dz[j])
+		end
+	end
+	#
+	for i in 1:num_parts
+		result += -0.25*abs2(z[i])
+	end
+	#
+	
+	return result
+end
+#
+avg_count = 1000
+ns = [i for i in 10:20]
+avg_times = [0.0 for i in 1:length(ns)]
+for (i,n) in enumerate(ns)
+	println(n)
+	local_avg = 0.0
+	for j in 1:avg_count
+		con = start_rand_config(n,3)
+		start_time = time()
+		rez = reverse_flux_wavefunction(con)
+		end_time = time()
+		local_avg += (end_time-start_time)/avg_count
+	end
+	avg_times[i] = local_avg
+end
+#
+scatter(ns,avg_times)
+xlabel("Particles")
+ylabel("Time to Calculate Wavefunction")
 
+expfit = exp_fit(ns,avg_times)
+powfit = power_fit(ns,avg_times)
+
+plot(ns,expfit[1] .* exp.(expfit[2] .* ns),label="exp $(round(expfit[2],digits=3))")
+plot(ns,powfit[1] .* (ns .^ powfit[2]),label="pow, $(round(powfit[2],digits=3))")
+legend()
+
+
+
+#=
+include("fqh-thesis/cf-wavefunc.jl")
+particles = 10
+#allowed_sets_matrix = get_full_acc_matrix(particles)
+#full_pasc_tri = [get_pascals_triangle(i)[2] for i in 1:particles]
+#full_derivs = get_deriv_orders_matrix(particles)
+
+
+m = 3
+#for particles in [3,4]
+	con = start_rand_config(particles,m)
+	
+	rm = sqrt(2*particles*m)
+	data_count = 50
+	xs = [-10*rm + i*(2*10*rm)/data_count for i in 1:data_count]
+	myver = fill(0.0,(data_count,data_count))
+	for i in 1:length(xs)
+		local_x = xs[i]
+		for j in 1:length(xs)
+			local_y = xs[j]
+			#append!(xs_plot,[local_x])
+			#append!(ys_plot,[local_y])
+			con[1] = local_x - im*local_y
+			
+			myver[i,j] = 2*real(reverse_flux_wavefunction(con,m)[1])
+		end
+	end
+	
+	fig = figure()
+	imshow(myver)
+	colorbar()
+	title("My RF")
+	
+	#mscver = get_rf_wavefunc(con,allowed_sets_matrix,full_pasc_tri,full_derivs,[0,[0]],true)
+	#=if particles == 3
+		exactver = test_3parts(con,m)
+	elseif particles == 4
+		exactver = test_4parts(con,m)
+	end
+	=#
+	#println(isapprox(real(myver),real(exactver),atol=10^-3))
+	#println("Mine = $(round(myver,digits=5)), Masters = $(round(mscver,digits=5)), Exact = $(round(exactver,digits=5))")
+#end
+=#
 
 
 
