@@ -44,7 +44,7 @@ mkdir -p "$datafolder"
 value=$START_VALUE
 while (( $(bc <<< "$value <= $END_VALUE") )); do
     # Submit the specified script as a SLURM job
-    sbatch run-script.sh "$script_name" "open_cores" 4 "dataloc" "$datafolder" "$param" "$value" "${additional_params[@]}"
+    sbatch run-script-jsc.sh "$script_name" "open_cores" 4 "dataloc" "$datafolder" "$param" "$value" "${additional_params[@]}"
 
     value=$(bc <<< "$value + $STEP_SIZE")
 done
