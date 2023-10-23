@@ -1,4 +1,4 @@
-using LinearAlgebra,Statistics,PyPlot
+using LinearAlgebra,Statistics,PyPlot,LsqFit
 include("analysis-functions.jl")
 include("reverse-flux.jl")
 include("laughlin-wavefunc.jl")
@@ -200,25 +200,72 @@ end
 
 
 #
+axisbins = 300
 m = 3
-mc_steps = 100000
+mc_steps = 500000
 output = 1
 sampfreq = 1
-#everyconfig = []
-allraddens = []
-for particles in [i for i in 3:9]
+everyconfig = []
+gauss(x,p) = (1/(p[1]*sqrt(2*pi))) .* exp.(-0.5 .* (((x .- p[2]) ./ p[1]).^2)) .+ p[3]
+allfits_dens = []
+allfits_dists = []
+for particles in [i for i in 4:20]
 #particles = 6
 rm = sqrt(2*particles*m)
 step_size = 0.125*rm
 ver = "R"
 
 model_paras = (vers = ver, step_size = step_size, m = m, opl = output, samp_freq = sampfreq)
-#accrate,allconfigs,allpsis,runtime = mc(particles,m,mc_steps; model_paras...)
-#append!(everyconfig,[allconfigs])
-allconfigs = everyconfig[particles-2]
-raddists = rad_dist(allconfigs,rm; axis_bins=100,labelstring="$particles")
-#raddens = radial_density_full(allconfigs,rm; rend="max", labelstring = "$particles")
-append!(allraddens,[raddists])
+accrate,allconfigs,allpsis,runtime = mc(particles,m,mc_steps; model_paras...)
+append!(everyconfig,[allconfigs])
+
+#allconfigs = everyconfig[particles-12]
+#raddenss = radial_density_full(allconfigs,rm; points=axisbins,labelstring="$particles", rend="max")
+get_occupancy(allconfigs,rm; title_string="N = $particles")
+#=raddists = rad_dist(allconfigs,rm; axis_bins=axisbins,labelstring="$particles")
+
+if particles > 5
+	start_point = findfirst(i->raddists[2][i] > 0.2,Int(axisbins/2):axisbins) + Int(axisbins/2)
+	end_point = findfirst(i->raddists[2][i] < 0.2,start_point+10:axisbins) + start_point + 10
+	println(raddists[1][start_point],", ",raddists[1][end_point])
+	maxval = findfirst(i->raddists[2][i]==maximum(raddists[2][start_point:end_point]),start_point:end_point) + start_point
+	p0 = [0.1,raddists[1][maxval],0.5]
+	localfit = LsqFit.curve_fit(gauss,raddists[1][start_point:end_point],raddists[2][start_point:end_point],p0)
+	append!(allfits,[localfit.param])
+	scatter(raddists[1][start_point:end_point],gauss(raddists[1][start_point:end_point],localfit.param))
+else
+	start_point = findfirst(i->raddists[2][i] >= 0.2,1:axisbins)
+	end_point = findfirst(i->raddists[2][i] <= 0.2,start_point+10:axisbins) + start_point+10
+	println(raddists[1][start_point],", ",raddists[1][end_point])
+	maxval = findfirst(i->raddists[2][i]==maximum(raddists[2][start_point:end_point]),start_point:end_point) + start_point
+	p0 = [0.5,raddists[1][maxval],0.5]
+	localfit = LsqFit.curve_fit(gauss,raddists[1][start_point:end_point],raddists[2][start_point:end_point],p0)
+	append!(allfits,[localfit.param])
+	scatter(raddists[1][start_point:end_point],gauss(raddists[1][start_point:end_point],localfit.param))
+end
+
+if particles > 5
+	start_point = findfirst(i->raddens[2][i] > 0.2,Int(axisbins/2):axisbins) + Int(axisbins/2)
+	end_point = findfirst(i->raddens[2][i] < 0.2,start_point+10:axisbins) + start_point + 10
+	println(raddens[1][start_point],", ",raddens[1][end_point])
+	maxval = findfirst(i->raddens[2][i]==maximum(raddens[2][start_point:end_point]),start_point:end_point) + start_point
+	p0 = [0.1,raddens[1][maxval],0.5]
+	localfit = LsqFit.curve_fit(gauss,raddens[1][start_point:end_point],raddens[2][start_point:end_point],p0)
+	append!(allfits,[localfit.param])
+	scatter(raddens[1][start_point:end_point],gauss(raddens[1][start_point:end_point],localfit.param))
+else
+	start_point = findfirst(i->raddens[2][i] >= 0.2,1:axisbins)
+	end_point = findfirst(i->raddens[2][i] <= 0.2,start_point+10:axisbins) + start_point+10
+	println(raddens[1][start_point],", ",raddens[1][end_point])
+	maxval = findfirst(i->raddens[2][i]==maximum(raddens[2][start_point:end_point]),start_point:end_point) + start_point
+	p0 = [0.5,raddens[1][maxval],0.5]
+	localfit = LsqFit.curve_fit(gauss,raddens[1][start_point:end_point],raddens[2][start_point:end_point],p0)
+	append!(allfits,[localfit.param])
+	scatter(raddens[1][start_point:end_point],gauss(raddens[1][start_point:end_point],localfit.param))
+end
+=#
+#append!(allraddens,[raddists])
+#
 end
 #rad_dist(allconfigs,rm; axis_bins=100, maxr = 1.25, labelstring = "$(round(approx_rad/rm,digits=2))")
 #get_occupancy(allconfigs,rm)

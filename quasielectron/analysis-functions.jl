@@ -8,7 +8,8 @@ function plot_circle(radius,center)
 	plot(xs .+ center,-1 .* ys .+ center,c="r")
 end
 
-function get_occupancy(time_config,rm,axis_bins=40)
+function get_occupancy(time_config,rm,axis_bins=40; kwargs...)
+	title_string = get(kwargs, :title_string, "")
 	occs = zeros(axis_bins,axis_bins)
 	max_x,min_x = maximum(real.(time_config))/rm,minimum(real.(time_config))/rm
 	max_y,min_y = -1*minimum(imag.(time_config))/rm,-1*maximum(imag.(time_config))/rm
@@ -23,11 +24,13 @@ function get_occupancy(time_config,rm,axis_bins=40)
 			occs[y_site,x_site] += 1/prod(size(time_config))
 		end
 	end
+	binwidth = abs(bins_x[2] - bins_x[1])
 	fig = figure()
 	imshow(occs)
 	colorbar()
-	plot_circle(rm,axis_bins/2)
-	plot_circle(2*rm,axis_bins/2)
+	plot_circle(1/binwidth,(axis_bins/2)-0.5)
+	title(title_string)
+	#plot_circle(5*rm,axis_bins/2)
 	return occs
 end
 
@@ -36,6 +39,7 @@ function rad_dist(time_config,rm; kwargs...)
 	maxr = get(kwargs, :maxr, maximum(abs.(time_config))/rm)
 	title_string = get(kwargs, :titlestring, "")
 	label_string = get(kwargs, :labelstring, "")
+	if_plot = get(kwargs, :if_plot, true)
 	
 	occs = zeros(axis_bins)
 	#bins = [-maxr + (i-1)*(2*maxr)/(axis_bins-1) for i in 1:axis_bins]
@@ -51,13 +55,15 @@ function rad_dist(time_config,rm; kwargs...)
 		end
 	end
 	normalization = integrate(bins, raddist)
-	#fig = figure()
-	plot(bins,raddist ./ normalization,label=label_string)
-	xlabel("Radial Position / rm")
-	ylabel("Number Times Found")
-	title(title_string)
-	legend()
-	return bins,raddist
+	if if_plot
+		#fig = figure()
+		plot(bins,raddist ./ normalization,label=label_string)
+		xlabel("Radial Position / rm")
+		ylabel("Number Times Found")
+		title(title_string)
+		legend()
+	end
+	return bins,raddist ./ normalization
 end
 
 function auto_correlation(energies, delta_t)
@@ -132,7 +138,7 @@ function radial_density_full(pos_data,rm; kwargs...)
 		legend()
 	end
 	
-	return allxs,raddens
+	return allxs ./ rm,raddens ./ normalization
 end
 
 
