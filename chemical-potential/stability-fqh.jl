@@ -17,7 +17,7 @@ max_occ = get(params_dict, "max_occ", 1)
 if_gpu = get(params_dict, "if_gpu", false)
 seed_ttn = get(params_dict, "seed_ttn", nothing)
 net = TTNKit.BinaryRectangularNetwork(layers, TTNKit.ITensorNode, "Boson";conserve_qns=syms,dim=max_occ+1)
-dataloc = "../cluster-data/chemical-potential"
+dataloc = get(params_dict, :dataloc, "../cluster-data/chemical-potential")
 open_cores = get(params_dict, "open_cores", "all")
 if typeof(open_cores) != String
 	BLAS.set_num_threads(open_cores)	

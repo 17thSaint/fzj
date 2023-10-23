@@ -25,6 +25,13 @@ additional_params=("${@:6}")
 # Calculate the number of iterations
 num_iters=$(echo "scale=2; ($END_VALUE - $START_VALUE) / $STEP_SIZE + 1" | bc)
 
+# Get the current date and time
+alpha=$(date +"%Y-%m-%d_%H-%M")
+datafolder="data-$alpha"
+
+# Create the folder
+mkdir -p "$datafolder"
+
 #SBATCH --array=1-$num_iters
 #SBATCH --time=00:15:00
 #SBATCH --nodes=1
@@ -37,7 +44,7 @@ num_iters=$(echo "scale=2; ($END_VALUE - $START_VALUE) / $STEP_SIZE + 1" | bc)
 value=$START_VALUE
 while (( $(bc <<< "$value <= $END_VALUE") )); do
     # Submit the specified script as a SLURM job
-    sbatch run-script.sh "$script_name" "open_cores" 4 "$param" "$value" "${additional_params[@]}"
+    sbatch run-script.sh "$script_name" "open_cores" 4 "dataloc" "$datafolder" "$param" "$value" "${additional_params[@]}"
 
     value=$(bc <<< "$value + $STEP_SIZE")
 done
