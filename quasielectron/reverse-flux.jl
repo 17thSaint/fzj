@@ -152,35 +152,6 @@ function test_4parts(z,m=3)
 	
 	return result
 end
-#
-avg_count = 1000
-ns = [i for i in 10:20]
-avg_times = [0.0 for i in 1:length(ns)]
-for (i,n) in enumerate(ns)
-	println(n)
-	local_avg = 0.0
-	for j in 1:avg_count
-		con = start_rand_config(n,3)
-		start_time = time()
-		rez = reverse_flux_wavefunction(con)
-		end_time = time()
-		local_avg += (end_time-start_time)/avg_count
-	end
-	avg_times[i] = local_avg
-end
-#
-scatter(ns,avg_times)
-xlabel("Particles")
-ylabel("Time to Calculate Wavefunction")
-
-expfit = exp_fit(ns,avg_times)
-powfit = power_fit(ns,avg_times)
-
-plot(ns,expfit[1] .* exp.(expfit[2] .* ns),label="exp $(round(expfit[2],digits=3))")
-plot(ns,powfit[1] .* (ns .^ powfit[2]),label="pow, $(round(powfit[2],digits=3))")
-legend()
-
-
 
 #=
 include("fqh-thesis/cf-wavefunc.jl")

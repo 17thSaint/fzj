@@ -1,7 +1,7 @@
 using LinearAlgebra,Statistics,PyPlot,LsqFit
 include("analysis-functions.jl")
-include("reverse-flux.jl")
 include("laughlin-wavefunc.jl")
+include("../other-funcs/data-storage-funcs.jl")
 
 function start_rand_config(num_parts::Int, m::Int)
     # Calculate the filling fraction
@@ -19,6 +19,8 @@ function start_rand_config(num_parts::Int, m::Int)
 
     return config
 end
+
+include("reverse-flux.jl")
 
 function get_log_add(a,b)
 	if real(a) > real(b)
@@ -71,7 +73,7 @@ function acc_rej_move(initial_config::Array,chosen_particle::Int; kwargs...)
 			return true, initial_config, 0, start_wavefunc, times
 		=#
 		if isinf(new_ham)
-			#println("New Inf")
+			println("New Inf")
 			shift_matrix = move_particle(length(initial_config),chosen_particle,step_size)
 			new_wavefunc,times = wave_function(initial_config+shift_matrix,m)
 			infinity_steps += 1
@@ -106,6 +108,7 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 	steps_therm = get(kwargs, :therm_time, 1000)
 	opl = get(kwargs, :opl, 1)
 	samp_freq = get(kwargs, :samp_freq, 10)
+	if_save_data = get(kwargs, :if_save_data, false)
 	wavefunc_type = get(kwargs, :vers, "P")
 	wave_function = wavefunc_type == "P" ? log_laughlin_wavefunction : reverse_flux_wavefunction
 	
@@ -128,8 +131,23 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 	#
 	for i_therm in 1:steps_therm
 		for j_therm in 1:num_parts
-			movement = acc_rej_move(running_config,j_therm; kwargs..., m = m,start_wavefunc=wavefunc)
-			
+			rejected = true
+			attempts = 0
+			while rejected
+				movement = acc_rej_move(running_config,j_therm; kwargs..., m = m,start_wavefunc=wavefunc)
+				if movement[3] == 1
+					running_config = movement[2]
+					wavefunc = movement[4]
+					rejected = false
+				else
+					attempts += 1
+				end
+				if attempts > 50
+					println("Too many attempts to move during Thermalization")
+					return nothing
+				end
+			end
+			#=
 			if movement[1]
 				running_config = movement[2]
 				wavefunc = movement[4]
@@ -137,6 +155,7 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 				println("NaN Wavefunc")
 				return movement
 			end
+			=#
 			
 		end
 	end
@@ -146,29 +165,50 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 	#
 	time_config = fill(0.0+im*0.0,(num_parts,Int(steps/samp_freq)))
 	time_wavefunc = fill(0.0+im*0.0,(Int(steps/samp_freq)))
-	acc_count = 0
 	
 	all_times = [[],[]]
 	
+	i = 0
+	steps_done = 0
 	time_start = time()
 	for i in 1:steps
+		rej_count = 0
 		for j in 1:num_parts
-			movement = acc_rej_move(running_config,j; kwargs..., m = m,start_wavefunc=wavefunc)
+			rejected = true
+			attempts = 0
+			while rejected
+				movement = acc_rej_move(running_config,j; kwargs..., m = m,start_wavefunc=wavefunc)
+				if movement[3] == 1
+					running_config = movement[2]
+					wavefunc = real(movement[4])
+					append!(all_times[1],[movement[5][1]])
+					append!(all_times[2],[movement[5][2]])
+					rejected = false
+				else
+					attempts += 1
+				end
+				if attempts > 20
+					println("Too many attempts to move")
+					return nothing
+				end
+			end
 			
+			#=
 			if movement[1]
-				acc_count += movement[3]
+				rej_count += attempts
 				running_config = movement[2]
 				wavefunc = real(movement[4])
 			else
 				println("NaN Wavefunc")
 				return movement
 			end
-			
-			append!(all_times[1],[movement[5][1]])
-			append!(all_times[2],[movement[5][2]])
+			=#
+
+			rej_count += attempts
+						
 		end
 		
-		acc_rate = acc_count/(num_parts*i)
+		acc_rate = 1-(rej_count/num_parts)
 		
 		if i%samp_freq == 0
 			time_config[:,index] = [Complex(running_config[x]) for x in 1:num_parts]
@@ -185,7 +225,7 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 	
 	time_end = time()
 	total_time = (time_end - time_start)
-	acc_rate = acc_count/(num_parts*steps)
+	#acc_rate = acc_count/(num_parts*steps)
 	
 	const_mean  = round(mean(all_times[1]),digits=4)
 	const_std  = round(std(all_times[1]),digits=4)
@@ -193,7 +233,17 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 	deriv_std  = round(std(all_times[2]),digits=4)
 	println("Times: Const = $const_mean +- $const_std, Deriv = $deriv_mean +- $deriv_std")
 	
-	return acc_rate,time_config,time_wavefunc,total_time
+	if if_save_data
+		location = get(kwargs, :location, "../cluster-data/quasielectron")
+		params_dict = Dict([("mc_steps",steps),("m",m),("particles",num_parts)])
+		filename = get(kwargs, :name, "rfa-" * make_parameters_filename(params_dict))
+		metadata_dict = merge(named_tuple_to_dict(kwargs),params_dict)
+		metadata = get(kwargs, :metadata, metadata_dict)
+		config_data_dict = Dict([("configs",time_config),("wavefuncs",time_wavefunc)])
+		write_data_jld2(filename,config_data_dict,location,metadata)
+	end
+	
+	return time_config,time_wavefunc,total_time
 end
 
 
@@ -202,21 +252,21 @@ end
 #
 axisbins = 300
 m = 3
-mc_steps = 500000
+mc_steps = 100000
 output = 1
 sampfreq = 1
 everyconfig = []
 gauss(x,p) = (1/(p[1]*sqrt(2*pi))) .* exp.(-0.5 .* (((x .- p[2]) ./ p[1]).^2)) .+ p[3]
 allfits_dens = []
 allfits_dists = []
-for particles in [i for i in 4:20]
-#particles = 6
+for particles in [i for i in 20:20]
+#particles = 4
 rm = sqrt(2*particles*m)
-step_size = 0.125*rm
+step_size = 0.5*rm#0.125*rm
 ver = "R"
 
-model_paras = (vers = ver, step_size = step_size, m = m, opl = output, samp_freq = sampfreq)
-accrate,allconfigs,allpsis,runtime = mc(particles,m,mc_steps; model_paras...)
+model_paras = (vers = ver, step_size = step_size, m = m, opl = output, samp_freq = sampfreq, if_save_data = true)
+allconfigs,allpsis,runtime = mc(particles,m,mc_steps; model_paras...)
 append!(everyconfig,[allconfigs])
 
 #allconfigs = everyconfig[particles-12]
@@ -266,13 +316,13 @@ end
 =#
 #append!(allraddens,[raddists])
 #
-end
+#end
 #rad_dist(allconfigs,rm; axis_bins=100, maxr = 1.25, labelstring = "$(round(approx_rad/rm,digits=2))")
 #get_occupancy(allconfigs,rm)
 #title("$(approx_rad/rm)")
 #end
 #raddata = rad_dist(allconfigs,rm; axis_bins=100, labelstring = "$particles")
-#end
+end
 #println("Runtime = ",runtime)
 #
 

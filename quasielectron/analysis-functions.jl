@@ -1,4 +1,5 @@
-using NumericalIntegration
+using NumericalIntegration,LsqFit
+include("../other-funcs/data-storage-funcs.jl")
 
 function plot_circle(radius,center)
 	counts = 100
@@ -128,8 +129,8 @@ function radial_density_full(pos_data,rm; kwargs...)
 		raddens[i] = get_rightband_count(ed,pos_data,rm) - shift
 	end
 	
+	normalization = integrate(allxs ./ rm, raddens)
 	if if_plot
-		normalization = integrate(allxs ./ rm, raddens)
 		#fig = figure()
 		plot(allxs ./ rm,raddens ./ normalization,label=label_string)
 		title(title_string)
@@ -141,8 +142,172 @@ function radial_density_full(pos_data,rm; kwargs...)
 	return allxs ./ rm,raddens ./ normalization
 end
 
+function fit_gaussian_raddens(particles,raddens,axisbins; kwargs...)
+	if_plot = get(kwargs, :if_plot, true)
+	gauss(x,p) = (1/(p[1]*sqrt(2*pi))) .* exp.(-0.5 .* (((x .- p[2]) ./ p[1]).^2)) .+ p[3]
+	yaxis_min = 0.1
+	if 5 < particles < 17
+		fit_parameters = [[],[]]
+		
+		start_point = findfirst(i->raddens[2][i] > yaxis_min,Int(axisbins/2):axisbins) + Int(axisbins/2)
+		end_point = findfirst(i->raddens[2][i] < yaxis_min,start_point+10:axisbins) + start_point + 10
+		#println(raddens[1][start_point],", ",raddens[1][end_point])
+		maxval = findfirst(i->raddens[2][i]==maximum(raddens[2][start_point:end_point]),start_point:end_point) + start_point
+		p0 = [0.1,raddens[1][maxval],0.5]
+		localfit = LsqFit.curve_fit(gauss,raddens[1][start_point:end_point],raddens[2][start_point:end_point],p0)
+		#append!(allfits,[localfit.param])
+		if_plot ? scatter(raddens[1][start_point:end_point],gauss(raddens[1][start_point:end_point],localfit.param)) : nothing
+		fit_parameters[2] = localfit.param
+		
+		start_point_left = findfirst(i->raddens[2][i] > yaxis_min,1:Int(axisbins/2))
+		end_point_left = findfirst(i->raddens[2][i] < yaxis_min,start_point_left+10:Int(axisbins/2)) + start_point_left + 10
+		#println(raddens[1][start_point],", ",raddens[1][end_point])
+		maxval_left = findfirst(i->raddens[2][i]==maximum(raddens[2][start_point_left:end_point_left]),start_point_left:end_point_left) + start_point_left
+		p0_left = [0.1,raddens[1][maxval_left],0.5]
+		localfit_left = LsqFit.curve_fit(gauss,raddens[1][start_point_left:end_point_left],raddens[2][start_point_left:end_point_left],p0_left)
+		#append!(allfits,[localfit.param])
+		if_plot ? scatter(raddens[1][start_point_left:end_point_left],gauss(raddens[1][start_point_left:end_point_left],localfit_left.param)) : nothing
+		fit_parameters[1] = localfit_left.param
+	elseif particles > 16
+		fit_parameters = [[],[],[]]
+		
+		start_point_right = findfirst(i->raddens[2][i] > yaxis_min,Int(2*axisbins/3):axisbins) + Int(2*axisbins/3)
+		end_point_right = findfirst(i->raddens[2][i] < yaxis_min,start_point_right+10:axisbins) + start_point_right + 10
+		#println(raddens[1][start_point],", ",raddens[1][end_point])
+		maxval_right = findfirst(i->raddens[2][i]==maximum(raddens[2][start_point_right:end_point_right]),start_point_right:end_point_right) + start_point_right
+		p0_right = [0.1,raddens[1][maxval_right],0.5]
+		localfit_right = LsqFit.curve_fit(gauss,raddens[1][start_point_right:end_point_right],raddens[2][start_point_right:end_point_right],p0_right)
+		#append!(allfits,[localfit.param])
+		if_plot ? scatter(raddens[1][start_point_right:end_point_right],gauss(raddens[1][start_point_right:end_point_right],localfit_right.param)) : nothing
+		fit_parameters[3] = localfit_right.param
+		
+		start_point_center = findfirst(i->raddens[2][i] > yaxis_min,Int(axisbins/3):Int(2*axisbins/3)) + Int(1*axisbins/3)
+		end_point_center = findfirst(i->raddens[2][i] < yaxis_min,start_point_center+10:axisbins) + start_point_center + 10
+		#println(raddens[1][start_point],", ",raddens[1][end_point])
+		maxval_center = findfirst(i->raddens[2][i]==maximum(raddens[2][start_point_center:end_point_center]),start_point_center:end_point_center) + start_point_center
+		p0_center = [0.1,raddens[1][maxval_center],0.5]
+		localfit_center = LsqFit.curve_fit(gauss,raddens[1][start_point_center:end_point_center],raddens[2][start_point_center:end_point_center],p0_center)
+		#append!(allfits,[localfit.param])
+		if_plot ? scatter(raddens[1][start_point_center:end_point_center],gauss(raddens[1][start_point_center:end_point_center],localfit_center.param)) : nothing
+		fit_parameters[2] = localfit_center.param
+		
+		start_point_left = findfirst(i->raddens[2][i] > yaxis_min,1:Int(axisbins/3))
+		end_point_left = findfirst(i->raddens[2][i] < yaxis_min,start_point_left+10:Int(axisbins/3)) + start_point_left + 10
+		#println(raddens[1][start_point],", ",raddens[1][end_point])
+		maxval_left = findfirst(i->raddens[2][i]==maximum(raddens[2][start_point_left:end_point_left]),start_point_left:end_point_left) + start_point_left
+		p0_left = [0.1,raddens[1][maxval_left],0.5]
+		localfit_left = LsqFit.curve_fit(gauss,raddens[1][start_point_left:end_point_left],raddens[2][start_point_left:end_point_left],p0_left)
+		#append!(allfits,[localfit.param])
+		if_plot ? scatter(raddens[1][start_point_left:end_point_left],gauss(raddens[1][start_point_left:end_point_left],localfit_left.param)) : nothing
+		fit_parameters[1] = localfit_left.param
+	else
+		start_point = findfirst(i->raddens[2][i] >= yaxis_min,1:axisbins)
+		end_point = findfirst(i->raddens[2][i] <= yaxis_min,start_point+10:axisbins) + start_point+10
+		#println(raddens[1][start_point],", ",raddens[1][end_point])
+		maxval = findfirst(i->raddens[2][i]==maximum(raddens[2][start_point:end_point]),start_point:end_point) + start_point
+		p0 = [0.5,raddens[1][maxval],0.5]
+		localfit = LsqFit.curve_fit(gauss,raddens[1][start_point:end_point],raddens[2][start_point:end_point],p0)
+		#append!(allfits,[localfit.param])
+		if_plot ? scatter(raddens[1][start_point:end_point],gauss(raddens[1][start_point:end_point],localfit.param)) : nothing
+		fit_parameters = localfit.param
+	end
+	return fit_parameters
+end
 
+#=
+dataloc = "/home/patrick/fzj/main-git/cluster-data/quasielectron"
+paradict = Dict([("m",3),("mc_steps",100000)])
+allfiles = find_data_file(paradict,"rfa","jld2",dataloc)
+everyconfig = []
+particles = []
+for file in allfiles
+	parts = get_params_dict_from_filename(file)["particles"]
+	append!(particles,[parts])
+	append!(everyconfig,[read_data_jld2(file,dataloc)[1]["configs"]])
+end
+#
+plotting_particles = []
+allfits = []
+axisbins = 300
+for (i,config) in enumerate(everyconfig)
+	parts = particles[i]
+	println(parts)
+	rm = sqrt(2*parts*3)
+	raddens = radial_density_full(config,rm; rend="max",points=axisbins,labelstring="$parts",if_plot=false)
+	fitparams = fit_gaussian_raddens(parts,raddens,axisbins; if_plot=false)
+	if 5 < parts < 17
+		append!(allfits,[fitparams[1]])
+		append!(allfits,[fitparams[2]])
+		append!(plotting_particles,[parts,parts])
+	elseif parts > 16
+		append!(allfits,[fitparams[1]])
+		append!(allfits,[fitparams[2]])
+		append!(allfits,[fitparams[3]])
+		append!(plotting_particles,[parts,parts,parts])
+	else
+		append!(allfits,[fitparams])
+		append!(plotting_particles,[parts])
+	end
+end
+#
+fig = figure()
+scatter(plotting_particles,[allfits[i][1] for i in 1:length(plotting_particles)])
+xlabel("Particles")
+ylabel("Width of Ring / rm")
 
+fig = figure()
+scatter(plotting_particles,[allfits[i][2] for i in 1:length(plotting_particles)])
+xlabel("Particles")
+ylabel("Location of Ring / rm")
+#
+
+alloccs = []
+for (i,parts) in enumerate(particles)
+	config = everyconfig[i]
+	rm = sqrt(2*parts*3)
+	raddens = radial_density_full(config,rm; rend="max",points=axisbins,labelstring="$parts",if_plot=false)
+	if 5 < parts < 17
+		left_occ = integrate(raddens[1][1:Int(axisbins/2)],raddens[2][1:Int(axisbins/2)])
+		right_occ = integrate(raddens[1][Int(axisbins/2):end],raddens[2][Int(axisbins/2):end])
+		if parts <= 9
+			occs = [left_occ,0.0,right_occ]
+		else
+			occs = [0.0,left_occ,right_occ]
+		end
+	elseif parts > 16
+		left_occ = integrate(raddens[1][1:Int(axisbins/3)],raddens[2][1:Int(axisbins/3)])
+		center_occ = integrate(raddens[1][Int(axisbins/3):Int(2*axisbins/3)],raddens[2][Int(axisbins/3):Int(2*axisbins/3)])
+		right_occ = integrate(raddens[1][Int(2*axisbins/3):end],raddens[2][Int(2*axisbins/3):end])
+		occs = [left_occ,center_occ,right_occ]
+	else
+		occs = [0.0,0.0,1.0]
+	end
+	append!(alloccs,[occs])
+end
+fig = figure()
+labstring = ["origin-disk","ring-2","ring-1"]
+for i in 1:3
+	plot(particles,[alloccs[j][i] for j in 1:length(particles)],"p",label="$(labstring[i])")
+end
+legend()
+xlabel("Particles")
+ylabel("Occupation")
+=#
+#=
+distance_btw_rings = []
+local_particles = []
+for i in 1:Int(length(plotting_particles)/2)
+	if i == 8
+		continue
+	else
+		println(plotting_particles[2*(i-1)+2],", ",plotting_particles[2*(i-1)+1])
+		distbtw = abs(allfits[2*(i-1)+2][2] - allfits[2*(i-1)+1][2])
+		append!(distance_btw_rings,[distbtw])
+		append!(local_particles,[plotting_particles[2*(i-1)+2]])
+	end
+end
+scatter(local_particles,distance_btw_rings)
+=#
 
 
 
