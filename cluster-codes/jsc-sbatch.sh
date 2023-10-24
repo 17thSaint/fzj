@@ -46,7 +46,4 @@ mkdir -p "$datafolder"
 
 srun intermediate-jsc.sh "$param" "$START_VALUE" "$STEP_SIZE" "$datafolder" "${additional_params[@]}"
 
-# Wait for all background jobs to finish
-wait
-
 

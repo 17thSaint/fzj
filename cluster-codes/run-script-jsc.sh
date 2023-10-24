@@ -32,7 +32,7 @@ do
         iter=$((iter + 1))
 done
 
-echo "$@"
+#echo "$@"
 
 julia "$@" > "${OUTPUTFILENAME}"
 

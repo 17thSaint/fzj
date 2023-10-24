@@ -30,8 +30,8 @@ no_magF = false
 #t_strength = get(params_dict, :t_strength, 0.02)
 #chem_strength = get(params_dict, :chem_strength, 0.0)
 alpha = get(params_dict, "alpha", 1/4)
-t_strength = get(params_dict, "t_strength", 0.5)
-chem_strength = get(params_dict, "chem_strength", 1.0)
+t_strength = round(get(params_dict, "t_strength", 0.5),digits=4)
+chem_strength = round(get(params_dict, "chem_strength", 1.0),digits=4)
 num_particles = Int(round(filling*alpha*num_sites,digits=0))
 
 naming_dict = Dict([("layers",layers),("alpha",alpha),("maxocc",max_occ),("chem",chem_strength),("t",t_strength)])
