@@ -1,10 +1,11 @@
 #!/bin/bash
 
-param=$1
-START_VALUE=$2
-STEP_SIZE=$3
-datafolder=$4
-additional_params=("${@:5}")
+script_name=$1
+param=$2
+START_VALUE=$3
+STEP_SIZE=$4
+datafolder=$5
+additional_params=("${@:6}")
 
 value=$(bc -l <<< "($SLURM_ARRAY_TASK_ID - 1) * $STEP_SIZE + $START_VALUE" )
 echo "$value"

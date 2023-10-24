@@ -44,6 +44,6 @@ mkdir -p "$datafolder"
 #value=$(( ( $SLURM_ARRAY_TASK_ID - 1 ) * $STEP_SIZE + $START_VALUE ))
 #echo "$value"
 
-srun intermediate-jsc.sh "$param" "$START_VALUE" "$STEP_SIZE" "$datafolder" "${additional_params[@]}"
+srun intermediate-jsc.sh "$script_name" "$param" "$START_VALUE" "$STEP_SIZE" "$datafolder" "${additional_params[@]}"
 
 wait
