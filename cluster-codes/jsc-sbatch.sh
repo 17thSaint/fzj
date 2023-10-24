@@ -1,7 +1,8 @@
 #!/bin/bash -x
 
+#SBATCH --tasks-per-node=1
 #SBATCH --time=00:15:00
-#SBATCH --cpus-per-task=1
+#SBATCH --cpus-per-task=4
 ##SBATCH --mem=1GB
 #SBATCH --account=netenesyquma
 
@@ -42,7 +43,7 @@ mkdir -p "$datafolder"
 value=$(( ( $SLURM_ARRAY_TASK_ID - 1 ) * $STEP_SIZE + $START_VALUE ))
 echo "$value"
 
-srun run-script-jsc.sh "$script_name" "open_cores" 4 "dataloc" "$datafolder" "$param" "$value" "${additional_params[@]}"
+srun intermediate-jsc.sh "$param" "$START_VALUE" "$STEP_SIZE" "$datafolder" "${additional_params[@]}"
 
 # Wait for all background jobs to finish
 wait
