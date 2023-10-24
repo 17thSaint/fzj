@@ -27,7 +27,7 @@ num_iters=$(echo "scale=2; ($END_VALUE - $START_VALUE) / $STEP_SIZE + 1" | bc)
 
 # Get the current date and time
 alpha=$(date +"%Y-%m-%d_%H-%M")
-datafolder="data-$alpha"
+datafolder="/p/project/netenesyquma/geraghty1/data/data-$alpha"
 
 # Create the folder
 mkdir -p "$datafolder"
