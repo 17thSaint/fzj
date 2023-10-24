@@ -1,8 +1,9 @@
 include("../review-practice-codes/ttn.jl")
-
+println("Added All files and packages")
 
 params_dict = make_args_dict(ARGS)
 #params_dict = Dict([("layers",4)])
+display(params_dict)
 
 layers = get(params_dict, "layers", 4)
 num_sites = 2^layers
@@ -33,6 +34,8 @@ alpha = get(params_dict, "alpha", 1/4)
 t_strength = round(get(params_dict, "t_strength", 0.5),digits=4)
 chem_strength = round(get(params_dict, "chem_strength", 1.0),digits=4)
 num_particles = Int(round(filling*alpha*num_sites,digits=0))
+
+println("Made All Variables")
 
 naming_dict = Dict([("layers",layers),("alpha",alpha),("maxocc",max_occ),("chem",chem_strength),("t",t_strength)])
 model_paras = (if_periodic = if_periodic, if_chem = if_chem, chem_strength = chem_strength, u_strength = u_strength, max_dim = mdim, num_sweeps = nsweeps, noise = noise, if_save_data = if_save_data, sweep_type = "dmrg", syms = syms, phi = alpha, ttn_net = net, seed_ttn = seed_ttn, if_gpu = if_gpu, layers = layers, t_strength = t_strength, filling = filling, location = dataloc)
