@@ -1,3 +1,4 @@
+println("Starting Now")
 include("../review-practice-codes/ttn.jl")
 println("Added All files and packages")
 
