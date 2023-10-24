@@ -4,7 +4,6 @@
 #SBATCH --time=01:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --account=netenesyquma
-#SBATCH --error=R-%j-here.err
 
 echo "Date:"
 date
