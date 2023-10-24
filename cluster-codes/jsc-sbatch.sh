@@ -25,7 +25,7 @@ script_name=$1
 param=$2
 START_VALUE=$3
 END_VALUE=$4
-STEP_SIZE=$(( ($END_VALUE - $START_VALUE) / ($SLURM_ARRAY_TASK_COUNT - 1.0) ))
+STEP_SIZE=$(( ( $END_VALUE - $START_VALUE ) / ( $SLURM_ARRAY_TASK_COUNT - 1.0 ) ))
 additional_params=("${@:5}")
 
 # Calculate the number of iterations
@@ -39,7 +39,7 @@ datafolder="/p/project/netenesyquma/geraghty1/data/data-$alpha"
 mkdir -p "$datafolder"
 
 
-value=$(( ($SLURM_ARRAY_TASK_ID - 1) * $STEP_SIZE + $START_VALUE ))
+value=$(( ( $SLURM_ARRAY_TASK_ID - 1 ) * $STEP_SIZE + $START_VALUE ))
 echo "$value"
 
 srun run-script-jsc.sh "$script_name" "open_cores" 4 "dataloc" "$datafolder" "$param" "$value" "${additional_params[@]}"
