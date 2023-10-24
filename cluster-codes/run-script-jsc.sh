@@ -19,6 +19,8 @@ done
 
 JOBNAME=${JOBNAME%-}
 
+echo "$JOBNAME"
+
 OUTPUTFILENAME="$datafolder/output-$JOBNAME.txt"
 
 # written by ChatGPT 15.06.2023
