@@ -6,40 +6,40 @@ params_dict = make_args_dict(ARGS)
 #params_dict = Dict([("layers",4)])
 display(params_dict)
 
-layers = get(params_dict, "layers", 4)
+layers = get(params_dict, "layers", 4)#Done
 num_sites = 2^layers
 filling = 1/2
-mdim = get(params_dict, "mdim", 100)
-nsweeps = get(params_dict, "nsweeps", 5)
-if_save_data = get(params_dict, "if_save_data", true)
-noise = get(params_dict, "noise", [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0.0])
-u_strength = get(params_dict, "u_strength", 1.0)
-syms = get(params_dict, "syms", false)
+mdim = get(params_dict, "mdim", 100)#Done
+nsweeps = get(params_dict, "nsweeps", 5)#Done
+if_save_data = get(params_dict, "if_save_data", true)#Done
+noise = get(params_dict, "noise", [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0.0])#Done
+u_strength = get(params_dict, "u_strength", 1.0)#Done
+syms = get(params_dict, "syms", false)#Done
 max_occ = get(params_dict, "max_occ", 1)
-if_gpu = get(params_dict, "if_gpu", false)
-seed_ttn = get(params_dict, "seed_ttn", nothing)
-net = TTNKit.BinaryRectangularNetwork(layers, TTNKit.ITensorNode, "Boson";conserve_qns=syms,dim=max_occ+1)
-dataloc = get(params_dict, "dataloc", "../cluster-data/chemical-potential")
-open_cores = get(params_dict, "open_cores", "all")
+if_gpu = get(params_dict, "if_gpu", false)#Done
+seed_ttn = get(params_dict, "seed_ttn", nothing)#Done
+net = TTNKit.BinaryRectangularNetwork(layers, TTNKit.ITensorNode, "Boson";conserve_qns=syms,dim=max_occ+1)#Done
+dataloc = get(params_dict, "dataloc", "../cluster-data/chemical-potential")#Done
+open_cores = get(params_dict, "open_cores", "all")#Done
 if typeof(open_cores) != String
 	BLAS.set_num_threads(open_cores)	
 end
 
-if_periodic = false
-if_chem = true
+if_periodic = false #Done
+if_chem = true#Done
 no_magF = false
 
 #t_strength = get(params_dict, :t_strength, 0.02)
 #chem_strength = get(params_dict, :chem_strength, 0.0)
-alpha = get(params_dict, "alpha", 1/4)
-t_strength = round(get(params_dict, "t_strength", 0.5),digits=4)
-chem_strength = round(get(params_dict, "chem_strength", 1.0),digits=4)
-num_particles = Int(round(filling*alpha*num_sites,digits=0))
+alpha = get(params_dict, "alpha", 1/4)#Done
+t_strength = round(get(params_dict, "t_strength", 0.5),digits=4)#Done
+chem_strength = round(get(params_dict, "chem_strength", 1.0),digits=4)#Done
+num_particles = Int(round(filling*alpha*num_sites,digits=0))#Done
 
 println("Made All Variables")
 
 naming_dict = Dict([("layers",layers),("alpha",alpha),("maxocc",max_occ),("chem",chem_strength),("t",t_strength)])
-model_paras = (if_periodic = if_periodic, if_chem = if_chem, chem_strength = chem_strength, u_strength = u_strength, max_dim = mdim, num_sweeps = nsweeps, noise = noise, if_save_data = if_save_data, sweep_type = "dmrg", syms = syms, phi = alpha, ttn_net = net, seed_ttn = seed_ttn, if_gpu = if_gpu, layers = layers, t_strength = t_strength, filling = filling, location = dataloc)
+model_paras = (if_periodic = if_periodic, if_chem = if_chem, chem_strength = chem_strength, u_strength = u_strength, max_dim = mdim, num_sweeps = nsweeps, noise = noise, if_save_data = if_save_data, sweep_type = "dmrg", syms = syms, phi = alpha, ttn_net = net, seed_ttn = seed_ttn, if_gpu = if_gpu, layers = layers, t_strength = t_strength, filling = filling, location = dataloc, particles = num_particles, open_cores = open_cores)
 metadata_dict = named_tuple_to_dict(model_paras)
 filename = "ttn-" * make_parameters_filename(naming_dict)
 display(filename)

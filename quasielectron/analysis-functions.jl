@@ -214,7 +214,7 @@ function fit_gaussian_raddens(particles,raddens,axisbins; kwargs...)
 	return fit_parameters
 end
 
-#=
+#
 dataloc = "/home/patrick/fzj/main-git/cluster-data/quasielectron"
 paradict = Dict([("m",3),("mc_steps",100000)])
 allfiles = find_data_file(paradict,"rfa","jld2",dataloc)
@@ -233,7 +233,7 @@ for (i,config) in enumerate(everyconfig)
 	parts = particles[i]
 	println(parts)
 	rm = sqrt(2*parts*3)
-	raddens = radial_density_full(config,rm; rend="max",points=axisbins,labelstring="$parts",if_plot=false)
+	raddens = radial_density_full(config,rm; rend="max",points=axisbins,labelstring="$parts",if_plot=true)
 	fitparams = fit_gaussian_raddens(parts,raddens,axisbins; if_plot=false)
 	if 5 < parts < 17
 		append!(allfits,[fitparams[1]])
@@ -292,7 +292,7 @@ end
 legend()
 xlabel("Particles")
 ylabel("Occupation")
-=#
+#
 #=
 distance_btw_rings = []
 local_particles = []
