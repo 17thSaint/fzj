@@ -2,7 +2,7 @@
 
 #SBATCH --tasks-per-node=1
 #SBATCH --time=01:00:00
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=1
 #SBATCH --account=netenesyquma
 
 echo "Date:"
