@@ -214,7 +214,7 @@ function fit_gaussian_raddens(particles,raddens,axisbins; kwargs...)
 	return fit_parameters
 end
 
-#
+#=
 dataloc = "/home/patrick/fzj/main-git/cluster-data/quasielectron"
 paradict = Dict([("m",3),("mc_steps",100000)])
 allfiles = find_data_file(paradict,"rfa","jld2",dataloc)
@@ -233,7 +233,7 @@ for (i,config) in enumerate(everyconfig)
 	parts = particles[i]
 	println(parts)
 	rm = sqrt(2*parts*3)
-	raddens = radial_density_full(config,rm; rend="max",points=axisbins,labelstring="$parts",if_plot=true)
+	raddens = radial_density_full(config,rm; rend="max",points=axisbins,labelstring="$parts",if_plot=false)
 	fitparams = fit_gaussian_raddens(parts,raddens,axisbins; if_plot=false)
 	if 5 < parts < 17
 		append!(allfits,[fitparams[1]])
@@ -249,17 +249,20 @@ for (i,config) in enumerate(everyconfig)
 		append!(plotting_particles,[parts])
 	end
 end
-#
+#=
 fig = figure()
 scatter(plotting_particles,[allfits[i][1] for i in 1:length(plotting_particles)])
 xlabel("Particles")
 ylabel("Width of Ring / rm")
-
+=#
+=#
 fig = figure()
-scatter(plotting_particles,[allfits[i][2] for i in 1:length(plotting_particles)])
+scatter(plotting_particles,[allfits[i][2] for i in 1:length(plotting_particles)],label="Reverse")
 xlabel("Particles")
 ylabel("Location of Ring / rm")
+
 #
+#=
 
 alloccs = []
 for (i,parts) in enumerate(particles)
@@ -292,7 +295,7 @@ end
 legend()
 xlabel("Particles")
 ylabel("Occupation")
-#
+=#
 #=
 distance_btw_rings = []
 local_particles = []
@@ -313,8 +316,13 @@ scatter(local_particles,distance_btw_rings)
 
 
 
-
-
+# Location of edges for Laughlin
+# for particles = [i for i in 5:20]
+partsss1 = [i for i in 5:20]
+edges1 = [1.495859155858919, 1.435630612727625, 1.37945930696872, 1.3654778777900691, 1.3864465233636276, 1.3130718120943006, 1.3447262795261632, 1.3038602437553868, 1.3199477842162546, 1.283222341188332, 1.2888736012325286, 1.2742575476804927, 1.2755683525810448, 1.2522972698797814, 1.2562847066293055, 1.2856352734705268]
+plot(partsss1,edges1,"-p",c="r",label="Laughlin")
+legend()
+#
 
 
 

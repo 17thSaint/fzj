@@ -36,7 +36,7 @@ function log_laughlin_wavefunction(z, m)
     
     log_exponent = -0.25 * sum(abs2.(z))
     
-    return log_norm_factor + log_exponent
+    return log_norm_factor + log_exponent,[]
 end
 
 

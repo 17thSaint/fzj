@@ -142,9 +142,11 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 				else
 					attempts += 1
 				end
-				if attempts > 50
-					println("Too many attempts to move during Thermalization")
-					return nothing
+				if wavefunc_type == "R"
+					if attempts > 50
+						println("Too many attempts to move during Thermalization")
+						return nothing
+					end
 				end
 			end
 			#=
@@ -181,15 +183,19 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 				if movement[3] == 1
 					running_config = movement[2]
 					wavefunc = real(movement[4])
-					append!(all_times[1],[movement[5][1]])
-					append!(all_times[2],[movement[5][2]])
+					if wavefunc_type == "R"
+						append!(all_times[1],[movement[5][1]])
+						append!(all_times[2],[movement[5][2]])
+					end
 					rejected = false
 				else
 					attempts += 1
 				end
-				if attempts > 20
-					println("Too many attempts to move")
-					return nothing
+				if wavefunc_type == "R"
+					if attempts > 50
+						println("Too many attempts to move")
+						return nothing
+					end
 				end
 			end
 			
@@ -208,7 +214,7 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 						
 		end
 		
-		acc_rate = 1-(rej_count/num_parts)
+		acc_rate = num_parts/(num_parts+rej_count)
 		
 		if i%samp_freq == 0
 			time_config[:,index] = [Complex(running_config[x]) for x in 1:num_parts]
@@ -227,11 +233,13 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 	total_time = (time_end - time_start)
 	#acc_rate = acc_count/(num_parts*steps)
 	
-	const_mean  = round(mean(all_times[1]),digits=4)
-	const_std  = round(std(all_times[1]),digits=4)
-	deriv_mean  = round(mean(all_times[2]),digits=4)
-	deriv_std  = round(std(all_times[2]),digits=4)
-	println("Times: Const = $const_mean +- $const_std, Deriv = $deriv_mean +- $deriv_std")
+	if wavefunc_type == "R"
+		const_mean  = round(mean(all_times[1]),digits=4)
+		const_std  = round(std(all_times[1]),digits=4)
+		deriv_mean  = round(mean(all_times[2]),digits=4)
+		deriv_std  = round(std(all_times[2]),digits=4)
+		println("Times: Const = $const_mean +- $const_std, Deriv = $deriv_mean +- $deriv_std")
+	end
 	
 	if if_save_data
 		location = get(kwargs, :location, "../cluster-data/quasielectron")
@@ -249,29 +257,30 @@ end
 
 
 
-#
+#=
 axisbins = 300
 m = 3
-mc_steps = 100000
+mc_steps = 10000
 output = 1
 sampfreq = 1
 everyconfig = []
 gauss(x,p) = (1/(p[1]*sqrt(2*pi))) .* exp.(-0.5 .* (((x .- p[2]) ./ p[1]).^2)) .+ p[3]
 allfits_dens = []
 allfits_dists = []
-for particles in [i for i in 20:20]
+num_parts = [i for i in 10:30]
+for particles in num_parts
 #particles = 4
 rm = sqrt(2*particles*m)
 step_size = 0.5*rm#0.125*rm
-ver = "R"
+ver = "P"
 
-model_paras = (vers = ver, step_size = step_size, m = m, opl = output, samp_freq = sampfreq, if_save_data = true)
+model_paras = (vers = ver, step_size = step_size, m = m, opl = output, samp_freq = sampfreq, if_save_data = false)
 allconfigs,allpsis,runtime = mc(particles,m,mc_steps; model_paras...)
 append!(everyconfig,[allconfigs])
 
 #allconfigs = everyconfig[particles-12]
 #raddenss = radial_density_full(allconfigs,rm; points=axisbins,labelstring="$particles", rend="max")
-get_occupancy(allconfigs,rm; title_string="N = $particles")
+#get_occupancy(allconfigs,rm; title_string="N = $particles")
 #=raddists = rad_dist(allconfigs,rm; axis_bins=axisbins,labelstring="$particles")
 
 if particles > 5
@@ -324,16 +333,42 @@ end
 #raddata = rad_dist(allconfigs,rm; axis_bins=100, labelstring = "$particles")
 end
 #println("Runtime = ",runtime)
+=#
+#=fig = figure()
+edges = [0.0 for i in 1:length(num_parts)]
+for i in 1:length(num_parts)
+	parts = num_parts[i]
+	rm = sqrt(2*parts*3)
+	
+	con = everyconfig[i]
+	#get_occupancy(con,rm,60; title_string="N = $parts")
+	
+	xs,rads = radial_density_full(con,rm; rend="max", labelstring="$parts", if_plot=false)
+	edge_loc = xs[end]#xs[findfirst(j -> rads[j] == maximum(rads),[k for k in 1:length(rads)])]
+	edges[i] = edge_loc
+end
 #
+fig = figure()
+plot(num_parts,edges,"-p")
+xlabel("Particle Number")
+ylabel("Radius of Edge / rm")
+title("Laughlin Wavefunction")
+=#
 
+#= Location of edges for Laughlin
+# for particles = [i for i in 5:20]
+partsss1 = [i for i in 5:20]
+edges1 = [1.495859155858919, 1.435630612727625, 1.37945930696872, 1.3654778777900691, 1.3864465233636276, 1.3130718120943006, 1.3447262795261632, 1.3038602437553868, 1.3199477842162546, 1.283222341188332, 1.2888736012325286, 1.2742575476804927, 1.2755683525810448, 1.2522972698797814, 1.2562847066293055, 1.2856352734705268]
+# for particles = [i for i in 10:30] with 10000 mc_steps
+partsss2 = [i for i in 10:30]
+edges_2 = [1.268621992836878, 1.323711571746685, 1.2754580172717975, 1.3377087481957572, 1.2428266925375056, 1.2268445567658224, 1.2688307138262522, 1.2453171121437712, 1.2292019961086964, 1.2603686230278608, 1.2667532728302995, 1.2025124522874775, 1.2418971614954482, 1.2010335988960956, 1.1871327744952063, 1.195154274324511, 1.2066232617157169, 1.1958074532675584, 1.2174605053706915, 1.1921377687610828, 1.21118076453031]
 
-
-
-
-
-
-
-
+plot(partsss2[11:end],edges_2[11:end],"-p",c="b")
+plot(partsss1,edges1,"-p",c="b")
+xlabel("Particle Number")
+ylabel("Radius of Edge / rm")
+title("Laughlin Wavefunction")
+=#
 
 
 
