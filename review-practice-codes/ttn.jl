@@ -726,6 +726,8 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	if_gpu = get(kwargs, :if_gpu, false)
 	if_fermion = get(kwargs, :if_fermion, false)
 	particle_type = if_fermion ? "Fermion" : "Boson"
+	
+	start_time = time()
 
 	if isnothing(net)
 		net = TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, particle_type;conserve_qns=conserve_qns,dim=max_occ+1)
@@ -785,21 +787,28 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 				ttn,ham,sp = warmed_results
 			end
 		end
+		
+		end_time = time()
+		
 		if if_save_data
 			try
 			location = get(kwargs, :location, pwd())
 			filename = get(kwargs, :name, "ttn")
-			metadata = get(kwargs, :metadata, nothing)
+			metadata = get(kwargs, :metadata, Dict())
+			metadata["runtime"] = end_time-start_time
 			ttn_data_dict = if_gpu ? Dict([("ttn",back2cpu(sp.ttn))]) : Dict([("ttn",sp.ttn)])
 			write_data_jld2(filename,ttn_data_dict,location,metadata)
 			catch
 				println("Saving Didn't work")
 			end
 		end
-		return ttn, ham, sp#, throwout_therm_time(times)
-	end
 
-	return ttn,ham,"no sweep"
+		
+		return ttn, ham, sp, end_time-start_time
+	end
+	
+	end_time = time()
+	return ttn,ham,"no sweep",end_time-start_time
 end
 
 function plot_grid(virt_edge_length,phys_edge_length)

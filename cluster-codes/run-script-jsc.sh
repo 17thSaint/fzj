@@ -1,11 +1,11 @@
 #!/bin/bash
 
 SCRIPTNAME="$1"
-datafolder="$5"
+datafolder="$3"
 
 declare -A dictionary
 
-for ((i=6; i<=$#; i+=2)); do
+for ((i=4; i<=$#; i+=2)); do
     key="${!i}"
     eval "value=\${$((i+1))}"
     dictionary["$key"]="$value"
