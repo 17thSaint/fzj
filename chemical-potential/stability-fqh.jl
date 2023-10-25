@@ -20,7 +20,7 @@ if_gpu = get(params_dict, "if_gpu", false)#Done
 seed_ttn = get(params_dict, "seed_ttn", nothing)#Done
 net = TTNKit.BinaryRectangularNetwork(layers, TTNKit.ITensorNode, "Boson";conserve_qns=syms,dim=max_occ+1)#Done
 dataloc = get(params_dict, "dataloc", "../cluster-data/chemical-potential")#Done
-open_cores = get(params_dict, "open_cores", "all")#Done
+open_cores = get(params_dict, "open_cores", 1)#Done
 if typeof(open_cores) != String
 	BLAS.set_num_threads(Int(open_cores))
 end
@@ -39,6 +39,9 @@ num_particles = Int(round(filling*alpha*num_sites,digits=0))#Done
 println("Made All Variables")
 
 naming_dict = merge(Dict([("layers",layers),("alpha",alpha),("maxocc",max_occ),("chem",chem_strength),("t",t_strength)]),params_dict)
+if "dataloc" in collect(keys(naming_dict))
+	delete!(naming_dict,"dataloc")
+end
 model_paras = (if_periodic = if_periodic, if_chem = if_chem, chem_strength = chem_strength, u_strength = u_strength, max_dim = mdim, num_sweeps = nsweeps, noise = noise, if_save_data = if_save_data, sweep_type = "dmrg", syms = syms, phi = alpha, ttn_net = net, seed_ttn = seed_ttn, if_gpu = if_gpu, layers = layers, t_strength = t_strength, filling = filling, location = dataloc, particles = num_particles, open_cores = open_cores)
 metadata_dict = named_tuple_to_dict(model_paras)
 filename = "ttn-" * make_parameters_filename(naming_dict)
