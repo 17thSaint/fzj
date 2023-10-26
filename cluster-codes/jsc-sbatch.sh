@@ -1,9 +1,9 @@
 #!/bin/bash -x
 
 #SBATCH --tasks-per-node=1
-#SBATCH --time=01:00:00
+#SBATCH --time=20:00:00
 #SBATCH --cpus-per-task=1
-#SBATCH --account=netenesyquma
+#SBATCH --account=pgi-8
 
 echo "Date:"
 date
@@ -33,11 +33,11 @@ additional_params=("${@:5}")
 #num_iters=$(echo "scale=2; ($END_VALUE - $START_VALUE) / $STEP_SIZE + 1" | bc)
 
 # Get the current date and time
-alpha=$(date +"%Y-%m-%d_%H-%M")
-datafolder="/p/project/netenesyquma/geraghty1/data/data-$alpha"
+#alpha=$(date +"%Y-%m-%d_%H-%M")
+datafolder="/p/project/pgi-8/geraghty1/data/data-zoomed-chemstrength"
 
 # Create the folder
-mkdir -p "$datafolder"
+#mkdir -p "$datafolder"
 
 
 #value=$(( ( $SLURM_ARRAY_TASK_ID - 1 ) * $STEP_SIZE + $START_VALUE ))
