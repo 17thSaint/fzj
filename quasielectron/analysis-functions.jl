@@ -1,4 +1,4 @@
-using NumericalIntegration,LsqFit
+using NumericalIntegration,LsqFit,PyPlot
 include("../other-funcs/data-storage-funcs.jl")
 
 function plot_circle(radius,center)
@@ -131,7 +131,7 @@ function radial_density_full(pos_data,rm; kwargs...)
 	
 	normalization = integrate(allxs ./ rm, raddens)
 	if if_plot
-		#fig = figure()
+		fig = figure()
 		plot(allxs ./ rm,raddens ./ normalization,label=label_string)
 		title(title_string)
 		xlabel("X Value / rm")
@@ -233,7 +233,9 @@ for (i,config) in enumerate(everyconfig)
 	parts = particles[i]
 	println(parts)
 	rm = sqrt(2*parts*3)
+	#get_occupancy(config,rm; points=axisbins,title_string="N = $parts")
 	raddens = radial_density_full(config,rm; rend="max",points=axisbins,labelstring="$parts",if_plot=false)
+	#
 	fitparams = fit_gaussian_raddens(parts,raddens,axisbins; if_plot=false)
 	if 5 < parts < 17
 		append!(allfits,[fitparams[1]])
@@ -248,6 +250,7 @@ for (i,config) in enumerate(everyconfig)
 		append!(allfits,[fitparams])
 		append!(plotting_particles,[parts])
 	end
+	#
 end
 #=
 fig = figure()
@@ -255,13 +258,13 @@ scatter(plotting_particles,[allfits[i][1] for i in 1:length(plotting_particles)]
 xlabel("Particles")
 ylabel("Width of Ring / rm")
 =#
-=#
+#
 fig = figure()
 scatter(plotting_particles,[allfits[i][2] for i in 1:length(plotting_particles)],label="Reverse")
 xlabel("Particles")
 ylabel("Location of Ring / rm")
+=#
 
-#
 #=
 
 alloccs = []
@@ -317,12 +320,16 @@ scatter(local_particles,distance_btw_rings)
 
 
 # Location of edges for Laughlin
-# for particles = [i for i in 5:20]
-partsss1 = [i for i in 5:20]
-edges1 = [1.495859155858919, 1.435630612727625, 1.37945930696872, 1.3654778777900691, 1.3864465233636276, 1.3130718120943006, 1.3447262795261632, 1.3038602437553868, 1.3199477842162546, 1.283222341188332, 1.2888736012325286, 1.2742575476804927, 1.2755683525810448, 1.2522972698797814, 1.2562847066293055, 1.2856352734705268]
-plot(partsss1,edges1,"-p",c="r",label="Laughlin")
+#=partsss = [i for i in 5:30]
+edges = [0.686007068731582, 0.7526144437351984, 0.7325654184434776, 0.7416893053012075, 0.7509802474404931, 0.7472506221284726, 0.7733763808284947, 0.7831085483799342, 0.8078296756174796, 0.7825334529355564, 0.799055760880487, 0.8025235335176291, 0.8315009730608518, 0.8031209327915373, 0.8308061727475506, 0.8181201376432033, 0.85149171199076, 0.8327787217982823, 0.8378196375522812, 0.8482237544988176, 0.8323290375268354, 0.8477416349471587, 0.8489149479914027, 0.8437840871136896, 0.8522205951470362, 0.8431593803625228]
+plot(partsss,edges,"-p",c="r",label="Laughlin")=#
+
+#= for particles = [i for i in 4:20]
+partsss1 = [i for i in 4:20]
+rmax_edges = [1.55835484,1.495859155858919, 1.435630612727625, 1.37945930696872, 1.3654778777900691, 1.3864465233636276, 1.3130718120943006, 1.3447262795261632, 1.3038602437553868, 1.3199477842162546, 1.283222341188332, 1.2888736012325286, 1.2742575476804927, 1.2755683525810448, 1.2522972698797814, 1.2562847066293055, 1.2856352734705268]
+plot(partsss1,rmax_edges,"-p",c="r",label="Laughlin (max radius)")
 legend()
-#
+=#
 
 
 

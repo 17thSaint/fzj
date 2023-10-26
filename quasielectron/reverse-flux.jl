@@ -128,6 +128,33 @@ function test_3parts(z,m=3)
 	return result
 end
 
+function test_3parts_jainkamila(z,m=3)
+	num_parts = length(z)
+	p = Int((m+1)/2)
+	
+	fulljs = im .* zeros(num_parts,num_parts)
+	fulljs[1,1] = dist_btw(z,1,2,2*p)*dist_btw(z,1,3,2*p)
+	fulljs[1,2] = dist_btw(z,2,1,2*p)*dist_btw(z,2,3,2*p)
+	fulljs[1,3] = dist_btw(z,3,1,2*p)*dist_btw(z,3,2,2*p)
+	
+	fulljs[2,1] = 2*p*(dist_btw(z,1,2,2*p-1)*dist_btw(z,1,3,2*p) + dist_btw(z,1,2,2*p)*dist_btw(z,1,3,2*p-1))
+	fulljs[2,2] = 2*p*(dist_btw(z,2,1,2*p-1)*dist_btw(z,2,3,2*p) + dist_btw(z,2,1,2*p)*dist_btw(z,2,3,2*p-1))
+	fulljs[2,3] = 2*p*(dist_btw(z,3,1,2*p-1)*dist_btw(z,3,2,2*p) + dist_btw(z,3,1,2*p)*dist_btw(z,3,2,2*p-1))
+	
+
+	fulljs[3,1] = 2*p*(2*p-1)*dist_btw(z,1,2,2*p-2)*dist_btw(z,1,3,2*p) + 2*p*2*p*dist_btw(z,1,2,2*p-1)*dist_btw(z,1,3,2*p-1) + 2*p*(2*p-1)*dist_btw(z,1,3,2*p-2)*dist_btw(z,1,2,2*p) + 2*p*2*p*dist_btw(z,1,3,2*p-1)*dist_btw(z,1,2,2*p-1)
+	fulljs[3,2] = 2*p*(2*p-1)*dist_btw(z,2,1,2*p-2)*dist_btw(z,2,3,2*p) + 2*p*(2*p-1)*dist_btw(z,2,1,2*p)*dist_btw(z,2,3,2*p-2) + 2*2*p*2*p*dist_btw(z,2,1,2*p-1)*dist_btw(z,2,3,2*p-1)
+	fulljs[3,3] = 2*p*(2*p-1)*dist_btw(z,3,1,2*p-2)*dist_btw(z,3,2,2*p) + 2*p*(2*p-1)*dist_btw(z,3,1,2*p)*dist_btw(z,3,2,2*p-2) + 2*2*p*2*p*dist_btw(z,3,1,2*p-1)*dist_btw(z,3,2,2*p-1)
+	
+	matver = im .* zeros(num_parts,num_parts)
+
+	matver[1,:] = (fulljs[1,:]) .^ 2
+	matver[2,:] = 4 .* (fulljs[1,:] .* fulljs[2,:])
+	matver[3,:] = 8 .* ((fulljs[2,:] .^ 2) .+ (fulljs[1,:] .* fulljs[3,:]))
+
+	return log(Complex(det(matver))) - 0.25*sum(abs2.(z))
+end
+
 function test_4parts(z,m=3)
 	num_parts = length(z)
 	p = Int((m+1)/2)
@@ -155,14 +182,43 @@ end
 
 #=
 include("fqh-thesis/cf-wavefunc.jl")
-particles = 10
-#allowed_sets_matrix = get_full_acc_matrix(particles)
-#full_pasc_tri = [get_pascals_triangle(i)[2] for i in 1:particles]
-#full_derivs = get_deriv_orders_matrix(particles)
+particles = 3
+allowed_sets_matrix = get_full_acc_matrix(particles)
+full_pasc_tri = [get_pascals_triangle(i)[2] for i in 1:particles]
+full_derivs = get_deriv_orders_matrix(particles)
+start_con = start_rand_config(particles,3)
 
+rm = sqrt(2*particles*3)
+data_count = 50
+xs = [-3*rm + i*(2*3*rm)/data_count for i in 1:data_count]
+oldrfs = zeros(data_count,data_count)
+exactrfs = zeros(data_count,data_count)
+for i in 1:data_count
+	new_x = xs[i]
+	for j in 1:data_count
+		println(i,", ",j)
+		new_y = xs[j]
+		start_con[1] = new_x - im*new_y
+		old_rf = get_rf_wavefunc(start_con,allowed_sets_matrix,full_pasc_tri,full_derivs,[0,[0]],true)
+		exactrf = test_3parts_jainkamila(start_con)
+		exactrfs[j,i] = real(exactrf)
+		oldrfs[j,i] = real(old_rf)
+	end
+end
+=#
+fig = figure()
+imshow(exactrfs .- 78) #.- oldrfs)
+colorbar()
+title("Exact")
+#
+fig = figure()
+imshow(oldrfs)
+colorbar()
+title("Old")
+#
 
-m = 3
-#for particles in [3,4]
+#=m = 3
+for particles in [3,4]
 	con = start_rand_config(particles,m)
 	
 	rm = sqrt(2*particles*m)

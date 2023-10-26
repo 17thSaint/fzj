@@ -3,6 +3,8 @@ include("analysis-functions.jl")
 include("laughlin-wavefunc.jl")
 include("../other-funcs/data-storage-funcs.jl")
 
+include("fqh-thesis/cf-wavefunc.jl")
+
 function start_rand_config(num_parts::Int, m::Int)
     # Calculate the filling fraction
     filling = 1 / m
@@ -52,12 +54,28 @@ function acc_rej_move(initial_config::Array,chosen_particle::Int; kwargs...)
 	#approx_start_config = particles_within_radius(initial_config, initial_config[chosen_particle], approx_radius)
 	#approx_new_config = particles_within_radius(initial_config + shift_matrix, initial_config[chosen_particle], approx_radius)
 	
-	if isnothing(start_wavefunc)
-		start_wavefunc,timesignore = wave_function(initial_config,m)
+	if isnothing(start_wavefunc)	
+		if wavefunc_type == "old-rf"
+			times = [0,0]
+			acc_sets_matrix = get(kwargs, :accmat, nothing)
+			all_pascal = get(kwargs, :pascal, nothing)
+			all_deriv_orders = get(kwargs, :derivs, nothing)
+			new_wavefunc = get_rf_wavefunc(initial_config,acc_sets_matrix,all_pascal,all_deriv_orders,[0,[0]],true)
+		else
+			start_wavefunc,timesignore = wave_function(initial_config,m)
+		end
 		println("Making own wavefunc")
 	end
 	
-	new_wavefunc,times = wave_function(initial_config+shift_matrix,m)
+	if wavefunc_type == "old-rf"
+		times = [0,0]
+		acc_sets_matrix = get(kwargs, :accmat, nothing)
+		all_pascal = get(kwargs, :pascal, nothing)
+		all_deriv_orders = get(kwargs, :derivs, nothing)
+		new_wavefunc = get_rf_wavefunc(initial_config+shift_matrix,acc_sets_matrix,all_pascal,all_deriv_orders,[0,[0]],true)
+	else
+		new_wavefunc,times = wave_function(initial_config+shift_matrix,m)
+	end
 	
 	check = 0.0
 	check_infinity = true
@@ -100,6 +118,7 @@ function acc_rej_move(initial_config::Array,chosen_particle::Int; kwargs...)
 		return true, initial_config+shift_matrix, 1, new_wavefunc, times
 	else
 		#println("Reject: ",new_ham,", ",start_ham,", ",rand_num)
+		#println("Reject: ",check,", ",rand_num)
 		return true, initial_config, 0, start_wavefunc, times
 	end
 end
@@ -118,9 +137,17 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 	starting_check = true
 	wavefunc = 0.0*im
 	
+	#
 	while starting_check
 		start_count += 1
-		wavefunc = wave_function(running_config, m)[1]
+		if wavefunc_type == "old-rf"
+			acc_sets_matrix = get(kwargs, :accmat, nothing)
+			all_pascal = get(kwargs, :pascal, nothing)
+			all_deriv_orders = get(kwargs, :derivs, nothing)
+			wavefunc = get_rf_wavefunc(running_config,acc_sets_matrix,all_pascal,all_deriv_orders,[0,[0]],true)
+		else
+			wavefunc = wave_function(running_config,m)[1]
+		end
 		if isinf(real(wavefunc))
 			running_config = start_rand_config(num_parts,m)
 		else
@@ -244,7 +271,7 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 	if if_save_data
 		location = get(kwargs, :location, "../cluster-data/quasielectron")
 		params_dict = Dict([("mc_steps",steps),("m",m),("particles",num_parts)])
-		filename = get(kwargs, :name, "rfa-" * make_parameters_filename(params_dict))
+		filename = get(kwargs, :name, "laugh-" * make_parameters_filename(params_dict))
 		metadata_dict = merge(named_tuple_to_dict(kwargs),params_dict)
 		metadata = get(kwargs, :metadata, metadata_dict)
 		config_data_dict = Dict([("configs",time_config),("wavefuncs",time_wavefunc)])
@@ -256,31 +283,42 @@ end
 
 
 
-
 #=
 axisbins = 300
 m = 3
-mc_steps = 10000
+mc_steps = 100000
 output = 1
 sampfreq = 1
 everyconfig = []
 gauss(x,p) = (1/(p[1]*sqrt(2*pi))) .* exp.(-0.5 .* (((x .- p[2]) ./ p[1]).^2)) .+ p[3]
 allfits_dens = []
 allfits_dists = []
-num_parts = [i for i in 10:30]
+num_parts = [i for i in 5:20]
+edges = []
 for particles in num_parts
 #particles = 4
 rm = sqrt(2*particles*m)
-step_size = 0.5*rm#0.125*rm
+step_size = 0.125*rm
 ver = "P"
 
+oldRF_paras = ()
+#=
+allowed_sets_matrix = get_full_acc_matrix(particles)
+full_pasc_tri = [get_pascals_triangle(i)[2] for i in 1:particles]
+full_derivs = get_deriv_orders_matrix(particles)
+oldRF_paras = (accmat = allowed_sets_matrix, pascal = full_pasc_tri, derivs = full_derivs)
+=#
+
 model_paras = (vers = ver, step_size = step_size, m = m, opl = output, samp_freq = sampfreq, if_save_data = false)
-allconfigs,allpsis,runtime = mc(particles,m,mc_steps; model_paras...)
+allconfigs,allpsis,runtime = mc(particles,m,mc_steps; model_paras...,oldRF_paras...)
 append!(everyconfig,[allconfigs])
 
 #allconfigs = everyconfig[particles-12]
-#raddenss = radial_density_full(allconfigs,rm; points=axisbins,labelstring="$particles", rend="max")
+raddenss = radial_density_full(allconfigs,rm; points=axisbins,labelstring="$particles", rend="max",if_plot=false)
 #get_occupancy(allconfigs,rm; title_string="N = $particles")
+edge_loc = raddenss[1][findfirst(i -> raddenss[2][i] == maximum(raddenss[2]),1:axisbins)]
+append!(edges,[edge_loc])
+plot([i for i in 5:particles],edges,"-p",c="b")
 #=raddists = rad_dist(allconfigs,rm; axis_bins=axisbins,labelstring="$particles")
 
 if particles > 5
@@ -332,8 +370,9 @@ end
 #end
 #raddata = rad_dist(allconfigs,rm; axis_bins=100, labelstring = "$particles")
 end
-#println("Runtime = ",runtime)
 =#
+#println("Runtime = ",runtime)
+#
 #=fig = figure()
 edges = [0.0 for i in 1:length(num_parts)]
 for i in 1:length(num_parts)
