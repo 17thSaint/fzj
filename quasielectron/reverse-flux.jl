@@ -1,4 +1,4 @@
-using SpecialMatrices,LinearAlgebra
+using SpecialMatrices,LinearAlgebra,LsqFit
 
 function start_rand_config(num_parts::Int, m::Int)
     # Calculate the filling fraction
@@ -104,7 +104,7 @@ function dist_btw(z,i,j,pow)
 	return (z[i] - z[j])^pow
 end
 
-function test_3parts(z,m=3)
+function test_3parts_girvinjach(z,m=3)
 	num_parts = length(z)
 	p = Int((m+1)/2)
 	
@@ -133,29 +133,28 @@ function test_3parts_jainkamila(z,m=3)
 	p = Int((m+1)/2)
 	
 	fulljs = im .* zeros(num_parts,num_parts)
-	fulljs[1,1] = dist_btw(z,1,2,2*p)*dist_btw(z,1,3,2*p)
-	fulljs[1,2] = dist_btw(z,2,1,2*p)*dist_btw(z,2,3,2*p)
-	fulljs[1,3] = dist_btw(z,3,1,2*p)*dist_btw(z,3,2,2*p)
+	fulljs[1,1] = dist_btw(z,1,2,1)*dist_btw(z,1,3,1)
+	fulljs[1,2] = dist_btw(z,2,1,1)*dist_btw(z,2,3,1)
+	fulljs[1,3] = dist_btw(z,3,1,1)*dist_btw(z,3,2,1)
 	
-	fulljs[2,1] = 2*p*(dist_btw(z,1,2,2*p-1)*dist_btw(z,1,3,2*p) + dist_btw(z,1,2,2*p)*dist_btw(z,1,3,2*p-1))
-	fulljs[2,2] = 2*p*(dist_btw(z,2,1,2*p-1)*dist_btw(z,2,3,2*p) + dist_btw(z,2,1,2*p)*dist_btw(z,2,3,2*p-1))
-	fulljs[2,3] = 2*p*(dist_btw(z,3,1,2*p-1)*dist_btw(z,3,2,2*p) + dist_btw(z,3,1,2*p)*dist_btw(z,3,2,2*p-1))
+	fulljs[2,1] = 1*(dist_btw(z,1,2,1-1)*dist_btw(z,1,3,1) + dist_btw(z,1,2,1)*dist_btw(z,1,3,1-1))
+	fulljs[2,2] = 1*(dist_btw(z,2,1,1-1)*dist_btw(z,2,3,1) + dist_btw(z,2,1,1)*dist_btw(z,2,3,1-1))
+	fulljs[2,3] = 1*(dist_btw(z,3,1,1-1)*dist_btw(z,3,2,1) + dist_btw(z,3,1,1)*dist_btw(z,3,2,1-1))
 	
 
-	fulljs[3,1] = 2*p*(2*p-1)*dist_btw(z,1,2,2*p-2)*dist_btw(z,1,3,2*p) + 2*p*2*p*dist_btw(z,1,2,2*p-1)*dist_btw(z,1,3,2*p-1) + 2*p*(2*p-1)*dist_btw(z,1,3,2*p-2)*dist_btw(z,1,2,2*p) + 2*p*2*p*dist_btw(z,1,3,2*p-1)*dist_btw(z,1,2,2*p-1)
-	fulljs[3,2] = 2*p*(2*p-1)*dist_btw(z,2,1,2*p-2)*dist_btw(z,2,3,2*p) + 2*p*(2*p-1)*dist_btw(z,2,1,2*p)*dist_btw(z,2,3,2*p-2) + 2*2*p*2*p*dist_btw(z,2,1,2*p-1)*dist_btw(z,2,3,2*p-1)
-	fulljs[3,3] = 2*p*(2*p-1)*dist_btw(z,3,1,2*p-2)*dist_btw(z,3,2,2*p) + 2*p*(2*p-1)*dist_btw(z,3,1,2*p)*dist_btw(z,3,2,2*p-2) + 2*2*p*2*p*dist_btw(z,3,1,2*p-1)*dist_btw(z,3,2,2*p-1)
+	fulljs[3,:] = [1,1,1]
 	
 	matver = im .* zeros(num_parts,num_parts)
 
-	matver[1,:] = (fulljs[1,:]) .^ 2
-	matver[2,:] = 4 .* (fulljs[1,:] .* fulljs[2,:])
-	matver[3,:] = 8 .* ((fulljs[2,:] .^ 2) .+ (fulljs[1,:] .* fulljs[3,:]))
+	matver[1,:] = (fulljs[1,:]) .^ p
+	matver[2,:] = (2*p) .* (fulljs[1,:] .* fulljs[2,:])
+	matver[3,:] = (4*p) .* (((fulljs[2,:] .^ 2) ./ 1) .+ (fulljs[1,:] .* fulljs[3,:]))
 
 	return log(Complex(det(matver))) - 0.25*sum(abs2.(z))
 end
 
-function test_4parts(z,m=3)
+
+function test_4parts_girvinjach(z,m=3)
 	num_parts = length(z)
 	p = Int((m+1)/2)
 	
@@ -180,43 +179,78 @@ function test_4parts(z,m=3)
 	return result
 end
 
-#=
-include("fqh-thesis/cf-wavefunc.jl")
-particles = 3
-allowed_sets_matrix = get_full_acc_matrix(particles)
-full_pasc_tri = [get_pascals_triangle(i)[2] for i in 1:particles]
-full_derivs = get_deriv_orders_matrix(particles)
-start_con = start_rand_config(particles,3)
+function linfit_matrix(mat1,mat2; kwargs...)
+	direction = get(kwargs, :direction, "col")
+	if_plot = get(kwargs, :if_plot, false)
+	title_string = get(kwargs, :title_string, "")
+	
+	linfit_func(x,p) = p[1] .* x .+ p[2]
+	direction == "col" ? xs = [mat1[i,:] for i in 1:size(mat1)[1]] : xs = [mat1[:,i] for i in 1:size(mat1)[1]]
+	direction == "col" ? ys = [mat2[i,:] for i in 1:size(mat2)[1]] : ys = [mat2[:,i] for i in 1:size(mat2)[1]]
+	fitparams = [[] for i in 1:size(mat1)[1]]
+	fitparams_error = [[] for i in 1:size(mat1)[1]]
+	for i in 1:size(mat1)[1]
+		localfit = curve_fit(linfit_func,xs[i],ys[i],[0.5,0.5])
+		fitparams[i] = localfit.param
+		fitparams_error[i] = stderror(localfit)
+	end
+	
+	if if_plot
+		multip = [fitparams[i][1] for i in 1:size(mat1)[1]]
+		multip_error = [fitparams_error[i][1] for i in 1:size(mat1)[1]]
+		fig = figure()
+		errorbar([i for i in 1:size(mat1)[1]],multip,yerr=[multip_error,multip_error])
+		title("Multiplicative Part, $title_string")
+		
+		constant = [fitparams[i][2] for i in 1:size(mat1)[1]]
+		constant_error = [fitparams_error[i][2] for i in 1:size(mat1)[1]]
+		fig = figure()
+		errorbar([i for i in 1:size(mat1)[1]],constant,yerr=[constant_error,constant_error])
+		title("Constant Part, $title_string")
+	end
+	
+	return fitparams,fitparams_error
+end
 
+#=
+particles = 3
+start_con = start_rand_config(particles,3)
 rm = sqrt(2*particles*3)
+#
+
+
+#
+using PyPlot
 data_count = 50
 xs = [-3*rm + i*(2*3*rm)/data_count for i in 1:data_count]
-oldrfs = zeros(data_count,data_count)
-exactrfs = zeros(data_count,data_count)
+jkrfs = zeros(data_count,data_count)
+exacts = zeros(data_count,data_count)
 for i in 1:data_count
 	new_x = xs[i]
 	for j in 1:data_count
 		println(i,", ",j)
 		new_y = xs[j]
 		start_con[1] = new_x - im*new_y
-		old_rf = get_rf_wavefunc(start_con,allowed_sets_matrix,full_pasc_tri,full_derivs,[0,[0]],true)
-		exactrf = test_3parts_jainkamila(start_con)
-		exactrfs[j,i] = real(exactrf)
-		oldrfs[j,i] = real(old_rf)
+		jkrf = test_3parts_jainkamila(start_con)
+		exact = test_3parts_girvinjach(start_con)
+		jkrfs[j,i] = real(jkrf)
+		exacts[j,i] = real(exact)
 	end
 end
-=#
-fig = figure()
-imshow(exactrfs .- 78) #.- oldrfs)
-colorbar()
-title("Exact")
 #
 fig = figure()
-imshow(oldrfs)
+imshow(jkrfs) #.- oldrfs)
 colorbar()
-title("Old")
+title("JK Exact")
+#
+fig = figure()
+imshow(exacts)
+colorbar()
+title("GJ Exact")
 #
 
+linfit_matrix(exacts,jkrfs; if_plot=true,title_string="GJ and JK")
+=#
 #=m = 3
 for particles in [3,4]
 	con = start_rand_config(particles,m)

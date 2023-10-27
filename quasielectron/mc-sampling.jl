@@ -283,7 +283,7 @@ end
 
 
 
-#=
+#
 axisbins = 300
 m = 3
 mc_steps = 100000
@@ -370,7 +370,7 @@ end
 #end
 #raddata = rad_dist(allconfigs,rm; axis_bins=100, labelstring = "$particles")
 end
-=#
+#
 #println("Runtime = ",runtime)
 #
 #=fig = figure()
