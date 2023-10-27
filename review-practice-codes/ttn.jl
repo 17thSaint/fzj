@@ -588,8 +588,12 @@ function fill_states(particle_count,site_count,max_occupation)
 end
 
 function initialize_ttn(ttn,maxdim,particle_count; kwargs...)
-	if_fermion = get(kwargs, :if_fermion, false)
-	creation = if_fermion ? "Cdag" : "Adag"
+	particle_type = get(kwargs, :part_type, "Boson")
+	if particle_type == "Fermion"
+		creation = "Cdag"
+	elseif particle_type == "Boson"
+		creation = "Adag"
+	end
 	
 	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
 	site_count = TTNKit.number_of_sites(TTNKit.network(ttn))
@@ -703,8 +707,9 @@ function throwout_therm_time(times)
 	end
 end
 
-function build_full_harperhofstadter(num_layers,particle_count,t_strength,filling; kwargs...)
+function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 	num_sites = 2^num_layers
+	filling = get(kwargs, :filling, 1/2)
 	max_dim = get(kwargs, :max_dim, particle_count+1)
 	num_sweeps = get(kwargs, :num_sweeps, 3)
 	sweep_iter = get(kwargs, :sweep_iter, 1)
@@ -724,8 +729,8 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	net = get(kwargs, :ttn_net, nothing)
 	ttn = get(kwargs, :seed_ttn, nothing)
 	if_gpu = get(kwargs, :if_gpu, false)
-	if_fermion = get(kwargs, :if_fermion, false)
-	particle_type = if_fermion ? "Fermion" : "Boson"
+	particle_type = get(kwargs, :part_type, "Boson")
+	
 	
 	start_time = time()
 
@@ -737,13 +742,16 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 	println("Finished Building Network")
 	
 	if isnothing(ttn)
-		states = fill("0", num_sites)
-		#states = fill_states(particle_count,num_sites,1)
-		old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
-		#ttn = TTNKit.increase_dim_tree_tensor_network_zeros(old_ttn, maxdim = max_dim)
-		#ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
-		#ttn = old_ttn
-		ttn = initialize_ttn(old_ttn,max_dim,particle_count; kwargs...)
+		if particle_type .== "Boson"
+			states = fill("0", num_sites)
+			old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
+			ttn = initialize_ttn(old_ttn,max_dim,particle_count; kwargs...)
+		else
+			states = fill_states(particle_count,num_sites,1)
+			old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
+			ttn = TTNKit.increase_dim_tree_tensor_network_zeros(old_ttn, maxdim = max_dim)
+			ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
+		end
 	end
 	
 	if if_gpu
@@ -771,7 +779,7 @@ function build_full_harperhofstadter(num_layers,particle_count,t_strength,fillin
 			time_end = time()
 			append!(times,[time_end - time_start])
 			#return sp.ttn, ham, sp
-			if_frozen,why = check_if_frozen(new_sp.ttn)
+			if_frozen,why = any(particle_type .== ["Fermion","Boson"]) ? check_if_frozen(new_sp.ttn) : (false,"cuz")
 			if !if_frozen
 				#get_position_dims(sp.ttn)
 				#return new_sp.ttn, new_ham, new_sp
