@@ -3,7 +3,7 @@
 #SBATCH --tasks-per-node=1
 #SBATCH --time=20:00:00
 #SBATCH --cpus-per-task=1
-#SBATCH --account=netenesyquma
+#SBATCH --account=pgi-8
 
 echo "Date:"
 date
