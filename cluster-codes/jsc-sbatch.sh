@@ -3,7 +3,7 @@
 #SBATCH --tasks-per-node=1
 #SBATCH --time=20:00:00
 #SBATCH --cpus-per-task=1
-#SBATCH --account=pgi-8
+#SBATCH --account=netenesyquma
 
 echo "Date:"
 date
@@ -34,7 +34,7 @@ additional_params=("${@:5}")
 
 # Get the current date and time
 #alpha=$(date +"%Y-%m-%d_%H-%M")
-datafolder="/p/project/pgi-8/geraghty1/data/data-zoomed-chemstrength"
+datafolder="/p/project/netenesyquma/geraghty1/data/data-zoomed-chemstrength"
 
 # Create the folder
 #mkdir -p "$datafolder"
