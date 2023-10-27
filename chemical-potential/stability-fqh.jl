@@ -15,7 +15,7 @@ if_save_data = get(params_dict, "if_save_data", true)#Done
 noise = get(params_dict, "noise", [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0.0])#Done
 u_strength = get(params_dict, "u_strength", 1.0)#Done
 syms = get(params_dict, "syms", false)#Done
-max_occ = get(params_dict, "max_occ", 1)
+max_occ = get(params_dict, "maxocc", 1)
 if_gpu = get(params_dict, "if_gpu", false)#Done
 seed_ttn = get(params_dict, "seed_ttn", nothing)#Done
 net = TTNKit.BinaryRectangularNetwork(layers, TTNKit.ITensorNode, "Boson";conserve_qns=syms,dim=max_occ+1)#Done
@@ -32,8 +32,8 @@ no_magF = false
 #t_strength = get(params_dict, :t_strength, 0.02)
 #chem_strength = get(params_dict, :chem_strength, 0.0)
 alpha = get(params_dict, "alpha", 1/4)#Done
-t_strength = round(get(params_dict, "t_strength", 0.5),digits=4)#Done
-chem_strength = round(get(params_dict, "chem_strength", 1.0),digits=4)#Done
+t_strength = round(get(params_dict, "t", 0.5),digits=4)#Done
+chem_strength = round(get(params_dict, "chem", 1.0),digits=4)#Done
 num_particles = Int(round(filling*alpha*num_sites,digits=0))#Done
 
 println("Made All Variables")

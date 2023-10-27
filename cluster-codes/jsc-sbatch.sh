@@ -1,7 +1,7 @@
 #!/bin/bash -x
 
 #SBATCH --tasks-per-node=1
-#SBATCH --time=20:00:00
+#SBATCH --time=00:30:00
 #SBATCH --cpus-per-task=1
 #SBATCH --account=pgi-8
 
