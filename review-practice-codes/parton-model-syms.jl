@@ -1,4 +1,3 @@
-using Test
 using ITensors
 using LinearAlgebra
 using LaTeXStrings
