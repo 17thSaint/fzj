@@ -150,9 +150,9 @@ function change_numparticles_metadata(filename)
 	end
 end
 
-function get_folder_location(folder_name)
-	get_to_fzj = split(pwd(),"fzj")[1]
-	full_location = occursin("main-git",pwd()) ? get_to_fzj * "fzj/main-git/" * folder_name : get_to_fzj * "fzj/" * folder_name
+function get_folder_location(folder_name,central_loc="fzj")
+	get_to_center = split(pwd(),central_loc)[1]
+	full_location = occursin("main-git",pwd()) ? get_to_center * "fzj/main-git/" * folder_name : get_to_center * central_loc * "/" * folder_name
 	return full_location
 end
 
