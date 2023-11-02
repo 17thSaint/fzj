@@ -14,7 +14,7 @@ function reconstruct_jld2_ttn(wavefunc)
 	return TTNKit.TreeTensorNetwork(wavefunc.data,wavefunc.ortho_direction,wavefunc.ortho_center,remade_network)
 end
 
-#=
+#
 dataloc = "../cluster-data/chemical-potential"
 layers = 6
 tstren = 0.5
@@ -30,7 +30,7 @@ for f in filenames
 	rebuilt_psi = reconstruct_jld2_ttn(fileversion_psi)
 	append!(allpsis,[rebuilt_psi])
 end
-=#
+#
 
 num_sites = 2^layers
 alldens = []
@@ -46,6 +46,7 @@ for (i,psi) in enumerate(allpsis)
 end
 fig = figure()
 plot(chem_vals,alldens,"-p")
+plot(chem_vals,[1-0.125 for i in 1:length(chem_vals)])
 xlabel("Chemical Potential Strength")
 ylabel("Density")
 #

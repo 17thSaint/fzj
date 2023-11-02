@@ -2,10 +2,11 @@ include("j1j2.jl")
 using ITensors
 
 
-function get_exact_j1j2ham(j2,j1=1.0; kwargs...)
+function get_exact_j1j2ham(j2,layers=4; kwargs...)
 	if_periodic = get(kwargs, :if_periodic, true)
+	j1 = get(kwargs, :j1, 1.0)
 	
-	net = TTNKit.BinaryRectangularNetwork(2, TTNKit.ITensorNode, "Qubit")
+	net = TTNKit.BinaryRectangularNetwork(layers, TTNKit.ITensorNode, "Qubit")
 	lat = TTNKit.physical_lattice(net)
 	resulting_ham = []
 	
@@ -39,9 +40,13 @@ function get_exact_j1j2ham(j2,j1=1.0; kwargs...)
 end
 
 j2 = 0.0
-sumham = get_exact_j1j2ham(j2)
+layers = 2
+if layers > 2
+	ITensors.disable_warn_order()
+end
+sumham = get_exact_j1j2ham(j2,layers)
 ham_mpo = MPO(sumham[1],siteinds(sumham[2]))
-
+ham_mat = round.(reshape(Array(prod(ham_mpo),siteinds(ham_mpo)),2^(2^layers),2^(2^layers)),digits=6)
 
 
 

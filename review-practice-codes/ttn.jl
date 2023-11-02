@@ -1,11 +1,18 @@
 using Statistics
 using TTNKit
-#cd("/home/patrick/Downloads")
-include("parton-model-syms.jl")
-include("../other-funcs/data-storage-funcs.jl")
-#=
-Need to figure out how sweeps works
-=#
+
+function include_other_files(all_files)
+	get_to_fzj = split(pwd(),"fzj")[1]
+	if typeof(all_files) == String
+		all_files = [all_files]
+	end
+	for file in all_files
+		occursin("main-git",pwd()) ? include(get_to_fzj * "fzj/main-git/" * file) : include(get_to_fzj * "fzj/" * file)
+		println("Included $file")
+	end
+end
+
+include_other_files(["review-practice-codes/parton-model-syms.jl","other-funcs/data-storage-funcs.jl"])
 
 thetax_1,thetay_1 = 0.2, 0.12
 thetax_2,thetay_2 = 0.64,0.56

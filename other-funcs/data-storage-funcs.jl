@@ -40,8 +40,17 @@ function turn_string_into_bool(input)
 	return input
 end
 
-function make_args_dict(args)
+function make_args_dict(args,parameter_iteration=0)
 	parameters_dict = Dict()
+	if length(args) == 1
+		args = collect(split(args[1],","))
+	end
+	if length(args) % 2 != 0
+		parameter_shift = parse(Float64,args[3])*parameter_iteration
+		deleteat!(args,3)
+	else
+		parameter_shift = 0.0
+	end
 	for i in 1:2:length(args)
 		key = args[i]
 		value = args[i+1]
@@ -56,7 +65,7 @@ function make_args_dict(args)
 		else
 			value = get_integer
 		end
-		parameters_dict[key] = value
+		parameters_dict[key] = i == 1 ? value + parameter_shift : value
 	end
 	return parameters_dict
 end
@@ -139,6 +148,12 @@ function change_numparticles_metadata(filename)
 		println("Had some error for $filename")
 		return "no"
 	end
+end
+
+function get_folder_location(folder_name)
+	get_to_fzj = split(pwd(),"fzj")[1]
+	full_location = occursin("main-git",pwd()) ? get_to_fzj * "fzj/main-git/" * folder_name : get_to_fzj * "fzj/" * folder_name
+	return full_location
 end
 
 function find_data_file(params_dict,calc_type,file_type="jld2",location="/home/patrick/fzj/main-git/cluster-data")
@@ -310,8 +325,12 @@ function read_data_jld2(file_name,location=pwd(); kwargs...)
 	try
 		cd(location)
 	catch
-		println("The directory $location is not accessible")
-		location = pwd()
+		try
+			cd(get_folder_location(location))
+		catch
+			println("The directory $location is not accessible")
+			location = pwd()
+		end
 	end
 	
 	file_name = make_sure_file_type(file_name,"jld2")
