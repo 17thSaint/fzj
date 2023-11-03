@@ -119,12 +119,34 @@ function test_3parts_girvinjach(z,m=3)
 			result += log(Complex(-2*(dz[i] - dz[j])))
 		end
 	end
-	#
+	#=
 	for i in 1:num_parts
 		result += -0.25*abs2(z[i])
 	end
-	#
+	=#
 	
+	return result
+end
+
+function analytical_3parts_girvinjach(z)
+	lin_result = 0.0
+	
+	lin_result += -48 * dist_btw(z,1,2,1) * dist_btw(z,1,3,4) * dist_btw(z,2,3,4)
+	lin_result += 48 * dist_btw(z,1,2,4) * dist_btw(z,1,3,2) * dist_btw(z,2,3,3)
+	lin_result += -48 * dist_btw(z,1,2,2) * dist_btw(z,1,3,3) * dist_btw(z,2,3,4)
+	lin_result += -48 * dist_btw(z,1,2,4) * dist_btw(z,1,3,4) * dist_btw(z,2,3,1)
+	lin_result += 48 * dist_btw(z,1,2,4) * dist_btw(z,1,3,1) * dist_btw(z,2,3,4)
+	lin_result += 48 * dist_btw(z,1,2,2) * dist_btw(z,1,3,4) * dist_btw(z,2,3,3)
+	lin_result += 48 * dist_btw(z,1,2,4) * dist_btw(z,1,3,3) * dist_btw(z,2,3,2)
+	lin_result += 48 * dist_btw(z,1,2,3) * dist_btw(z,1,3,2) * dist_btw(z,2,3,4)
+	lin_result += 48 * dist_btw(z,1,2,3) * dist_btw(z,1,3,4) * dist_btw(z,2,3,2)
+	
+	result = log(Complex(lin_result)) + log(8)
+	#=
+	for i in 1:3
+		result += -0.25*abs2(z[i])
+	end
+	=#
 	return result
 end
 
@@ -212,14 +234,15 @@ function linfit_matrix(mat1,mat2; kwargs...)
 	return fitparams,fitparams_error
 end
 
-#=
+#
 particles = 3
-start_con = start_rand_config(particles,3)
+con = start_rand_config(particles,3)
 rm = sqrt(2*particles*3)
-#
 
 
-#
+
+
+#=
 using PyPlot
 data_count = 50
 xs = [-3*rm + i*(2*3*rm)/data_count for i in 1:data_count]
