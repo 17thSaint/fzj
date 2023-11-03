@@ -1,0 +1,68 @@
+using Test
+include("fqh-thesis/cf-wavefunc.jl")
+include("reverse-flux.jl")
+
+
+if true
+@testset "analytical Jain-Kamila" begin
+
+particles = 3
+con = start_rand_config(particles,3)
+
+jkexact = test_3parts_jainkamila(con)
+myver = reverse_flux_wavefunction(con)
+# check if the analytical Jain-Kamila for 3 particles matches my AutoDiff calculation
+@test abs(real(jkexact) - real(myver))/abs(real(jkexact)) <= 0.001
+
+# the MSc function has some factors of 2 missing so this checks the edited
+# analytical Jain-Kamila function against the MSc result
+# this shows that the new AutoDiff matches the MSc up to a few factors of 2
+exact_with_correction = test_3parts_jainkamila_msc(con)
+
+all_deriv_orders = get_deriv_orders_matrix(particles)
+all_pascal = [get_pascals_triangle(i)[2] for i in 1:particles]
+acc_sets_matrix = get_full_acc_matrix(particles)
+msc = get_rf_wavefunc(con,acc_sets_matrix,all_pascal,all_deriv_orders,[0,[0]],true)
+
+@test abs(real(exact_with_correction) - real(msc))/abs(real(exact_with_correction)) <= 0.001
+
+end;
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"fin"

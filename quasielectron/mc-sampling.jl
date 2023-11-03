@@ -286,20 +286,20 @@ end
 #
 axisbins = 300
 m = 3
-mc_steps = 100000
+mc_steps = 1000
 output = 1
 sampfreq = 1
 everyconfig = []
 gauss(x,p) = (1/(p[1]*sqrt(2*pi))) .* exp.(-0.5 .* (((x .- p[2]) ./ p[1]).^2)) .+ p[3]
 allfits_dens = []
 allfits_dists = []
-num_parts = [i for i in 5:20]
+num_parts = [i for i in 4:4]
 edges = []
 for particles in num_parts
 #particles = 4
 rm = sqrt(2*particles*m)
 step_size = 0.125*rm
-ver = "P"
+ver = "R"
 
 oldRF_paras = ()
 #=
@@ -309,16 +309,16 @@ full_derivs = get_deriv_orders_matrix(particles)
 oldRF_paras = (accmat = allowed_sets_matrix, pascal = full_pasc_tri, derivs = full_derivs)
 =#
 
-model_paras = (vers = ver, step_size = step_size, m = m, opl = output, samp_freq = sampfreq, if_save_data = false)
+model_paras = (vers = ver, step_size = step_size, m = m, opl = output, samp_freq = sampfreq, if_save_data = false, therm_time = 0)
 allconfigs,allpsis,runtime = mc(particles,m,mc_steps; model_paras...,oldRF_paras...)
 append!(everyconfig,[allconfigs])
 
 #allconfigs = everyconfig[particles-12]
-raddenss = radial_density_full(allconfigs,rm; points=axisbins,labelstring="$particles", rend="max",if_plot=false)
-#get_occupancy(allconfigs,rm; title_string="N = $particles")
-edge_loc = raddenss[1][findfirst(i -> raddenss[2][i] == maximum(raddenss[2]),1:axisbins)]
-append!(edges,[edge_loc])
-plot([i for i in 5:particles],edges,"-p",c="b")
+#raddenss = radial_density_full(allconfigs,rm; points=axisbins,labelstring="$particles", rend="max",if_plot=true)
+get_occupancy(allconfigs,rm; title_string="N = $particles")
+#edge_loc = raddenss[1][findfirst(i -> raddenss[2][i] == maximum(raddenss[2]),1:axisbins)]
+#append!(edges,[edge_loc])
+#plot([i for i in 5:particles],edges,"-p",c="b")
 #=raddists = rad_dist(allconfigs,rm; axis_bins=axisbins,labelstring="$particles")
 
 if particles > 5

@@ -1,4 +1,4 @@
-using SpecialMatrices,LinearAlgebra,LsqFit
+using SpecialMatrices,LinearAlgebra,LsqFit,Zygote
 
 function start_rand_config(num_parts::Int, m::Int)
     # Calculate the filling fraction
@@ -17,10 +17,52 @@ function start_rand_config(num_parts::Int, m::Int)
     return config
 end
 
-function trace_part(config,which_particle=1)
-	vdm_deriv = [(i-1)*config[which_particle]^(i-2) for i in 1:length(config)]
-	return ( conj(Vandermonde(config)') \ vdm_deriv )[which_particle]
-	#return  -1 * det(Vandermonde(config)) * (( conj(Vandermonde(config)') \ vdm_deriv )[which_particle])
+function jastrow_squared(z,which)
+	result = 1.0
+	for i in 1:length(z)
+		if z[i] != which
+			result *= (which - z[i])^2
+		end
+	end
+	return result
+end
+
+function firstderiv_j2(z,which)
+	return conj(ForwardDiff.gradient(c -> real(jastrow_squared(z,c)),which)[1])
+end
+
+function nth_deriv_j2(z, which, n)
+    if n == 0
+        return jastrow_squared(z, which)  # 0th derivative is the function itself
+    else
+    	#println("Working on $(n-1)-th order")
+        return conj(ForwardDiff.derivative(c -> real(nth_deriv_j2(z, c, n - 1)), which)[1])
+    end
+end
+
+function test_jastrow_firstderiv(z)
+	autodiff_result = firstderiv_j2(z,z[1])
+	exact_result = 2*sum([(z[1] - z[k])*prod([(z[1] - z[j])^2 for j in deleteat!([l for l in 2:length(z)],k-1)]) for k in 2:length(z)])
+	if isapprox(abs(autodiff_result-exact_result)/abs(exact_result),0.001;atol=10^-3)
+		return true
+	else
+		return false,autodiff_result,exact_result
+	end
+end
+
+function reverse_flux_wavefunction(z,m=3)
+	num_parts = length(z)
+	full_mat = im.*zeros(num_parts,num_parts)
+	for i in 1:num_parts
+		#println("Making Row $i")
+		full_mat[i,:] = [log(Complex(nth_deriv_j2(z,z[j],i-1))) + log(2)*(i-1) for j in 1:num_parts]
+	end
+	
+	result = get_log_det(full_mat)[1]
+	
+	result += -0.25*sum(abs2.(z))
+	
+	return result,[0,0]
 end
 
 function get_log_add(a,b)
@@ -69,36 +111,6 @@ function get_log_det(matrix::Matrix{ComplexF64},reg_input=false)
 	return reduced_logdet,maxes,changed
 end
 
-function reverse_flux_wavefunction(z,m=3)
-	p = Int((m+1)/2)
-	num_parts = length(z)
-	nt = sum([i for i in 1:num_parts-1])
-	wavefunc = 0.0*im
-	
-	c_start = time()
-	vdm_logdet = get_log_det(log.(Vandermonde(z)))[1]
-	const_part = nt * (log(4*p) + 2*p*vdm_logdet)#log(Complex(det(Vandermonde(z)))))
-	c_end = time()
-	
-	d_start = time()
-	deriv_part = 0.0*im
-	#all_derivs = [deriv_of_slater(z,i) for i in 1:num_parts]
-	for j in 1:num_parts
-		for i in 1:j-1
-			new_term = trace_part(z,i) - trace_part(z,j)
-			deriv_part += log(Complex(new_term))
-		end
-	end
-	d_end = time()
-	
-	log_exponent = -0.25 * sum(abs2.(z))
-	
-	times = [100*(c_end-c_start),100*(d_end-d_start)]
-	
-	#println("Deriv $deriv_part, Const $const_part")
-	
-	return deriv_part + const_part + log_exponent,times
-end
 
 function dist_btw(z,i,j,pow)
 	return (z[i] - z[j])^pow
@@ -164,13 +176,38 @@ function test_3parts_jainkamila(z,m=3)
 	fulljs[2,3] = 1*(dist_btw(z,3,1,1-1)*dist_btw(z,3,2,1) + dist_btw(z,3,1,1)*dist_btw(z,3,2,1-1))
 	
 
-	fulljs[3,:] = [1,1,1]
+	fulljs[3,:] = [1,1,1] .* 2
 	
 	matver = im .* zeros(num_parts,num_parts)
 
 	matver[1,:] = (fulljs[1,:]) .^ p
 	matver[2,:] = (2*p) .* (fulljs[1,:] .* fulljs[2,:])
 	matver[3,:] = (4*p) .* (((fulljs[2,:] .^ 2) ./ 1) .+ (fulljs[1,:] .* fulljs[3,:]))
+
+	return log(Complex(det(matver))) - 0.25*sum(abs2.(z))
+end
+
+function test_3parts_jainkamila_msc(z,m=3)
+	num_parts = length(z)
+	p = Int((m+1)/2)
+	
+	fulljs = im .* zeros(num_parts,num_parts)
+	fulljs[1,1] = dist_btw(z,1,2,1)*dist_btw(z,1,3,1)
+	fulljs[1,2] = dist_btw(z,2,1,1)*dist_btw(z,2,3,1)
+	fulljs[1,3] = dist_btw(z,3,1,1)*dist_btw(z,3,2,1)
+	
+	fulljs[2,1] = 1*(dist_btw(z,1,2,1-1)*dist_btw(z,1,3,1) + dist_btw(z,1,2,1)*dist_btw(z,1,3,1-1))
+	fulljs[2,2] = 1*(dist_btw(z,2,1,1-1)*dist_btw(z,2,3,1) + dist_btw(z,2,1,1)*dist_btw(z,2,3,1-1))
+	fulljs[2,3] = 1*(dist_btw(z,3,1,1-1)*dist_btw(z,3,2,1) + dist_btw(z,3,1,1)*dist_btw(z,3,2,1-1))
+	
+
+	fulljs[3,:] = [1,1,1] .* 1
+	
+	matver = im .* zeros(num_parts,num_parts)
+
+	matver[1,:] = (fulljs[1,:]) .^ p
+	matver[2,:] = (2*p) .* (fulljs[1,:] .* fulljs[2,:])
+	matver[3,:] = (4*p) .* (((fulljs[2,:] .^ 2) ./ 2) .+ (fulljs[1,:] .* fulljs[3,:]))
 
 	return log(Complex(det(matver))) - 0.25*sum(abs2.(z))
 end
@@ -234,13 +271,17 @@ function linfit_matrix(mat1,mat2; kwargs...)
 	return fitparams,fitparams_error
 end
 
-#
+#=
+include("fqh-thesis/cf-wavefunc.jl")
 particles = 3
 con = start_rand_config(particles,3)
 rm = sqrt(2*particles*3)
 
-
-
+newver = reverse_flux_wavefunction(con)
+oldver = 
+#correct = test_3parts_jainkamila(con)
+println("My ver = $newver and Exact = $correct")
+=#
 
 #=
 using PyPlot
