@@ -62,7 +62,7 @@ function acc_rej_move(initial_config::Array,chosen_particle::Int; kwargs...)
 			all_deriv_orders = get(kwargs, :derivs, nothing)
 			new_wavefunc = get_rf_wavefunc(initial_config,acc_sets_matrix,all_pascal,all_deriv_orders,[0,[0]],true)
 		else
-			start_wavefunc,timesignore = wave_function(initial_config,m)
+			start_wavefunc,timesignore = wave_function(initial_config,m; kwargs...)
 		end
 		println("Making own wavefunc")
 	end
@@ -74,7 +74,7 @@ function acc_rej_move(initial_config::Array,chosen_particle::Int; kwargs...)
 		all_deriv_orders = get(kwargs, :derivs, nothing)
 		new_wavefunc = get_rf_wavefunc(initial_config+shift_matrix,acc_sets_matrix,all_pascal,all_deriv_orders,[0,[0]],true)
 	else
-		new_wavefunc,times = wave_function(initial_config+shift_matrix,m)
+		new_wavefunc,times = wave_function(initial_config+shift_matrix,m; kwargs...)
 	end
 	
 	check = 0.0
@@ -93,7 +93,7 @@ function acc_rej_move(initial_config::Array,chosen_particle::Int; kwargs...)
 		if isinf(new_ham)
 			println("New Inf")
 			shift_matrix = move_particle(length(initial_config),chosen_particle,step_size)
-			new_wavefunc,times = wave_function(initial_config+shift_matrix,m)
+			new_wavefunc,times = wave_function(initial_config+shift_matrix,m; kwargs...)
 			infinity_steps += 1
 		#=elseif isinf(start_ham)
 			if start_ham > 0
@@ -130,6 +130,11 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 	if_save_data = get(kwargs, :if_save_data, false)
 	wavefunc_type = get(kwargs, :vers, "P")
 	wave_function = wavefunc_type == "P" ? log_laughlin_wavefunction : reverse_flux_wavefunction
+	qe_cutoff = get(kwargs, :qe_cutoff, 0)
+	
+	if qe_cutoff != 0
+		println("Using Quasielectron with cutoff at $qe_cutoff / $num_parts")
+	end
 	
 	running_config = start_rand_config(num_parts,m)
 	start_count = 0
@@ -146,7 +151,7 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 			all_deriv_orders = get(kwargs, :derivs, nothing)
 			wavefunc = get_rf_wavefunc(running_config,acc_sets_matrix,all_pascal,all_deriv_orders,[0,[0]],true)
 		else
-			wavefunc = wave_function(running_config,m)[1]
+			wavefunc = wave_function(running_config,m; kwargs...)[1]
 		end
 		if isinf(real(wavefunc))
 			running_config = start_rand_config(num_parts,m)
@@ -271,7 +276,8 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 	if if_save_data
 		location = get(kwargs, :location, "../cluster-data/quasielectron")
 		params_dict = Dict([("mc_steps",steps),("m",m),("particles",num_parts)])
-		filename = get(kwargs, :name, "laugh-" * make_parameters_filename(params_dict))
+		wavefunc_type_name = wavefunc_type == "P" ? "laugh-" : "rfa-"
+		filename = get(kwargs, :name, wavefunc_type_name * make_parameters_filename(params_dict))
 		metadata_dict = merge(named_tuple_to_dict(kwargs),params_dict)
 		metadata = get(kwargs, :metadata, metadata_dict)
 		config_data_dict = Dict([("configs",time_config),("wavefuncs",time_wavefunc)])
@@ -286,7 +292,7 @@ end
 #
 axisbins = 300
 m = 3
-mc_steps = 10000
+mc_steps = 100000
 output = 1
 sampfreq = 1
 everyconfig = []
@@ -309,15 +315,16 @@ full_derivs = get_deriv_orders_matrix(particles)
 oldRF_paras = (accmat = allowed_sets_matrix, pascal = full_pasc_tri, derivs = full_derivs)
 =#
 
-model_paras = (vers = ver, step_size = step_size, m = m, opl = output, samp_freq = sampfreq, if_save_data = false, therm_time = 0)
+model_paras = (vers = ver, step_size = step_size, m = m, opl = output, samp_freq = sampfreq, if_save_data = false, qe_cutoff = 0)
 allconfigs,allpsis,runtime = mc(particles,m,mc_steps; model_paras...,oldRF_paras...)
 append!(everyconfig,[allconfigs])
 
 #allconfigs = everyconfig[particles-12]
-#raddenss = radial_density_full(allconfigs,rm; points=axisbins,labelstring="$particles", rend="max",if_plot=true)
-get_occupancy(allconfigs,rm; title_string="N = $particles")
+raddenss = radial_density_full(allconfigs,rm; points=axisbins, rend="max",if_plot=true, labelstring="no QE")
+#get_occupancy(allconfigs,rm; title_string="N = $particles")
 #edge_loc = raddenss[1][findfirst(i -> raddenss[2][i] == maximum(raddenss[2]),1:axisbins)]
 #append!(edges,[edge_loc])
+#println("Edge = ",edge_loc)
 #plot([i for i in 5:particles],edges,"-p",c="b")
 #=raddists = rad_dist(allconfigs,rm; axis_bins=axisbins,labelstring="$particles")
 
@@ -391,7 +398,7 @@ fig = figure()
 plot(num_parts,edges,"-p")
 xlabel("Particle Number")
 ylabel("Radius of Edge / rm")
-title("Laughlin Wavefunction")
+title("RF Wavefunction")
 =#
 
 #= Location of edges for Laughlin

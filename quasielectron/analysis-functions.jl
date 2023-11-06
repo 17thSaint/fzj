@@ -26,7 +26,7 @@ function get_occupancy(time_config,rm,axis_bins=40; kwargs...)
 		end
 	end
 	binwidth = abs(bins_x[2] - bins_x[1])
-	fig = figure()
+	#fig = figure()
 	imshow(occs)
 	colorbar()
 	plot_circle(1/binwidth,(axis_bins/2)-0.5)
@@ -131,7 +131,9 @@ function radial_density_full(pos_data,rm; kwargs...)
 	
 	normalization = integrate(allxs ./ rm, raddens)
 	if if_plot
-		fig = figure()
+		if label_string == ""
+			fig = figure()
+		end
 		plot(allxs ./ rm,raddens ./ normalization,label=label_string)
 		title(title_string)
 		xlabel("X Value / rm")

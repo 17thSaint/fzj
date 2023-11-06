@@ -17,7 +17,7 @@ function start_rand_config(num_parts::Int, m::Int)
     return config
 end
 
-function jastrow(z,which)
+function jastrow(z,which)	
 	result = 1.0
 	for i in 1:length(z)
 		if z[i] != which
@@ -27,11 +27,22 @@ function jastrow(z,which)
 	return result
 end
 
-function jastrow_squared(z,which)
-	result = 1.0
-	for i in 1:length(z)
-		if z[i] != which
-			result *= (which - z[i])^2
+function jastrow_squared(z,which; kwargs...)
+	if_log = get(kwargs, :if_log, false)
+		
+	if if_log
+		result = 0.0*im
+		for i in 1:length(z)
+			if z[i] != which
+				result += 2*log(Complex(which - z[i]))
+			end
+		end
+	else
+		result = 1.0
+		for i in 1:length(z)
+			if z[i] != which
+				result *= (which - z[i])^2
+			end
 		end
 	end
 	return result
@@ -57,10 +68,15 @@ function test_jastrow_firstderiv(z)
 	end
 end
 
-function reverse_flux_wavefunction(z,m=3)
+function reverse_flux_wavefunction(z,m=3; kwargs...)
 	num_parts = length(z)
+	qe_cutoff = get(kwargs, :qe_cutoff, 0)
 	full_mat = im.*zeros(num_parts,num_parts)
-	for i in 1:num_parts
+	for i in 1:qe_cutoff
+		#println("Making Row $i with Quasielectron")
+		full_mat[i,:] = [get_log_add(log(Complex(nth_deriv_j2(z,z[j],i-1)*z[j])),jastrow_squared(z,z[j]; if_log=true)) + log(2)*(i-1) for j in 1:num_parts]
+	end
+	for i in qe_cutoff+1:num_parts
 		#println("Making Row $i")
 		full_mat[i,:] = [log(Complex(nth_deriv_j2(z,z[j],i-1))) + log(2)*(i-1) for j in 1:num_parts]
 	end

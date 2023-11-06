@@ -15,7 +15,7 @@ function particles_within_radius(particle_positions, center_point, radius)
     return [particle for particle in particle_positions if abs(particle - center_point) <= radius]
 end
 
-function log_laughlin_wavefunction(z, m)
+function log_laughlin_wavefunction(z, m; kwargs...)
     """
     Compute the logarithm of the Laughlin wavefunction for a given set of particle positions.
     
