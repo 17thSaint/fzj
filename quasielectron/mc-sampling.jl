@@ -286,14 +286,14 @@ end
 #
 axisbins = 300
 m = 3
-mc_steps = 1000
+mc_steps = 10000
 output = 1
 sampfreq = 1
 everyconfig = []
 gauss(x,p) = (1/(p[1]*sqrt(2*pi))) .* exp.(-0.5 .* (((x .- p[2]) ./ p[1]).^2)) .+ p[3]
 allfits_dens = []
 allfits_dists = []
-num_parts = [i for i in 4:4]
+num_parts = [i for i in 10:10]
 edges = []
 for particles in num_parts
 #particles = 4

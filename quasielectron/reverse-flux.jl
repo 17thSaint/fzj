@@ -1,4 +1,4 @@
-using SpecialMatrices,LinearAlgebra,LsqFit,Zygote
+using SpecialMatrices,LinearAlgebra,LsqFit,TaylorDiff
 
 function start_rand_config(num_parts::Int, m::Int)
     # Calculate the filling fraction
@@ -17,6 +17,16 @@ function start_rand_config(num_parts::Int, m::Int)
     return config
 end
 
+function jastrow(z,which)
+	result = 1.0
+	for i in 1:length(z)
+		if z[i] != which
+			result *= (which - z[i])^1
+		end
+	end
+	return result
+end
+
 function jastrow_squared(z,which)
 	result = 1.0
 	for i in 1:length(z)
@@ -27,23 +37,20 @@ function jastrow_squared(z,which)
 	return result
 end
 
-function firstderiv_j2(z,which)
-	return conj(ForwardDiff.gradient(c -> real(jastrow_squared(z,c)),which)[1])
-end
-
 function nth_deriv_j2(z, which, n)
     if n == 0
         return jastrow_squared(z, which)  # 0th derivative is the function itself
     else
     	#println("Working on $(n-1)-th order")
-        return conj(ForwardDiff.derivative(c -> real(nth_deriv_j2(z, c, n - 1)), which)[1])
+        return derivative(c -> jastrow_squared(z,c),which,n)
+        #return conj(ForwardDiff.derivative(c -> real(nth_deriv_j2(z, c, n - 1)), which)[1])
     end
 end
 
 function test_jastrow_firstderiv(z)
-	autodiff_result = firstderiv_j2(z,z[1])
+	autodiff_result = nth_deriv_j2(z,z[1],1)
 	exact_result = 2*sum([(z[1] - z[k])*prod([(z[1] - z[j])^2 for j in deleteat!([l for l in 2:length(z)],k-1)]) for k in 2:length(z)])
-	if isapprox(abs(autodiff_result-exact_result)/abs(exact_result),0.001;atol=10^-3)
+	if abs(autodiff_result-exact_result)/abs(exact_result) <= 0.001
 		return true
 	else
 		return false,autodiff_result,exact_result
