@@ -3,36 +3,9 @@ include("analysis-functions.jl")
 include("laughlin-wavefunc.jl")
 include("../other-funcs/data-storage-funcs.jl")
 
-include("fqh-thesis/cf-wavefunc.jl")
-
-function start_rand_config(num_parts::Int, m::Int)
-    # Calculate the filling fraction
-    filling = 1 / m
-
-    # Calculate the characteristic length scale
-    rm = sqrt(2 * num_parts / filling)
-
-    # Generate random real and imaginary parts in one step
-    real_parts = rand(Float64, num_parts) .* rand(-1:2:1, num_parts) .* rm
-    imag_parts = rand(Float64, num_parts) .* rand(-1:2:1, num_parts) .* rm
-
-    # Combine real and imaginary parts to create complex numbers
-    config = real_parts .- im .* imag_parts
-
-    return config
-end
+#include("fqh-thesis/cf-wavefunc.jl")
 
 include("reverse-flux.jl")
-
-function get_log_add(a,b)
-	if real(a) > real(b)
-		ordered::Vector{typeof(a)} = [b,a]
-	else
-		ordered = [a,b]
-	end
-	result::ComplexF64 = ordered[2] + log(Complex(1 + exp(ordered[1] - ordered[2])))
-	return Complex(result)
-end
 
 function move_particle(num_parts::Int,chosen::Int,step_size::Float64)
 	shift_matrix::Vector{ComplexF64} = [0.0+im*0.0 for i = 1:num_parts]
@@ -46,7 +19,7 @@ function acc_rej_move(initial_config::Array,chosen_particle::Int; kwargs...)
 	m = get(kwargs, :m, 3)
 	start_wavefunc = get(kwargs, :start_wavefunc, nothing)
 	wavefunc_type = get(kwargs, :vers, "P")
-	wave_function = wavefunc_type == "P" ? log_laughlin_wavefunction : reverse_flux_wavefunction
+	wave_function = wavefunc_type == "P" ? laughlin_wavefunction_girvinjach : reverse_flux_wavefunction
 	
 	shift_matrix = move_particle(length(initial_config),chosen_particle,step_size)
 	rand_num = log(rand(Float64))
@@ -129,8 +102,11 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 	samp_freq = get(kwargs, :samp_freq, 10)
 	if_save_data = get(kwargs, :if_save_data, false)
 	wavefunc_type = get(kwargs, :vers, "P")
-	wave_function = wavefunc_type == "P" ? log_laughlin_wavefunction : reverse_flux_wavefunction
+	wave_function = wavefunc_type == "P" ? laughlin_wavefunction_girvinjach : reverse_flux_wavefunction
 	qe_cutoff = get(kwargs, :qe_cutoff, 0)
+	qe_loc = get(kwargs, :qe_loc, 0.0+im*0.0)
+	
+	rm = sqrt(2*num_parts*m)
 	
 	if qe_cutoff != 0
 		println("Using Quasielectron with cutoff at $qe_cutoff / $num_parts")
@@ -275,12 +251,18 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 	
 	if if_save_data
 		location = get(kwargs, :location, "../cluster-data/quasielectron")
-		params_dict = Dict([("mc_steps",steps),("m",m),("particles",num_parts)])
+		params_dict::Dict{String,Any} = Dict([("mc_steps",steps),("m",m),("particles",num_parts)])
+		if qe_cutoff > 0
+			params_dict["qe_loc"] = round(real(qe_loc)/rm,digits=4)
+			params_dict["qe_cutoff"] = qe_cutoff
+		end
 		wavefunc_type_name = wavefunc_type == "P" ? "laugh-" : "rfa-"
 		filename = get(kwargs, :name, wavefunc_type_name * make_parameters_filename(params_dict))
 		metadata_dict = merge(named_tuple_to_dict(kwargs),params_dict)
 		metadata = get(kwargs, :metadata, metadata_dict)
 		config_data_dict = Dict([("configs",time_config),("wavefuncs",time_wavefunc)])
+		println(filename)
+		display(metadata)
 		write_data_jld2(filename,config_data_dict,location,metadata)
 	end
 	
@@ -292,22 +274,16 @@ end
 #
 axisbins = 300
 m = 3
-mc_steps = 100000
+mc_steps = 10000000
 output = 1
 sampfreq = 1
-everyconfig = []
-gauss(x,p) = (1/(p[1]*sqrt(2*pi))) .* exp.(-0.5 .* (((x .- p[2]) ./ p[1]).^2)) .+ p[3]
-allfits_dens = []
-allfits_dists = []
-num_parts = [i for i in 10:10]
-edges = []
+num_parts = [i for i in 8:8]
 for particles in num_parts
 #particles = 4
 rm = sqrt(2*particles*m)
 step_size = 0.125*rm
-ver = "R"
+ver = "P"
 
-oldRF_paras = ()
 #=
 allowed_sets_matrix = get_full_acc_matrix(particles)
 full_pasc_tri = [get_pascals_triangle(i)[2] for i in 1:particles]
@@ -315,12 +291,15 @@ full_derivs = get_deriv_orders_matrix(particles)
 oldRF_paras = (accmat = allowed_sets_matrix, pascal = full_pasc_tri, derivs = full_derivs)
 =#
 
-model_paras = (vers = ver, step_size = step_size, m = m, opl = output, samp_freq = sampfreq, if_save_data = false, qe_cutoff = 0)
-allconfigs,allpsis,runtime = mc(particles,m,mc_steps; model_paras...,oldRF_paras...)
-append!(everyconfig,[allconfigs])
+for i in 1:10
+model_paras = (therm_time = 1000, vers = ver, step_size = step_size, m = m, opl = output, samp_freq = sampfreq, if_save_data = true, qe_cutoff = particles)
+allconfigs,allpsis,runtime = mc(particles,m,mc_steps; model_paras...,qe_loc = rm*i/10)
+end
 
 #allconfigs = everyconfig[particles-12]
-raddenss = radial_density_full(allconfigs,rm; points=axisbins, rend="max",if_plot=true, labelstring="no QE")
+#raddenss = radial_density_full(allconfigs,rm; points=axisbins, rend="max",if_plot=true,labelstring="with QE")
+#corrlength = get_autocorr_length(allpsis,1)[1]
+#println("CorrLength = ",corrlength)
 #get_occupancy(allconfigs,rm; title_string="N = $particles")
 #edge_loc = raddenss[1][findfirst(i -> raddenss[2][i] == maximum(raddenss[2]),1:axisbins)]
 #append!(edges,[edge_loc])

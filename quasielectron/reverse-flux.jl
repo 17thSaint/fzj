@@ -1,59 +1,25 @@
 using SpecialMatrices,LinearAlgebra,LsqFit,TaylorDiff
 
-function start_rand_config(num_parts::Int, m::Int)
-    # Calculate the filling fraction
-    filling = 1 / m
+include("general-funcs.jl")
 
-    # Calculate the characteristic length scale
-    rm = sqrt(2 * num_parts / filling)
-
-    # Generate random real and imaginary parts in one step
-    real_parts = rand(Float64, num_parts) .* rand(-1:2:1, num_parts) .* rm
-    imag_parts = rand(Float64, num_parts) .* rand(-1:2:1, num_parts) .* rm
-
-    # Combine real and imaginary parts to create complex numbers
-    config = real_parts .- im .* imag_parts
-
-    return config
-end
-
-function jastrow(z,which)	
-	result = 1.0
-	for i in 1:length(z)
-		if z[i] != which
-			result *= (which - z[i])^1
-		end
-	end
-	return result
-end
-
-function jastrow_squared(z,which; kwargs...)
-	if_log = get(kwargs, :if_log, false)
-		
-	if if_log
-		result = 0.0*im
-		for i in 1:length(z)
-			if z[i] != which
-				result += 2*log(Complex(which - z[i]))
-			end
-		end
-	else
-		result = 1.0
-		for i in 1:length(z)
-			if z[i] != which
-				result *= (which - z[i])^2
-			end
-		end
-	end
-	return result
-end
-
-function nth_deriv_j2(z, which, n)
+function nth_deriv_j2(z, which, n; kwargs...)
+    if_qe = get(kwargs, :if_qe, false)
+    qe_loc = get(kwargs, :qe_loc, 0.0+im*0.0)
     if n == 0
-        return jastrow_squared(z, which)  # 0th derivative is the function itself
+    	if if_qe
+    		return (which - qe_loc)*jastrow_squared(z, which)
+    	else
+        	return jastrow_squared(z, which)  # 0th derivative is the function itself
+        end
     else
     	#println("Working on $(n-1)-th order")
-        return derivative(c -> jastrow_squared(z,c),which,n)
+    	if if_qe
+    		#println("using QE at $qe_loc")
+    		return derivative(c -> (c - qe_loc)*jastrow_squared(z,c),which,n)
+    	else
+		#println("No QE")
+	        return derivative(c -> jastrow_squared(z,c),which,n)
+	end
         #return conj(ForwardDiff.derivative(c -> real(nth_deriv_j2(z, c, n - 1)), which)[1])
     end
 end
@@ -72,13 +38,13 @@ function reverse_flux_wavefunction(z,m=3; kwargs...)
 	num_parts = length(z)
 	qe_cutoff = get(kwargs, :qe_cutoff, 0)
 	full_mat = im.*zeros(num_parts,num_parts)
-	for i in 1:qe_cutoff
-		#println("Making Row $i with Quasielectron")
-		full_mat[i,:] = [get_log_add(log(Complex(nth_deriv_j2(z,z[j],i-1)*z[j])),jastrow_squared(z,z[j]; if_log=true)) + log(2)*(i-1) for j in 1:num_parts]
-	end
-	for i in qe_cutoff+1:num_parts
+	if_qe = qe_cutoff > 0
+	for i in 1:num_parts
 		#println("Making Row $i")
-		full_mat[i,:] = [log(Complex(nth_deriv_j2(z,z[j],i-1))) + log(2)*(i-1) for j in 1:num_parts]
+		if i > qe_cutoff
+			if_qe = false
+		end
+		full_mat[i,:] = [log(Complex(nth_deriv_j2(z,z[j],i-1; if_qe = if_qe,kwargs...))) + log(2)*(i-1) for j in 1:num_parts]
 	end
 	
 	result = get_log_det(full_mat)[1]
@@ -86,57 +52,6 @@ function reverse_flux_wavefunction(z,m=3; kwargs...)
 	result += -0.25*sum(abs2.(z))
 	
 	return result,[0,0]
-end
-
-function get_log_add(a,b)
-	if real(a) > real(b)
-		ordered::Vector{typeof(a)} = [b,a]
-	else
-		ordered = [a,b]
-	end
-	result::ComplexF64 = ordered[2] + log(Complex(1 + exp(ordered[1] - ordered[2])))
-	return Complex(result)
-end
-
-function get_log_subtract(a,b)
-	ordered = [a,b]
-	result::ComplexF64 = ordered[1] + log(Complex(1 - exp(ordered[2] - ordered[1])))
-	return Complex(result)
-end
-
-function get_log_det(matrix::Matrix{ComplexF64},reg_input=false)
-	num_parts::Int64 = size(matrix)[1]
-	maxes::Vector{ComplexF64} = [0.0+0.0*im for i in 1:num_parts]
-	rejected_indices::Vector{Int64} = []
-	
-	changed::Matrix{ComplexF64} = matrix + fill(0.0,(num_parts,num_parts))
-	for i in 1:num_parts
-		row::Vector{Float64} = real(changed[i,:])
-		validation::Bool = true
-		j::Int64 = 0
-		index::Int64 = 0
-		while validation
-			val::ComplexF64 = sort(row)[end - j]
-			guess_index::Int64 = findfirst(real.(changed[i,:]) .== val )
-			if any(rejected_indices .== index)
-				j += 1
-			else
-				index = guess_index
-				validation = false
-			end
-		end
-		maxes[i] = changed[i,index]
-		changed[i,:] .-= maxes[i]
-		append!(rejected_indices,index)
-	end
-	reduced_logdet::ComplexF64 = sum(maxes) + log(Complex(det(exp.(changed))))
-
-	return reduced_logdet,maxes,changed
-end
-
-
-function dist_btw(z,i,j,pow)
-	return (z[i] - z[j])^pow
 end
 
 function test_3parts_girvinjach(z,m=3)
@@ -185,7 +100,8 @@ function analytical_3parts_girvinjach(z)
 	return result
 end
 
-function test_3parts_jainkamila(z,m=3)
+function test_3parts_jainkamila(z,m=3; kwargs...)
+	qe_cutoff = get(kwargs, :qe_cutoff, 0)
 	num_parts = length(z)
 	p = Int((m+1)/2)
 	
@@ -202,12 +118,25 @@ function test_3parts_jainkamila(z,m=3)
 	fulljs[3,:] = [1,1,1] .* 2
 	
 	matver = im .* zeros(num_parts,num_parts)
-
+	
 	matver[1,:] = (fulljs[1,:]) .^ p
+	if qe_cutoff > 0
+		matver[1,:] .*= z
+	end
+	
 	matver[2,:] = (2*p) .* (fulljs[1,:] .* fulljs[2,:])
+	if qe_cutoff > 1
+		matver[2,:] .*= z
+		matver[2,:] += 2*(fulljs[1,:]) .^ p
+	end
+	
 	matver[3,:] = (4*p) .* (((fulljs[2,:] .^ 2) ./ 1) .+ (fulljs[1,:] .* fulljs[3,:]))
+	if qe_cutoff > 2
+		matver[3,:] .*= z
+		matver[3,:] += (8*p) .* (fulljs[1,:] .* fulljs[2,:])
+	end
 
-	return log(Complex(det(matver))) - 0.25*sum(abs2.(z))
+	return log(Complex(det(matver))) - 0.25*sum(abs2.(z)),log.(matver)
 end
 
 function test_3parts_jainkamila_msc(z,m=3)

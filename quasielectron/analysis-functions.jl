@@ -26,7 +26,7 @@ function get_occupancy(time_config,rm,axis_bins=40; kwargs...)
 		end
 	end
 	binwidth = abs(bins_x[2] - bins_x[1])
-	#fig = figure()
+	fig = figure()
 	imshow(occs)
 	colorbar()
 	plot_circle(1/binwidth,(axis_bins/2)-0.5)
@@ -103,7 +103,7 @@ end
 function get_rightband_count(edge,pos_data,rm)
 	local_count = 0
 	for pos in pos_data
-		if -edge <= real(pos) <= edge && abs(imag(pos)) <= 0.1*rm 
+		if 0.0 <= real(pos) <= edge && abs(imag(pos)) <= 0.01*rm 
 			local_count += 1/prod(size(pos_data))
 		end
 	end
