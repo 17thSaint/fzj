@@ -273,8 +273,8 @@ end
 
 #
 axisbins = 300
-m = 3
-mc_steps = 10000000
+m = 1
+mc_steps = 1000000
 output = 1
 sampfreq = 1
 num_parts = [i for i in 8:8]
