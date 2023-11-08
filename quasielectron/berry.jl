@@ -80,8 +80,11 @@ function get_berry_phase(allconfigs,allwavefuncs,qe_loc,clockcount,m=3; kwargs..
 end
 
 #
-whichtype = "laugh"
-m = 1
+phases = [[0.0 for i in 1:10] for j in 1:2]
+qe_radii = [[0.0 for i in 1:10] for j in 1:2]
+for m in [3]
+whichtype = "rfa"
+#m = 3
 
 if whichtype == "rfa"
 	parts = 10
@@ -104,41 +107,56 @@ end
 #fig2 = figure()
 #fig1 = figure()
 quadr(x,p) = p[1] .* (x.^2)
-for cc in [100,200]
-cl = 1000
-#cc = 50
-phases = [0.0 for i in 1:length(allfiles)]
+#for cl in [1000]
+cl = 100
+cc = 100
+#phases = [0.0 for i in 1:length(allfiles)]
 phase_errors = [0.0 for i in 1:length(allfiles)]
-qe_radii = [0.0 for i in 1:length(allfiles)]
+#qe_radii = [0.0 for i in 1:length(allfiles)]
 throws = [0.0 for i in 1:length(allfiles)]
 for (i,f) in enumerate(allfiles)
 	println(i/length(allfiles))
 	alldata,allmetadata = read_data_jld2(f,"../cluster-data/quasielectron/")
 	configs = alldata["configs"]
 	wavefuncs = alldata["wavefuncs"]
-	berry_data = get_berry_phase(configs,wavefuncs,allmetadata["qe_loc"],cc; corrlength = cl,vers=vers)
-	phases[i] = berry_data[1]
+	#=berry_data = get_berry_phase(configs,wavefuncs,allmetadata["qe_loc"],cc; corrlength = cl,vers=vers)
+	phases[m == 1 ? 1 : 2][i] = berry_data[1]
 	phase_errors[i] = berry_data[2]
-	qe_radii[i] = allmetadata["qe_loc"]
+	qe_radii[m == 1 ? 1 : 2][i] = allmetadata["qe_loc"]
 	throws[i] = mean(berry_data[4])
+	=#
+	occrez,bw = get_occupancy(configs,sqrt(2*parts*m),100; if_plot=false,title_string="QE Loc = $(allmetadata["qe_loc"]), m = $m")
+	quartersize = Int(size(occrez)[1]/4)
+	scatter([allmetadata["qe_loc"]],[bw*(findfirst(x->occrez[2*quartersize,x] ==minimum(occrez[Int(2*quartersize),quartersize:Int((80/25)*quartersize)]),collect(1:4*quartersize))-50)],label="$(allmetadata["qe_loc"]),$m")
+	
 	#scatter([j for j in 1:length(berry_data[3])],berry_data[3],label="$cc,$(qe_radii[i])")
 	#legend()
 end
 #
-println(mean(phase_errors))
-display(throws)
-plot(qe_radii,phases,"-p",label="$cc")
+#println(mean(abs.(phase_errors ./ phases[m == 1 ? 1 : 2])))
+#display(throws)
+#plot(qe_radii,phases,"-p",label="$m")
+#shift = 1.0
+#errorbar(qe_radii,phases ./ ((pi*shift) .* (qe_radii.^2)),yerr=[phase_errors ./ ((pi*shift) .* (qe_radii.^2)),phase_errors ./ ((pi*shift) .* (qe_radii.^2))],label="$cl")
+#=if cc == 50
+plot(qe_radii,[1/3 for j in 1:length(qe_radii)],label="1/3")
+end
+=#
 #plot(qe_radii,[1/6 for i in 1:length(phases)]) 
-xlabel("QE Radius / rm")
-ylabel("Aharanov-Bohm Phase")
-#
+#xlabel("QE Radius / rm")
+#ylabel("Charge of Excitation")
+#=
 thisfit = LsqFit.curve_fit(quadr,qe_radii[1:5],phases[1:5],[pi/3])
 plot(qe_radii,quadr(qe_radii,thisfit.param),label="$(round(thisfit.param[1]/pi,digits=3))")
-#
-legend()
+=#
+#legend()
 #
 end
-
+#=
+fig = figure()
+plot(qe_radii[1],phases[1] ./ phases[2],"-p")
+xlabel("QE Radius / rm")
+=#
 
 
 

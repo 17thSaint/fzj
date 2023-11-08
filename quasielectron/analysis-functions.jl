@@ -11,6 +11,7 @@ end
 
 function get_occupancy(time_config,rm,axis_bins=40; kwargs...)
 	title_string = get(kwargs, :title_string, "")
+	if_plot = get(kwargs, :if_plot, true)
 	occs = zeros(axis_bins,axis_bins)
 	max_x,min_x = maximum(real.(time_config))/rm,minimum(real.(time_config))/rm
 	max_y,min_y = -1*minimum(imag.(time_config))/rm,-1*maximum(imag.(time_config))/rm
@@ -26,13 +27,15 @@ function get_occupancy(time_config,rm,axis_bins=40; kwargs...)
 		end
 	end
 	binwidth = abs(bins_x[2] - bins_x[1])
-	fig = figure()
-	imshow(occs)
-	colorbar()
-	plot_circle(1/binwidth,(axis_bins/2)-0.5)
-	title(title_string)
-	#plot_circle(5*rm,axis_bins/2)
-	return occs
+	if if_plot
+		fig = figure()
+		imshow(occs)
+		colorbar()
+		plot_circle(1/binwidth,(axis_bins/2)-0.5)
+		title(title_string)
+		#plot_circle(5*rm,axis_bins/2)
+	end
+	return occs,binwidth
 end
 
 function rad_dist(time_config,rm; kwargs...)

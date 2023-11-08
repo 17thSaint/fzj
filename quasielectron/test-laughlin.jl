@@ -19,16 +19,17 @@ end
 if true
 @testset "1QH exact for 3 particles" begin;
 
+m = 3
 particles = 3
-con = start_rand_config(particles,3)
+con = start_rand_config(particles,m)
 
-jkver = laughlin_wavefunction(con; qe_loc = 0.0, qe_cutoff = particles)[1]
-gjver = laughlin_wavefunction_girvinjach(con; qe_loc = 0.0)[1]
+jkver = laughlin_wavefunction(con,m; qe_loc = 0.0, qe_cutoff = particles)[1]
+gjver = laughlin_wavefunction_girvinjach(con,m; qe_loc = 0.0)[1]
 
 exactmat = zeros(particles,particles) .* im
 for i in 1:particles
 	for j in 1:particles
-		exactmat[i,j] = jastrow(con,con[i]) * (con[i]^(j))
+		exactmat[i,j] = jastrow(con,con[i]; power = 1) * (con[i]^(j))
 	end
 end
 exver = log(Complex(det(exactmat)))

@@ -272,17 +272,19 @@ end
 
 
 #
+if_qe = true
 axisbins = 300
 m = 1
-mc_steps = 1000000
+mc_steps = 100000
 output = 1
 sampfreq = 1
-num_parts = [i for i in 8:8]
+num_parts = [i for i in 10:10]
 for particles in num_parts
 #particles = 4
+qecut = if_qe ? particles : 0
 rm = sqrt(2*particles*m)
 step_size = 0.125*rm
-ver = "P"
+ver = "R"
 
 #=
 allowed_sets_matrix = get_full_acc_matrix(particles)
@@ -292,7 +294,7 @@ oldRF_paras = (accmat = allowed_sets_matrix, pascal = full_pasc_tri, derivs = fu
 =#
 
 for i in 1:10
-model_paras = (therm_time = 1000, vers = ver, step_size = step_size, m = m, opl = output, samp_freq = sampfreq, if_save_data = true, qe_cutoff = particles)
+model_paras = (therm_time = 1000, vers = ver, step_size = step_size, m = m, opl = output, samp_freq = sampfreq, if_save_data = true, qe_cutoff = qecut)
 allconfigs,allpsis,runtime = mc(particles,m,mc_steps; model_paras...,qe_loc = rm*i/10)
 end
 

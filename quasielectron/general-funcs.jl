@@ -17,19 +17,20 @@ end
 
 function jastrow(z,which; kwargs...)	
 	if_log = get(kwargs, :if_log, false)
+	power = get(kwargs, :power, 2)
 	
 	if if_log
 		result = 0.0*im
 		for i in 1:length(z)
 			if z[i] != which
-				result += log(Complex(which - z[i]))
+				result += power * log(Complex(which - z[i]))
 			end
 		end
 	else
 		result = 1.0
 		for i in 1:length(z)
 			if z[i] != which
-				result *= (which - z[i])^1
+				result *= (which - z[i])^power
 			end
 		end
 	end

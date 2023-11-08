@@ -67,6 +67,7 @@ end
 # the qe here is of the form of a quasihole
 function laughlin_wavefunction(z, m=3; kwargs...)
 	num_parts = length(z)
+	jast_pow = Int((m-1)/2)
 	qe_cutoff = get(kwargs, :qe_cutoff, 0)
 	qe_loc = get(kwargs, :qe_loc, 0.0+im*0.0)
 	full_mat = im.*zeros(num_parts,num_parts)
@@ -76,7 +77,7 @@ function laughlin_wavefunction(z, m=3; kwargs...)
 		if i > qe_cutoff
 			if_qe = false
 		end
-		full_mat[i,:] = [jastrow(z,z[j]; if_log=true) + (i-1)*log(Complex(z[j])) for j in 1:num_parts]
+		full_mat[i,:] = [jastrow(z,z[j]; if_log=true,power=jast_pow) + (i-1)*log(Complex(z[j])) for j in 1:num_parts]
 		if if_qe
 			full_mat[i,:] .+= [log(Complex(z[j] - qe_loc)) for j in 1:num_parts]
 		end

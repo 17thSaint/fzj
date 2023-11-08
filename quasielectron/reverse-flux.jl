@@ -2,30 +2,30 @@ using SpecialMatrices,LinearAlgebra,LsqFit,TaylorDiff
 
 include("general-funcs.jl")
 
-function nth_deriv_j2(z, which, n; kwargs...)
+function nth_deriv_jastrow(z, which, n; kwargs...)
     if_qe = get(kwargs, :if_qe, false)
     qe_loc = get(kwargs, :qe_loc, 0.0+im*0.0)
     if n == 0
     	if if_qe
-    		return (which - qe_loc)*jastrow_squared(z, which)
+    		return (which - qe_loc)*jastrow(z, which; kwargs...)
     	else
-        	return jastrow_squared(z, which)  # 0th derivative is the function itself
+        	return jastrow(z, which; kwargs...)  # 0th derivative is the function itself
         end
     else
     	#println("Working on $(n-1)-th order")
     	if if_qe
     		#println("using QE at $qe_loc")
-    		return derivative(c -> (c - qe_loc)*jastrow_squared(z,c),which,n)
+    		return derivative(c -> (c - qe_loc)*jastrow(z,c; kwargs...),which,n)
     	else
 		#println("No QE")
-	        return derivative(c -> jastrow_squared(z,c),which,n)
+	        return derivative(c -> jastrow(z,c; kwargs...),which,n)
 	end
         #return conj(ForwardDiff.derivative(c -> real(nth_deriv_j2(z, c, n - 1)), which)[1])
     end
 end
 
 function test_jastrow_firstderiv(z)
-	autodiff_result = nth_deriv_j2(z,z[1],1)
+	autodiff_result = nth_deriv_jastrow(z,z[1],1;power=2)
 	exact_result = 2*sum([(z[1] - z[k])*prod([(z[1] - z[j])^2 for j in deleteat!([l for l in 2:length(z)],k-1)]) for k in 2:length(z)])
 	if abs(autodiff_result-exact_result)/abs(exact_result) <= 0.001
 		return true
@@ -37,6 +37,7 @@ end
 function reverse_flux_wavefunction(z,m=3; kwargs...)
 	num_parts = length(z)
 	qe_cutoff = get(kwargs, :qe_cutoff, 0)
+	jast_pow = Int((m+1)/2)
 	full_mat = im.*zeros(num_parts,num_parts)
 	if_qe = qe_cutoff > 0
 	for i in 1:num_parts
@@ -44,7 +45,7 @@ function reverse_flux_wavefunction(z,m=3; kwargs...)
 		if i > qe_cutoff
 			if_qe = false
 		end
-		full_mat[i,:] = [log(Complex(nth_deriv_j2(z,z[j],i-1; if_qe = if_qe,kwargs...))) + log(2)*(i-1) for j in 1:num_parts]
+		full_mat[i,:] = [log(Complex(nth_deriv_jastrow(z,z[j],i-1; if_qe = if_qe,power=jast_pow,kwargs...))) + log(2)*(i-1) for j in 1:num_parts]
 	end
 	
 	result = get_log_det(full_mat)[1]
