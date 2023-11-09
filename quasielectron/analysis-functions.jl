@@ -12,9 +12,19 @@ end
 function get_occupancy(time_config,rm,axis_bins=40; kwargs...)
 	title_string = get(kwargs, :title_string, "")
 	if_plot = get(kwargs, :if_plot, true)
+	max_x = get(kwargs, :max_x, nothing)
+	max_y = get(kwargs, :max_y, nothing)
 	occs = zeros(axis_bins,axis_bins)
-	max_x,min_x = maximum(real.(time_config))/rm,minimum(real.(time_config))/rm
-	max_y,min_y = -1*minimum(imag.(time_config))/rm,-1*maximum(imag.(time_config))/rm
+	if isnothing(max_x)
+		max_x,min_x = maximum(real.(time_config))/rm,minimum(real.(time_config))/rm
+	else
+		min_x = -max_x
+	end
+	if isnothing(max_y)
+		max_y,min_y = -1*minimum(imag.(time_config))/rm,-1*maximum(imag.(time_config))/rm
+	else
+		min_y = -max_y
+	end
 	bins_x = [min_x + (i-1)*(max_x-min_x)/(axis_bins-1) for i in 1:axis_bins]
 	bins_y = [min_y + (i-1)*(max_y-min_y)/(axis_bins-1) for i in 1:axis_bins]
 	for pos in time_config

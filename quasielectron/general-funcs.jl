@@ -15,6 +15,16 @@ function start_rand_config(num_parts::Int, m::Int)
     return config
 end
 
+function slice_matrix(data,corrlength)
+	if length(size(data)) > 1
+		sliced_data = [data[:,j*corrlength] for j in 1:Int(floor(size(data)[2]/corrlength))]
+	else
+		sliced_data = [data[j*corrlength] for j in 1:Int(floor(size(data)[1]/corrlength))]
+	end
+	return sliced_data
+end
+
+
 function jastrow(z,which; kwargs...)	
 	if_log = get(kwargs, :if_log, false)
 	power = get(kwargs, :power, 2)

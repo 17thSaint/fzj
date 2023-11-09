@@ -96,6 +96,16 @@ function acc_rej_move(initial_config::Array,chosen_particle::Int; kwargs...)
 	end
 end
 
+function expected_time(time_expected)
+	timeinseconds = time_expected
+	timeinhours = timeinseconds/3600
+	hoursneeded = Int(floor(timeinhours))
+	timeinminutes = 60*(timeinhours - hoursneeded)
+	minutesneeded = Int(floor(timeinminutes))
+	timeinseconds = round(60*(timeinminutes - minutesneeded),digits=3)
+	return "H:$hoursneeded,M:$minutesneeded,S:$timeinseconds"
+end
+	
 function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 	steps_therm = get(kwargs, :therm_time, 1000)
 	opl = get(kwargs, :opl, 1)
@@ -103,10 +113,20 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 	if_save_data = get(kwargs, :if_save_data, false)
 	wavefunc_type = get(kwargs, :vers, "P")
 	wave_function = wavefunc_type == "P" ? laughlin_wavefunction_girvinjach : reverse_flux_wavefunction
-	qe_cutoff = get(kwargs, :qe_cutoff, 0)
-	qe_loc = get(kwargs, :qe_loc, 0.0+im*0.0)
+	qe_cutoff = get(kwargs, :qe_cutoff, nothing)
+	qe_loc = get(kwargs, :qe_loc, nothing)
 	
 	rm = sqrt(2*num_parts*m)
+	
+	params_dict::Dict{String,Any} = Dict([("mc_steps",steps),("m",m),("particles",num_parts)])
+	params_dict["qe_loc"] = isnothing(qe_loc) ? nothing : round(real(qe_loc)/rm,digits=4)
+	params_dict["qe_cutoff"] = qe_cutoff
+	wavefunc_type_name = wavefunc_type == "P" ? "laugh-" : "rfa-"
+	metadata_dict = merge(named_tuple_to_dict(kwargs),params_dict)
+	metadata = get(kwargs, :metadata, metadata_dict)
+	filename = get(kwargs, :name, wavefunc_type_name * make_parameters_filename(params_dict))
+	println(filename)
+	display(metadata)
 	
 	if qe_cutoff != 0
 		println("Using Quasielectron with cutoff at $qe_cutoff / $num_parts")
@@ -137,6 +157,7 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 		end
 	end
 	#
+	time_therm_start = time()
 	for i_therm in 1:steps_therm
 		for j_therm in 1:num_parts
 			rejected = true
@@ -170,6 +191,9 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 		end
 	end
 	
+	time_therm_end = time()
+	expected_time_perstep = (time_therm_end - time_therm_start) / steps_therm
+	println("Expected Completion time = ",expected_time(expected_time_perstep*steps*2/3))
 	
 	println("Thermalization completed")
 	#
@@ -177,12 +201,13 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 	time_wavefunc = fill(0.0+im*0.0,(Int(steps/samp_freq)))
 	
 	all_times = [[],[]]
-	
+	avg_time_perstep = 0.0
 	i = 0
 	steps_done = 0
 	time_start = time()
 	for i in 1:steps
 		rej_count = 0
+		time_perstep_start = time()
 		for j in 1:num_parts
 			rejected = true
 			attempts = 0
@@ -222,6 +247,9 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 						
 		end
 		
+		time_perstep_end = time()
+		avg_time_perstep = (i-1)*(time_perstep_end - time_perstep_start)/i
+		
 		acc_rate = num_parts/(num_parts+rej_count)
 		
 		if i%samp_freq == 0
@@ -233,12 +261,13 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 		end
 		#
 		if opl == 1 && i%(steps*0.01) == 0
-			println("Running 1/$m with $num_parts particles:"," ",100*i/steps,"%: AccRate = ",acc_rate)
+			println("Running 1/$m with $num_parts particles:"," ",100*i/steps,"%: AccRate = ",acc_rate,", Time to finish = ",round(avg_time_perstep*(steps - i),digits=3))
 		end
 	end
 	
 	time_end = time()
 	total_time = (time_end - time_start)
+	println("Took $(round(total_time,digits=3)) seconds and expected ",round(expected_time_perstep*steps*2/3,digits=3))
 	#acc_rate = acc_count/(num_parts*steps)
 	
 	if wavefunc_type == "R"
@@ -251,41 +280,31 @@ function mc(num_parts::Int,m::Int,steps::Int; kwargs...)
 	
 	if if_save_data
 		location = get(kwargs, :location, "../cluster-data/quasielectron")
-		params_dict::Dict{String,Any} = Dict([("mc_steps",steps),("m",m),("particles",num_parts)])
-		if qe_cutoff > 0
-			params_dict["qe_loc"] = round(real(qe_loc)/rm,digits=4)
-			params_dict["qe_cutoff"] = qe_cutoff
-		end
-		wavefunc_type_name = wavefunc_type == "P" ? "laugh-" : "rfa-"
-		filename = get(kwargs, :name, wavefunc_type_name * make_parameters_filename(params_dict))
-		metadata_dict = merge(named_tuple_to_dict(kwargs),params_dict)
-		metadata = get(kwargs, :metadata, metadata_dict)
 		metadata["total_time"] = total_time
+		metadata["avg_steptime"] = avg_time_perstep
 		config_data_dict = Dict([("configs",time_config),("wavefuncs",time_wavefunc)])
-		println(filename)
-		display(metadata)
 		write_data_jld2(filename,config_data_dict,location,metadata)
 	end
 	
 	return time_config,time_wavefunc,total_time
 end
 
-
-
+bins = 200
+rs = [-1.2 + (i-1)*2.4/(bins-1) for i in 1:bins]
 #
-if_qe = true
+if_qe = false
 axisbins = 300
-m = 1
-mc_steps = 100000
+m = 3
+mc_steps = 1000000
 output = 1
-sampfreq = 1
-num_parts = [11]
+sampfreq = 10
+num_parts = [150]
 for particles in num_parts
 #particles = 4
 qecut = if_qe ? particles : 0
 rm = sqrt(2*particles*m)
 step_size = 0.125*rm
-ver = "R"
+ver = "P"
 
 #=
 allowed_sets_matrix = get_full_acc_matrix(particles)
@@ -294,11 +313,18 @@ full_derivs = get_deriv_orders_matrix(particles)
 oldRF_paras = (accmat = allowed_sets_matrix, pascal = full_pasc_tri, derivs = full_derivs)
 =#
 
-for i in 1:10
-model_paras = (therm_time = 1000, vers = ver, step_size = step_size, m = m, opl = output, samp_freq = sampfreq, if_save_data = true, qe_cutoff = qecut)
-allconfigs,allpsis,runtime = mc(particles,m,mc_steps; model_paras...,qe_loc = rm*i/10)
+#for i in 1:10
+i = 0
+model_paras = (therm_time = 10, vers = ver, step_size = step_size, m = m, opl = output, samp_freq = sampfreq, if_save_data = true, qe_cutoff = qecut)
+allconfigs,allpsis,runtime = mc(particles,m,mc_steps; model_paras...,qe_loc = if_qe ? i*rm/10 : nothing)
+
+gs_density = get_occupancy(allconfigs,rm,bins; max_x = 1.2, max_y = 1.2, if_plot = false)
+nn = integrate(rs,gs_density[1][Int(bins/2),:])
+plot(rs,gs_density[1][Int(bins/2),:] ./ nn)
+title("GS")
+
 #get_occupancy(allconfigs,rm; title_string="QE Loc = $(i/10), N = $particles")
-end
+#end
 
 #allconfigs = everyconfig[particles-12]
 #raddenss = radial_density_full(allconfigs,rm; points=axisbins, rend="max",if_plot=true,labelstring="with QE")

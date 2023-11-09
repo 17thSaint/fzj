@@ -3,16 +3,6 @@ include("reverse-flux.jl")
 include("laughlin-wavefunc.jl")
 include("analysis-functions.jl")
 
-
-function slice_matrix(data,corrlength)
-	if length(size(data)) > 1
-		sliced_data = [data[:,j*corrlength] for j in 1:Int(floor(size(data)[2]/corrlength))]
-	else
-		sliced_data = [data[j*corrlength] for j in 1:Int(floor(size(data)[1]/corrlength))]
-	end
-	return sliced_data
-end
-
 function get_berry_phase(allconfigs,allwavefuncs,qe_loc,clockcount,m=3; kwargs...)
 	if_check = get(kwargs, :if_check, false)
 	wavefunc_type = get(kwargs, :vers, "P")
