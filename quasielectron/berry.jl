@@ -79,18 +79,47 @@ function get_berry_phase(allconfigs,allwavefuncs,qe_loc,clockcount,m=3; kwargs..
 	return final_val,val_error,calced_vals,throw_counts
 end
 
+function find_actual_qeloc(configs,expected_loc,rm; kwargs...)
+	findqeloc(x,p) = p[1] .* ((x .+ p[2]).^2) .+ p[3]
+	raddens = radial_density_full(configs,rm; rend=expected_loc*rm*1.5, points = 200, if_plot=true,titlestring="$expected_loc")
+	if expected_loc > 0.4
+		shift = 50
+		limit = 0.75
+		if expected_loc > 0.5
+			shift = 20
+			limit = 0.5
+		end
+		left = findfirst(x -> raddens[2][x] > limit && raddens[2][x+1] < limit,1:length(raddens[2])-1)
+		right = findfirst(x -> raddens[2][x+left+shift] < limit && raddens[2][x+left+shift+1] > limit,1:length(raddens[2])-left-shift-1) + left + shift
+	else
+		left = 2
+		right = length(raddens[1])
+	end
+	findlocfit = LsqFit.curve_fit(findqeloc,raddens[1][left:right],raddens[2][left:right],[1.0,-expected_loc,0.0])
+	plot(raddens[1][left:right],findqeloc(raddens[1][left:right],findlocfit.param),label="$(round(-findlocfit.param[2],digits=3))")
+	legend()
+	qe_actual_loc = -findlocfit.param[2]#-findlocfit.param[2] < 0.0 ? expected_loc : -findlocfit.param[2]
+	return qe_actual_loc
+end
+
 #
+for parts in [8,9,10,11]
 phases = [[0.0 for i in 1:10] for j in 1:2]
 qe_radii = [[0.0 for i in 1:10] for j in 1:2]
-for m in [3]
+#part = [8,9,10,11]
+ms = [1,3]
+figure()
+for (j,m) in enumerate(ms)
 whichtype = "rfa"
 #m = 3
+#parts = 9
+rm = sqrt(2*parts*m)
 
 if whichtype == "rfa"
-	parts = 10
+	#parts = 10
 	vers = "R"
 else
-	parts = 8
+	#parts = 8
 	vers = "P"
 end
 allfiles = find_data_file(Dict([("m",m),("particles",parts),("qe_cutoff",parts)]),whichtype,"jld2","../cluster-data/quasielectron/")
@@ -119,23 +148,29 @@ for (i,f) in enumerate(allfiles)
 	alldata,allmetadata = read_data_jld2(f,"../cluster-data/quasielectron/")
 	configs = alldata["configs"]
 	wavefuncs = alldata["wavefuncs"]
-	#=berry_data = get_berry_phase(configs,wavefuncs,allmetadata["qe_loc"],cc; corrlength = cl,vers=vers)
-	phases[m == 1 ? 1 : 2][i] = berry_data[1]
+	berry_data = get_berry_phase(configs,wavefuncs,allmetadata["qe_loc"],cc; corrlength = cl,vers=vers)
+	phases[j][i] = berry_data[1]
 	phase_errors[i] = berry_data[2]
-	qe_radii[m == 1 ? 1 : 2][i] = allmetadata["qe_loc"]
+	#qe_radii[parts == 9 ? 1 : 2][i] = allmetadata["qe_loc"]
 	throws[i] = mean(berry_data[4])
-	=#
+	
+	qe_radii[j][i] = allmetadata["qe_loc"]#find_actual_qeloc(configs,allmetadata["qe_loc"],rm)
+	#plot(raddens[1][left:right],findqeloc(raddens[1][left:right],findlocfit.param),label="$(round(-findlocfit.param[2],digits=3))")
+	#legend()
+	#=
 	occrez,bw = get_occupancy(configs,sqrt(2*parts*m),100; if_plot=false,title_string="QE Loc = $(allmetadata["qe_loc"]), m = $m")
 	quartersize = Int(size(occrez)[1]/4)
 	scatter([allmetadata["qe_loc"]],[bw*(findfirst(x->occrez[2*quartersize,x] ==minimum(occrez[Int(2*quartersize),quartersize:Int((80/25)*quartersize)]),collect(1:4*quartersize))-50)],label="$(allmetadata["qe_loc"]),$m")
+	=#
 	
 	#scatter([j for j in 1:length(berry_data[3])],berry_data[3],label="$cc,$(qe_radii[i])")
 	#legend()
 end
 #
-#println(mean(abs.(phase_errors ./ phases[m == 1 ? 1 : 2])))
-#display(throws)
-#plot(qe_radii,phases,"-p",label="$m")
+println(mean(abs.(phase_errors ./ phases[j])))
+display(throws)
+plot(qe_radii[j],phases[j],"-p",label="$parts")
+#
 #shift = 1.0
 #errorbar(qe_radii,phases ./ ((pi*shift) .* (qe_radii.^2)),yerr=[phase_errors ./ ((pi*shift) .* (qe_radii.^2)),phase_errors ./ ((pi*shift) .* (qe_radii.^2))],label="$cl")
 #=if cc == 50
@@ -143,23 +178,41 @@ plot(qe_radii,[1/3 for j in 1:length(qe_radii)],label="1/3")
 end
 =#
 #plot(qe_radii,[1/6 for i in 1:length(phases)]) 
-#xlabel("QE Radius / rm")
-#ylabel("Charge of Excitation")
-#=
-thisfit = LsqFit.curve_fit(quadr,qe_radii[1:5],phases[1:5],[pi/3])
-plot(qe_radii,quadr(qe_radii,thisfit.param),label="$(round(thisfit.param[1]/pi,digits=3))")
-=#
-#legend()
+xlabel("QE Radius / rm")
+ylabel("Charge of Excitation")
+#
+edge = 6
+thisfit = LsqFit.curve_fit(quadr,qe_radii[j][1:edge],phases[j][1:edge],[pi/3])
+plot(qe_radii[j],quadr(qe_radii[j],thisfit.param),label="$(round(thisfit.param[1]/pi,digits=3))")
+#
+legend()
 #
 end
+
+ratio = mean(phases[1] ./ phases[2])
+title("RF v=1,1/3 Ratio = $(round(ratio,digits=4))")
+
+end
+#
 #=
 fig = figure()
 plot(qe_radii[1],phases[1] ./ phases[2],"-p")
 xlabel("QE Radius / rm")
 =#
+#=
+quadr(x,p) = p[1] .* (x.^2)
+for parts in [9,10]
+fig = figure()
+plot(qe_radii[parts == 9 ? 1 : 2],phases[parts == 9 ? 1 : 2],"-p",label="$parts")
+xlabel("QE Radius / rm")
+ylabel("Charge of Excitation")
 
 
-
+thisfit = LsqFit.curve_fit(quadr,qe_radii[parts == 9 ? 1 : 2],phases[parts == 9 ? 1 : 2],[pi/3])
+plot(qe_radii[parts == 9 ? 1 : 2],quadr(qe_radii[parts == 9 ? 1 : 2],thisfit.param),label="$(round(thisfit.param[1]/pi,digits=3))")
+legend()
+end
+=#
 
 
 

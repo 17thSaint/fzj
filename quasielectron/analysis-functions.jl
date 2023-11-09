@@ -103,11 +103,20 @@ function get_autocorr_length(wavefunc_data,samp_freq)
 	return corr_length,dts,autocorr
 end
 
-function get_rightband_count(edge,pos_data,rm)
+function get_rightband_count(edge,pos_data,rm; kwargs...)
+	left_edge = get(kwargs, :left_edge, 0.0)
 	local_count = 0
-	for pos in pos_data
-		if 0.0 <= real(pos) <= edge && abs(imag(pos)) <= 0.01*rm 
-			local_count += 1/prod(size(pos_data))
+	if left_edge >= 0.0
+		for pos in pos_data
+			if left_edge <= real(pos) <= edge && abs(imag(pos)) <= 0.01*rm 
+				local_count += 1/prod(size(pos_data))
+			end
+		end
+	else
+		for pos in pos_data
+			if left_edge <= real(pos) <= edge && abs(imag(pos)) <= 0.01*rm 
+				local_count += 1/prod(size(pos_data))
+			end
 		end
 	end
 	return local_count
@@ -116,20 +125,22 @@ end
 function radial_density_full(pos_data,rm; kwargs...)
 	points = get(kwargs, :points, 100)
 	rend = get(kwargs, :rend, 1.25*rm)
+	if_neg = get(kwargs, :if_neg, false)
 	typeof(rend) == String ? rend = maximum(abs.(pos_data)) : nothing
 	if_plot = get(kwargs, :if_plot, true)
 	title_string = get(kwargs, :titlestring, "")
 	label_string = get(kwargs, :labelstring, "")
 	
-	allxs = [(i-1)*rend/(points-1) for i in 1:points]
+	if_neg ? allxs = [-rend + (i-1)*2*rend/(points-1) for i in 1:points] : allxs = [(i-1)*rend/(points-1) for i in 1:points]
 	raddens = [0.0 for i in 1:points]
+	if_neg ? le = -rend : le = 0.0
 	for (i,ed) in enumerate(allxs)
 		if i == 1
 			shift = 0
 		else
 			shift = sum(raddens[1:i-1])
 		end
-		raddens[i] = get_rightband_count(ed,pos_data,rm) - shift
+		raddens[i] = get_rightband_count(ed,pos_data,rm; left_edge = le) - shift
 	end
 	
 	normalization = integrate(allxs ./ rm, raddens)
