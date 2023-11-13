@@ -1,4 +1,4 @@
-using NumericalIntegration,LsqFit,PyPlot
+using NumericalIntegration,LsqFit,PyPlot,Statistics
 include("../other-funcs/data-storage-funcs.jl")
 
 function plot_circle(radius,center)
@@ -241,17 +241,44 @@ function fit_gaussian_raddens(particles,raddens,axisbins; kwargs...)
 end
 
 #=
+mcsteps = 100000
 dataloc = "/home/patrick/fzj/main-git/cluster-data/quasielectron"
-paradict = Dict([("m",3),("mc_steps",100000)])
+paradict = Dict([("m",3),("mc_steps",mcsteps),("qe_loc",0.0)])
 allfiles = find_data_file(paradict,"rfa","jld2",dataloc)
-everyconfig = []
+everydata = []
+everymetadata = []
 particles = []
+#
 for file in allfiles
 	parts = get_params_dict_from_filename(file)["particles"]
 	append!(particles,[parts])
-	append!(everyconfig,[read_data_jld2(file,dataloc)[1]["configs"]])
+	fulldats = read_data_jld2(file,dataloc)
+	append!(everydata,[fulldats[1]["wavefuncs"]])
+	append!(everymetadata,[fulldats[2]])
 end
 #
+alltimes = []
+allcorrlengths = []
+for (i,m) in enumerate(everymetadata)
+	append!(alltimes,[m["total_time"]])
+	append!(allcorrlengths,[get_autocorr_length(everydata[i],m["samp_freq"])[1]])
+end
+times_for_single_uncorrelated_sample = []
+for (i,p) in enumerate(particles)
+	uncorrtime = allcorrlengths[i] * alltimes[i] / mcsteps
+	append!(times_for_single_uncorrelated_sample,[uncorrtime])
+end
+=#
+scatter(particles,times_for_single_uncorrelated_sample)
+xlabel("Particle Number")
+ylabel("Uncorrlated Time (seconds)")
+title("Clocktime for single uncorrelated MC Sample")
+quad(x,p) = p[1] .* (x .^ p[3]) .+ p[2]
+qfit = LsqFit.curve_fit(quad,particles,times_for_single_uncorrelated_sample,[0.1,0.0,3.0])
+plot(collect(5:15),quad(collect(5:15),qfit.param),c="r",label="x^$(round(qfit.param[3],digits=2))")
+legend()
+#
+#=
 plotting_particles = []
 allfits = []
 axisbins = 300
