@@ -2,8 +2,9 @@ using Test
 include("fqh-thesis/cf-wavefunc.jl")
 include("reverse-flux.jl")
 
+if_all = true
 
-if true
+if if_all && true
 @testset "derivatives" begin
 
 #particles = 3
@@ -20,7 +21,7 @@ end;
 end
 
 
-if true
+if if_all && true
 @testset "analytical Jain-Kamila" begin
 
 m = 3
@@ -47,7 +48,7 @@ msc = get_rf_wavefunc(con,acc_sets_matrix,all_pascal,all_deriv_orders,[0,[0]],tr
 end;
 end
 
-if true
+if if_all && true
 @testset "quasielectron" begin
 
 m = 3
@@ -66,6 +67,22 @@ for c in 1:3
 	@test abs(real(jkexact) - real(myver))/abs(real(jkexact)) <= 0.001
 end
 
+
+end;
+end
+
+
+if false
+@testset "GJ vs JK for reverse" begin
+
+m = 3
+particles = 3
+con = start_rand_config(particles,m)
+
+gjver = analytical_3parts_girvinjach(con)
+myver = reverse_flux_wavefunction(con,m)[1]
+
+@test abs(real(gjver) - real(myver))/abs(real(gjver)) <= 0.1
 
 end;
 end

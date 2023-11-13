@@ -292,13 +292,13 @@ end
 bins = 200
 rs = [-1.2 + (i-1)*2.4/(bins-1) for i in 1:bins]
 #
-if_qe = false
+if_qe = true
 axisbins = 300
-m = 3
+m = 5
 mc_steps = 1000000
 output = 1
 sampfreq = 10
-num_parts = [150]
+num_parts = [8]
 for particles in num_parts
 #particles = 4
 qecut = if_qe ? particles : 0
@@ -313,15 +313,17 @@ full_derivs = get_deriv_orders_matrix(particles)
 oldRF_paras = (accmat = allowed_sets_matrix, pascal = full_pasc_tri, derivs = full_derivs)
 =#
 
-#for i in 1:10
-i = 0
-model_paras = (therm_time = 10, vers = ver, step_size = step_size, m = m, opl = output, samp_freq = sampfreq, if_save_data = true, qe_cutoff = qecut)
+for i in 1:10
+model_paras = (therm_time = 1000, vers = ver, step_size = step_size, m = m, opl = output, samp_freq = sampfreq, if_save_data = true, qe_cutoff = qecut)
 allconfigs,allpsis,runtime = mc(particles,m,mc_steps; model_paras...,qe_loc = if_qe ? i*rm/10 : nothing)
-
+#get_occupancy(allconfigs,rm,bins; max_x = 1.2, max_y = 1.2, if_plot = true)
+end
+#=
 gs_density = get_occupancy(allconfigs,rm,bins; max_x = 1.2, max_y = 1.2, if_plot = false)
 nn = integrate(rs,gs_density[1][Int(bins/2),:])
 plot(rs,gs_density[1][Int(bins/2),:] ./ nn)
 title("GS")
+=#
 
 #get_occupancy(allconfigs,rm; title_string="QE Loc = $(i/10), N = $particles")
 #end

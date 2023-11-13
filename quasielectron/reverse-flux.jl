@@ -92,12 +92,12 @@ function analytical_3parts_girvinjach(z)
 	lin_result += 48 * dist_btw(z,1,2,3) * dist_btw(z,1,3,2) * dist_btw(z,2,3,4)
 	lin_result += 48 * dist_btw(z,1,2,3) * dist_btw(z,1,3,4) * dist_btw(z,2,3,2)
 	
-	result = log(Complex(lin_result)) + log(8)
-	#=
+	result = log(Complex(lin_result)) #+ log(8)
+	#
 	for i in 1:3
 		result += -0.25*abs2(z[i])
 	end
-	=#
+	#
 	return result
 end
 

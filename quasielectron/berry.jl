@@ -71,34 +71,33 @@ end
 
 function find_actual_qeloc(configs,expected_loc,rm; kwargs...)
 	findqeloc(x,p) = p[1] .* ((x .+ p[2]).^2) .+ p[3]
-	raddens = radial_density_full(configs,rm; rend=expected_loc*rm*1.5, points = 200, if_plot=true,titlestring="$expected_loc")
+	raddens = radial_density_full(configs,rm; rend=expected_loc*rm*1.5, points = 300, if_plot=false,titlestring="$expected_loc")
 	if expected_loc > 0.4
-		shift = 50
-		limit = 0.75
-		if expected_loc > 0.5
-			shift = 20
-			limit = 0.5
-		end
-		left = findfirst(x -> raddens[2][x] > limit && raddens[2][x+1] < limit,1:length(raddens[2])-1)
+		shift = 100
+		limit = maximum(raddens[2]) * 0.1
+		left = findfirst(x -> raddens[2][x] > limit && raddens[2][x+1] < limit,10:length(raddens[2])-1) + 10
 		right = findfirst(x -> raddens[2][x+left+shift] < limit && raddens[2][x+left+shift+1] > limit,1:length(raddens[2])-left-shift-1) + left + shift
 	else
 		left = 2
 		right = length(raddens[1])
 	end
 	findlocfit = LsqFit.curve_fit(findqeloc,raddens[1][left:right],raddens[2][left:right],[1.0,-expected_loc,0.0])
-	plot(raddens[1][left:right],findqeloc(raddens[1][left:right],findlocfit.param),label="$(round(-findlocfit.param[2],digits=3))")
-	legend()
+	#plot(raddens[1][left:right],findqeloc(raddens[1][left:right],findlocfit.param),label="$(round(-findlocfit.param[2],digits=3))")
+	#legend()
 	qe_actual_loc = -findlocfit.param[2]#-findlocfit.param[2] < 0.0 ? expected_loc : -findlocfit.param[2]
-	return qe_actual_loc
+	if abs(qe_actual_loc) > 1.2
+		return expected_loc
+	else
+		return qe_actual_loc
+	end
 end
 
 #
-for parts in [8,9,10,11]
-phases = [[0.0 for i in 1:10] for j in 1:2]
-qe_radii = [[0.0 for i in 1:10] for j in 1:2]
+parts = 10
+ms = [5]
+phases = [[0.0 for i in 1:10] for j in 1:length(ms)]
+qe_radii = [[0.0 for i in 1:10] for j in 1:length(ms)]
 #part = [8,9,10,11]
-ms = [1,3]
-figure()
 for (j,m) in enumerate(ms)
 whichtype = "rfa"
 #m = 3
@@ -113,6 +112,8 @@ else
 	vers = "P"
 end
 allfiles = find_data_file(Dict([("m",m),("particles",parts),("qe_cutoff",parts)]),whichtype,"jld2","../cluster-data/quasielectron/")
+loc = findfirst(x -> get_params_dict_from_filename(allfiles[x])["qe_loc"] == 0.0,1:length(allfiles))
+!isnothing(loc) ? deleteat!(allfiles,loc) : nothing
 #=
 alldata = []
 allmetadata = []
@@ -136,15 +137,17 @@ throws = [0.0 for i in 1:length(allfiles)]
 for (i,f) in enumerate(allfiles)
 	println(i/length(allfiles))
 	alldata,allmetadata = read_data_jld2(f,"../cluster-data/quasielectron/")
-	configs = alldata["configs"]
-	wavefuncs = alldata["wavefuncs"]
-	berry_data = get_berry_phase(configs,wavefuncs,allmetadata["qe_loc"],cc; corrlength = cl,vers=vers)
+	therm_time = allmetadata["therm_time"]
+	samp_freq = allmetadata["samp_freq"]
+	configs = alldata["configs"][:,Int((1000 - therm_time)/samp_freq)+1:end]
+	wavefuncs = alldata["wavefuncs"][Int((1000 - therm_time)/samp_freq)+1:end]
+	berry_data = get_berry_phase(configs,wavefuncs,allmetadata["qe_loc"],cc; corrlength = Int(cl / samp_freq),vers=vers)
 	phases[j][i] = berry_data[1]
 	phase_errors[i] = berry_data[2]
 	#qe_radii[parts == 9 ? 1 : 2][i] = allmetadata["qe_loc"]
 	throws[i] = mean(berry_data[4])
 	
-	qe_radii[j][i] = allmetadata["qe_loc"]#find_actual_qeloc(configs,allmetadata["qe_loc"],rm)
+	qe_radii[j][i] = find_actual_qeloc(configs,allmetadata["qe_loc"],rm)
 	#plot(raddens[1][left:right],findqeloc(raddens[1][left:right],findlocfit.param),label="$(round(-findlocfit.param[2],digits=3))")
 	#legend()
 	#=
@@ -168,22 +171,41 @@ plot(qe_radii,[1/3 for j in 1:length(qe_radii)],label="1/3")
 end
 =#
 #plot(qe_radii,[1/6 for i in 1:length(phases)]) 
-xlabel("QE Radius / rm")
-ylabel("Charge of Excitation")
-#
-edge = 6
+#xlabel("QE Radius / rm")
+#ylabel("Charge of Excitation")
+#=
+edge = 5
 thisfit = LsqFit.curve_fit(quadr,qe_radii[j][1:edge],phases[j][1:edge],[pi/3])
 plot(qe_radii[j],quadr(qe_radii[j],thisfit.param),label="$(round(thisfit.param[1]/pi,digits=3))")
 #
 legend()
-#
+=#
 end
+#=
 
-ratio = mean(phases[1] ./ phases[2])
-title("RF v=1,1/3 Ratio = $(round(ratio,digits=4))")
-
+quadr(x,p) = p[1] .* (x.^2)
+slopes = [0.0 for i in 1:3]
+edges = [5,5,8]
+givenslope = [36,12,36/5]
+for j in 1:3
+plot(qe_radii[j],phases[j],"-p",label="1/$(ms[j])")
+edge = edges[j]
+thisfit = LsqFit.curve_fit(quadr,qe_radii[j][1:edge],phases[j][1:edge],[pi/3])
+if j == 1
+plot(qe_radii[j],quadr(qe_radii[j],[givenslope[j]*pi]),c="k",label="TH")#"$(round(thisfit.param[1]/pi,digits=3))")
+else
+plot(qe_radii[j],quadr(qe_radii[j],[givenslope[j]*pi]),c="k")#"$(round(thisfit.param[1]/pi,digits=3))")
 end
-#
+slopes[j] = thisfit.param[1]/pi
+end
+xlabel("QE Radius / rm")
+ylabel("Berry Phase")
+legend()
+ylim(0,60)
+ratio13 = slopes[1] / slopes[2]#mean(phases[1][1:10] ./ phases[2][1:10])
+ratio15 = slopes[1] / slopes[3]#mean(phases[1][1:10] ./ phases[3][1:10])
+title("Laughlin v=1,1/3,1/5")#: 1/3 Ratio = $(round(ratio13,digits=4)), 1/5 Ratio = $(round(ratio15,digits=4))")
+=#
 #=
 fig = figure()
 plot(qe_radii[1],phases[1] ./ phases[2],"-p")
