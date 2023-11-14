@@ -346,6 +346,25 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	return psi
 end
 
+function check_convergence(starting_mps,metadata,filename)
+	allnrgs = metadata["observer"].energies
+	if abs(allnrgs[end] - allnrgs[end-1]) < 10^-2
+		println("Converged by DMRGObserver")
+		return true
+	else
+		metadata["if_save_data"] = false
+		metadata["nsweeps"] = 10
+		u1 = metadata["U1"]
+		u2 = metadata["U2"]
+		phi = metadata["phi"]
+		L = metadata["L"]
+		nf = metadata["nflavors"]
+		nb = metadata["nbosons"]
+		println("Not Converged")
+		return false
+	end
+end
+
 function run_mps_new_variable(seed_wavefunc,seed_params_dict,new_params_dict,location="../cluster-data/orsay-sept23")
 	newname = rewrite_filename(seed_params_dict["name"],new_params_dict)
 	

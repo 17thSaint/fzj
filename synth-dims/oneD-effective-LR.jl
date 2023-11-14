@@ -19,7 +19,7 @@ save_nothing = false
 params_dict = Dict()
 #L = 24#get(params_dict, "L", 4)
 #nbosons = 5#get(params_dict, "nbosons", nflavors)
-nflavors = 5#get(params_dict, "nflavors", Int(L/2))
+nflavors = 10#get(params_dict, "nflavors", Int(L/2))
 t1 = get(params_dict, "t1", 1.0)
 t2 = get(params_dict, "t2", 1.0)
 U = get(params_dict, "U", 100)
@@ -29,7 +29,7 @@ conserve_qns = true
 if_nn_int = false#get(params_dict, "if_nn_int", false)
 if_2ord_pert = false#get(params_dict, "if_2ord_pert", false)
 nsweeps = 100
-mdim = get(params_dict, "mdim", 100)
+mdim = get(params_dict, "mdim", 60)
 noises = [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0.0]
 if_save_data = save_nothing ? false : true
 data_loc = "/home/patrick/fzj/main-git/cluster-data/orsay-sept23"
@@ -39,7 +39,7 @@ if_periodic_synth = true
 #alpha = 23/(24^2)
 
 
-dmrg_obs = TTNKit.DMRGObserver(;energy_tol=10^-3,minsweeps=3)
+dmrg_obs = TTNKit.DMRGObserver(;energy_tol=10^-3,minsweeps=6)
 
 other_params_dict = Dict([("U",U),("conserve_qns",conserve_qns),("nsweeps",nsweeps),("mdim",mdim),("noise",noises)])
 savefig_data = save_nothing ? false : true
@@ -50,16 +50,18 @@ if_lines = false
 #alpha = 0.0
 
 density = 5/40
-Ls = [8,24,40,56,72,88]
-
+#Ls = [8]
+L = 16
+count = 20
+alphas = [0.05 + (i-1)*(0.08 - 0.05)/(count-1) for i in 8:count] .- 0.0001
 
 wavefuncs = []
 rhos = []
 #nbosons = Int(L/2)
 #fillings = ["1/2","2/3","1/3"]
-for (idx,L) in enumerate(Ls)
-	nbosons = Int(L*nflavors*density)
-	alpha = nbosons/((L-1)*nflavors)
+for (idx,alpha) in enumerate(alphas)
+	nbosons = 10#Int(L*nflavors*density)
+	#alpha = nbosons/((L-1)*nflavors)
 	phi = 2*pi*alpha
 	filename_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons),("alpha",round(alpha,digits=4)),("if_periodic_synth",if_periodic_synth),("if_periodic_phys",if_periodic_phys)])
 	#filename_dict_highdens = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons_highdens),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
@@ -77,7 +79,7 @@ for (idx,L) in enumerate(Ls)
 
 	psi = execute_mps(U1,U2,phi,L,nflavors,nbosons; model_paras...,metadata=metadata_dict)
 	append!(wavefuncs,[psi])
-	#plot(expect(psi,"N"),label="$nflavors")
+	get_occupancy(psi; plot_title="$alpha")
 	#densmat = correlation_matrix(psi,"FullDag","FullHat") #./ 2.0
 	#append!(rhos,[densmat])
 	#=if false

@@ -1,23 +1,98 @@
+if false
 include("long-range-ttn.jl")
 include("fqh_effective.jl")
 using PyPlot
-
-#
+end
+#=
 alpha_start = 0.1
 alpha_end = 0.15
 alpha_count = 5
 alpha_vals = [alpha_start + (i-1)*(alpha_end-alpha_start)/(alpha_count-1) for i in 1:alpha_count]
 change = 0.0001
-#
-
 density = 5/40
 Ls = [8,24,40,56,72,88,96]
+=#
 
-#params_dict = Dict([("nbosons",60),("L",96)])
+
+
+
+#
+params_dict = Dict([("if_periodic_phys",false),("if_periodic_synth",true),("nflavors",10),("L",16),("nbosons",10)])
 loc = "/home/patrick/fzj/main-git/cluster-data/orsay-sept23"
-#all_files = find_data_file(params_dict,"mps","jld2",loc)
-#display(all_files)
+all_files = find_data_file(params_dict,"mps","jld2",loc)
+display(all_files)
+#
+notcon = []
+location_dict = Dict()
+for (i,f) in enumerate(all_files)
+	namedata = get_params_dict_from_filename(f)
+	nf,L,nbosons,alpha = namedata["nflavors"],namedata["L"],namedata["nbosons"],namedata["alpha"]
+	#filling = nbosons/(L*nf*alpha)
+	if "$L,$nf" in collect(keys(location_dict))
+		append!(location_dict["$L,$nf"],[i])
+	else
+		location_dict["$L,$nf"] = [i]
+	end
+end
 
+for (k,v) in location_dict
+	if length(location_dict[k]) < 5
+		delete!(location_dict,k)
+	end
+end
+#
+toberm = []
+for (idx,i) in enumerate(location_dict["16,10"])
+	file = all_files[i]
+	if occursin("mk",file)
+		append!(toberm,[idx])
+	end
+end
+deleteat!(location_dict["16,10"],toberm)
+#
+
+allfillings = []
+alllocs = []
+for (idx,i) in enumerate(location_dict["16,10"])
+	file = all_files[i]
+	namedata = get_params_dict_from_filename(file)
+	alpha = namedata["alpha"]
+	#filling = nbosons/(L*nf*alpha)
+	append!(allfillings,[alpha])
+	append!(alllocs,[idx])
+end
+
+noneighbors = []
+for (i,v) in enumerate(allfillings)
+	alldifs = deleteat!(abs.(v .- allfillings),i)
+	if !any(alldifs .< 0.0002)
+		append!(noneighbors,[alllocs[i]])
+	end
+end
+deleteat!(location_dict["16,10"],noneighbors)
+
+
+#
+#
+alphas = []
+dbds = []
+for i in 1:Int(length(location_dict["16,10"])/2)
+	file1 = all_files[location_dict["16,10"][2*i-1]]
+	file2 = all_files[location_dict["16,10"][2*i]]
+	ttndict1,metadata1 = read_data_jld2(file1,loc)
+	ttndict2,metadata2 = read_data_jld2(file2,loc)
+	alpha1, alpha2 = metadata1["phi"]/(2*pi) ,metadata2["phi"]/(2*pi)
+	alphadiff = alpha1 - alpha2
+	append!(alphas,[0.5*(alpha1+alpha2)])
+	dbd = deriv_bulk_dens(ttndict1["mps"],ttndict2["mps"],alphadiff)
+	append!(dbds,[dbd])
+end
+#
+ys = collect(minimum(dbds):0.01:maximum(dbds))
+plot([1/8 for i in 1:length(ys)],ys)
+scatter(alphas,dbds)
+#
+#=
 allpsis = Dict()
 all_dbds = Dict()
 all_nrgs = Dict()
@@ -119,7 +194,7 @@ end
 #fig2 = figure()
 #plot(Iterators.flatten([[alpha_vals[i]-change,alpha_vals[i],alpha_vals[i]+change] for i in 1:alpha_count]),bulkdenses,"-p")
 #title("Bulk Density vs Flux Density")
-
+=#
 
 
 

@@ -436,8 +436,8 @@ function deriv_bulk_dens(ttn1,ttn2,alpha_change,bulk_width_phys=1,bulk_width_vir
 		bulk_dens_1 = bulk_density(nothing,bulk_width_phys,bulk_width_virt; occ_mat=occ_mat1)
 		bulk_dens_2 = bulk_density(nothing,bulk_width_phys,bulk_width_virt; occ_mat=occ_mat2)
 	else
-		bulk_dens_1 = bulk_density(ttn1,bulk_width)
-		bulk_dens_2 = bulk_density(ttn2,bulk_width)
+		bulk_dens_1 = bulk_density(ttn1,bulk_width_phys,bulk_width_virt)
+		bulk_dens_2 = bulk_density(ttn2,bulk_width_phys,bulk_width_virt)
 	end
 	deriv = (bulk_dens_1 - bulk_dens_2)/alpha_change
 	return deriv
