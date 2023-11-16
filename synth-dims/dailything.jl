@@ -1,4 +1,4 @@
-if false
+if true
 include("long-range-ttn.jl")
 include("fqh_effective.jl")
 using PyPlot
@@ -89,7 +89,7 @@ for i in 1:Int(length(location_dict["16,10"])/2)
 end
 #
 ys = collect(minimum(dbds):0.01:maximum(dbds))
-plot([1/8 for i in 1:length(ys)],ys)
+plot([1/16 for i in 1:length(ys)],ys)
 scatter(alphas,dbds)
 #
 #=

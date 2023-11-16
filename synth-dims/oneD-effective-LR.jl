@@ -15,11 +15,11 @@ function fix_filling(L,nflavors,nu)
 	return nothing,nothing
 end
 if true
-save_nothing = false
+save_nothing = true
 params_dict = Dict()
 #L = 24#get(params_dict, "L", 4)
 #nbosons = 5#get(params_dict, "nbosons", nflavors)
-nflavors = 10#get(params_dict, "nflavors", Int(L/2))
+nflavors = 2#get(params_dict, "nflavors", Int(L/2))
 t1 = get(params_dict, "t1", 1.0)
 t2 = get(params_dict, "t2", 1.0)
 U = get(params_dict, "U", 100)
@@ -34,7 +34,7 @@ noises = [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0.0]
 if_save_data = save_nothing ? false : true
 data_loc = "/home/patrick/fzj/main-git/cluster-data/orsay-sept23"
 if_periodic_phys = false
-if_periodic_synth = true
+if_periodic_synth = false
 #nflavors = 9
 #alpha = 23/(24^2)
 
@@ -51,16 +51,19 @@ if_lines = false
 
 density = 5/40
 #Ls = [8]
-L = 16
+L = 1
 count = 20
-alphas = [0.05 + (i-1)*(0.08 - 0.05)/(count-1) for i in 8:count] .- 0.0001
-
+alphastart = 0.081
+alphaend = 0.3
+alphas = [0.0]#[alphastart + (i-1)*(alphaend - alphastart)/(count-1) for i in 1:count] .- 0.0001
+#alphas = [alphas; alphas .+ 0.0001]
+display(alphas)
 wavefuncs = []
 rhos = []
 #nbosons = Int(L/2)
 #fillings = ["1/2","2/3","1/3"]
 for (idx,alpha) in enumerate(alphas)
-	nbosons = 10#Int(L*nflavors*density)
+	nbosons = 1#Int(L*nflavors*density)
 	#alpha = nbosons/((L-1)*nflavors)
 	phi = 2*pi*alpha
 	filename_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons),("alpha",round(alpha,digits=4)),("if_periodic_synth",if_periodic_synth),("if_periodic_phys",if_periodic_phys)])
@@ -80,6 +83,8 @@ for (idx,alpha) in enumerate(alphas)
 	psi = execute_mps(U1,U2,phi,L,nflavors,nbosons; model_paras...,metadata=metadata_dict)
 	append!(wavefuncs,[psi])
 	get_occupancy(psi; plot_title="$alpha")
+	get_greenfunc(psi)
+	get_greenfunc(psi,"phys")
 	#densmat = correlation_matrix(psi,"FullDag","FullHat") #./ 2.0
 	#append!(rhos,[densmat])
 	#=if false

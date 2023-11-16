@@ -288,7 +288,8 @@ function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 				end
 			end
 			ampo += (-t2 * exp(im*phi*j), "Cr$(next_site) * Anh$(s)", j)
-			ampo += (-t2 * exp(-im*phi*j), "Cr$(s) * Anh$(next_site)", j)
+			#ampo += (-t2 * exp(-im*phi*j), "Cr$(s) * Anh$(next_site)", j)
+			ampo += (-t2 * exp(-im*phi*j), "Anh$(next_site) * Cr$(s)", j)
 		end
 	end
 	
@@ -318,6 +319,7 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	end
 	H = MPO(hamiltonian(t1,t2,phi,U1,U2,L,nflavors; kwargs...), sidx)
 	println("Built Hams")
+	display(matrix(combiner(dag.(sidx))*prod(H)*combiner(prime.(sidx))))
 	states = make_states(L,nbosons,nflavors)
 	if isnothing(psi0)
 		psi0 = randomMPS(sidx, states)
