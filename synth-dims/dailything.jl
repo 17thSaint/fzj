@@ -15,7 +15,6 @@ Ls = [8,24,40,56,72,88,96]
 
 
 
-
 #
 params_dict = Dict([("if_periodic_phys",false),("if_periodic_synth",true),("nflavors",10),("L",16),("nbosons",10)])
 loc = "/home/patrick/fzj/main-git/cluster-data/orsay-sept23"

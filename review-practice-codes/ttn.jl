@@ -680,7 +680,7 @@ function warming(ttn,ham,sp,particle_count,warming_limit; kwargs...)
 	frozen = true
 	global old_data = [ttn,ham,sp]
 	while frozen && warming_count < warming_limit
-		new_maxdim = Int((warming_count+10)*max_dim/10)
+		new_maxdim = Int(ceil((warming_count+10)*max_dim/10))
 		reexpanded_ttn = TTNKit.adjust_tree_tensor_dimensions(old_data[1],new_maxdim)
 		new_ttn, new_ham, new_sp = do_sweep(reexpanded_ttn,ham,sweep_type,particle_count; kwargs...)
 		println("Max Dim = ",TTNKit.maxlinkdim(new_sp.ttn),", Expected = $new_maxdim")
@@ -736,6 +736,7 @@ function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 	net = get(kwargs, :ttn_net, nothing)
 	ttn = get(kwargs, :seed_ttn, nothing)
 	if_gpu = get(kwargs, :if_gpu, false)
+	if_check = get(kwargs, :if_check, false)
 	particle_type = get(kwargs, :part_type, "Boson")
 	
 	
@@ -786,20 +787,24 @@ function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 			time_end = time()
 			append!(times,[time_end - time_start])
 			#return sp.ttn, ham, sp
-			if_frozen,why = any(particle_type .== ["Fermion","Boson"]) ? check_if_frozen(new_sp.ttn) : (false,"cuz")
-			if !if_frozen
-				#get_position_dims(sp.ttn)
-				#return new_sp.ttn, new_ham, new_sp
-				ttn,ham,sp = new_ttn,new_ham,new_sp
-			else
-				if why == "frozen"
-					println("Frozen on First Attempt, Starting Warming")
-				elseif why == "variables"
-					println("Bad Variables on First Attempt, Starting Reset")	
+			if if_check
+				if_frozen,why = any(particle_type .== ["Fermion","Boson"]) ? check_if_frozen(new_sp.ttn) : (false,"cuz")
+				if !if_frozen
+					#get_position_dims(sp.ttn)
+					#return new_sp.ttn, new_ham, new_sp
+					ttn,ham,sp = new_ttn,new_ham,new_sp
+				else
+					if why == "frozen"
+						println("Frozen on First Attempt, Starting Warming")
+					elseif why == "variables"
+						println("Bad Variables on First Attempt, Starting Reset")	
+					end
+					warmed_results = warming(new_ttn,new_ham,new_sp,particle_count,warming_limit;kwargs...)
+					#return warmed_results
+					ttn,ham,sp = warmed_results
 				end
-				warmed_results = warming(new_ttn,new_ham,new_sp,particle_count,warming_limit;kwargs...)
-				#return warmed_results
-				ttn,ham,sp = warmed_results
+			else
+				ttn,ham,sp = new_ttn,new_ham,new_sp
 			end
 		end
 		

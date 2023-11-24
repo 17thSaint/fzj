@@ -1,4 +1,4 @@
-#using PyPlot
+using PyPlot
 include("../review-practice-codes/ttn.jl")
 
 function spin_matrix_element(m1,m2,spin,direction::String)
@@ -144,7 +144,7 @@ function build_HH_net(num_layers; kwargs...)
 	return net
 end
 
-function get_interaction_coords(given_site,inter_dist,lat) # written by ChatGPT 12.06.2023 then vastly edited 13.06.2023 by me
+function get_interaction_coords(given_site,inter_dist,lat,if_periodic_virt) # written by ChatGPT 12.06.2023 then vastly edited 13.06.2023 by me
 	virtual, physical = given_site
 	coordinates = []
     
@@ -157,21 +157,23 @@ function get_interaction_coords(given_site,inter_dist,lat) # written by ChatGPT 
 		new_virtual = virtual + shift
 				
 		# Apply periodic boundary conditions along the virtual-axis
-		if new_virtual < 1
-			new_virtual += virt_edge_length
-		elseif new_virtual > virt_edge_length
-			new_virtual -= virt_edge_length
+		if if_periodic_virt
+			if new_virtual < 1
+				new_virtual += virt_edge_length
+			elseif new_virtual > virt_edge_length
+				new_virtual -= virt_edge_length
+			end
 		end
 
-               	# Check if new coordinates are within lattice dimensions
+        # Check if new coordinates are within lattice dimensions
 		if 1 <= new_virtual <= virt_edge_length && new_virtual != virtual
  			append!(coordinates, [[new_virtual,physical]])
- 		else
- 			println("Still Outside Lattice")
+ 		#else
+ 			#println("Still Outside Lattice")
 		end
 
 	end
-	return coordinates
+	return unique(coordinates)
 end
 
 function long_range_HH_ham(net,t_strength,phi; kwargs...)
@@ -180,10 +182,9 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	
 	u_strength = get(kwargs, :u_strength, 1.0)
 	scaling_distance = get(kwargs, :scaling_dist, 0) #[[u_strength/2]; [0 for i in 1:virt_edge_length-1]]
-	long_range_strengths = long_range_scaling(scaling_distance,virt_edge_length,u_strength; kwargs...)
 	
-	if_interaction = !all(long_range_strengths.==0)
-	if_periodic = get(kwargs, :if_periodic, true)
+	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
+	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
 	if_hopping = get(kwargs, :if_hopping, true)
 	if_chem = get(kwargs, :if_chem, false)
 	if_nn_int = get(kwargs, :if_nn_int, false)
@@ -192,16 +193,20 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	vpinning = get(kwargs, :vpinning, 2.5)
 	no_magF = get(kwargs, :no_magF, false)
 	chem_strength = get(kwargs, :chem_strength, 0.0)
+
+	long_range_strengths = long_range_scaling(scaling_distance,virt_edge_length,nn_int_strength; kwargs...)
+	if_interaction = !all(long_range_strengths.==0)
 	
 	lat = TTNKit.physical_lattice(net)
 	
 	if if_hopping
 		hopping = TTNKit.OpSum()
-		for (s1,s2) in TTNKit.nearest_neighbours(lat,collect(1:TTNKit.number_of_sites(lat)); periodic=if_periodic)
+		#
+		for (s1,s2) in TTNKit.nearest_neighbours(lat,collect(1:TTNKit.number_of_sites(lat)))
 			s1_coord = TTNKit.coordinate(lat,s1)
 			s2_coord = TTNKit.coordinate(lat,s2)
 						
-			coeff = get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
+			coeff = 2*get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
 			
 			#if s1_coord[1] == s2_coord[1]
 			#	coeff *= 500
@@ -211,9 +216,54 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 			hopping += (conj(coeff),"Adag",s2_coord,"A",s1_coord)
 			
 		end
+		#
+		if if_periodic_virt
+			for i in 1:virt_edge_length
+				s1_coord = (i,1)
+				s2_coord = (i,virt_edge_length)
+				coeff = 2*get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
+				hopping += (coeff,"Adag",(i,1),"A",(i,virt_edge_length))
+				hopping += (conj(coeff),"Adag",(i,virt_edge_length),"A",(i,1))
+			end
+		end
+
+		if if_periodic_phys
+			for i in 1:phys_edge_length
+				s1_coord = (1,i)
+				s2_coord = (phys_edge_length,i)
+				coeff = 2*get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
+				hopping += (coeff,"Adag",(1,i),"A",(phys_edge_length,i))
+				hopping += (conj(coeff),"Adag",(phys_edge_length,i),"A",(1,i))
+			end
+		end
+
 		append!(resulting_ham,[hopping])
 	end
 	
+	if if_interaction
+		interaction = TTNKit.OpSum()
+		for (idx,stren) in enumerate(long_range_strengths)
+			if stren == 0.0
+				continue
+			else
+				if idx == 1
+					for j in TTNKit.eachindex(lat)
+						interaction += (stren,"N * N",TTNKit.coordinate(lat,j))
+					end
+				else
+					for j in TTNKit.eachindex(lat)
+						interaction_sites = get_interaction_coords(TTNKit.coordinate(lat,j),idx-1,lat,if_periodic_virt)
+						
+						for k in interaction_sites
+							interaction += (stren,"Adag * A",TTNKit.coordinate(lat,j),"Adag * A",Tuple(k))
+						end
+					end
+				end
+			end
+		end
+		append!(resulting_ham,[interaction])
+	end
+	#=
 	if if_interaction
 		interaction = TTNKit.OpSum()
 		for i in 1:length(long_range_strengths)
@@ -249,7 +299,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 		end
 		append!(resulting_ham,[nn_int])
 	end
-	
+	=#
 	if if_chem && chem_strength != 0.0
 		chem = TTNKit.OpSum()
 		for i in TTNKit.eachindex(lat)
@@ -442,8 +492,8 @@ function deriv_bulk_dens(ttn1,ttn2,alpha_change,bulk_width_phys=1,bulk_width_vir
 	deriv = (bulk_dens_1 - bulk_dens_2)/alpha_change
 	return deriv
 end
-#=
-if false
+#
+if true
 
 nns_start = 0.01
 nns_end = 1.0
@@ -452,11 +502,11 @@ nn_strens = [nns_start + (i-1)*(nns_end-nns_start)/(nns_count-1) for i in 1:nns_
 wavefuncs = []
 
 nnst = 100.0
-layers = 6
-lr = Int(sqrt(2^layers)/2)
+layers = 4
+lr = Int(sqrt(2^layers))-1
 #for nnst in nn_strens
 
-	params_dict = Dict([("layers",layers),("mdim",20),("mag_off",false),("lr",lr),("if_nn_int",true),("nn_strength",nnst)])
+	params_dict = Dict([("layers",layers),("mdim",200),("mag_off",false),("lr",lr),("if_nn_int",true),("nn_strength",nnst)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
@@ -493,29 +543,32 @@ lr = Int(sqrt(2^layers)/2)
 	end
 
 	#
+	nu = 1.0
 	sweep_type = "dmrg"
 	max_occ = 2
-	if_per = true
+	if_per_phys = false
+	if_per_virt = false
 	evolve = true
 	chemical = false
-	mu = 0.5
+	mu = 0.0
 	#max_occupation = 3
-	expan = TTNKit.DefaultExpander(0.5)
+	expan = TTNKit.NoExpander()#DefaultExpander(0.5)
+	noise = [0.0]#[1E-2, 1E-2, 1E-2,0.0]
 	ts = 0.500
 	tot_sites = 2^layer_count
 
 	if isnothing(alpha)
 		if !mag_off
-			alpha = num_particles/(mu * (tot_sites))
+			alpha = num_particles/(nu * (tot_sites))
 		else
 			alpha = 0.0
 		end
 	end
 	nswps = 5
-	nu = 1/1
-	alpha = 7/64
+	#alpha = 7/64
 	num_particles = Int(alpha * tot_sites * nu)
 	#
+	alpha = 0.0
 
 	plotting = false
 	save_plot = false
@@ -525,10 +578,9 @@ lr = Int(sqrt(2^layers)/2)
 	if_cliff = false
 	sc_type = "flat"
 	dists = [i for i in 1:2*edge_sites]
-	lr_scaling = long_range_scaling(longrange_dist,edge_sites,0.0; cliff=if_cliff,limit=limit,scaling=sc_type,if_plot=false)
+	lr_scaling = long_range_scaling(longrange_dist,edge_sites,limit; cliff=if_cliff,limit=limit,scaling=sc_type,if_plot=false)
 
-		
-	metadata_dict = Dict([("if_per",if_per),("mag_off",mag_off),("chemical",chemical),("mu",mu),("ts",ts),("nu",nu),("layers",layer_count),("particles",num_particles),("alpha",alpha),("mdim",mdim),("nswps",nswps),("if_cliff",if_cliff),("sc_type",sc_type),("longrange_dist",longrange_dist),("max_occ",max_occ),("sweep_type",sweep_type),("limit",limit),("lr_scaling",lr_scaling),("if_change",if_change),("change",change),("if_nn_int",if_NN),("nn_strength",nnst)])
+	metadata_dict = Dict([("if_per",if_per),("mag_off",mag_off),("chemical",chemical),("mu",mu),("ts",ts),("layers",layer_count),("particles",num_particles),("alpha",alpha),("mdim",mdim),("nswps",nswps),("if_cliff",if_cliff),("sc_type",sc_type),("longrange_dist",longrange_dist),("max_occ",max_occ),("sweep_type",sweep_type),("limit",limit),("lr_scaling",lr_scaling),("if_change",if_change),("change",change),("if_nn_int",if_NN),("nn_strength",nnst),("noise",noise)])
 	
 	filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("nu",round(nu,digits=4)),("if_periodic",if_per),("nn_strength",nnst),("mdim",mdim)])
 
@@ -538,7 +590,7 @@ lr = Int(sqrt(2^layers)/2)
 	#else
 		datafile_name = make_parameters_filename(filename_dict)
 	#end
-
+	model_paras = (if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=nnst,if_chem=chemical,chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,limit=limit,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=noise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc,metadata=metadata_dict)
 		#
 	println(datafile_name)
 	title_string = "Np = $num_particles, LR = $longrange_dist at $limit"
@@ -546,12 +598,14 @@ lr = Int(sqrt(2^layers)/2)
 	if true
 	starting = time()
 	net = build_HH_net(layer_count; syms=true)
-	ham = long_range_HH_ham(net,ts,alpha; scaling=sc_type,limit=limit,scaling_dist=longrange_dist,cliff=if_cliff,if_periodic=if_per,if_chem=chemical,no_magF=mag_off)
-	og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layer_count,num_particles,ts,nu; ttn_net=net,ham_op=ham,if_save_data=save_data,name="ttn-"*datafile_name,location=loc,metadata=metadata_dict,max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=max_occ,if_sweep=evolve,sweep_type=sweep_type,expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,if_gpu=if_gpu,output_level=0)
+	ham = long_range_HH_ham(net,ts,alpha; model_paras...)
+	og_ttn, hamilt, dm_sp = find_ground_state(layer_count,num_particles,ts; ttn_net=net,ham_op=ham,model_paras...)
 	total_time = time() - starting
 	println("Running time = $total_time")
 	append!(wavefuncs,[dm_sp.ttn])
-	
+	get_occupancy(dm_sp.ttn)
+	get_xdir_greenfunc(dm_sp.ttn)
+	get_ydir_greenfunc(dm_sp.ttn)
 	end
 
 end
@@ -571,7 +625,7 @@ end
 #
 
 #occs1 = get_occupancy(dm_sp.ttn; if_plot=true,if_save_fig=false,if_save_data=false)
-=#
+#
 
 
 
