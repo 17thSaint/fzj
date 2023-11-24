@@ -115,7 +115,14 @@ function plot_greenfunc(all_vals,all_greens,virt_edge_length,direction; kwargs..
 	if !isnothing(data_dict)
 		all_vals,all_greens = data_dict["coords"],data_dict["greens"]
 	end
-	title_string = "$direction Spatial Green's Function, " * get(kwargs, :plot_title, "Virt Edge Count = $virt_edge_length")
+	if direction == "X"
+		name_dir = "Phys"
+		name_otherdir = "Virt"
+	else
+		name_dir = "Virt"
+		name_otherdir = "Phys"	
+	end
+	title_string = "$name_dir Spatial Green's Function, " * get(kwargs, :plot_title, "")
 	other_direction = "X"
 	if direction == "X"
 		all_vals = transpose(all_vals)
@@ -128,14 +135,14 @@ function plot_greenfunc(all_vals,all_greens,virt_edge_length,direction; kwargs..
 	end
 	yscale("log")
 	title(title_string)
-	xlabel("Y")
+	xlabel(name_dir)
 	ylabel("Correlation")
 	legend()
 	#
 	fig2 = figure()
 	imshow(all_greens)
-	xlabel("$direction")
-	ylabel("$other_direction")
+	xlabel(name_dir)
+	ylabel(name_otherdir)
 	colorbar()
 	title(title_string)
 	
@@ -195,6 +202,14 @@ function get_xdir_greenfunc(ttn; kwargs...)
 	if_plot || if_save_fig ? plot_greenfunc(all_xvals,all_greens,virt_edge_length,"X"; kwargs...) : nothing
 	
 	return all_xvals,all_greens
+end
+
+function get_greenfunc(ttn::TTNKit.TreeTensorNetwork,dir="phys"; kwargs...)
+	if dir == "phys"
+		return get_xdir_greenfunc(ttn; kwargs...)
+	elseif dir =="virt"
+		return get_ydir_greenfunc(ttn; kwargs...)
+	end
 end
 
 function get_current_yfunc(ttn; kwargs...)
@@ -625,7 +640,7 @@ end
 function do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
 
 	opl = get(kwargs, :output_level, 0)
-	max_dim = get(kwargs, :max_dim, particle_count+1)
+	max_dim = get(kwargs, :mdim, particle_count+1)
 	num_sweeps = get(kwargs, :num_sweeps, 1)
 	noise = get(kwargs, :noise, 0.0)
 	expander = get(kwargs, :expander, TTNKit.NoExpander())
@@ -635,7 +650,6 @@ function do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
 	else
 		observer = DMRGObserver(;energy_tol=etol)
 	end
-	
 	#println("PreSweep Link Dim = ",TTNKit.maxlinkdim(ttn))
 	#get_position_dims(ttn)
 	if sweep_type == "dmrg"
@@ -717,7 +731,7 @@ end
 function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 	num_sites = 2^num_layers
 	filling = get(kwargs, :filling, 1/2)
-	max_dim = get(kwargs, :max_dim, particle_count+1)
+	max_dim = get(kwargs, :mdim, particle_count+1)
 	num_sweeps = get(kwargs, :num_sweeps, 3)
 	sweep_iter = get(kwargs, :sweep_iter, 1)
 	if_sweep = get(kwargs, :if_sweep, true)
@@ -738,6 +752,11 @@ function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 	if_gpu = get(kwargs, :if_gpu, false)
 	if_check = get(kwargs, :if_check, false)
 	particle_type = get(kwargs, :part_type, "Boson")
+	location = get(kwargs, :location, pwd())
+	filename = get(kwargs, :name, "ttn")
+	metadata = get(kwargs, :metadata, Dict())
+	
+	display(metadata)
 	
 	
 	start_time = time()
@@ -812,9 +831,6 @@ function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 		
 		if if_save_data
 			#try
-			location = get(kwargs, :location, pwd())
-			filename = get(kwargs, :name, "ttn")
-			metadata = get(kwargs, :metadata, Dict())
 			metadata["runtime"] = end_time-start_time
 			ttn_data_dict = if_gpu ? Dict([("ttn",back2cpu(sp.ttn))]) : Dict([("ttn",sp.ttn)])
 			write_data_jld2(filename,ttn_data_dict,location,metadata)

@@ -206,7 +206,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 			s1_coord = TTNKit.coordinate(lat,s1)
 			s2_coord = TTNKit.coordinate(lat,s2)
 						
-			coeff = 2*get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
+			coeff = get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
 			
 			#if s1_coord[1] == s2_coord[1]
 			#	coeff *= 500
@@ -221,7 +221,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 			for i in 1:virt_edge_length
 				s1_coord = (i,1)
 				s2_coord = (i,virt_edge_length)
-				coeff = 2*get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
+				coeff = get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
 				hopping += (coeff,"Adag",(i,1),"A",(i,virt_edge_length))
 				hopping += (conj(coeff),"Adag",(i,virt_edge_length),"A",(i,1))
 			end
@@ -231,7 +231,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 			for i in 1:phys_edge_length
 				s1_coord = (1,i)
 				s2_coord = (phys_edge_length,i)
-				coeff = 2*get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
+				coeff = get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
 				hopping += (coeff,"Adag",(1,i),"A",(phys_edge_length,i))
 				hopping += (conj(coeff),"Adag",(phys_edge_length,i),"A",(1,i))
 			end
@@ -495,18 +495,12 @@ end
 #
 if true
 
-nns_start = 0.01
-nns_end = 1.0
-nns_count = 10
-nn_strens = [nns_start + (i-1)*(nns_end-nns_start)/(nns_count-1) for i in 1:nns_count]
-wavefuncs = []
-
 nnst = 100.0
-layers = 4
+layers = 6
 lr = Int(sqrt(2^layers))-1
 #for nnst in nn_strens
 
-	params_dict = Dict([("layers",layers),("mdim",200),("mag_off",false),("lr",lr),("if_nn_int",true),("nn_strength",nnst)])
+	params_dict = Dict([("layers",layers),("mdim",10),("mag_off",false),("lr",lr),("if_nn_int",true),("nn_strength",nnst)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
@@ -543,7 +537,7 @@ lr = Int(sqrt(2^layers))-1
 	end
 
 	#
-	nu = 1.0
+	#nu = 1.0
 	sweep_type = "dmrg"
 	max_occ = 2
 	if_per_phys = false
@@ -552,11 +546,12 @@ lr = Int(sqrt(2^layers))-1
 	chemical = false
 	mu = 0.0
 	#max_occupation = 3
-	expan = TTNKit.NoExpander()#DefaultExpander(0.5)
+	expan = TTNKit.DefaultExpander(0.5)#TTNKit.NoExpander()
 	noise = [0.0]#[1E-2, 1E-2, 1E-2,0.0]
 	ts = 0.500
 	tot_sites = 2^layer_count
-
+	#=
+	nu = 1.0
 	if isnothing(alpha)
 		if !mag_off
 			alpha = num_particles/(nu * (tot_sites))
@@ -564,11 +559,11 @@ lr = Int(sqrt(2^layers))-1
 			alpha = 0.0
 		end
 	end
+	=#
 	nswps = 5
 	#alpha = 7/64
-	num_particles = Int(alpha * tot_sites * nu)
-	#
-	alpha = 0.0
+	num_particles = 4#Int(alpha * tot_sites * nu)
+	
 
 	plotting = false
 	save_plot = false
@@ -579,33 +574,44 @@ lr = Int(sqrt(2^layers))-1
 	sc_type = "flat"
 	dists = [i for i in 1:2*edge_sites]
 	lr_scaling = long_range_scaling(longrange_dist,edge_sites,limit; cliff=if_cliff,limit=limit,scaling=sc_type,if_plot=false)
-
-	metadata_dict = Dict([("if_per",if_per),("mag_off",mag_off),("chemical",chemical),("mu",mu),("ts",ts),("layers",layer_count),("particles",num_particles),("alpha",alpha),("mdim",mdim),("nswps",nswps),("if_cliff",if_cliff),("sc_type",sc_type),("longrange_dist",longrange_dist),("max_occ",max_occ),("sweep_type",sweep_type),("limit",limit),("lr_scaling",lr_scaling),("if_change",if_change),("change",change),("if_nn_int",if_NN),("nn_strength",nnst),("noise",noise)])
 	
-	filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("nu",round(nu,digits=4)),("if_periodic",if_per),("nn_strength",nnst),("mdim",mdim)])
+	alpha_start = 0.05
+	alpha_end = 0.07
+	alpha_count = 5
+	alphas = [alpha_start + (i-1)*(alpha_end-alpha_start)/(alpha_count-1) for i in 1:alpha_count] .- change/2
+	alphas = [alphas; alphas .+ change]
+	wavefuncs = []
+	display(alphas)
+	for (idx,alpha) in enumerate(alphas)
+
+		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys),("nn_strength",nnst),("mdim",mdim)])
 
 
-	#if length(keys(params_dict)) == 0
-	#	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
-	#else
-		datafile_name = make_parameters_filename(filename_dict)
-	#end
-	model_paras = (if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=nnst,if_chem=chemical,chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,limit=limit,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=noise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc,metadata=metadata_dict)
+		#if length(keys(params_dict)) == 0
+		#	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
+		#else
+			datafile_name = make_parameters_filename(filename_dict)
+		#end
+		model_paras = (if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=nnst,if_chem=chemical,chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,limit=limit,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=noise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc)
+		
+		metadata_dict = merge(named_tuple_to_dict(model_paras),filename_dict)
+
 		#
-	println(datafile_name)
-	title_string = "Np = $num_particles, LR = $longrange_dist at $limit"
-	println("Starting Script using $num_particles particles on $tot_sites sites with $(!mag_off) Mag Field, Bond Dim = $mdim, and Long Range Dist = $longrange_dist")
-	if true
-	starting = time()
-	net = build_HH_net(layer_count; syms=true)
-	ham = long_range_HH_ham(net,ts,alpha; model_paras...)
-	og_ttn, hamilt, dm_sp = find_ground_state(layer_count,num_particles,ts; ttn_net=net,ham_op=ham,model_paras...)
-	total_time = time() - starting
-	println("Running time = $total_time")
-	append!(wavefuncs,[dm_sp.ttn])
-	get_occupancy(dm_sp.ttn)
-	get_xdir_greenfunc(dm_sp.ttn)
-	get_ydir_greenfunc(dm_sp.ttn)
+		println(datafile_name)
+		title_string = "Np = $num_particles, LR = $longrange_dist at $limit"
+		println("Starting Script using $num_particles particles on $tot_sites sites with $(!mag_off) Mag Field, Bond Dim = $mdim, and Long Range Dist = $longrange_dist")
+		if true
+		starting = time()
+		net = build_HH_net(layer_count; syms=true)
+		ham = long_range_HH_ham(net,ts,alpha; model_paras...)
+		og_ttn, hamilt, dm_sp = find_ground_state(layer_count,num_particles,ts; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
+		total_time = time() - starting
+		println("Running time = $total_time")
+		append!(wavefuncs,[dm_sp.ttn])
+		#get_occupancy(dm_sp.ttn; plot_title = "Alpha = $(round(alpha,digits=4))")
+		#get_greenfunc(dm_sp.ttn,"phys")
+		get_greenfunc(dm_sp.ttn,"virt")
+		end
 	end
 
 end
