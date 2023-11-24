@@ -4,7 +4,7 @@ include("analysis-functions.jl")
 
 dataloc = "../cluster-data/quasielectron/"
 m = 3
-parts = 10
+parts = 100
 rm = sqrt(2*parts*m)
 whichtype = "laugh"
 bins = 100
@@ -23,7 +23,7 @@ title("GS")
 
 all_excessdensity = [0.0 for i in 1:length(allfiles)-1]
 qe_radii = [0.0 for i in 1:length(allfiles)-1]
-for i in length(allfiles)-1:length(allfiles)-1
+#=for i in length(allfiles)-1:length(allfiles)-1
 	f = allfiles[i]
 	alldata,allmetadata = read_data_jld2(f,dataloc)
 	qe1_density = get_occupancy(alldata["configs"],rm,bins; max_x = 1, max_y = 1, if_plot = false)
@@ -42,7 +42,7 @@ for i in length(allfiles)-1:length(allfiles)-1
 	qe_radii[i] = allmetadata["qe_loc"]
 	=#
 end
-
+=#
 #plot(qe_radii,all_excessdensity,"-p")
 
 

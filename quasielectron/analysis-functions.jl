@@ -268,7 +268,7 @@ for (i,p) in enumerate(particles)
 	uncorrtime = allcorrlengths[i] * alltimes[i] / mcsteps
 	append!(times_for_single_uncorrelated_sample,[uncorrtime])
 end
-=#
+#
 scatter(particles,times_for_single_uncorrelated_sample)
 xlabel("Particle Number")
 ylabel("Uncorrlated Time (seconds)")
@@ -277,7 +277,7 @@ quad(x,p) = p[1] .* (x .^ p[3]) .+ p[2]
 qfit = LsqFit.curve_fit(quad,particles,times_for_single_uncorrelated_sample,[0.1,0.0,3.0])
 plot(collect(5:15),quad(collect(5:15),qfit.param),c="r",label="x^$(round(qfit.param[3],digits=2))")
 legend()
-#
+=#
 #=
 plotting_particles = []
 allfits = []

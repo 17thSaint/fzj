@@ -292,19 +292,19 @@ end
 bins = 200
 rs = [-1.2 + (i-1)*2.4/(bins-1) for i in 1:bins]
 #
-if_qe = true
+if_qe = false
 axisbins = 300
 m = 3
 mc_steps = 100000
 output = 1
-sampfreq = 1
-num_parts = [i for i in 5:15]
+sampfreq = 10
+num_parts = [100]
 for particles in num_parts
 #particles = 4
 qecut = if_qe ? particles : 0
 rm = sqrt(2*particles*m)
 step_size = 0.125*rm
-ver = "R"
+ver = "P"
 
 #=
 allowed_sets_matrix = get_full_acc_matrix(particles)
