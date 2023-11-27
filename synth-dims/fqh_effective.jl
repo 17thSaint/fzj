@@ -69,21 +69,21 @@ begin
 	function _op(::OpName"Anh", ::SiteType"ExtendedHardcore", d::Int; flavor)
 		@assert flavor > 0
 	    mat = zeros(d,d)
-		mat[1, flavor + 1] = 1
+		mat[1, flavor + 1] = 1 + 0.0*im
 		return mat
 	end
 
 	function _op(::OpName"Cr", ::SiteType"ExtendedHardcore", d::Int; flavor)
 		@assert flavor > 0
 	    mat = zeros(d,d)
-		mat[flavor + 1,1] = 1
+		mat[flavor + 1,1] = 1 + 0.0*im
 		return mat
 	end
 	
 	function _op(::OpName"FullDag", ::SiteType"ExtendedHardcore", d::Int)
 	    mat = zeros(d,d)
 	    for i in 1:d-1
-	    	mat[i + 1,1] = 1
+	    	mat[i + 1,1] = 1 + 0.0*im
 	    end
 	    return mat
 	end
@@ -91,7 +91,7 @@ begin
 	function _op(::OpName"FullHat", ::SiteType"ExtendedHardcore", d::Int)
 	    mat = zeros(d,d)
 	    for i in 1:d-1
-	    	mat[1,i + 1] = 1
+	    	mat[1,i + 1] = 1 + 0.0*im
 	    end
 	    return mat
 	end
@@ -102,13 +102,13 @@ begin
 	function _op(::OpName"N", ::SiteType"ExtendedHardcore", d::Int)
 		mat = zeros(d,d)
 		for j in 2:d
-			mat[j,j] = 1
+			mat[j,j] = 1 + 0.0*im
 		end
 		return mat
 	end
 	function _op(::OpName"Ns", ::SiteType"ExtendedHardcore", d::Int; flavor)
 		mat = zeros(d,d)
-		mat[flavor+1,flavor+1] = 1
+		mat[flavor+1,flavor+1] = 1 + 0.0*im
 		
 		return mat
 	end
@@ -116,14 +116,14 @@ begin
 	function _op(::OpName"S+", ::SiteType"ExtendedHardcore", d::Int)
 		mat = zeros(d,d)
 		for j in 2:d-1
-			mat[j+1,j] = 1
+			mat[j+1,j] = 1 + 0.0*im
 		end
 		return mat
 	end
 	function _op(::OpName"S-", ::SiteType"ExtendedHardcore", d::Int)
 		mat = zeros(d,d)
 		for j in 2:d-1
-			mat[j, j+1] = 1
+			mat[j, j+1] = 1 + 0.0*im
 		end
 		return mat
 	end
@@ -229,7 +229,8 @@ function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 	if_2ord_pert = get(kwargs, :if_2ord_pert, true)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
 	if_periodic_synth = get(kwargs, :if_periodic_synth, false)
-	
+	if_applied_current = get(kwargs, :if_applied_current, false)
+	current_strength = get(kwargs, :current_strength, 0.0)
 	
 	ampo = OpSum()
 	for j in 1:L
@@ -277,7 +278,7 @@ function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 	end
 	
 	for j in 1:L
-		for s in 1:nflavors-1
+		for s in 1:nflavors
 			# synthetic dimension hopping
 			next_site = s+1
 			if s == nflavors
@@ -288,8 +289,16 @@ function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 				end
 			end
 			ampo += (-t2 * exp(im*phi*j), "Cr$(next_site) * Anh$(s)", j)
-			#ampo += (-t2 * exp(-im*phi*j), "Cr$(s) * Anh$(next_site)", j)
-			ampo += (-t2 * exp(-im*phi*j), "Anh$(next_site) * Cr$(s)", j)
+			ampo += (-t2 * exp(-im*phi*j), "Cr$(s) * Anh$(next_site)", j)
+			#ampo += (-t2 * exp(-im*phi*j), "Anh$(next_site) * Cr$(s)", j)
+		end
+	end
+
+	if if_applied_current
+		for j in 1:L
+			for s in 1:nflavors
+				ampo += (-current_strength*j, "Ns$(s)", j)
+			end
 		end
 	end
 	
@@ -300,6 +309,7 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	conserve_qns = get(kwargs, :conserve_qns, true)
 	nsweeps = get(kwargs, :nsweeps, 10)
 	psi0 = get(kwargs, :psi_guess, nothing)
+	ham = get(kwargs, :ham, nothing)
 	mdim = get(kwargs, :mdim, 100)
 	noise = get(kwargs, :noise, 0.0)
 	obs = get(kwargs, :observer, TTNKit.NoObserver())
@@ -317,9 +327,13 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 		println("Phi = $phi")
 		sidx = siteinds(psi0)
 	end
-	H = MPO(hamiltonian(t1,t2,phi,U1,U2,L,nflavors; kwargs...), sidx)
+	if isnothing(ham)
+		H = MPO(hamiltonian(t1,t2,phi,U1,U2,L,nflavors; kwargs...), sidx)
+	else
+		H = MPOs(ham, sidx)
+	end
 	println("Built Hams")
-	display(matrix(combiner(dag.(sidx))*prod(H)*combiner(prime.(sidx))))
+	#display(matrix(combiner(dag.(sidx))*prod(H)*combiner(prime.(sidx))))
 	states = make_states(L,nbosons,nflavors)
 	if isnothing(psi0)
 		psi0 = randomMPS(sidx, states)
@@ -427,9 +441,11 @@ end
 function mps_plot_occupancy(occ_mat,L,nflavors; kwargs...)
 	title_string = "Occupancy, " * get(kwargs, :plot_title, "")
 	fig = figure()
-	plot_surface(1:nflavors,1:L,occ_mat)
+	#plot_surface(1:nflavors,1:L,occ_mat)
+	imshow(occ_mat)
 	xlabel("Virtual Dim")
 	ylabel("Physical Dim")
+	colorbar()
 	title(title_string)
 	
 	if_save_fig = get(kwargs, :if_save_fig, false)

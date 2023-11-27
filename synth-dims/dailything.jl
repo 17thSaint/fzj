@@ -1,7 +1,7 @@
 if true
 include("long-range-ttn.jl")
 include("fqh_effective.jl")
-using PyPlot
+using PyPlot,NumericalIntegration
 end
 #=
 alpha_start = 0.1
@@ -13,23 +13,79 @@ density = 5/40
 Ls = [8,24,40,56,72,88,96]
 =#
 
+function average_position(psi::MPS)
+	occmat = get_occupancy(psi; if_plot=false)
+	xs = [-Int(size(occmat)[1]/2) + (i-1)*size(occmat)[1]/(size(occmat)[1]-1) for i in 1:size(occmat)[1]]
+	ys = [-Int(size(occmat)[2]/2) + (i-1)*size(occmat)[2]/(size(occmat)[2]-1) for i in 1:size(occmat)[2]]
+	n1 = integrate((xs,ys),occmat)
+	occmat ./= n1
+	position_matrix = zeros(size(occmat))
+	avg_position = [0.0,0.0]
+	for i in 1:size(occmat)[1]
+		for j in 1:size(occmat)[2]
+			avg_position += [i,j] .* occmat[i,j]
+		end
+	end
+	return avg_position
+end
+
 #
-filling = 1/1
-params_dict = Dict([("if_periodic_phys",false),("if_periodic_virt",false),("layers",6),("alpha",round(1/(16*filling),digits=4)),("lr",0)])
+if false
+params_dict = Dict([("L",16),("nbosons",10),("nflavors",10)])
 loc = "/home/patrick/fzj/main-git/cluster-data/orsay-sept23"
-all_files = find_data_file(params_dict,"ttn","jld2",loc)
-display(all_files)
-#
-occs = [zeros(64,64),zeros(64,64)]
+all_files = find_data_file(params_dict,"mps","jld2",loc)
+#display(all_files)
+
+toberemoved = []
+for (idx,f) in enumerate(all_files)
+	alpha = get_params_dict_from_filename(f)["alpha"]
+	if !isapprox(10/(alpha*10*16),1.0,atol=10^-3)
+		append!(toberemoved,[idx])
+	end
+end
+deleteat!(all_files,toberemoved)
+#display(all_files)
+
 data1,metadata1 = read_data_jld2(all_files[1],loc)
 data2,metadata2 = read_data_jld2(all_files[2],loc)
-occs[1] = get_occupancy(data1["ttn"]; if_plot=false)
-occs[2] = get_occupancy(data2["ttn"]; if_plot=false)
-xs = [-4 + (i-1)*8/7 for i in 1:8]
-n1 = integrate((xs,xs),occs[1])
-n2 = integrate((xs,xs),occs[2])
-rez = integrated_density(occs[1]./n1-occs[2]./n2)
-#plot(rez[1],[filling for i in 1:length(rez[1])])
+end
+
+if_current = true
+current_strength = metadata1["t1"]/2
+
+s = siteinds(data1["mps"])#siteinds("ExtendedHardcore", metadata1["L"]; nflavors=metadata1["nflavors"])
+#states = make_states(metadata1["L"],metadata1["nbosons"],metadata1["nflavors"])
+psi0 = data1["mps"]#MPS(s,states)
+ham1 = hamiltonian(metadata1["t1"],metadata1["t2"],metadata1["phi"],metadata1["U1"],metadata1["U2"],metadata1["L"],metadata1["nflavors"]; dict_to_symbols(metadata1)...,if_applied_current=if_current,current_strength=current_strength)
+H = MPO(ham1,s)
+println("Made Hamiltonian")
+
+time_end = 20.0
+time_count = 20
+time_change = time_end/time_count
+times = [i*time_change for i in 1:time_count]
+timepsis = []
+start_avg = average_position(psi0)
+xs = [start_avg[1]]
+ys = [start_avg[2]]
+scatter(xs,ys,c="r")
+xlim(0,metadata1["L"])
+ylim(0,metadata1["nflavors"])
+xlabel("Physical")
+ylabel("Synthetic")
+for i in 1:10
+	if i == 1
+		prev_psi = psi0
+	else
+		prev_psi = timepsis[i-1]
+	end
+	append!(timepsis,[tdvp(H,prev_psi,time_change; outputlevel=1,maxdim=30)])
+	pos = average_position(timepsis[i])
+	append!(xs,[pos[1]])
+	append!(ys,[pos[2]])
+	plot(xs,ys,"-p",c="b")
+end
+
 #
 
 #=
