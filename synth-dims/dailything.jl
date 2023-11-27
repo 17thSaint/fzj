@@ -13,14 +13,43 @@ density = 5/40
 Ls = [8,24,40,56,72,88,96]
 =#
 
-
-
 #
-params_dict = Dict([("if_periodic_phys",false),("if_periodic_synth",true),("nflavors",10),("L",16),("nbosons",10)])
+filling = 1/1
+params_dict = Dict([("if_periodic_phys",false),("if_periodic_virt",false),("layers",6),("alpha",round(1/(16*filling),digits=4)),("lr",0)])
 loc = "/home/patrick/fzj/main-git/cluster-data/orsay-sept23"
-all_files = find_data_file(params_dict,"mps","jld2",loc)
+all_files = find_data_file(params_dict,"ttn","jld2",loc)
 display(all_files)
 #
+occs = [zeros(64,64),zeros(64,64)]
+data1,metadata1 = read_data_jld2(all_files[1],loc)
+data2,metadata2 = read_data_jld2(all_files[2],loc)
+occs[1] = get_occupancy(data1["ttn"]; if_plot=false)
+occs[2] = get_occupancy(data2["ttn"]; if_plot=false)
+xs = [-4 + (i-1)*8/7 for i in 1:8]
+n1 = integrate((xs,xs),occs[1])
+n2 = integrate((xs,xs),occs[2])
+rez = integrated_density(occs[1]./n1-occs[2]./n2)
+#plot(rez[1],[filling for i in 1:length(rez[1])])
+#
+
+#=
+alphas = []
+dbds = []
+for i in 1:Int(length(all_files)/2)
+	data1,metadata1 = read_data_jld2(all_files[2*i-1],loc)
+#	data2,metadata2 = read_data_jld2(all_files[2*i],loc)
+	alpha1,alpha2 = metadata1["alpha"],metadata2["alpha"]
+	#get_greenfunc(data1["ttn"],"phys"; plot_title="$(round(alpha1,digits=4))")
+	#get_greenfunc(data1["ttn"],"virt"; plot_title="$(round(alpha1,digits=4))")
+	#get_occupancy(data1["ttn"]; plot_title="$(round(alpha1,digits=4))")
+#	append!(alphas,[0.5*(alpha1+alpha2)])
+	append!(dbds,[deriv_bulk_dens(data1["ttn"],data2["ttn"],abs(alpha1-alpha2),1,2)])
+end
+plot(alphas,dbds,"-p")
+xlabel("Flux Density")
+ylabel("Deriv Bulk Density")
+=#
+#=
 notcon = []
 location_dict = Dict()
 for (i,f) in enumerate(all_files)
@@ -90,7 +119,7 @@ end
 ys = collect(minimum(dbds):0.01:maximum(dbds))
 plot([1/16 for i in 1:length(ys)],ys)
 scatter(alphas,dbds)
-#
+=#
 #=
 allpsis = Dict()
 all_dbds = Dict()

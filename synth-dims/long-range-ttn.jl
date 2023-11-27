@@ -104,7 +104,7 @@ function long_range_scaling(x_final,virt_edge_length,initial_strength; kwargs...
 	end
 	
 	if_plot || if_save_fig ? plot_long_range_scaling(strengths,virt_edge_length; kwargs...) : nothing
-	if_save_data ? save_long_range_scaling(strengths,virt_edge_length; kwargs...) : nothing
+	#if_save_data ? save_long_range_scaling(strengths,virt_edge_length; kwargs...) : nothing
 
 	return strengths
 end
@@ -193,7 +193,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	vpinning = get(kwargs, :vpinning, 2.5)
 	no_magF = get(kwargs, :no_magF, false)
 	chem_strength = get(kwargs, :chem_strength, 0.0)
-
+	
 	long_range_strengths = long_range_scaling(scaling_distance,virt_edge_length,nn_int_strength; kwargs...)
 	if_interaction = !all(long_range_strengths.==0)
 	
@@ -492,15 +492,16 @@ function deriv_bulk_dens(ttn1,ttn2,alpha_change,bulk_width_phys=1,bulk_width_vir
 	deriv = (bulk_dens_1 - bulk_dens_2)/alpha_change
 	return deriv
 end
-#
+
+#=
 if true
 
-nnst = 100.0
+nnst = 0.0
 layers = 6
-lr = Int(sqrt(2^layers))-1
+lr = 0#Int(sqrt(2^layers))-1
 #for nnst in nn_strens
 
-	params_dict = Dict([("layers",layers),("mdim",10),("mag_off",false),("lr",lr),("if_nn_int",true),("nn_strength",nnst)])
+	params_dict = Dict([("if_pinning",true),("layers",layers),("mdim",160),("mag_off",false),("lr",lr),("if_nn_int",true),("nn_strength",nnst)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
@@ -509,6 +510,7 @@ lr = Int(sqrt(2^layers))-1
 	end
 	#
 	if_NN = get(params_dict, "if_nn_int", false)
+	if_pinning = get(params_dict, "if_pinning", false)
 	if_gpu = get(params_dict, "if_gpu", false)
 	if_change = get(params_dict, "if_change", false)
 	change = get(params_dict, "change", 0.0001)
@@ -562,12 +564,12 @@ lr = Int(sqrt(2^layers))-1
 	=#
 	nswps = 5
 	#alpha = 7/64
-	num_particles = 4#Int(alpha * tot_sites * nu)
+	num_particles = Int(sqrt(2^layer_count)/2)#Int(alpha * tot_sites * nu)
 	
 
 	plotting = false
 	save_plot = false
-	save_data = false
+	save_data = true
 
 	loc = "../cluster-data/orsay-sept23"
 	if_cliff = false
@@ -575,16 +577,17 @@ lr = Int(sqrt(2^layers))-1
 	dists = [i for i in 1:2*edge_sites]
 	lr_scaling = long_range_scaling(longrange_dist,edge_sites,limit; cliff=if_cliff,limit=limit,scaling=sc_type,if_plot=false)
 	
-	alpha_start = 0.05
-	alpha_end = 0.07
+	alpha_start = 0.0525
+	alpha_end = 0.0725
 	alpha_count = 5
 	alphas = [alpha_start + (i-1)*(alpha_end-alpha_start)/(alpha_count-1) for i in 1:alpha_count] .- change/2
 	alphas = [alphas; alphas .+ change]
+	alpha = 1 * num_particles / tot_sites
 	wavefuncs = []
-	display(alphas)
-	for (idx,alpha) in enumerate(alphas)
+	#display(alphas)
+	#for (idx,alpha) in enumerate(alphas)
 
-		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys),("nn_strength",nnst),("mdim",mdim)])
+		filename_dict = Dict([("if_pinning",if_pinning),("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys),("nn_strength",nnst),("mdim",mdim)])
 
 
 		#if length(keys(params_dict)) == 0
@@ -592,7 +595,7 @@ lr = Int(sqrt(2^layers))-1
 		#else
 			datafile_name = make_parameters_filename(filename_dict)
 		#end
-		model_paras = (if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=nnst,if_chem=chemical,chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,limit=limit,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=noise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc)
+		model_paras = (if_pinning_pot=if_pinning,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=nnst,if_chem=chemical,chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,limit=limit,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=noise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc)
 		
 		metadata_dict = merge(named_tuple_to_dict(model_paras),filename_dict)
 
@@ -603,16 +606,22 @@ lr = Int(sqrt(2^layers))-1
 		if true
 		starting = time()
 		net = build_HH_net(layer_count; syms=true)
+		println("here")
 		ham = long_range_HH_ham(net,ts,alpha; model_paras...)
 		og_ttn, hamilt, dm_sp = find_ground_state(layer_count,num_particles,ts; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
 		total_time = time() - starting
 		println("Running time = $total_time")
 		append!(wavefuncs,[dm_sp.ttn])
-		#get_occupancy(dm_sp.ttn; plot_title = "Alpha = $(round(alpha,digits=4))")
-		#get_greenfunc(dm_sp.ttn,"phys")
+		get_occupancy(dm_sp.ttn; plot_title = "Alpha = $(round(alpha,digits=4))")
+		get_greenfunc(dm_sp.ttn,"phys")
 		get_greenfunc(dm_sp.ttn,"virt")
+		#=
+		specs = entanglement_spectrum(dm_sp.ttn)
+		fig = figure()
+		scatter(collect(1:mdim),-log.(specs))
+		=#
 		end
-	end
+	#end
 
 end
 
@@ -631,7 +640,7 @@ end
 #
 
 #occs1 = get_occupancy(dm_sp.ttn; if_plot=true,if_save_fig=false,if_save_data=false)
-#
+=#
 
 
 

@@ -1496,6 +1496,34 @@ function get_part_counts_range_fillings(site_count,phi)
 	return part_counts,nu_values
 end
 
+function entanglement_spectrum(ttn::TTNKit.TreeTensorNetwork{N, ITensor}) where{N}
+    pos_right = (TTNKit.number_of_layers(ttn),1)
+    pos_left = (TTNKit.number_of_layers(ttn)-1,2)
+    net = TTNKit.network(ttn)
+    # checking if pos_right is contained in the network
+    TTNKit.check_valid_position(net, pos_right)
+    # check if layer number is not physical
+    @assert pos_right[1] > 0
+    # check if pos_left is either in the child nodes/ or being the parent node
+    @assert (pos_left ∈ TTNKit.child_nodes(net, pos_right) || pos_left == TTNKit.parent_node(net, pos_left))
+
+    # now move the orthogonality centrum
+    ttnc = TTNKit.move_ortho!(copy(ttn), pos_right)
+    T = ttnc[pos_right]
+    
+    # this only works for ITensors...
+    # getting the indices for decomposition, this only contains pos_left link
+    if pos_left[1] == 0
+        # pos_left is a physical site.. we need to filter differently
+        idx_left = TTNKit.inds(T; tags = "Site,n=$(pos_left[2])")
+    else
+        idx_left = TTNKit.inds(T; tags = "Link,nl=$(pos_left[1]),np=$(pos_left[2])")
+    end
+
+    U,S,V,spec = svd(T, idx_left)
+    return eigs(spec)
+end
+
 function density_matrix(ttn; kwargs...)
 	if_fermion = get(kwargs, :if_fermion, false)
 	creation = if_fermion ? "Cdag" : "Adag"
@@ -1526,6 +1554,25 @@ function density_matrix(ttn; kwargs...)
 	end
 	
 	return densmat
+end
+
+function integrated_density(occs_diff::Matrix; kwargs...)
+	if_plot = get(kwargs,:if_plot,true)
+
+	side_length = size(occs_diff)[1]
+	edges = [i for i in 1:Int(side_length/2)]
+	int_dens = [0.0 for i in 1:length(edges)]
+	for (idx,edge) in enumerate(edges)
+		int_dens[idx] = ((edge+1)^2) * sum(occs_diff[Int(side_length/2)-edge+1:Int(side_length/2)+edge,Int(side_length/2)-edge+1:Int(side_length/2)+edge])
+	end
+
+	if if_plot
+		plot(edges,int_dens,"-p")
+		xlabel("Radius")
+		ylabel("Integrated Density")
+	end
+
+	return edges,int_dens
 end
 
 #=
