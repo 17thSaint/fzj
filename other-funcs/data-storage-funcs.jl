@@ -231,6 +231,18 @@ function check_plot_label(file_name,version)
 	return file_name
 end
 
+function check_data_exists(filename,data_type="observer"; kwargs...)
+    location = get(kwargs, :location, pwd())
+    here = pwd()
+    cd(location)
+    if check_duplicates(filename)[1]
+        cd(here)
+        return true,read_data_jld2(filename,location)[1][data_type]
+    end
+    cd(here)
+    return false,nothing
+end
+
 function check_duplicates(file_name)
 	split_period_name = split(file_name,".")
 	file_type = split_period_name[end]
@@ -253,12 +265,12 @@ function check_duplicates(file_name)
 	if rename
 		println("Found Duplicate File, renaming $file_name")
 	end
-	return file_name
+	return rename,file_name
 end
 
 function prep_file(file_name,desired_type)
 	file_name = make_sure_file_type(file_name,desired_type)
-	file_name = check_duplicates(file_name)
+	file_name = check_duplicates(file_name)[2]
 	return file_name
 end
 

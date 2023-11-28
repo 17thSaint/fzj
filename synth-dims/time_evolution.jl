@@ -1,7 +1,8 @@
 if false
+include("../other-funcs/data-storage-funcs.jl")
 include("long-range-ttn.jl")
 include("fqh_effective.jl")
-using ITensorsTDVP, Observers
+#using ITensorsTDVP, Observers
 end
 
 function current_time(; current_time, bond, half_sweep)
@@ -85,9 +86,9 @@ function spacial_density_polarization(psi,occmat=nothing)
     result = 0.0
     j0 = (size(occmat)[1]+1)/2
     for i in 1:size(occmat)[1]
-        result += 1*sum(occmat[i,:] .* (i - j0))
+        result += sum(occmat[i,:] .* (i - j0))
     end
-    return result / size(occmat)[1]
+    return 2 * result / size(occmat)[1]
 end
 
 function spacial_density_polarization(all_occmats::Vector{Matrix{Float64}})
@@ -155,6 +156,11 @@ function execute_tevo(psi0_filename,final_time,dt; kwargs...)
 	naming_dict["time_end"] = final_time
 	filename = make_parameters_filename(naming_dict)
 	println(filename)
+
+    if_exists,data = check_data_exists("tevo-"*filename*".jld2","observer";location=location)
+    if if_exists
+        return data
+    end
 
 	tevo_params = (metadata=metadata,location=loc,name=filename)
 

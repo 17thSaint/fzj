@@ -15,7 +15,7 @@ Ls = [8,24,40,56,72,88,96]
 =#
 
 #
-if true
+if false
 params_dict = Dict([("L",16),("nbosons",10),("nflavors",10)])
 loc = "/home/patrick/fzj/main-git/cluster-data/orsay-sept23"
 all_files = find_data_file(params_dict,"mps","jld2",loc)
@@ -37,52 +37,38 @@ data2,metadata2 = read_data_jld2(all_files[2],loc)
 end
 
 mdim = 30
-if_save_data = true
+if_save_data = false
 
 if_current = true
-current_strength = 0.1*metadata1["t1"]/metadata1["L"]
-#=
-new_metadata = Dict([("if_applied_current",if_current),("current_strength",current_strength),("time_mdim",mdim)])
-metadata = merge(metadata1,new_metadata)
-naming_dict = merge(get_params_dict_from_filename(all_files[1]),Dict([("if_current",if_current),("current_strength",current_strength)]))
+current_strength = 10.1*metadata1["t1"]/metadata1["L"]
+time_end = 0.5
+time_count = 10
+time_change = time_end/time_count
+tevo_params = (current_strength=current_strength,mdim=mdim,location=loc,if_save_data=if_save_data)
 
-psi0 = data1["mps"]#MPS(s,states)
-ham1 = hamiltonian(metadata1["t1"],metadata1["t2"],metadata1["phi"],metadata1["U1"],metadata1["U2"],metadata1["L"],metadata1["nflavors"]; dict_to_symbols(metadata1)...,if_applied_current=if_current,current_strength=current_strength)
-
-whattodo = Dict([("occs",current_occ)])
-
-time_end = 1.0
-#for time_change in [0.5]#[0.03,0.02,0.01]
-time_change = 0.1
-
-	naming_dict["dt"] = time_change
-	naming_dict["time_end"] = time_end
-	filename = make_parameters_filename(naming_dict)
-	println(filename)
-
-	tevo_params = (mdim=mdim,metadata=metadata,location=loc,name=filename,obs_measures=whattodo,if_save_data=if_save_data)
-=#
-	tevo_params = (current_strength=current_strength,mdim=mdim,location=loc,if_save_data=if_save_data)
-	rez = execute_tevo(all_files[1],time_end,time_change; tevo_params...)
+rez = execute_tevo(all_files[1],time_end,time_change; tevo_params...)
 	#=
-	alldenspols = rez["denspols"].results#density_polarization(rez["occs"].results)
+	alldenspols = density_polarization(rez["occs"].results)
 	times = rez["times"].results
 	fig = figure()
-	plot([[0.0]; times],[[density_polarization(psi0)]; alldenspols],"-p",label="$time_change")
+	plot(times,alldenspols,"-p",label="$mdim")
 	legend()
 	xlabel("Time")
 	ylabel("Density Polarization")
-
-	allspacialpols = rez["spacespols"].results
-	fig4 = figure()
-	plot([[0.0]; times],[[spacial_density_polarization(psi0)]; allspacialpols],"-p",label="$time_change")
+	=#
+	allspacialpols = spacial_density_polarization(rez["occs"].results)
+	spacial_limit = 1.0*get_params_dict_from_filename(all_files[1])["nbosons"]/get_params_dict_from_filename(all_files[1])["L"]
+	#fig4 = figure()
+	plot(times,allspacialpols,"-p",label="$current_strength")
+	plot(times,[spacial_limit for i in 1:length(times)],c="r",label="Spacial Limit")
+	plot(times,[-spacial_limit for i in 1:length(times)],c="r")
 	xlabel("Time")
 	ylabel("Spacial Density Polarization")
 	legend()
-	#
+	#=
 	fig2 = figure()
 	currents = get_current(rez["states"].results; alpha=alpha1,if_exp_part=true)
-	plot([[0.0]; times],[[get_current(psi0; alpha=alpha1,if_exp_part=true)[1]]; currents],"-p",label="$time_change")
+	plot(times,currents,"-p",label="$time_change")
 	xlabel("Time")
 	ylabel("Current")
 	legend()
