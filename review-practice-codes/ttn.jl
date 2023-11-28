@@ -212,6 +212,14 @@ function get_greenfunc(ttn::TTNKit.TreeTensorNetwork,dir="phys"; kwargs...)
 	end
 end
 
+function get_current(ttn,dir="phys"; kwargs...)
+	if dir == "phys"
+		return get_current_xfunc(ttn; kwargs...)
+	elseif dir =="virt"
+		return get_current_yfunc(ttn; kwargs...)
+	end
+end
+
 function get_current_yfunc(ttn; kwargs...)
 	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
 	edge_length = virt_edge_length

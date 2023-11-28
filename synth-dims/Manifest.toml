@@ -2,7 +2,7 @@
 
 julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "8cf7a342997bc153984ed2d43272270a3b5a424d"
+project_hash = "39fa0c808065e548fd7daff55a37852677ffbcf1"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra", "Test"]
@@ -343,6 +343,12 @@ git-tree-sha1 = "df603fb5b6dcd6ccd5c8272397dc2e37f782a469"
 uuid = "d89171c1-af8f-46b3-badf-d2a472317c15"
 version = "0.1.1"
 
+[[deps.ITensorTDVP]]
+deps = ["ITensors", "KrylovKit", "Observers", "Printf", "TimerOutputs"]
+git-tree-sha1 = "558ad62d28a292ea572c1f494b7f798b13329256"
+uuid = "25707e16-a4db-4a07-99d9-4d67b7af0342"
+version = "0.1.1"
+
 [[deps.ITensors]]
 deps = ["Adapt", "BitIntegers", "ChainRulesCore", "Compat", "Dictionaries", "Functors", "HDF5", "IsApprox", "KrylovKit", "LinearAlgebra", "LinearMaps", "NDTensors", "PackageCompiler", "Pkg", "Printf", "Random", "Requires", "SerializedElementArrays", "SimpleTraits", "StaticArrays", "Strided", "TimerOutputs", "TupleTools", "Zeros", "ZygoteRules"]
 git-tree-sha1 = "5fe9a3b16040f659f355dbc76f009748e7fec6ed"
@@ -583,6 +589,11 @@ deps = ["Interpolations", "LinearAlgebra", "Logging"]
 git-tree-sha1 = "2a4ef5fc235053f9747d59cfdee19bcb8ba1e833"
 uuid = "e7bfaba1-d571-5449-8927-abc22e82249b"
 version = "0.3.3"
+
+[[deps.Observers]]
+git-tree-sha1 = "1b36073c8041f9256ae809afe6bfb8fa66fe5eb8"
+uuid = "338f10d5-c7f1-4033-a7d1-f9dec39bcaa0"
+version = "0.0.8"
 
 [[deps.OffsetArrays]]
 deps = ["Adapt"]

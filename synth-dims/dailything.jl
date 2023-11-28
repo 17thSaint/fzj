@@ -1,7 +1,8 @@
 if true
 include("long-range-ttn.jl")
 include("fqh_effective.jl")
-using PyPlot,NumericalIntegration
+include("time_evolution.jl")
+using PyPlot
 end
 #=
 alpha_start = 0.1
@@ -13,24 +14,8 @@ density = 5/40
 Ls = [8,24,40,56,72,88,96]
 =#
 
-function average_position(psi::MPS)
-	occmat = get_occupancy(psi; if_plot=false)
-	xs = [-Int(size(occmat)[1]/2) + (i-1)*size(occmat)[1]/(size(occmat)[1]-1) for i in 1:size(occmat)[1]]
-	ys = [-Int(size(occmat)[2]/2) + (i-1)*size(occmat)[2]/(size(occmat)[2]-1) for i in 1:size(occmat)[2]]
-	n1 = integrate((xs,ys),occmat)
-	occmat ./= n1
-	position_matrix = zeros(size(occmat))
-	avg_position = [0.0,0.0]
-	for i in 1:size(occmat)[1]
-		for j in 1:size(occmat)[2]
-			avg_position += [i,j] .* occmat[i,j]
-		end
-	end
-	return avg_position
-end
-
 #
-if false
+if true
 params_dict = Dict([("L",16),("nbosons",10),("nflavors",10)])
 loc = "/home/patrick/fzj/main-git/cluster-data/orsay-sept23"
 all_files = find_data_file(params_dict,"mps","jld2",loc)
@@ -46,45 +31,68 @@ end
 deleteat!(all_files,toberemoved)
 #display(all_files)
 
+alpha1,alpha2 = get_params_dict_from_filename(all_files[1])["alpha"],get_params_dict_from_filename(all_files[2])["alpha"]
 data1,metadata1 = read_data_jld2(all_files[1],loc)
 data2,metadata2 = read_data_jld2(all_files[2],loc)
 end
 
-if_current = true
-current_strength = metadata1["t1"]/2
+mdim = 30
+if_save_data = true
 
-s = siteinds(data1["mps"])#siteinds("ExtendedHardcore", metadata1["L"]; nflavors=metadata1["nflavors"])
-#states = make_states(metadata1["L"],metadata1["nbosons"],metadata1["nflavors"])
+if_current = true
+current_strength = 0.1*metadata1["t1"]/metadata1["L"]
+#=
+new_metadata = Dict([("if_applied_current",if_current),("current_strength",current_strength),("time_mdim",mdim)])
+metadata = merge(metadata1,new_metadata)
+naming_dict = merge(get_params_dict_from_filename(all_files[1]),Dict([("if_current",if_current),("current_strength",current_strength)]))
+
 psi0 = data1["mps"]#MPS(s,states)
 ham1 = hamiltonian(metadata1["t1"],metadata1["t2"],metadata1["phi"],metadata1["U1"],metadata1["U2"],metadata1["L"],metadata1["nflavors"]; dict_to_symbols(metadata1)...,if_applied_current=if_current,current_strength=current_strength)
-H = MPO(ham1,s)
-println("Made Hamiltonian")
 
-time_end = 20.0
-time_count = 20
-time_change = time_end/time_count
-times = [i*time_change for i in 1:time_count]
-timepsis = []
-start_avg = average_position(psi0)
-xs = [start_avg[1]]
-ys = [start_avg[2]]
-scatter(xs,ys,c="r")
-xlim(0,metadata1["L"])
-ylim(0,metadata1["nflavors"])
-xlabel("Physical")
-ylabel("Synthetic")
-for i in 1:10
-	if i == 1
-		prev_psi = psi0
-	else
-		prev_psi = timepsis[i-1]
-	end
-	append!(timepsis,[tdvp(H,prev_psi,time_change; outputlevel=1,maxdim=30)])
-	pos = average_position(timepsis[i])
-	append!(xs,[pos[1]])
-	append!(ys,[pos[2]])
-	plot(xs,ys,"-p",c="b")
-end
+whattodo = Dict([("occs",current_occ)])
+
+time_end = 1.0
+#for time_change in [0.5]#[0.03,0.02,0.01]
+time_change = 0.1
+
+	naming_dict["dt"] = time_change
+	naming_dict["time_end"] = time_end
+	filename = make_parameters_filename(naming_dict)
+	println(filename)
+
+	tevo_params = (mdim=mdim,metadata=metadata,location=loc,name=filename,obs_measures=whattodo,if_save_data=if_save_data)
+=#
+	tevo_params = (current_strength=current_strength,mdim=mdim,location=loc,if_save_data=if_save_data)
+	rez = execute_tevo(all_files[1],time_end,time_change; tevo_params...)
+	#=
+	alldenspols = rez["denspols"].results#density_polarization(rez["occs"].results)
+	times = rez["times"].results
+	fig = figure()
+	plot([[0.0]; times],[[density_polarization(psi0)]; alldenspols],"-p",label="$time_change")
+	legend()
+	xlabel("Time")
+	ylabel("Density Polarization")
+
+	allspacialpols = rez["spacespols"].results
+	fig4 = figure()
+	plot([[0.0]; times],[[spacial_density_polarization(psi0)]; allspacialpols],"-p",label="$time_change")
+	xlabel("Time")
+	ylabel("Spacial Density Polarization")
+	legend()
+	#
+	fig2 = figure()
+	currents = get_current(rez["states"].results; alpha=alpha1,if_exp_part=true)
+	plot([[0.0]; times],[[get_current(psi0; alpha=alpha1,if_exp_part=true)[1]]; currents],"-p",label="$time_change")
+	xlabel("Time")
+	ylabel("Current")
+	legend()
+
+	fig3 = figure()
+	plot(times,(1/alpha1) .* (alldenspols ./ currents),"-p",label="$time_change")
+	xlabel("Time")
+	ylabel("Hall Imbalance")
+	=#
+#end
 
 #
 

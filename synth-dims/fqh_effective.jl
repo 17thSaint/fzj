@@ -582,6 +582,46 @@ function plot_greenfunc(all_greens,hopping_direction; kwargs...)
 	if_save_fig ? save_figure(filename; location=location) : nothing
 end
 
+function get_current_phys(wavefunc::MPS; kwargs...)
+	if_exp_part = get(kwargs,:if_exp_part,false)
+	alpha = get(kwargs,:alpha,0.0)
+	L,nflavors = get_mps_dims(wavefunc)
+	m0 = (nflavors+1)/2
+
+	currents = [0.0*im for i in 1:nflavors]
+	for i in 1:nflavors
+		fullmat = correlation_matrix(wavefunc,"Cr$(i)","Anh$(i)")
+		component,hc_component = diag(fullmat,-1),diag(fullmat,1)
+		if if_exp_part
+			component .*= exp(im*alpha*(i-m0))
+			hc_component .*= exp(-im*alpha*(i-m0))
+		end
+		currents[i] = sum(component) - sum(hc_component)
+	end
+	return -imag(sum(currents)),-imag.(currents)
+end
+
+function get_current_synth(psi::MPS; kwargs...)
+	println("Haven't made synthetic dimension current yet")
+	return nothing,nothing
+end
+
+function get_current(psi::MPS,dir="phys"; kwargs...)
+	if dir == "phys"
+		return get_current_phys(psi; kwargs...)
+	else
+		return get_current_synth(psi; kwargs...)
+	end
+end
+
+function get_current(all_psis::Vector{MPS},dir="phys"; kwargs...)
+	if dir == "phys"
+		return [get_current_phys(psi; kwargs...)[1] for psi in all_psis]
+	else
+		return [get_current_synth(psi; kwargs...)[1] for psi in all_psis]
+	end
+end
+
 function momentum_occupation(wavefunc::MPS,part_count::Int,p_count::Int64,p_end=8.0,p_start=0.0; kwargs...)
 	num_sites = length(siteinds(wavefunc))
 	dimension = dim(siteinds(wavefunc)[1])

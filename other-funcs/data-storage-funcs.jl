@@ -219,7 +219,7 @@ end
 function check_plot_label(file_name,version)
 	split_name = split(file_name,"-")
 	potential_type = split_name[1]
-	if potential_type in ["densdens","occs","ttn","Y-dir-GF","X-dir-GF","Y-dir-current","X-dir-current","mps","rfa","laugh"]
+	if potential_type in ["densdens","occs","ttn","Y-dir-GF","X-dir-GF","Y-dir-current","X-dir-current","mps","rfa","laugh","tevo"]
 		if potential_type != version
 			println("Wrong Plot Label: changing $potential_type => $version")
 			file_name = "$version-" * join(split_name[2:end],"-")
