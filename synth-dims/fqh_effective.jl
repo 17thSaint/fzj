@@ -306,13 +306,17 @@ function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 end
 
 function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
+	opl = get(kwargs, :outputlevel, 1)
 	conserve_qns = get(kwargs, :conserve_qns, true)
 	nsweeps = get(kwargs, :nsweeps, 10)
 	psi0 = get(kwargs, :psi_guess, nothing)
 	ham = get(kwargs, :ham, nothing)
 	mdim = get(kwargs, :mdim, 100)
+	if mdim == 100
+		mdim = [Int(floor(mdim/4)),Int(floor(mdim/2)), mdim]
+	end
 	noise = get(kwargs, :noise, 0.0)
-	obs = get(kwargs, :observer, TTNKit.NoObserver())
+	obs = get(kwargs, :observer, NoObserver())
 	if_save_data = get(kwargs, :if_save_data, false)
 	if_gpu = get(kwargs, :if_gpu, false)
 	t1 = 1.0
@@ -320,29 +324,28 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	if_nrg = get(kwargs, :if_nrg, false)
 	#if_nrg ? nsweeps = 1 : nothing
 	
-	println(U1,", ",U2,", ",phi/(2*pi),", ",L,", ",nflavors)
+	#display(kwargs)
 	if isnothing(psi0)
 		sidx = siteinds("ExtendedHardcore", L; conserve_qns = conserve_qns, nflavors = nflavors)
 	else
-		println("Phi = $phi")
 		sidx = siteinds(psi0)
 	end
 	if isnothing(ham)
 		H = MPO(hamiltonian(t1,t2,phi,U1,U2,L,nflavors; kwargs...), sidx)
 	else
-		H = MPOs(ham, sidx)
+		H = MPO(ham, sidx)
 	end
 	println("Built Hams")
 	#display(matrix(combiner(dag.(sidx))*prod(H)*combiner(prime.(sidx))))
-	states = make_states(L,nbosons,nflavors)
 	if isnothing(psi0)
+		states = make_states(L,nbosons,nflavors)
 		psi0 = randomMPS(sidx, states)
 	end
 	if if_gpu
 		H = ITensorsGPU.gpu(H)
 		psi0 = ITensorsGPU.gpu(psi0)
 	end
-	E, psi = dmrg(H, psi0; maxdim = [Int(floor(mdim/4)),Int(floor(mdim/2)), mdim], nsweeps = nsweeps, noise = noise, observer = obs)
+	E, psi = dmrg(H, psi0; maxdim = mdim, nsweeps = 10, noise = noise, observer = NoObserver(), outputlevel=opl, cutoff = 0)
 	
 	if if_nrg
 		return E
@@ -415,8 +418,19 @@ function get_mps_dims(wavefunc::MPS)
 	return L,nflavors
 end
 
+function occupancy_variance(wavefunc::MPS; kwargs...)
+	L,nflavors = get_mps_dims(wavefunc)
+	fo_occ = get_occupancy(wavefunc; if_plot=false)
+	occ_var = sqrt.(abs.(fo_occ.^2 .- get_occupancy(wavefunc; if_plot=false,if_squared=true)))
+	if_plot = get(kwargs, :if_plot, true)
+	if_plot ? mps_plot_occupancy(occ_var,L,nflavors; kwargs...) : nothing
+	
+	return occ_var
+end
+
 function get_occupancy(wavefunc::MPS; kwargs...)
 	L,nflavors = get_mps_dims(wavefunc)
+	if_squared = get(kwargs, :if_squared, false)
 	
 	if_plot = get(kwargs, :if_plot, true)
 	if_save_data = get(kwargs, :if_save_data, false)
@@ -429,7 +443,11 @@ function get_occupancy(wavefunc::MPS; kwargs...)
 		
 	occ_mat = zeros(L,nflavors)
 	for s in 1:nflavors
-		occ_mat[:, s] = expect(wavefunc, "Ns$(s)")
+		loc_op = "Ns$(s)"
+		if if_squared
+			loc_op = "Ns$(s) * Ns$(s)"
+		end
+		occ_mat[:, s] = expect(wavefunc, loc_op)
 	end
 	if_plot ? mps_plot_occupancy(occ_mat,L,nflavors; kwargs...) : nothing
 	data_dict = Dict([("vals",occ_mat)])

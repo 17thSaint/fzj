@@ -2,7 +2,7 @@ if true
 include("long-range-ttn.jl")
 include("fqh_effective.jl")
 include("time_evolution.jl")
-using PyPlot
+#using PyPlot,Observers,ITensorTDVP,LsqFit
 end
 #=
 alpha_start = 0.1
@@ -14,8 +14,47 @@ density = 5/40
 Ls = [8,24,40,56,72,88,96]
 =#
 
+function percent_change(values)
+    return [(values[i+1] - values[i]) for i in 1:length(values)-1]
+end
+
+function find_quadratic_region(values)
+	pchange = percent_change(values)
+    start_index = findfirst(x -> x > 1e-3, pchange) + 1
+    end_index = findfirst(x -> pchange[x+1] < pchange[x],collect(1:length(pchange)-1))
+	#println("Start Index = ",start_index,", End Index = ",end_index)
+    return start_index, end_index
+end
+
+function fit_quadratic(times,values,start_index,end_index)
+    x = times[start_index:end_index]
+    y = values[start_index:end_index]
+    model(x, p) = p[1].*((x .+ p[2]).^2) .+ values[start_index]
+    fit = curve_fit(model, x, y, [0.5,0.5])
+    return fit.param
+end
+
+function find_slope(times,values; kwargs...)
+	if_plot = get(kwargs, :if_plot, false)
+    start_index, end_index = find_quadratic_region(values)
+    a,b = fit_quadratic(times,values,start_index,end_index)
+
+	if if_plot
+		fig = figure()
+        plot(times, values, "-p")
+        plot(times[start_index:end], a.*((times[start_index:end] .+ b).^2) .+ values[start_index])
+        title("Quadratic Fit with Slope = $(round(a,digits=4))")
+        xlabel("Times")
+        ylabel("Value")
+		ylim(-0.1*maximum(values),1.5*maximum(values))
+    end
+
+    return a
+end
+
+
 #
-if false
+if true
 params_dict = Dict([("L",16),("nbosons",10),("nflavors",10)])
 loc = "/home/patrick/fzj/main-git/cluster-data/orsay-sept23"
 all_files = find_data_file(params_dict,"mps","jld2",loc)
@@ -33,46 +72,66 @@ deleteat!(all_files,toberemoved)
 
 alpha1,alpha2 = get_params_dict_from_filename(all_files[1])["alpha"],get_params_dict_from_filename(all_files[2])["alpha"]
 data1,metadata1 = read_data_jld2(all_files[1],loc)
-data2,metadata2 = read_data_jld2(all_files[2],loc)
+#data2,metadata2 = read_data_jld2(all_files[2],loc)
 end
 
-mdim = 30
+#obs_measures=Dict("denspols" => current_density_polarization)
+
+mdim = 100
 if_save_data = false
 
-if_current = true
-current_strength = 10.1*metadata1["t1"]/metadata1["L"]
-time_end = 0.5
+if_current = false
+#time_end = 30.0
+time_change = 0.00001
 time_count = 10
-time_change = time_end/time_count
-tevo_params = (current_strength=current_strength,mdim=mdim,location=loc,if_save_data=if_save_data)
+time_end = time_count * time_change
 
-rez = execute_tevo(all_files[1],time_end,time_change; tevo_params...)
+strens = [0.05,0.025,0.01,0.0075,0.005]
+current_strength = 0.0
+#for (i,time_change) in enumerate(strens)
+#time_end = time_count * time_change
+tevo_params = (if_GScheck=true,current_strength=current_strength,if_current=if_current,mdim=mdim,location=loc,if_save_data=if_save_data)
+	rez,ham = execute_tevo(all_files[1],time_end,time_change; tevo_params...)
+	#slopes[i] = (rez["denspols"].results[end] - rez["denspols"].results[1])/(time_end)
+	times = rez["times"].results
+	#
+	nrg_invs = mean([energy_variance(rez["states"].results[i],ham) for i in 1:length(times)])
+	occ_invs = mean([first(occupancy_variance(rez["states"].results[i]; if_plot=false)) for i in 1:length(times)])
+	println("Energy Variance = ",nrg_invs,", Occupation Variance = ",occ_invs)
+	#=
+	allspacialpols = spacial_density_polarization(rez["occs"].results)
+	spacial_limit = 1.0*get_params_dict_from_filename(all_files[1])["nbosons"]/get_params_dict_from_filename(all_files[1])["L"]
+	fig2 = figure()
+	plot(times,[spacial_limit for i in 1:length(times)],c="r",label="Spacial Limit")
+	plot(times,[-spacial_limit for i in 1:length(times)],c="r")
+	plot(times,allspacialpols,"-p")
+	xlabel("Time")
+	ylabel("Spacial Density Polarization")
+	title("Current Strength = $(current_strength)")
+	legend()
+	=#
+#end
+
 	#=
 	alldenspols = density_polarization(rez["occs"].results)
-	times = rez["times"].results
-	fig = figure()
+	virtual_limit = 1.0
+	fig3 = figure()
+	plot(times,[virtual_limit for i in 1:length(times)],c="r",label="Spacial Limit")
+	plot(times,[-virtual_limit for i in 1:length(times)],c="r")
 	plot(times,alldenspols,"-p",label="$mdim")
 	legend()
 	xlabel("Time")
 	ylabel("Density Polarization")
 	=#
-	allspacialpols = spacial_density_polarization(rez["occs"].results)
-	spacial_limit = 1.0*get_params_dict_from_filename(all_files[1])["nbosons"]/get_params_dict_from_filename(all_files[1])["L"]
-	#fig4 = figure()
-	plot(times,allspacialpols,"-p",label="$current_strength")
-	plot(times,[spacial_limit for i in 1:length(times)],c="r",label="Spacial Limit")
-	plot(times,[-spacial_limit for i in 1:length(times)],c="r")
-	xlabel("Time")
-	ylabel("Spacial Density Polarization")
-	legend()
+	
 	#=
-	fig2 = figure()
+	fig4 = figure()
 	currents = get_current(rez["states"].results; alpha=alpha1,if_exp_part=true)
 	plot(times,currents,"-p",label="$time_change")
 	xlabel("Time")
 	ylabel("Current")
 	legend()
-
+	#
 	fig3 = figure()
 	plot(times,(1/alpha1) .* (alldenspols ./ currents),"-p",label="$time_change")
 	xlabel("Time")

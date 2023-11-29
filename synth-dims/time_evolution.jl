@@ -1,13 +1,14 @@
-if false
-include("../other-funcs/data-storage-funcs.jl")
-include("long-range-ttn.jl")
-include("fqh_effective.jl")
-#using ITensorsTDVP, Observers
+if true
+#include("../other-funcs/data-storage-funcs.jl")
+#include("long-range-ttn.jl")
+#include("fqh_effective.jl")
+using ITensorTDVP, Observers
 end
+
 
 function current_time(; current_time, bond, half_sweep)
 	if bond == 1 && half_sweep == 2
-	  return current_time
+	  return -imag(current_time)
 	end
 	return nothing
 end
@@ -19,9 +20,14 @@ function return_state(; psi, bond, half_sweep)
 	return nothing
 end
 
-function current_occ(; psi, bond, half_sweep)
+function current_occ(; psi, bond, half_sweep, current_time)
 	if bond == 1 && half_sweep == 2
-	  return get_occupancy(psi; if_plot=false)
+      #if isapprox(-imag(current_time) % 2,0.0;atol=10^-3) || isapprox(-imag(current_time) % 2,2.0;atol=10^-3)
+       #   return get_occupancy(psi; plot_title="$(-imag(current_time))")
+      #else
+      #    println("No Plot: ",-imag(current_time) % 2)
+    	  return get_occupancy(psi; if_plot=false)
+      #end
 	end
 	return nothing
 end
@@ -30,7 +36,7 @@ function current_density_polarization(; psi, bond, half_sweep, current_time)
     if bond == 1 && half_sweep == 2
       result = density_polarization(psi)
       #println("Result: ",result)
-      scatter([current_time],[result],c="r")
+      scatter([-imag(current_time)],[result],c="r")
       return result
     end
     return nothing
@@ -39,8 +45,8 @@ end
 function current_spacial_density_polarization(; psi, bond, half_sweep, current_time)
     if bond == 1 && half_sweep == 2
       result = spacial_density_polarization(psi)
-      println("Result: ",result)
-      scatter([current_time],[result],c="b")
+      #println("Result: ",result)
+      scatter([-imag(current_time)],[result],c="b")
       return result
     end
     return nothing
@@ -73,7 +79,7 @@ function density_polarization(psi,occmat=nothing)
     for i in 1:size(occmat)[2]
         result += 2*sum(occmat[:,i] .* (i - m0))
     end
-    result /= size(occmat)[2]
+    result /= sum(occmat)*size(occmat)[2]
     return result
 end
 
@@ -88,11 +94,20 @@ function spacial_density_polarization(psi,occmat=nothing)
     for i in 1:size(occmat)[1]
         result += sum(occmat[i,:] .* (i - j0))
     end
-    return 2 * result / size(occmat)[1]
+    return 2 * result / (sum(occmat)*size(occmat)[1])
 end
 
 function spacial_density_polarization(all_occmats::Vector{Matrix{Float64}})
     return [spacial_density_polarization(nothing,occmat) for occmat in all_occmats]
+end
+
+function calculate_energy(psi,H)
+	return abs(inner(psi', H, psi) / inner(psi, psi))
+end
+
+function energy_variance(psi,H)
+    fo_nrg = calculate_energy(psi,H)
+	return sqrt(abs(fo_nrg^2 - inner(H,psi,H,psi) / inner(psi,psi)))
 end
 
 function evolve_in_time(psi0,final_time,dt,ham; kwargs...)
@@ -106,12 +121,15 @@ function evolve_in_time(psi0,final_time,dt,ham; kwargs...)
     metadata["dt"] = dt
     metadata["psi0"] = psi0
     metadata["time_ham"] = ham
-    display(metadata)
+    #display(metadata)
 
     time_steps = Int(ceil(final_time/dt))
     println("Time Steps: $time_steps")
 
-    obs = Observer("states" => return_state, "times" => current_time, "occs" => current_occ)
+    H = MPO(ham,siteinds(psi0))
+    println("Made Hamiltonian")
+
+    obs = Observer("times" => current_time)#"states" => return_state#, "occs" => current_occ)
     if obs_measures != nothing
         for (key,val) in obs_measures
             obs[key] = val
@@ -119,11 +137,8 @@ function evolve_in_time(psi0,final_time,dt,ham; kwargs...)
     end
     println("Made Observer")
 
-    H = MPO(ham,siteinds(psi0))
-    println("Made Hamiltonian")
-
     time_start = time()
-    psit = tdvp(H,psi0,dt; nsweeps=time_steps,outputlevel=outputlevel,maxdim=mdim,(observer!)=obs)
+    psit = tdvp(H,psi0,-im*dt; nsweeps=time_steps,outputlevel=outputlevel,maxdim=mdim,(observer!)=obs)
     time_end = time()
 
     if if_save_data
@@ -135,22 +150,44 @@ function evolve_in_time(psi0,final_time,dt,ham; kwargs...)
 		write_data_jld2(filename,data_dict,location,metadata)
 	end
 
-    return obs
+    return obs,H
+end
+
+function check_if_GS(psi0,ham,metadata)
+   new_gs = execute_mps(metadata["U1"],metadata["U2"],metadata["phi"],metadata["L"],metadata["nflavors"],metadata["nbosons"]; psi_guess=psi0,ham=ham,dict_to_symbols(metadata)...,if_save_data=false,mdim=metadata["maxlinkdim"],outputlevel=1)
+   println("Initial Energy Variance = ",energy_variance(new_gs,MPO(ham,siteinds(new_gs))))
+   println("Initial Occupation Variance = ",first(occupancy_variance(new_gs; if_plot=false)))
+   return new_gs
 end
 
 function execute_tevo(psi0_filename,final_time,dt; kwargs...)
     location = get(kwargs, :location, pwd())
     if_current = get(kwargs, :if_current, false)
-    current_strength = get(kwargs, :current_strength, 0.0)
+    if if_current
+        current_strength = get(kwargs, :current_strength, 0.0)
+    else
+        current_strength = 0.0
+    end
     mdim = get(kwargs, :mdim, 10)
+    if_GScheck = get(kwargs, :if_GScheck, false)
 
     data0,metadata0 = read_data_jld2(psi0_filename,location)
+    local_phi = 0.0#metadata0["phi"]
     psi0 = data0["mps"]
+    if if_GScheck
+        static_ham = hamiltonian(metadata0["t1"],metadata0["t2"],local_phi,metadata0["U1"],metadata0["U2"],metadata0["L"],metadata0["nflavors"]; dict_to_symbols(metadata0)...)
+        psi0 = check_if_GS(psi0,static_ham,metadata0)
+    end
+
+
     new_metadata = Dict([("if_applied_current",if_current),("current_strength",current_strength),("time_mdim",mdim)])
     metadata = merge(metadata0,new_metadata)
+    metadata["phi"] = local_phi
+    metadata["alpha"] = round(local_phi/(2*pi),digits=4)
     naming_dict = merge(get_params_dict_from_filename(psi0_filename),Dict([("if_current",if_current),("current_strength",current_strength)]))
+    naming_dict["alpha"] = round(local_phi/(2*pi),digits=4)
 
-    time_ham = hamiltonian(metadata0["t1"],metadata0["t2"],metadata0["phi"],metadata0["U1"],metadata0["U2"],metadata0["L"],metadata0["nflavors"]; dict_to_symbols(metadata0)...,if_applied_current=if_current,current_strength=current_strength)
+    time_ham = hamiltonian(metadata0["t1"],metadata0["t2"],local_phi,metadata0["U1"],metadata0["U2"],metadata0["L"],metadata0["nflavors"]; dict_to_symbols(metadata0)...,if_applied_current=if_current,current_strength=current_strength)
 
     naming_dict["dt"] = dt
 	naming_dict["time_end"] = final_time
@@ -164,8 +201,8 @@ function execute_tevo(psi0_filename,final_time,dt; kwargs...)
 
 	tevo_params = (metadata=metadata,location=loc,name=filename)
 
-	obs = evolve_in_time(psi0,final_time,dt,time_ham; tevo_params...,kwargs...)
-    return obs
+	obs,time_ham = evolve_in_time(psi0,final_time,dt,time_ham; tevo_params...,kwargs...)
+    return obs,time_ham
 end
 
 
