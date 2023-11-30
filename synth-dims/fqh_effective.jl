@@ -229,7 +229,9 @@ function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 	if_2ord_pert = get(kwargs, :if_2ord_pert, true)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
 	if_periodic_synth = get(kwargs, :if_periodic_synth, false)
-	if_applied_current = get(kwargs, :if_applied_current, false)
+	if_tilt = get(kwargs, :if_tilt, false)
+	tilt_strength = get(kwargs, :tilt_strength, 0.0)
+	if_current = get(kwargs, :if_current, false)
 	current_strength = get(kwargs, :current_strength, 0.0)
 	
 	ampo = OpSum()
@@ -288,16 +290,16 @@ function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 					continue
 				end
 			end
-			ampo += (-t2 * exp(im*phi*j), "Cr$(next_site) * Anh$(s)", j)
-			ampo += (-t2 * exp(-im*phi*j), "Cr$(s) * Anh$(next_site)", j)
+			ampo += (-t2 * exp(im*phi*j*1.0), "Cr$(next_site) * Anh$(s)", j)
+			ampo += (-t2 * exp(-im*phi*j*1.0), "Cr$(s) * Anh$(next_site)", j)
 			#ampo += (-t2 * exp(-im*phi*j), "Anh$(next_site) * Cr$(s)", j)
 		end
 	end
 
-	if if_applied_current
+	if if_tilt
 		for j in 1:L
 			for s in 1:nflavors
-				ampo += (-current_strength*j, "Ns$(s)", j)
+				ampo += (-tilt_strength*j, "Ns$(s)", j)
 			end
 		end
 	end
@@ -306,6 +308,7 @@ function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 end
 
 function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
+	psi_ortho = get(kwargs, :psi_ortho, nothing)
 	opl = get(kwargs, :outputlevel, 1)
 	conserve_qns = get(kwargs, :conserve_qns, true)
 	nsweeps = get(kwargs, :nsweeps, 10)
@@ -322,7 +325,6 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	t1 = 1.0
 	t2 = 1.0
 	if_nrg = get(kwargs, :if_nrg, false)
-	#if_nrg ? nsweeps = 1 : nothing
 	
 	#display(kwargs)
 	if isnothing(psi0)
@@ -345,10 +347,13 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 		H = ITensorsGPU.gpu(H)
 		psi0 = ITensorsGPU.gpu(psi0)
 	end
-	E, psi = dmrg(H, psi0; maxdim = mdim, nsweeps = 10, noise = noise, observer = NoObserver(), outputlevel=opl, cutoff = 0)
-	
-	if if_nrg
-		return E
+	if !isnothing(psi_ortho)
+		if typeof(psi_ortho) != Vector{MPS}
+			psi_ortho = [psi_ortho]
+		end
+		E, psi = dmrg(H, psi_ortho, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = 0)
+	else
+		E, psi = dmrg(H, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = 0)
 	end
 	
 	if if_save_data
@@ -362,7 +367,11 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 		write_data_jld2(filename,data_dict,location,metadata)
 	end
 	
-	return psi
+	if if_nrg
+		return psi, E
+	else
+		return psi
+	end
 end
 
 function check_convergence(starting_mps,metadata,filename)
@@ -604,19 +613,19 @@ function get_current_phys(wavefunc::MPS; kwargs...)
 	if_exp_part = get(kwargs,:if_exp_part,false)
 	alpha = get(kwargs,:alpha,0.0)
 	L,nflavors = get_mps_dims(wavefunc)
-	m0 = (nflavors+1)/2
+	m0 = (nflavors)/2
 
 	currents = [0.0*im for i in 1:nflavors]
 	for i in 1:nflavors
 		fullmat = correlation_matrix(wavefunc,"Cr$(i)","Anh$(i)")
 		component,hc_component = diag(fullmat,-1),diag(fullmat,1)
 		if if_exp_part
-			component .*= exp(im*alpha*(i-m0))
-			hc_component .*= exp(-im*alpha*(i-m0))
+			component .*= exp(im*alpha*(i-m0)/nflavors)
+			hc_component .*= exp(-im*alpha*(i-m0)/nflavors)
 		end
 		currents[i] = sum(component) - sum(hc_component)
 	end
-	return -imag(sum(currents)),-imag.(currents)
+	return sum(currents), currents
 end
 
 function get_current_synth(psi::MPS; kwargs...)

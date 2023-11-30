@@ -102,10 +102,16 @@ function spacial_density_polarization(all_occmats::Vector{Matrix{Float64}})
 end
 
 function calculate_energy(psi,H)
-	return abs(inner(psi', H, psi) / inner(psi, psi))
+    if typeof(H) != MPO
+        H = MPO(H,siteinds(psi))
+    end
+	return inner(psi', H, psi) / inner(psi, psi)
 end
 
 function energy_variance(psi,H)
+    if typeof(H) != MPO
+        H = MPO(H,siteinds(psi))
+    end
     fo_nrg = calculate_energy(psi,H)
 	return sqrt(abs(fo_nrg^2 - inner(H,psi,H,psi) / inner(psi,psi)))
 end
@@ -129,7 +135,7 @@ function evolve_in_time(psi0,final_time,dt,ham; kwargs...)
     H = MPO(ham,siteinds(psi0))
     println("Made Hamiltonian")
 
-    obs = Observer("times" => current_time)#"states" => return_state#, "occs" => current_occ)
+    obs = Observer("times" => current_time)#,"states" => return_state)#, "occs" => current_occ)
     if obs_measures != nothing
         for (key,val) in obs_measures
             obs[key] = val
