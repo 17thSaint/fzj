@@ -610,7 +610,7 @@ function plot_greenfunc(all_greens,hopping_direction; kwargs...)
 end
 
 function get_current_phys(wavefunc::MPS; kwargs...)
-	if_exp_part = get(kwargs,:if_exp_part,false)
+	if_exp_part = get(kwargs,:if_exp_part,true)
 	alpha = get(kwargs,:alpha,0.0)
 	L,nflavors = get_mps_dims(wavefunc)
 	m0 = (nflavors)/2
@@ -620,8 +620,8 @@ function get_current_phys(wavefunc::MPS; kwargs...)
 		fullmat = correlation_matrix(wavefunc,"Cr$(i)","Anh$(i)")
 		component,hc_component = diag(fullmat,-1),diag(fullmat,1)
 		if if_exp_part
-			component .*= exp(im*alpha*(i-m0)/nflavors)
-			hc_component .*= exp(-im*alpha*(i-m0)/nflavors)
+			component .*= exp(im*alpha*(i-m0)/1)
+			hc_component .*= exp(-im*alpha*(i-m0)/1)
 		end
 		currents[i] = sum(component) - sum(hc_component)
 	end

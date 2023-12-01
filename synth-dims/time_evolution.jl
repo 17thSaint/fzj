@@ -5,9 +5,24 @@ if true
 using ITensorTDVP, Observers
 end
 
+function current_nrg(; psi, bond, half_sweep)
+    if bond == 1 && half_sweep == 2
+      return calculate_energy(psi,ham_evolve)
+    end
+    return nothing
+end
+
+function current_nrgvar(; psi, bond, half_sweep)
+    if bond == 1 && half_sweep == 2
+      nrgvar = energy_variance(psi,ham_evolve)
+      println("Current Energy Variance = ",nrgvar)
+      return nrgvar
+    end
+    return nothing
+end
 
 function current_time(; current_time, bond, half_sweep)
-	if bond == 1 && half_sweep == 2
+    if bond == 1 && half_sweep == 2
 	  return -imag(current_time)
 	end
 	return nothing
@@ -113,7 +128,7 @@ function energy_variance(psi,H)
         H = MPO(H,siteinds(psi))
     end
     fo_nrg = calculate_energy(psi,H)
-	return sqrt(abs(fo_nrg^2 - inner(H,psi,H,psi) / inner(psi,psi)))
+	return abs(fo_nrg^2 - inner(H,psi,H,psi) / inner(psi,psi))
 end
 
 function evolve_in_time(psi0,final_time,dt,ham; kwargs...)
@@ -135,6 +150,8 @@ function evolve_in_time(psi0,final_time,dt,ham; kwargs...)
     H = MPO(ham,siteinds(psi0))
     println("Made Hamiltonian")
 
+    #obs = get(kwargs, :observer, NoObserver())
+    #
     obs = Observer("times" => current_time)#,"states" => return_state)#, "occs" => current_occ)
     if obs_measures != nothing
         for (key,val) in obs_measures
@@ -142,6 +159,7 @@ function evolve_in_time(psi0,final_time,dt,ham; kwargs...)
         end
     end
     println("Made Observer")
+    #
 
     time_start = time()
     psit = tdvp(H,psi0,-im*dt; nsweeps=time_steps,outputlevel=outputlevel,maxdim=mdim,(observer!)=obs)
