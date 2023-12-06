@@ -768,6 +768,41 @@ function plot_denscorr(denscorrs,corr_errors,distances; kwargs...)
 	return denscorrs,corr_errors
 end
 
+mutable struct NRGVarObserver <: AbstractObserver
+    var_tol::Float64
+    local_ham
+    nrg_var::Float64
+ 
+    NRGVarObserver(var_tol=0.0,local_ham=10.0) = new(var_tol,local_ham,1000.0)
+ end
+
+function ITensors.checkdone!(o::NRGVarObserver;kwargs...)
+  sw = kwargs[:sweep]
+  psi = kwargs[:psi]
+  ham = o.local_ham
+  if o.nrg_var < o.var_tol
+    println("Stopping DMRG after sweep $sw")
+    return true
+  end
+  # Otherwise, update last_energy and keep going
+  o.nrg_var = energy_variance(psi,ham) 
+  return false
+end
+
+function ITensors.measure!(o::NRGVarObserver; kwargs...)
+    nrg_var = o.nrg_var
+    var_tol = o.var_tol
+    #display(kwargs)
+    half_sweep = kwargs[:half_sweep]
+    bond = kwargs[:bond]
+    outputlevel = kwargs[:outputlevel]
+    
+  
+    if bond == 1 && half_sweep == 2 && outputlevel > 0
+      println("The energy variance is $nrg_var for tolerance $var_tol")
+    end
+end
+
 # ╔═╡ 12309987-d529-4820-bf06-5c3407a977b3
 begin
 if false

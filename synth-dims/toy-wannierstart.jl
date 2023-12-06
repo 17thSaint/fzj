@@ -1,9 +1,17 @@
 include("fqh_effective.jl")
 include("time_evolution.jl")
+using Statistics,PyPlot,Observers,ITensorTDVP,LsqFit
 
 function wannierstark_ham(L::Int,field_strength::Number; kwargs...)
-    if_periodic = get(kwargs, :if_periodic, false)
+    if_periodic = get(kwargs, :if_periodic, true)
     hopping_strength = get(kwargs, :hopping_strength, 1.0)
+    current_strength = get(kwargs, :current_strength, 0.0)
+    if_current = current_strength != 0.0
+    if_field = field_strength != 0.0
+
+    println("Whether or not Periodic = ",if_periodic)
+
+    if_current ? hopping_strength *= exp(im*2*pi*current_strength/L) : nothing
 
     ampo = OpSum()
 
@@ -22,8 +30,22 @@ function wannierstark_ham(L::Int,field_strength::Number; kwargs...)
     end
 
     # applied field term
-    for j in 1:L
-        ampo += (-field_strength*j, "N", j)
+
+    if if_field
+        for j in 1:L
+            ampo += (-field_strength*j, "N", j)
+        end
+    end
+
+    return ampo
+end
+
+function momentum_ham(L,nbosons,current_strength; kwargs...)
+    ampo = OpSum()
+
+    for i in 0:L-1
+        coeff = cos((pi*nbosons - current_strength + 2*pi*i)/L) / L
+        ampo += (coeff, "adag", i+1, "a", i+1)
     end
 
     return ampo
@@ -91,20 +113,186 @@ function find_decay_rate(positions,times; kwargs...)
     return decay_rate,freq
 end
 
+function toy_current(psi,phi,L)
+	fullmat = correlation_matrix(psi,"adag","a")
+    #fig = figure()
+    #imshow(abs.(fullmat))
+	currents = zeros(L) .* im
+    for i in 1:L
+        minus = i-1
+        if i == 1
+            minus = L
+        end
+        plus = i+1
+        if i == L
+            plus = 1
+        end
+        inflow = exp(im*phi*2*pi/L) * fullmat[plus,i] + exp(-im*phi*2*pi/L) * fullmat[minus,i]
+        outflow = exp(-im*phi*2*pi/L) * fullmat[i,minus] + exp(im*phi*2*pi/L) * fullmat[i,plus]
+        #display(inflow)
+        #display(outflow)
+        currents[i] = inflow - outflow #exp(im*phi*2*pi/L) * (fullmat[plus,i] - fullmat[i,minus]) + exp(-im*phi*2*pi/L) * (fullmat[minus,i] - fullmat[i,plus])
+    end
+    
+    return -imag.(currents)
+end
+
+function working_ham(L,phi)
+    ampo = OpSum()
+    coeff = exp(im*2*pi*phi/L)
+    for i in 1:L
+        ampo += (coeff, "S+", i, "S-", mod1(i+1,L))
+        ampo += (conj(coeff), "S+", mod1(i+1,L), "S-", i)
+    end
+    return ampo
+end
+
+function current_calculate(psi::MPS,site::Int,L,phi)
+    coeff = exp(im*phi*2*pi/L)
+    sites = siteinds(psi)
+    opform = im*coeff*op(sites[site],"S+") * op(sites[mod1(site+1,L)],"S-") - im*conj(coeff)*op(sites[mod1(site+1,L)],"S+") * op(sites[site],"S-")
+    
+    result = inner(psi,apply(opform,psi))
+    return result
+end
+
+function current_calculate(psi::MPS,L,phi)
+    return [current_calculate(psi,i,L,phi) for i in 1:L]
+end
+
+function differentiate_state(psi::MPS,psi_shifted::MPS,shift=0.001)
+    return abs2.((inner(psi,psi_shifted) - 1) / shift)
+end
+
+function differentiate_state(psi::Vector,psi_shifted::Vector,shift=0.001)
+    return [differentiate_state(psi[i],psi_shifted[i],shift) for i in 1:length(psi)]
+end
+
 #
-L = 10
+#L = 10
 mdim = 100
 mdim_time = 100
 nbosons = 1
 time_end = 50.0
+nrgvar_tol = 1e-8
 
-ham_start = wannierstark_ham(L,0.0)
+change = 0.001
+counting = 20
+strens = range(0.01,stop=0.25,length=counting)
+deriv_strens = strens .+ change/2
+strens = [strens; strens .+ 0.5*change; strens .+ change]
+Ls = [10]
+nrgs = [[] for i in 1:length(Ls)]
+direct_jx = [[] for i in 1:length(Ls)]
+secderiv_nrg = [[] for i in 1:length(Ls)]
+deriv_jx = [[] for i in 1:length(Ls)]
+states = [[] for i in 1:length(Ls)]
+deriv_states = [[] for i in 1:length(Ls)]
+theory = [[] for i in 1:length(Ls)]
+fromham = [[] for i in 1:length(Ls)]
 
-sites = siteinds("Boson", L)
-states = make_states(L,nbosons,1)
-psi0 = MPS(sites,states)
-gs_psi = execute_mps(nothing,nothing,nothing,L,nothing,nbosons; psi_guess=psi0,ham=ham_start,mdim=mdim)
-println("Initial Energy Variance = ",energy_variance(gs_psi,MPO(ham_start,siteinds(gs_psi))))
+for (j,L) in enumerate(Ls)
+sites = siteinds("Qubit", L; conserve_number = true)
+making_states = make_states(L,nbosons,1)
+psi0 = MPS(sites,making_states)
+nrgs[j] = zeros(length(strens)) .* im
+direct_jx[j] = zeros(length(strens)) .* im
+for (i,stren) in enumerate(strens)
+    hamhere = working_ham(L,stren)
+    obs = NRGVarObserver(nrgvar_tol,hamhere)
+
+    gs_psi = execute_mps(nothing,nothing,nothing,L,nothing,nbosons; psi_guess=psi0,ham=hamhere,mdim=mdim,observer=obs)
+    append!(states[j],[gs_psi])
+    nrgs[j][i] = calculate_energy(gs_psi,hamhere)
+    direct_jx[j][i] = current_calculate(gs_psi,Int(L/2),L,stren)
+end
+#
+deriv_jx[j] = (nrgs[j][2*counting+1:end] .- nrgs[j][1:counting]) / change / (2*pi)
+deriv_states[j] = differentiate_state(states[j][1:counting],states[j][2*counting+1:end],change)
+#
+end
+#
+fig = figure()
+for (j,L) in enumerate(Ls)
+    #fig1 = figure()
+scatter(deriv_strens,real.(deriv_jx[j]),label="Deriv $L")
+scatter(strens,real.(direct_jx[j]),label="Direct $L")
+legend()
+xlabel("Phi")
+ylabel("Jx")
+end
+fig = figure()
+
+for (j,L) in enumerate(Ls)
+#fig2 = figure()
+scatter(strens,real.(nrgs[j]),label="$L")
+xlabel("Phi")
+ylabel("Energy")
+legend()
+end
+fig = figure()
+
+for (j,L) in enumerate(Ls)
+secderiv_nrg[j] = L^2 .* ((nrgs[j][2*counting+1:end] .- (2 .* nrgs[j][counting+1:2*counting]) .+ nrgs[j][1:counting]) / (change/2)^2 / (2*pi)^2)
+#fig3 = figure()
+scatter(deriv_strens,real.(secderiv_nrg[j]),label="$L")
+xlabel("Phi")
+ylabel("Drude Weight")
+legend()
+end
+
+fig4 = figure()
+ccs = [0.0 for i in 1:length(Ls)]
+for (j,L) in enumerate(Ls)
+#fig4 = figure()
+theory[j] = (secderiv_nrg[j] .* (2*pi/L)^2) .+ ((2. * nrgs[j][1:counting]) .* (deriv_states[j] .- 1))
+fromham[j] = nrgs[j][1:counting]
+what = filter(x -> x < 0, real.(theory[j] ./ fromham[j]))
+display(what)
+ccs[j] = mean(what)
+scatter(strens[1:counting],real.(fromham[j]),label="From Ham $L")
+scatter(strens[1:counting],real.(theory[j]),label="Theory $L")
+xlabel("Phi")
+ylabel("Exp of SecDeriv Hamiltonian")
+legend()
+end
+
+#=
+torus_current = 0.01
+counting = 50
+change = 0.0001
+strens = range(0.01,stop=2.0,length=counting)
+derivstrens = strens .+ change/2
+#strens = [strens; strens .+ change]
+nrgs = zeros(length(strens)) .* im
+jxs = zeros(length(strens))
+#direct_jxs = zeros(Int(length(strens)/2)) .* im
+for (i,torus_current) in enumerate(strens)
+ham_start = wannierstark_ham(L,0.0; current_strength=torus_current, if_periodic=true)
+obs = NRGVarObserver(nrgvar_tol,ham_start)
+
+gs_psi = execute_mps(nothing,nothing,nothing,L,nothing,nbosons; psi_guess=psi0,ham=ham_start,mdim=mdim,observer=obs,if_periodic=true)
+#println("Initial Energy Variance = ",energy_variance(gs_psi,ham_start))
+nrgs[i] = calculate_energy(gs_psi,ham_start)
+loccurr = toy_current(gs_psi,torus_current,L)
+#display(loccurr)
+#println("Mean values = ",mean(loccurr))
+#plot(loccurr)
+jxs[i] = loccurr[Int(L/2)]
+end
+
+#=
+for i in 1:counting
+    direct_jxs[i] = (nrgs[i+counting] - nrgs[i])/change
+end
+plot(derivstrens,imag.(direct_jxs),"-p",label="Deriv")
+=#
+#
+plot(strens,jxs,"-p",label="Operator")
+xlabel("Current Strength")
+ylabel("Jx")
+legend()
+=#
 
 #=occs = expect(gs_psi,"N")
 fig = figure()
@@ -134,6 +322,8 @@ rates[i] = decay_params[1]
 freqs[i] = decay_params[2]
 end
 =#
+
+#=
 fig = figure()
 plot(strens,abs.(rates),"-p")
 yscale("log")
@@ -144,6 +334,7 @@ fig2 = figure()
 plot(strens,abs.(freqs),"-p")
 xlabel("Field Strength")   
 ylabel("Frequency")
+=#
 
 #=
 fig2 = figure()
