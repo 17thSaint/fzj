@@ -116,7 +116,7 @@ function spacial_density_polarization(all_occmats::Vector{Matrix{Float64}})
     return [spacial_density_polarization(nothing,occmat) for occmat in all_occmats]
 end
 
-function calculate_energy(psi,H)
+function calculate_energy(psi::MPS,H)
     if typeof(H) != MPO
         H = MPO(H,siteinds(psi))
     end

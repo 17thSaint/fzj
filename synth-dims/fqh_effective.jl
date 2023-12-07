@@ -337,7 +337,7 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	else
 		H = MPO(ham, sidx)
 	end
-	println("Built Hams")
+	#println("Built Hams")
 	#display(matrix(combiner(dag.(sidx))*prod(H)*combiner(prime.(sidx))))
 	if isnothing(psi0)
 		states = make_states(L,nbosons,nflavors)
@@ -781,7 +781,7 @@ function ITensors.checkdone!(o::NRGVarObserver;kwargs...)
   psi = kwargs[:psi]
   ham = o.local_ham
   if o.nrg_var < o.var_tol
-    println("Stopping DMRG after sweep $sw")
+    #println("Stopping DMRG after sweep $sw")
     return true
   end
   # Otherwise, update last_energy and keep going
@@ -799,7 +799,7 @@ function ITensors.measure!(o::NRGVarObserver; kwargs...)
     
   
     if bond == 1 && half_sweep == 2 && outputlevel > 0
-      println("The energy variance is $nrg_var for tolerance $var_tol")
+      #println("The energy variance is $nrg_var for tolerance $var_tol")
     end
 end
 
