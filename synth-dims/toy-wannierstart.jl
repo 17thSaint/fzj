@@ -179,7 +179,7 @@ function find_deriv_overlap(psi::MPS,observer,local_strength,psi0)
     change_limit = local_strength/10
     next_strength = local_strength + change
     reshiftcount = 0
-    fitcount = 6
+    fitcount = 5
     attempts = 1
     while length(shifted_states) < 2*fitcount
         if next_strength > local_strength + change_limit
@@ -219,7 +219,7 @@ function find_deriv_overlap(psi::MPS,observer,local_strength,psi0)
 end
 
 function nrg_limitderiv(nrgs,real_strengths,og_strengths,order)
-    fitcount = 6
+    fitcount = 5
     nrg_sets = [nrgs[(2*fitcount+1)*i+1:(2*fitcount+1)*i+1+2*fitcount] for i in 0:length(og_strengths)-1]
     strength_sets = [real_strengths[(2*fitcount+1)*i+1:(2*fitcount+1)*i+1+2*fitcount] for i in 0:length(og_strengths)-1]
     if order == 1
@@ -281,7 +281,7 @@ time_end = 50.0
 nrgvar_tol = 1e-8
 
 #change = 0.01
-counting = 5
+counting = 2
 strens = range(0.1,stop=0.25,length=counting) #0.25 .+ [i/1000 for i in 0:100]
 #strens = [strens; strens .+ change]
 Ls = [10]
@@ -299,16 +299,16 @@ for (j,L) in enumerate(Ls)
 sites = siteinds("Qubit", L; conserve_number = true)
 making_states = make_states(L,nbosons,1)
 psi0 = MPS(sites,making_states)
-nrgs[j] = zeros(length(strens)) .* im
-direct_jx[j] = zeros(length(strens)) .* im
+#nrgs[j] = zeros(length(strens)) .* im
+#direct_jx[j] = zeros(length(strens)) .* im
 for (i,stren) in enumerate(strens)
     append!(real_strens[j],[stren])
     hamhere = working_ham(L,stren)
     obs = NRGVarObserver(nrgvar_tol,hamhere)
 
-    gs_psi = execute_mps(nothing,nothing,nothing,L,nothing,nbosons; psi_guess=psi0,ham=hamhere,mdim=mdim)#,observer=obs)
+    gs_psi = execute_mps(nothing,nothing,nothing,nothing,nothing,nothing; psi_guess=psi0,ham=hamhere,mdim=mdim)#,observer=obs)
     append!(states[j],[gs_psi])
-    nrgs[j][i] = calculate_energy(gs_psi,hamhere)
+    append!(nrgs[j],[calculate_energy(gs_psi,hamhere)])
     #direct_jx[j][i] = current_calculate(gs_psi,Int(L/2),L,stren)
     #
     new_states,new_strens,new_nrgs,deriv_overlap = find_deriv_overlap(gs_psi,obs,stren,psi0)
@@ -346,7 +346,7 @@ if true
 fig = figure()
 for (j,L) in enumerate(Ls)
 #fig2 = figure()
-scatter(strens,real.(nrgs[j]),label="$L")
+scatter(real_strens,real.(nrgs[j]),label="$L")
 xlabel("Phi")
 ylabel("Energy")
 legend()
