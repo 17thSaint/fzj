@@ -192,7 +192,7 @@ function find_deriv_overlap(psi::MPS,observer,local_strength,psi0,if_plot=false)
         next_psi = execute_mps(nothing,nothing,nothing,nothing,nothing,nothing; psi_guess=psi0,ham=next_ham,mdim=100,outputlevel=0)#,observer=observer)
         derivoverlap = differentiate_state(psi,next_psi,next_strength-local_strength)
         #println(next_strength,", ",local_strength,", ",derivoverlap,", ",reshiftcount)
-        if derivoverlap <= 2.0
+        #if derivoverlap <= 2.0
             append!(shifted_states,[next_psi])
             append!(new_strengths,[next_strength])
             append!(derivoverlaps,[derivoverlap])
@@ -205,7 +205,7 @@ function find_deriv_overlap(psi::MPS,observer,local_strength,psi0,if_plot=false)
             append!(shifted_states,[otherdirection_psi])
             append!(new_strengths,[otherdirection_strength])
             append!(new_nrgs,[calculate_energy(otherdirection_psi,otherdirection_ham)])
-        end
+        #end
         attempts += 1
         next_strength += change
     end
@@ -218,7 +218,7 @@ function find_deriv_overlap(psi::MPS,observer,local_strength,psi0,if_plot=false)
     title("Overlap: Limit Value = $(cf.param[2])")
     end
     println("Found Limit Derivative with $(attempts-fitcount) extra attempts and $(reshiftcount) reshifts")
-    return shifted_states,new_strengths,new_nrgs,cf.param[2]
+    return shifted_states,new_strengths,new_nrgs#,cf.param[2]
 end
 
 function nrg_limitderiv(nrgs,real_strengths,og_strengths,order,if_plot=false)
@@ -278,7 +278,7 @@ end
 
         
 
-#=
+#
 #L = 10
 mdim = 100
 mdim_time = 100
@@ -287,10 +287,10 @@ time_end = 50.0
 nrgvar_tol = 1e-8
 
 #change = 0.01
-counting = 10
-strens = range(0.1,stop=0.25,length=counting) #0.25 .+ [i/1000 for i in 0:100]
+counting = 30
+strens = range(0.1,stop=1.0,length=counting) #0.25 .+ [i/1000 for i in 0:100]
 #strens = [strens; strens .+ change]
-Ls = [6]
+Ls = [10]
 real_strens = [[] for i in 1:length(Ls)]
 
 nrgs = [[] for i in 1:length(Ls)]
@@ -320,10 +320,11 @@ for (i,stren) in enumerate(strens)
     append!(nrgs[j],[calculate_energy(gs_psi,hamhere)])
     append!(firstderiv_ham[j],[current_calculate(gs_psi,Int(L/2),L,stren)])
     #
-    new_states,new_strens,new_nrgs,deriv_overlap = find_deriv_overlap(gs_psi,obs,stren,psi0)
+    #new_states,new_strens,new_nrgs,deriv_overlap = find_deriv_overlap(gs_psi,obs,stren,psi0)
+    new_states,new_strens,new_nrgs = find_deriv_overlap(gs_psi,obs,stren,psi0)
     append!(real_strens[j],new_strens)
     append!(states[j],new_states)
-    append!(deriv_states[j],[deriv_overlap])
+    #append!(deriv_states[j],[deriv_overlap])
     append!(nrgs[j],new_nrgs)
 
     append!(firstderiv_ham[j],[current_calculate(new_states[k],Int(L/2),L,new_strens[k]) for k in 1:length(new_strens)])
@@ -336,7 +337,7 @@ secderiv_ham[j] = nrgs[j] .* (-(2*pi/L)^2)
 #deriv_states[j] = differentiate_state(states[j][1:counting],states[j][2*counting+1:end],change)
 #
 end
-=#
+#
 
 #rr = [differentiate_state(states[1][1],states[1][i],strens[i] - strens[1]) for i in 2:length(strens)]
 #scatter(strens[2:end],rr)
@@ -358,8 +359,8 @@ if true
     fig = figure()
     for (j,L) in enumerate(Ls)
         #fig1 = figure()
-    scatter(strens,real.(firstderiv_nrg[j]),label="NRG $L")
-    plot(real_strens[1],real.(firstderiv_ham[j]),label="Ham $L")
+    plot(strens,real.(firstderiv_nrg[j]),c="r",label="NRG $L")
+    scatter(real_strens[1],real.(firstderiv_ham[j]),label="Ham $L")
     legend()
     xlabel("Phi")
     ylabel("First Derivative")
@@ -369,8 +370,8 @@ end
 if true
 fig = figure()
 for (j,L) in enumerate(Ls)
-scatter(strens,real.(secderiv_nrg[j]),label="NRG $L")
-plot(real_strens[1],real.(secderiv_ham[j]),label="HamOp $L")
+plot(strens,real.(secderiv_nrg[j]),c="r",label="NRG $L")
+scatter(real_strens[1],real.(secderiv_ham[j]),label="HamOp $L")
 xlabel("Phi")
 ylabel("Second Derivative")
 legend()
