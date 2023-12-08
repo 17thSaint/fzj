@@ -4,6 +4,78 @@ using Statistics,PyPlot,Observers,ITensorTDVP,LsqFit
 
 lin_model(x,p) = p[1].* x .+ p[2]
 
+function firstderiv_ham(s,j,L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
+    if_periodic_phys = get(kwargs, :if_periodic_phys, false)
+    current_strength = get(kwargs, :current_strength, 0.0)
+    if_s0 = get(kwargs, :if_s0, false)
+    
+    s0 = 0.0
+    if if_s0
+        s0 = nflavors/2
+    end
+
+    ampo = OpSum()
+    next_site = j+1
+    if j == L
+        if if_periodic_phys
+            next_site = 1
+        end
+    end
+    ampo += (-tp * (im*2*pi/L) * exp(im*chi*(s-s0)/(nflavors)) * exp(im*2*pi*current_strength/L), "Cr$s", j, "Anh$s", next_site)
+    ampo += (-tp * (-im*2*pi/L) * exp(-im*chi*(s-s0)/(nflavors)) * exp(-im*2*pi*current_strength/L), "Anh$s", j, "Cr$s", next_site)
+    
+    return ampo
+end
+
+function secderiv_ham(s,j,L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
+    if_periodic_phys = get(kwargs, :if_periodic_phys, false)
+    current_strength = get(kwargs, :current_strength, 0.0)
+    if_s0 = get(kwargs, :if_s0, false)
+    
+    s0 = 0.0
+    if if_s0
+        s0 = nflavors/2
+    end
+
+    ampo = OpSum()
+    next_site = j+1
+    if j == L
+        if if_periodic_phys
+            next_site = 1
+        end
+    end
+    ampo += (tp * (2*pi/L)^2 * exp(im*chi*(s-s0)/(nflavors)) * exp(im*2*pi*current_strength/L), "Cr$s", j, "Anh$s", next_site)
+    ampo += (tp * (2*pi/L)^2 * exp(-im*chi*(s-s0)/(nflavors)) * exp(-im*2*pi*current_strength/L), "Anh$s", j, "Cr$s", next_site)
+    
+    return ampo
+end
+
+function calc_deriv(order,psi,s,j,nflavors,chi,ham_params)
+    L = length(psi)
+    if order == 1
+        mpo_ver = MPO(firstderiv_ham(s,j,L,nflavors,chi; ham_params...),siteinds(psi))
+    elseif order == 2
+        mpo_ver = MPO(secderiv_ham(s,j,L,nflavors,chi; ham_params...),siteinds(psi))
+    end
+    return inner(psi',mpo_ver,psi) / inner(psi,psi)
+end
+
+function allsite_deriv(order,psi,nflavors,chi,ham_params)
+    L = length(psi)
+    currents = zeros(nflavors,L) .* im
+    for j in 1:L
+        for s in 1:nflavors
+            if order == 1
+                mpo_ver = MPO(firstderiv_ham(s,j,L,nflavors,chi; ham_params...),siteinds(psi))
+            elseif order == 2
+                mpo_ver = MPO(secderiv_ham(s,j,L,nflavors,chi; ham_params...),siteinds(psi))
+            end
+            currents[s,j] = inner(psi',mpo_ver,psi) / inner(psi,psi)
+        end
+    end
+    return currents
+end
+
 function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
         if_periodic_phys = get(kwargs, :if_periodic_phys, false)
         if_periodic_synth = get(kwargs, :if_periodic_synth, false)
@@ -28,8 +100,8 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
                         continue
                     end
                 end
-                ampo += (-tp * exp(im*chi*(s-s0)/(nflavors)) * exp(im*current_strength/L), "Cr$s", j, "Anh$s", next_site)
-                ampo += (-tp * exp(-im*chi*(s-s0)/(nflavors)) * exp(-im*current_strength/L), "Anh$s", j, "Cr$s", next_site)
+                ampo += (-tp * exp(im*chi*(s-s0)/(nflavors)) * exp(im*2*pi*current_strength/L), "Cr$s", j, "Anh$s", next_site)
+                ampo += (-tp * exp(-im*chi*(s-s0)/(nflavors)) * exp(-im*2*pi*current_strength/L), "Anh$s", j, "Cr$s", next_site)
             end
         end
         
@@ -75,74 +147,87 @@ chi = part_count / (nu*L*nflavors)
 #tilt = 0.001
 
 if_per_phys = true
-if_per_virt = true
+if_per_virt = false
 
 #current_strength = 0.00
 
 #
 if true
-change = 0.001
-counting = 5
-strens = range(0.2,stop=0.3,length=counting)
-strens = [strens; strens .+ change]
+counting = 30
+strens = range(0.01,stop=1.0,length=counting)
 nrgs = zeros(length(strens)) .* im
-currents = zeros(Int(length(strens)/2)) .* im
+currents = zeros(nflavors,length(strens)) .* im
+drudes = zeros(nflavors,length(strens)) .* im
 states = []
 
 for (i,current_strength) in enumerate(strens)
-ham_start = hamiltonian_universal(L,nflavors,chi; if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,current_strength=current_strength,if_s0=true,tilt_strength=0.0)
-obs = NRGVarObserver(nrgvar_tol,ham_start)
-psi_gs = execute_mps(nothing,nothing,chi,L,nflavors,part_count; ham=ham_start,mdim=mdim,if_save_data=if_save_data,observer=obs)
-println("Energy Variance = ",energy_variance(psi_gs,ham_start))
+    ham_params = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,current_strength=current_strength,if_s0=true,tilt_strength=0.0)
+    ham_start = hamiltonian_universal(L,nflavors,chi; ham_params...)
+    #obs = NRGVarObserver(nrgvar_tol,ham_start)
+    psi_gs = execute_mps(nothing,nothing,chi,L,nflavors,part_count; ham=ham_start,mdim=mdim,if_save_data=if_save_data)#,observer=obs)
+    println("Energy Variance = ",energy_variance(psi_gs,ham_start))
 
-#jx0 = get_current(psi_gs; alpha=chi)[2][3]
-append!(states,[psi_gs])
-#occ0 = get_occupancy(psi_gs)
-if (i+1) % 2 == 0
-jx = get_current(psi_gs; alpha=chi, if_exp_part=true)
-currents[Int((i+1)/2)] = jx[2][3]#jx[1]
+    append!(states,[psi_gs])
+    nrgs[i] = calculate_energy(psi_gs,ham_start)
+
+    currents[:,i] = [calc_deriv(1,psi_gs,s,Int(L/2),nflavors,chi,ham_params) for s in 1:nflavors]
+    drudes[:,i] = [calc_deriv(2,psi_gs,s,Int(L/2),nflavors,chi,ham_params) for s in 1:nflavors]
+    #=fig = figure()
+    imshow(real.(drude))
+    title("Drudes at Current Strength = $(current_strength)")
+    xlabel("Physical Site")
+    ylabel("Synthetic Site")
+    colorbar()
+    =#
 end
-nrgs[i] = calculate_energy(psi_gs,ham_start)
+#
+fig = figure()
+plot(strens,real.(nrgs),"-p",label="Energy")
+xlabel("Phi")
+legend()
+fig2 = figure()
+for i in 1:nflavors
+    plot(strens,real.(currents[i,:]),"-p",label="Current $i")
 end
-scatter(strens,real.(nrgs),"-p")
+xlabel("Phi")
+legend()
+fig3 = figure()
+for i in 1:nflavors
+    plot(strens,real.(drudes[i,:]),"-p",label="Drude $i")
+end
+xlabel("Phi")
+legend()
 #
-#jx_theory = real.([(nrgs[i+count] - nrgs[i])/change for i in 1:count]) #.* L
-#new_strens = [strens[i] + change/2 for i in 1:count]
-#
-#plot(strens[1:count],imag.(currents),"-p")
-#plot(new_strens,jx_theory,label="Theory")
-#xlabel("Phi")
-#ylabel("Current")
 end
 #
 
 
 #
 if false
-time_end = 10.0
-time_change = 0.2
-mdim_time = 50
+    time_end = 10.0
+    time_change = 0.2
+    mdim_time = 50
 
-tilts = [0.1,0.075,0.05,0.025,0.01]
-for (i,tilt) in enumerate(tilts)
-ham_evolve = hamiltonian_universal(L,nflavors,chi; if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,current_strength=current_strength,tilt_strength=tilt,if_s0=true)
+    tilts = [0.1,0.075,0.05,0.025,0.01]
+    for (i,tilt) in enumerate(tilts)
+        ham_evolve = hamiltonian_universal(L,nflavors,chi; if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,current_strength=current_strength,tilt_strength=tilt,if_s0=true)
 
-#rez0, otherham0 = evolve_in_time(psi_gs,time_end,time_change,ham_start; mdim=mdim_time,obs_measures=Dict("occs" => current_occ, "states" => return_state, "nrg_vars" => current_nrgvar, "nrgs" => current_nrg))
-rez, otherham = evolve_in_time(psi_gs,time_end,time_change,ham_evolve; mdim=mdim_time,obs_measures=Dict("occs" => current_occ, "states" => return_state))
-times = [[0.0]; rez["times"].results]
+        #rez0, otherham0 = evolve_in_time(psi_gs,time_end,time_change,ham_start; mdim=mdim_time,obs_measures=Dict("occs" => current_occ, "states" => return_state, "nrg_vars" => current_nrgvar, "nrgs" => current_nrg))
+        rez, otherham = evolve_in_time(psi_gs,time_end,time_change,ham_evolve; mdim=mdim_time,obs_measures=Dict("occs" => current_occ, "states" => return_state))
+        times = [[0.0]; rez["times"].results]
 
-currents = [[jx0]; [get_current(rez["states"].results[i]; alpha=chi)[2][3] for i in 1:length(times)-1]] .-jx0
-#currents_null = [[jx0]; [get_current(rez0["states"].results[i]; alpha=chi)[2][3] for i in 1:length(times)-1]] .-jx0
+        currents = [[jx0]; [get_current(rez["states"].results[i]; alpha=chi)[2][3] for i in 1:length(times)-1]] .-jx0
+        #currents_null = [[jx0]; [get_current(rez0["states"].results[i]; alpha=chi)[2][3] for i in 1:length(times)-1]] .-jx0
 
-#fig = figure()
-plot(times,-imag.(currents) ./ maximum(-imag.(currents)[1:10]),"-p",label="$(round(tilt,digits=3))")
-legend()
-end
+        #fig = figure()
+        plot(times,-imag.(currents) ./ maximum(-imag.(currents)[1:10]),"-p",label="$(round(tilt,digits=3))")
+        legend()
+    end
 
-#=fig2 = figure()
-plot(times,imag.(currents_null),"-p")
-title("Null")
-=#
+    #=fig2 = figure()
+    plot(times,imag.(currents_null),"-p")
+    title("Null")
+    =#
 end
 #
 
