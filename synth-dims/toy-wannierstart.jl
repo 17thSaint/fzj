@@ -152,7 +152,7 @@ function current_calculate(psi::MPS,site::Int,L,phi)
     sites = siteinds(psi)
     opform = im*coeff*op(sites[site],"S+") * op(sites[mod1(site+1,L)],"S-") - im*conj(coeff)*op(sites[mod1(site+1,L)],"S+") * op(sites[site],"S-")
     
-    result = inner(psi,apply(opform,psi))
+    result = inner(psi,apply(opform,psi)) * (2*pi)
     return result
 end
 
@@ -169,8 +169,9 @@ function differentiate_state(psi::Vector,psi_shifted::Vector,shift)
 end
 
 linmod(x,p) = p[1] .* x .+ p[2]
+quadmod(x,p) = p[1] .* x .^2 .+ p[2] .* x .+ p[3]
 
-function find_deriv_overlap(psi::MPS,observer,local_strength,psi0)
+function find_deriv_overlap(psi::MPS,observer,local_strength,psi0,if_plot=false)
     shifted_states = []
     new_strengths = []
     derivoverlaps = []
@@ -190,7 +191,7 @@ function find_deriv_overlap(psi::MPS,observer,local_strength,psi0)
         next_ham = working_ham(length(psi),next_strength)
         next_psi = execute_mps(nothing,nothing,nothing,nothing,nothing,nothing; psi_guess=psi0,ham=next_ham,mdim=100,outputlevel=0)#,observer=observer)
         derivoverlap = differentiate_state(psi,next_psi,next_strength-local_strength)
-        println(next_strength,", ",local_strength,", ",derivoverlap,", ",reshiftcount)
+        #println(next_strength,", ",local_strength,", ",derivoverlap,", ",reshiftcount)
         if derivoverlap <= 2.0
             append!(shifted_states,[next_psi])
             append!(new_strengths,[next_strength])
@@ -210,15 +211,17 @@ function find_deriv_overlap(psi::MPS,observer,local_strength,psi0)
     end
     forward_strengths = [new_strengths[2*i+1] for i in 0:fitcount-1]
     cf = curve_fit(linmod,forward_strengths .- local_strength,derivoverlaps,[-1.0,0.5])
+    if if_plot
     fig = figure()
     scatter(forward_strengths .- local_strength,derivoverlaps)
     plot(forward_strengths .- local_strength,linmod(forward_strengths .- local_strength,cf.param))
     title("Overlap: Limit Value = $(cf.param[2])")
+    end
     println("Found Limit Derivative with $(attempts-fitcount) extra attempts and $(reshiftcount) reshifts")
     return shifted_states,new_strengths,new_nrgs,cf.param[2]
 end
 
-function nrg_limitderiv(nrgs,real_strengths,og_strengths,order)
+function nrg_limitderiv(nrgs,real_strengths,og_strengths,order,if_plot=false)
     fitcount = 5
     nrg_sets = [nrgs[(2*fitcount+1)*i+1:(2*fitcount+1)*i+1+2*fitcount] for i in 0:length(og_strengths)-1]
     strength_sets = [real_strengths[(2*fitcount+1)*i+1:(2*fitcount+1)*i+1+2*fitcount] for i in 0:length(og_strengths)-1]
@@ -227,10 +230,9 @@ function nrg_limitderiv(nrgs,real_strengths,og_strengths,order)
         for (i,nrg_set) in enumerate(nrg_sets)
             forward_nrgs = [[nrg_set[1]]; [nrg_set[2*j] for j in 1:fitcount]]
             forward_strengths = [[strength_sets[i][1]]; [strength_sets[i][2*j] for j in 1:fitcount]]
-            append!(values,first_deriv_nrgs(forward_nrgs,forward_strengths))
+            append!(values,first_deriv_nrgs(forward_nrgs,forward_strengths,if_plot))
         end
     elseif order == 2
-        println("Not done yet")
         values = []
         for (i,nrg_set) in enumerate(nrg_sets)
             center_nrg = nrg_set[1]
@@ -238,41 +240,45 @@ function nrg_limitderiv(nrgs,real_strengths,og_strengths,order)
             forward_nrgs = [nrg_set[2*j] for j in 1:fitcount]
             forward_strengths = [strength_sets[i][2*j] for j in 1:fitcount]
             reverse_nrgs = [nrg_set[2*j+1] for j in 1:fitcount]
-            append!(values,second_deriv_nrgs(forward_nrgs,forward_strengths,reverse_nrgs,center_nrg,center_strength))
+            append!(values,second_deriv_nrgs(forward_nrgs,forward_strengths,reverse_nrgs,center_nrg,center_strength,if_plot))
         end
     end
 
     return values
 end
 
-function second_deriv_nrgs(forward_nrgs,forward_strens,reverse_nrgs,center_nrg,center_stren)
+function second_deriv_nrgs(forward_nrgs,forward_strens,reverse_nrgs,center_nrg,center_stren,if_plot=false)
     full_derivs = (forward_nrgs .- (2 .* center_nrg) .+ reverse_nrgs) ./ (forward_strens .- center_stren).^2
     derivs = real.(full_derivs)
-    println("Imag Part: ",mean(imag.(derivs)))
-    cf = curve_fit(linmod,forward_strens .- center_stren,derivs,[-1.0,0.5])
+    #println("Imag Part: ",mean(imag.(derivs)))
+    cf = curve_fit(quadmod,forward_strens .- center_stren,derivs,[-1.0,0.5,0.5])
+    if if_plot
     fig = figure()
     scatter(forward_strens .- center_stren,derivs)
-    plot(forward_strens .- center_stren,linmod(forward_strens .- center_stren,cf.param))
+    plot(forward_strens .- center_stren,quadmod(forward_strens .- center_stren,cf.param))
     title("Second Derivative")
-    return cf.param[2]
+    end
+    return cf.param[3]
 end
 
-function first_deriv_nrgs(nrgs,strengths)
+function first_deriv_nrgs(nrgs,strengths,if_plot=false)
     full_derivs = (nrgs[2:end] .- nrgs[1]) ./ (strengths[2:end] .- strengths[1])
     derivs = real.(full_derivs)
-    println("Imag Part: ",mean(imag.(derivs)))
+    #println("Imag Part: ",mean(imag.(derivs)))
     cf = curve_fit(linmod,strengths[2:end] .- strengths[1],derivs,[-1.0,0.5])
+    if if_plot
     fig = figure()
     scatter(strengths[2:end] .- strengths[1],derivs)
     plot(strengths[2:end] .- strengths[1],linmod(strengths[2:end] .- strengths[1],cf.param))
     title("First Derivative")
+    end
     return cf.param[2]
 end
 
 
         
 
-#
+#=
 #L = 10
 mdim = 100
 mdim_time = 100
@@ -281,19 +287,22 @@ time_end = 50.0
 nrgvar_tol = 1e-8
 
 #change = 0.01
-counting = 2
+counting = 10
 strens = range(0.1,stop=0.25,length=counting) #0.25 .+ [i/1000 for i in 0:100]
 #strens = [strens; strens .+ change]
-Ls = [10]
+Ls = [6]
 real_strens = [[] for i in 1:length(Ls)]
+
 nrgs = [[] for i in 1:length(Ls)]
-direct_jx = [[] for i in 1:length(Ls)]
+firstderiv_nrg = [[] for i in 1:length(Ls)]
 secderiv_nrg = [[] for i in 1:length(Ls)]
-deriv_jx = [[] for i in 1:length(Ls)]
+
+firstderiv_ham = [[] for i in 1:length(Ls)]
+secderiv_ham = [[] for i in 1:length(Ls)]
+
 states = [[] for i in 1:length(Ls)]
 deriv_states = [[] for i in 1:length(Ls)]
-theory = [[] for i in 1:length(Ls)]
-fromham = [[] for i in 1:length(Ls)]
+
 
 for (j,L) in enumerate(Ls)
 sites = siteinds("Qubit", L; conserve_number = true)
@@ -309,76 +318,61 @@ for (i,stren) in enumerate(strens)
     gs_psi = execute_mps(nothing,nothing,nothing,nothing,nothing,nothing; psi_guess=psi0,ham=hamhere,mdim=mdim)#,observer=obs)
     append!(states[j],[gs_psi])
     append!(nrgs[j],[calculate_energy(gs_psi,hamhere)])
-    #direct_jx[j][i] = current_calculate(gs_psi,Int(L/2),L,stren)
+    append!(firstderiv_ham[j],[current_calculate(gs_psi,Int(L/2),L,stren)])
     #
     new_states,new_strens,new_nrgs,deriv_overlap = find_deriv_overlap(gs_psi,obs,stren,psi0)
     append!(real_strens[j],new_strens)
     append!(states[j],new_states)
     append!(deriv_states[j],[deriv_overlap])
     append!(nrgs[j],new_nrgs)
+
+    append!(firstderiv_ham[j],[current_calculate(new_states[k],Int(L/2),L,new_strens[k]) for k in 1:length(new_strens)])
     #
 end
 #
-deriv_jx[j] = nrg_limitderiv(nrgs[j],real_strens[j],strens,1)
-secderiv_nrg[j] = (L/(2*pi))^2 .* nrg_limitderiv(nrgs[j],real_strens[j],strens,2)
+firstderiv_nrg[j] = nrg_limitderiv(nrgs[j],real_strens[j],strens,1)
+secderiv_nrg[j] = nrg_limitderiv(nrgs[j],real_strens[j],strens,2)
+secderiv_ham[j] = nrgs[j] .* (-(2*pi/L)^2)
 #deriv_states[j] = differentiate_state(states[j][1:counting],states[j][2*counting+1:end],change)
 #
 end
-#
+=#
 
 #rr = [differentiate_state(states[1][1],states[1][i],strens[i] - strens[1]) for i in 2:length(strens)]
 #scatter(strens[2:end],rr)
-
 #
+
 if true
-fig = figure()
-for (j,L) in enumerate(Ls)
-    #fig1 = figure()
-scatter(strens,real.(deriv_jx[j]),label="Deriv $L")
-#scatter(strens,real.(direct_jx[j]),label="Direct $L")
-legend()
-xlabel("Phi")
-ylabel("Jx")
+    fig = figure()
+    for (j,L) in enumerate(Ls)
+        #fig2 = figure()
+        scatter(real_strens,real.(nrgs[j]),label="$L")
+        xlabel("Phi")
+        ylabel("Energy")
+        legend()
+    end
 end
+
+
+if true
+    fig = figure()
+    for (j,L) in enumerate(Ls)
+        #fig1 = figure()
+    scatter(strens,real.(firstderiv_nrg[j]),label="NRG $L")
+    plot(real_strens[1],real.(firstderiv_ham[j]),label="Ham $L")
+    legend()
+    xlabel("Phi")
+    ylabel("First Derivative")
+    end
 end
 
 if true
 fig = figure()
 for (j,L) in enumerate(Ls)
-#fig2 = figure()
-scatter(real_strens,real.(nrgs[j]),label="$L")
+scatter(strens,real.(secderiv_nrg[j]),label="NRG $L")
+plot(real_strens[1],real.(secderiv_ham[j]),label="HamOp $L")
 xlabel("Phi")
-ylabel("Energy")
-legend()
-end
-end
-
-if true
-fig = figure()
-for (j,L) in enumerate(Ls)
-#secderiv_nrg[j] = L^2 .* ((nrgs[j][2*counting+1:end] .- (2 .* nrgs[j][counting+1:2*counting]) .+ nrgs[j][1:counting]) / (change/2)^2 / (2*pi)^2)
-#fig3 = figure()
-scatter(strens,real.(secderiv_nrg[j]),label="$L")
-xlabel("Phi")
-ylabel("Drude Weight")
-legend()
-end
-end
-
-if false
-fig4 = figure()
-ccs = [0.0 for i in 1:length(Ls)]
-for (j,L) in enumerate(Ls)
-#fig4 = figure()
-theory[j] = (secderiv_nrg[j] .* (2*pi/L)^2) .+ ((2. * nrgs[j][counting+1:2*counting]) .* (deriv_states[j] .- 1))
-fromham[j] = nrgs[j][1:counting]
-what = filter(x -> x < 0, real.(theory[j] ./ fromham[j]))
-display(what)
-ccs[j] = mean(what)
-scatter(strens[1:counting],real.(fromham[j]),label="From Ham $L")
-scatter(strens[1:counting],real.(theory[j]),label="Theory $L")
-xlabel("Phi")
-ylabel("Exp of SecDeriv Hamiltonian")
+ylabel("Second Derivative")
 legend()
 end
 end
