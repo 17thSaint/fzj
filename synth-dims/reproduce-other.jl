@@ -135,7 +135,8 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
         return ampo
 end
 
-if_save_data = false
+#
+if_save_data = true
 dataloc = "/home/patrick/fzj/main-git/cluster-data/synth-dims/"
 
 nrgvar_tol = 1E-12
@@ -145,13 +146,15 @@ nu = 1.0
 L = 8
 nflavors = 5
 part_count = 5
-chi = part_count / (nu*L*nflavors)
+#chi = 0.0#part_count / (nu*L*nflavors)
 tilt = 0.0
 
 if_per_phys = true
 if_per_virt = false
 
-naming_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",part_count),("chi",chi),("mdim",mdim),("centralflux_strength","n")])
+centralflux_strength = 0.25
+
+naming_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",part_count),("mdim",mdim),("centralflux_strength",centralflux_strength)])
 metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodic_virt",if_per_virt),("tilt_strength",tilt),("location",dataloc),("if_save_data",if_save_data),("nrgvar_tol",nrgvar_tol),("mdim",mdim)]))
 
 
@@ -160,22 +163,26 @@ metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodi
 
 #
 if true
-counting = 1
-scaling = 16
-strens = 0.0 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]#range(0.00,stop=1.0,length=counting)
+counting = 20
+scaling = 64
+strens = range(0.1,stop=0.15,length=counting)#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
 display(strens)
 nrgs = zeros(length(strens)) .* im
 currents = zeros(nflavors,length(strens)) .* im
 drudes = zeros(nflavors,length(strens)) .* im
 states = []
 
-for (i,centralflux_strength) in enumerate(strens)
+for (i,chi) in enumerate(strens)
+    metadata["chi"] = chi
+    naming_dict["chi"] = round(chi,digits=5)
+    #=
     metadata["centralflux_strength"] = centralflux_strength
     if centralflux_strength < 0.0
         naming_dict["centralflux_strength"] = "n" * string(-round(centralflux_strength,digits=5))
     else
         naming_dict["centralflux_strength"] = round(centralflux_strength,digits=5)
     end
+    =#
     filename = make_parameters_filename(naming_dict)
     metadata["name"] = filename
     display(filename)
@@ -191,7 +198,7 @@ for (i,centralflux_strength) in enumerate(strens)
     else
         dmrg_params = (ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=dataloc,observer=obs)
         psi_gs = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
-        println("Energy Variance = ",energy_variance(psi_gs,ham_start)," at centralflux Strength = ",centralflux_strength)
+        println("Energy Variance = ",energy_variance(psi_gs,ham_start)," at Chi = ",chi)
     end
 
     append!(states,[psi_gs])

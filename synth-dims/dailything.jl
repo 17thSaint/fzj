@@ -1,7 +1,8 @@
-if true
+if false
 include("long-range-ttn.jl")
 include("fqh_effective.jl")
 include("time_evolution.jl")
+include("reproduce-other.jl")
 #using PyPlot,Observers,ITensorTDVP,LsqFit
 end
 #=
@@ -52,14 +53,52 @@ function find_slope(times,values; kwargs...)
     return a
 end
 
+nflavors = 5
+L = 8
+centralflux_strength = 0.25
 
 #
 if true
-params_dict = Dict([("L",16),("nbosons",10),("nflavors",10)])
-loc = "/home/patrick/fzj/main-git/cluster-data/orsay-sept23"
+params_dict = Dict([("L",L),("nbosons",5),("nflavors",nflavors),("centralflux_strength",0.0)])
+loc = "/home/patrick/fzj/main-git/cluster-data/synth-dims/"
 all_files = find_data_file(params_dict,"mps","jld2",loc)
-#display(all_files)
+display(all_files)
 
+chis = []
+all_states = []
+for f in all_files
+	metadata = read_data_jld2(f,loc)[2]
+	append!(chis,[metadata["chi"]])
+	append!(all_states,[read_data_jld2(f,loc)[1]["mps"]])
+end
+end
+
+#=
+entrops = []
+for (i,psi) in enumerate(all_states)
+	u,s,v = svd(psi[Int(L/2)],linkind(psi,Int(L/2)))
+	entrop = sum([s[n,n]^2 * log(s[n,n]^2) for n in 1:size(s)[1]])
+	append!(entrops,[entrop])
+end
+plot(5 ./ (chis .* (L*nflavors)) ,log.(entrops),"-p")
+=#
+
+#
+currents = zeros(nflavors,length(all_files)) .* im
+for (i,psi) in enumerate(all_states)
+	ham_params = (if_periodic_phys=true,if_periodic_synth=false,centralflux_strength=centralflux_strength,tilt_strength=0.0)
+	currents[:,i] = [calc_deriv(1,psi,s,Int(L/2),nflavors,chi,ham_params) for s in 1:nflavors]
+end
+#=
+hall_currents = abs.((currents[1,:] .- currents[nflavors,:])/2)
+plot(chis,hall_currents,"-p")
+xlabel("Flux Density")
+ylabel("Hall Current")
+=#
+
+
+
+#=
 toberemoved = []
 for (idx,f) in enumerate(all_files)
 	alpha = get_params_dict_from_filename(f)["alpha"]
@@ -98,7 +137,7 @@ tevo_params = (if_GScheck=true,current_strength=current_strength,if_current=if_c
 	nrg_invs = mean([energy_variance(rez["states"].results[i],ham) for i in 1:length(times)])
 	occ_invs = mean([first(occupancy_variance(rez["states"].results[i]; if_plot=false)) for i in 1:length(times)])
 	println("Energy Variance = ",nrg_invs,", Occupation Variance = ",occ_invs)
-	#=
+	#
 	allspacialpols = spacial_density_polarization(rez["occs"].results)
 	spacial_limit = 1.0*get_params_dict_from_filename(all_files[1])["nbosons"]/get_params_dict_from_filename(all_files[1])["L"]
 	fig2 = figure()
@@ -109,10 +148,10 @@ tevo_params = (if_GScheck=true,current_strength=current_strength,if_current=if_c
 	ylabel("Spacial Density Polarization")
 	title("Current Strength = $(current_strength)")
 	legend()
-	=#
+	#
 #end
 
-	#=
+	#
 	alldenspols = density_polarization(rez["occs"].results)
 	virtual_limit = 1.0
 	fig3 = figure()

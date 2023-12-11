@@ -373,6 +373,7 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 		location = get(kwargs, :location, pwd())
 		metadata["final_energy"] = E
 		metadata["maxlinkdim"] = maxlinkdim(psi)
+		metadata["final_nrg_variance"] = energy_variance(psi,H)
 		data_dict = Dict([("mps",psi)])
 		write_data_jld2(filename,data_dict,location,metadata)
 	end
