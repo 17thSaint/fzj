@@ -311,7 +311,7 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	psi_ortho = get(kwargs, :psi_ortho, nothing)
 	opl = get(kwargs, :outputlevel, 1)
 	conserve_qns = get(kwargs, :conserve_qns, true)
-	nsweeps = get(kwargs, :nsweeps, 10)
+	nsweeps = get(kwargs, :nsweeps, 50)
 	psi0 = get(kwargs, :psi_guess, nothing)
 	ham = get(kwargs, :ham, nothing)
 	mdim = get(kwargs, :mdim, 100)
@@ -325,8 +325,21 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	t1 = 1.0
 	t2 = 1.0
 	if_nrg = get(kwargs, :if_nrg, false)
+
+	metadata = get(kwargs, :metadata, Dict())
+	metadata["psi_ortho"] = psi_ortho
+	metadata["outputlevel"] = opl
+	metadata["psi0"] = psi0
+	metadata["ham"] = ham
+	metadata["mdim"] = mdim
+	metadata["noise"] = noise
+	metadata["observer"] = obs
+	metadata["if_gpu"] = if_gpu
+	filename = get(kwargs, :name, "mps")
+	filename = check_plot_label(filename,"mps")
+	display(metadata)
 	
-	#display(kwargs)
+	
 	if isnothing(psi0)
 		sidx = siteinds("ExtendedHardcore", L; conserve_qns = conserve_qns, nflavors = nflavors)
 	else
@@ -358,9 +371,6 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	
 	if if_save_data
 		location = get(kwargs, :location, pwd())
-		filename = get(kwargs, :name, "mps")
-		filename = check_plot_label(filename,"mps")
-		metadata = get(kwargs, :metadata, nothing)
 		metadata["final_energy"] = E
 		metadata["maxlinkdim"] = maxlinkdim(psi)
 		data_dict = Dict([("mps",psi)])

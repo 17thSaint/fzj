@@ -101,6 +101,9 @@ function get_params_dict_from_filename(filename)
 	for i in 1:Int(length(split_filename)/2)
 		key = split_filename[2*i-1]
 		value = split_filename[2*i]
+		if value[1] == 'n'
+			value = "-" * string(value[2:end])
+		end
 		get_integer = tryparse(Int,value) 
 		if isnothing(get_integer)
 			get_float = tryparse(Float64,value)
