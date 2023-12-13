@@ -493,15 +493,15 @@ function deriv_bulk_dens(ttn1,ttn2,alpha_change,bulk_width_phys=1,bulk_width_vir
 	return deriv
 end
 
-#=
+#
 if true
 
 nnst = 0.0
-layers = 6
+layers = 4
 lr = 0#Int(sqrt(2^layers))-1
 #for nnst in nn_strens
 
-	params_dict = Dict([("if_pinning",true),("layers",layers),("mdim",160),("mag_off",false),("lr",lr),("if_nn_int",true),("nn_strength",nnst)])
+	params_dict = Dict([("if_pinning",false),("layers",layers),("mdim",50),("mag_off",false),("lr",lr),("if_nn_int",false),("nn_strength",nnst)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
@@ -542,7 +542,7 @@ lr = 0#Int(sqrt(2^layers))-1
 	#nu = 1.0
 	sweep_type = "dmrg"
 	max_occ = 2
-	if_per_phys = false
+	if_per_phys = true
 	if_per_virt = false
 	evolve = true
 	chemical = false
@@ -569,7 +569,7 @@ lr = 0#Int(sqrt(2^layers))-1
 
 	plotting = false
 	save_plot = false
-	save_data = true
+	save_data = false
 
 	loc = "../cluster-data/orsay-sept23"
 	if_cliff = false
@@ -577,12 +577,13 @@ lr = 0#Int(sqrt(2^layers))-1
 	dists = [i for i in 1:2*edge_sites]
 	lr_scaling = long_range_scaling(longrange_dist,edge_sites,limit; cliff=if_cliff,limit=limit,scaling=sc_type,if_plot=false)
 	
-	alpha_start = 0.0525
+	#=alpha_start = 0.0525
 	alpha_end = 0.0725
 	alpha_count = 5
 	alphas = [alpha_start + (i-1)*(alpha_end-alpha_start)/(alpha_count-1) for i in 1:alpha_count] .- change/2
 	alphas = [alphas; alphas .+ change]
-	alpha = 1 * num_particles / tot_sites
+	=#
+	alpha = mag_off ? 0.0 : 1 * num_particles / tot_sites
 	wavefuncs = []
 	#display(alphas)
 	#for (idx,alpha) in enumerate(alphas)
@@ -603,7 +604,7 @@ lr = 0#Int(sqrt(2^layers))-1
 		println(datafile_name)
 		title_string = "Np = $num_particles, LR = $longrange_dist at $limit"
 		println("Starting Script using $num_particles particles on $tot_sites sites with $(!mag_off) Mag Field, Bond Dim = $mdim, and Long Range Dist = $longrange_dist")
-		if true
+		#if true
 		starting = time()
 		net = build_HH_net(layer_count; syms=true)
 		println("here")
@@ -613,34 +614,34 @@ lr = 0#Int(sqrt(2^layers))-1
 		println("Running time = $total_time")
 		append!(wavefuncs,[dm_sp.ttn])
 		get_occupancy(dm_sp.ttn; plot_title = "Alpha = $(round(alpha,digits=4))")
-		get_greenfunc(dm_sp.ttn,"phys")
-		get_greenfunc(dm_sp.ttn,"virt")
+		#get_greenfunc(dm_sp.ttn,"phys")
+		#get_greenfunc(dm_sp.ttn,"virt")
 		#=
 		specs = entanglement_spectrum(dm_sp.ttn)
 		fig = figure()
 		scatter(collect(1:mdim),-log.(specs))
 		=#
-		end
+		#end
 	#end
 
 end
 
-if false
-	occs = get_occupancy(wavefuncs[1];if_plot=false)
-	fig = figure()
-	plot([sum(occs[i,:]) for i in 1:Int(sqrt(tot_sites))])
+include("time_evolution.jl")
 
-	spin = Int(sqrt(tot_sites)/2)
-	fig2 = figure()
-	my,sites = get_magnetization(wavefuncs[1],sqrt(tot_sites)/2,"Y";plot_label="My")
-	mz,sites = get_magnetization(wavefuncs[1],sqrt(tot_sites)/2,"Z";plot_label="Mz")
-	mx,sites = get_magnetization(wavefuncs[1],sqrt(tot_sites)/2,"Y";plot_label="Mx",plot_title="U=$nnst, S=$spin")
+psi_gs = wavefuncs[1]
+
+if true
+	time_end = 0.5
+	time_change = 0.1
+	tilt_stren = 0.00
+
+	swphndler = evolve_in_time(psi_gs,time_end,time_change,ham)	
 end
 #end
 #
 
 #occs1 = get_occupancy(dm_sp.ttn; if_plot=true,if_save_fig=false,if_save_data=false)
-=#
+#
 
 
 

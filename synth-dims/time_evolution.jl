@@ -21,7 +21,12 @@ function current_nrgvar(; psi, bond, half_sweep)
     return nothing
 end
 
-function current_time(; current_time, bond, half_sweep)
+function ttn_time(; ttn)
+    println("Doing Time things")
+    return typeof(ttn)
+end
+
+function get_time(; current_time, bond, half_sweep)
     if bond == 1 && half_sweep == 2
 	  return -imag(current_time)
 	end
@@ -98,7 +103,7 @@ function density_polarization(psi,occmat=nothing)
     return result
 end
 
-function density_polarization(all_occmats::Vector{Matrix{Float64}})
+function density_polarization(all_occmats::Vector{Matrix{Any}})
     return [density_polarization(nothing,occmat) for occmat in all_occmats]
 end
 
@@ -106,10 +111,14 @@ function spacial_density_polarization(psi,occmat=nothing)
     occmat = isnothing(occmat) ? get_occupancy(psi; if_plot=false) : occmat
     result = 0.0
     j0 = (size(occmat)[1]+1)/2
+    virtual_results = [0.0 for i in 1:size(occmat)[2]]
+    for s in 1:size(occmat)[2]
+        virtual_results[s] = 2*sum(occmat[:,s] .* [i - j0 for i in 1:size(occmat)[1]])
+    end
     for i in 1:size(occmat)[1]
         result += sum(occmat[i,:] .* (i - j0))
     end
-    return 2 * result / (sum(occmat)*size(occmat)[1])
+    return 2 * result / (sum(occmat)*size(occmat)[1]),virtual_results
 end
 
 function spacial_density_polarization(all_occmats::Vector{Matrix{Float64}})
@@ -121,6 +130,10 @@ function calculate_energy(psi::MPS,H)
         H = MPO(H,siteinds(psi))
     end
 	return inner(psi', H, psi) / inner(psi, psi)
+end
+
+function calculate_energy(psis::Vector,H)
+    return [calculate_energy(psi,H) for psi in psis]
 end
 
 function energy_variance(psi,H)
@@ -147,12 +160,22 @@ function evolve_in_time(psi0,final_time,dt,ham; kwargs...)
     time_steps = Int(ceil(final_time/dt))
     println("Time Steps: $time_steps")
 
-    H = MPO(ham,siteinds(psi0))
+    if typeof(psi0) == MPS
+        H = MPO(ham,siteinds(psi0))
+    else
+        lat = TTNKit.physical_lattice(TTNKit.network(psi0))
+        H = TTNKit.TPO(ham,lat)
+    end
     println("Made Hamiltonian")
 
     #obs = get(kwargs, :observer, NoObserver())
     #
-    obs = Observer("times" => current_time)#,"states" => return_state)#, "occs" => current_occ)
+    if typeof(psi0) == MPS
+        obs = Observer("times" => get_time)
+    else
+        obs = Observer("times" => ttn_time)
+    end
+    #obs = Observer("times" => current_time)#,"states" => return_state)#, "occs" => current_occ)
     if obs_measures != nothing
         for (key,val) in obs_measures
             obs[key] = val
@@ -162,7 +185,11 @@ function evolve_in_time(psi0,final_time,dt,ham; kwargs...)
     #
 
     time_start = time()
-    psit = tdvp(H,psi0,-im*dt; nsweeps=time_steps,outputlevel=outputlevel,maxdim=mdim,(observer!)=obs)
+    if typeof(psi0) == MPS
+        psit = tdvp(H,psi0,-im*dt; nsweeps=time_steps,outputlevel=outputlevel,maxdim=mdim,(observer!)=obs)
+    else
+        time_ttnswp = TTNKit.tdvp(psi0,H; timestep=dt,finaltime=final_time, (observer!)=obs)
+    end
     time_end = time()
 
     if if_save_data
@@ -174,7 +201,11 @@ function evolve_in_time(psi0,final_time,dt,ham; kwargs...)
 		write_data_jld2(filename,data_dict,location,metadata)
 	end
 
-    return obs,H
+    if typeof(psi0) == MPS
+        return obs,H
+    else
+        return time_ttnswp,obs
+    end
 end
 
 function check_if_GS(psi0,ham,metadata)

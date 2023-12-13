@@ -139,20 +139,26 @@ end
 if_save_data = true
 dataloc = "/home/patrick/fzj/main-git/cluster-data/synth-dims/"
 
-nrgvar_tol = 1E-12
-mdim = 50
+nrgvar_tol = 1E-10
+mdim = 100
+
+#geo_params = [()] # (L,nf,nb)
+Ls = [4,5,6,7,8,9,10,11,12,13,14,15]
 
 nu = 1.0
-L = 8
-nflavors = 5
-part_count = 5
+#
+states = []
+for L in Ls
+#L = 8
+nflavors = Int(ceil(0.75*L))
+part_count = nflavors
 #chi = 0.0#part_count / (nu*L*nflavors)
 tilt = 0.0
 
 if_per_phys = true
 if_per_virt = false
 
-centralflux_strength = 0.25
+centralflux_strength = 0.0
 
 naming_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",part_count),("mdim",mdim),("centralflux_strength",centralflux_strength)])
 metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodic_virt",if_per_virt),("tilt_strength",tilt),("location",dataloc),("if_save_data",if_save_data),("nrgvar_tol",nrgvar_tol),("mdim",mdim)]))
@@ -165,13 +171,13 @@ metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodi
 if true
 counting = 20
 scaling = 64
-strens = range(0.1,stop=0.15,length=counting)#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
-display(strens)
+strens = [part_count / (nu*L*nflavors)]#range(0.1,stop=0.15,length=counting)#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
 nrgs = zeros(length(strens)) .* im
 currents = zeros(nflavors,length(strens)) .* im
 drudes = zeros(nflavors,length(strens)) .* im
-states = []
 
+println("Chi = ",part_count / (nu*L*nflavors))
+#
 for (i,chi) in enumerate(strens)
     metadata["chi"] = chi
     naming_dict["chi"] = round(chi,digits=5)
@@ -194,18 +200,23 @@ for (i,chi) in enumerate(strens)
     if_exists,found_data = check_data_exists("mps-"*filename*".jld2","mps";location=dataloc)
 
     if if_exists
-        psi_gs = found_data
+        #psi_gs = found_data
     else
         dmrg_params = (ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=dataloc,observer=obs)
         psi_gs = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
         println("Energy Variance = ",energy_variance(psi_gs,ham_start)," at Chi = ",chi)
     end
 
-    append!(states,[psi_gs])
+    #append!(states,[psi_gs])
     nrgs[i] = calculate_energy(psi_gs,ham_start)
 
-    currents[:,i] = [calc_deriv(1,psi_gs,s,Int(L/2),nflavors,chi,ham_params) for s in 1:nflavors]
-    drudes[:,i] = [calc_deriv(2,psi_gs,s,Int(L/2),nflavors,chi,ham_params) for s in 1:nflavors]
+    centersite = Int(ceil(L/2))
+    u,s,v = svd(psi_gs[centersite],linkind(psi_gs,centersite))
+    ents = sum([s[n,n]^2 * 2 * log(s[n,n]) for n in 1:size(s)[1]])
+    scatter([L],[ents],c="b")
+
+    #currents[:,i] = [calc_deriv(1,psi_gs,s,Int(L/2),nflavors,chi,ham_params) for s in 1:nflavors]
+    #drudes[:,i] = [calc_deriv(2,psi_gs,s,Int(L/2),nflavors,chi,ham_params) for s in 1:nflavors]
     #=fig = figure()
     imshow(real.(drude))
     title("Drudes at Current Strength = $(centralflux_strength)")
@@ -215,6 +226,7 @@ for (i,chi) in enumerate(strens)
     =#
 end
 #
+#=
 fig = figure()
 plot(strens,real.(nrgs),"-p",label="Energy")
 xlabel("Phi")
@@ -231,32 +243,84 @@ for i in 1:nflavors
 end
 xlabel("Phi")
 legend()
+=#
+end
 #
 end
 #
 
-
 #
 if false
     time_end = 10.0
-    time_change = 0.2
+    time_change = 0.1
     mdim_time = 50
 
-    tilts = [0.1,0.075,0.05,0.025,0.01]
+    chi = strens[1]
+    println("Chi = ",chi)
+    #
+    tilts = [0.00]
+    time_states = [[] for i in 1:length(tilts)]
+    time_occs = [[] for i in 1:length(tilts)]
+    alltimes = [[] for i in 1:length(tilts)]
+    time_currents = [zeros(nflavors,Int(time_end/time_change)+1) .* im for i in 1:length(tilts)]
     for (i,tilt) in enumerate(tilts)
-        ham_evolve = hamiltonian_universal(L,nflavors,chi; if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,current_strength=current_strength,tilt_strength=tilt,if_s0=true)
+        ham_params_evolve = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=tilt)
+        ham_evolve = hamiltonian_universal(L,nflavors,chi; ham_params_evolve...)
 
+        psi_gs = states[1]
+        #time_currents[i][:,1] = [calc_deriv(1,psi_gs,s,Int(L/2),nflavors,chi,ham_params_evolve) for s in 1:nflavors]
         #rez0, otherham0 = evolve_in_time(psi_gs,time_end,time_change,ham_start; mdim=mdim_time,obs_measures=Dict("occs" => current_occ, "states" => return_state, "nrg_vars" => current_nrgvar, "nrgs" => current_nrg))
         rez, otherham = evolve_in_time(psi_gs,time_end,time_change,ham_evolve; mdim=mdim_time,obs_measures=Dict("occs" => current_occ, "states" => return_state))
         times = [[0.0]; rez["times"].results]
-
-        #currents = [[jx0]; [get_current(rez["states"].results[i]; alpha=chi)[2][3] for i in 1:length(times)-1]] .-jx0
-        #currents_null = [[jx0]; [get_current(rez0["states"].results[i]; alpha=chi)[2][3] for i in 1:length(times)-1]] .-jx0
-
-        #fig = figure()
-        #plot(times,-imag.(currents) ./ maximum(-imag.(currents)[1:10]),"-p",label="$(round(tilt,digits=3))")
-        #legend()
+        time_states[i] = [[psi_gs]; rez["states"].results]
+        time_occs[i] = [[get_occupancy(psi_gs;if_plot=false)]; rez["occs"].results]
+        alltimes[i] = times
     end
+    #
+
+    times = alltimes[1]
+    ham_params_evolve = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
+    for j in 1:length(times)-1
+        #fig = figure()
+        #imshow(real.(allsite_deriv(1,rez["states"].results[j],nflavors,chi,ham_params_evolve)))
+        #colorbar()
+        time_currents[1][:,j+1] = [calc_deriv(1,time_states[1][j],s,Int(L/2),nflavors,chi,ham_params_evolve) for s in 1:nflavors]
+    end
+
+    sumcurrents = [0.0 for i in 1:length(times)]
+    for j in 1:length(times)
+        sumcurrents[j] = real(sum(allsite_deriv(1,time_states[1][j],nflavors,chi,ham_params_evolve)))
+    end
+    fig = figure()
+    plot(times,sumcurrents,"-p")
+    xlabel("Time")
+    ylabel("Total Current")
+
+    #println(length(times),", ",length())
+    fig = figure()
+    for j in 1:nflavors
+        plot(times,real.(time_currents[1][j,:]) .- real.(time_currents[1][j,1]),"-p",label="$j")
+    end
+    xlabel("Time")
+    ylabel("Current")
+    title("Tilt = $(round(tilt,digits=3)), Chi = $(round(chi,digits=3))")
+    legend()
+
+    denspols = [density_polarization(nothing,time_occs[1][j]) for j in 1:length(times)]
+    fig2 = figure()
+    plot(times,real.(denspols) .- real(denspols[1]),"-p")
+    xlabel("Times")
+    ylabel("Density Polarization")
+
+    spacdenspols = [spacial_density_polarization(nothing,time_occs[1][j])[2] for j in 1:length(times)]
+    fig2 = figure()
+    for i in 1:nflavors
+        yvals = real.([spacdenspols[j][i] for j in 1:length(times)])
+        plot(times,yvals .- yvals[1],"-p",label="$i")
+    end
+    legend()
+    xlabel("Times")
+    ylabel("Spacial Density Polarization")
 
     #=fig2 = figure()
     plot(times,imag.(currents_null),"-p")

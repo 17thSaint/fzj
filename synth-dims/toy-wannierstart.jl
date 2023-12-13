@@ -1,5 +1,6 @@
 include("fqh_effective.jl")
 include("time_evolution.jl")
+include("../other-funcs/data-storage-funcs.jl")
 using Statistics,PyPlot,Observers,ITensorTDVP,LsqFit
 
 function wannierstark_ham(L::Int,field_strength::Number; kwargs...)
@@ -137,13 +138,21 @@ function toy_current(psi,phi,L)
     return -imag.(currents)
 end
 
-function working_ham(L,phi)
+function working_ham(L,phi,tilt=0.0)
     ampo = OpSum()
+
     coeff = exp(im*2*pi*phi/L)
     for i in 1:L
         ampo += (coeff, "S+", i, "S-", mod1(i+1,L))
         ampo += (conj(coeff), "S+", mod1(i+1,L), "S-", i)
     end
+
+    if tilt != 0.0
+        for i in 1:L
+            ampo += (tilt*i, "S+ * S-", i)
+        end
+    end
+
     return ampo
 end
 
@@ -275,6 +284,14 @@ function first_deriv_nrgs(nrgs,strengths,if_plot=false)
     return cf.param[2]
 end
 
+function average_site(psi::MPS,num_particles)
+    L = length(psi)
+    siteprobs = num_particles .- expect(psi,"S+ * S-")
+    weights = siteprobs .* collect(1:L)
+    avg_site = sum(weights)
+    site_variance = sum(siteprobs .* (collect(1:L) .- avg_site).^2)
+    return avg_site,site_variance
+end
 
         
 
@@ -285,10 +302,10 @@ mdim_time = 100
 nbosons = 1
 time_end = 50.0
 nrgvar_tol = 1e-8
-
+if true
 #change = 0.01
 counting = 30
-strens = range(0.1,stop=1.0,length=counting) #0.25 .+ [i/1000 for i in 0:100]
+strens = [0.0]#range(0.1,stop=1.0,length=counting) #0.25 .+ [i/1000 for i in 0:100]
 #strens = [strens; strens .+ change]
 Ls = [10]
 real_strens = [[] for i in 1:length(Ls)]
@@ -299,6 +316,7 @@ secderiv_nrg = [[] for i in 1:length(Ls)]
 
 firstderiv_ham = [[] for i in 1:length(Ls)]
 secderiv_ham = [[] for i in 1:length(Ls)]
+sumcurrents = [[] for i in 1:length(Ls)]
 
 states = [[] for i in 1:length(Ls)]
 deriv_states = [[] for i in 1:length(Ls)]
@@ -311,14 +329,17 @@ psi0 = MPS(sites,making_states)
 #nrgs[j] = zeros(length(strens)) .* im
 #direct_jx[j] = zeros(length(strens)) .* im
 for (i,stren) in enumerate(strens)
-    append!(real_strens[j],[stren])
+    #append!(real_strens[j],[stren])
     hamhere = working_ham(L,stren)
     obs = NRGVarObserver(nrgvar_tol,hamhere)
 
-    gs_psi = execute_mps(nothing,nothing,nothing,nothing,nothing,nothing; psi_guess=psi0,ham=hamhere,mdim=mdim)#,observer=obs)
+    gs_psi = execute_mps(nothing,nothing,nothing,nothing,nothing,nothing; psi_guess=psi0,ham=hamhere,mdim=mdim,observer=obs)
     append!(states[j],[gs_psi])
     append!(nrgs[j],[calculate_energy(gs_psi,hamhere)])
-    append!(firstderiv_ham[j],[current_calculate(gs_psi,Int(L/2),L,stren)])
+    allfirstderivs = current_calculate(gs_psi,L,stren)
+    append!(sumcurrents[j],[sum(allfirstderivs)])
+    append!(firstderiv_ham[j],[allfirstderivs[Int(L/2)]])
+    append!(secderiv_ham[j],nrgs[j] .* (-(2*pi/L)^2))
     #
     #=new_states,new_strens,new_nrgs,deriv_overlap = find_deriv_overlap(gs_psi,obs,stren,psi0)
     new_states,new_strens,new_nrgs = find_deriv_overlap(gs_psi,obs,stren,psi0)
@@ -333,11 +354,38 @@ end
 #
 #firstderiv_nrg[j] = nrg_limitderiv(nrgs[j],real_strens[j],strens,1)
 #secderiv_nrg[j] = nrg_limitderiv(nrgs[j],real_strens[j],strens,2)
-secderiv_ham[j] = nrgs[j] .* (-(2*pi/L)^2)
+#secderiv_ham[j] = nrgs[j] .* (-(2*pi/L)^2)
 #deriv_states[j] = differentiate_state(states[j][1:counting],states[j][2*counting+1:end],change)
 #
 end
 #
+end
+
+if true
+time_end = 50.0
+time_change = 0.4
+tilt_stren = 0.01
+fulltimes = [0.0]
+
+for (i,L) in enumerate(Ls)
+    psi_gs = states[i][1]
+    centralflux_strength = strens[1]
+    ham_evolve = working_ham(L,centralflux_strength,tilt_stren)
+
+    rez, otherham = evolve_in_time(psi_gs,time_end,time_change,ham_evolve; mdim=mdim_time,obs_measures=Dict("states" => return_state))
+    if i == 1
+        append!(fulltimes,rez["times"].results)
+    end
+    allfirstderivs = [current_calculate(psi,L,centralflux_strength) for psi in rez["states"].results]
+    #display(allfirstderivs)
+    append!(sumcurrents[i],[sum(allfirstderivs[j]) for j in 1:length(fulltimes)-1])
+    append!(states[i],rez["states"].results)
+    append!(nrgs[i],calculate_energy(rez["states"].results,ham_evolve))
+    append!(firstderiv_ham[i],[current_calculate(psi,Int(L/2),L,centralflux_strength) for psi in rez["states"].results])
+    append!(secderiv_ham[i], nrgs[i][2:end] .* (-(2*pi/L)^2))
+end
+
+end
 
 #rr = [differentiate_state(states[1][1],states[1][i],strens[i] - strens[1]) for i in 2:length(strens)]
 #scatter(strens[2:end],rr)
@@ -346,9 +394,25 @@ end
 if true
     fig = figure()
     for (j,L) in enumerate(Ls)
+        hereresults = [average_site(psi,nbosons) for psi in states[j]]
+        avg_sites = [hereresults[i][1] for i in 1:length(hereresults)]
+        site_variances = sqrt.([hereresults[i][2] for i in 1:length(hereresults)])
+        plot(fulltimes,avg_sites,"-p",label="$L")
+        plot(fulltimes,avg_sites .+ site_variances,c="k")
+        plot(fulltimes,avg_sites .- site_variances,c="k")
+        plot(fulltimes,L .* ones(length(fulltimes)),c="r")
+        plot(fulltimes,ones(length(fulltimes)),c="r")
+        xlabel("Time")
+        ylabel("Average Site")
+    end
+end
+
+if true
+    fig = figure()
+    for (j,L) in enumerate(Ls)
         #fig2 = figure()
-        scatter(real_strens,real.(nrgs[j]),label="$L")
-        xlabel("Phi")
+        plot(fulltimes,real.(nrgs[j]) .- real(nrgs[j][1]),"-p",label="$L")
+        xlabel("Time")
         ylabel("Energy")
         legend()
     end
@@ -360,10 +424,22 @@ if true
     for (j,L) in enumerate(Ls)
         #fig1 = figure()
     #plot(strens,real.(firstderiv_nrg[j]),c="r",label="NRG $L")
-    scatter(real_strens[1],real.(firstderiv_ham[j]),label="Ham $L")
+    plot(fulltimes,real.(firstderiv_ham[j]) .- real(firstderiv_ham[j][1]),"-p",label="Ham $L")
     legend()
-    xlabel("Phi")
+    xlabel("Time")
     ylabel("First Derivative")
+    end
+end
+
+if true
+    fig = figure()
+    for (j,L) in enumerate(Ls)
+        #fig1 = figure()
+    #plot(strens,real.(firstderiv_nrg[j]),c="r",label="NRG $L")
+    plot(fulltimes,real.(sumcurrents[j]) .- real(sumcurrents[j][1]),"-p",label="Ham $L")
+    legend()
+    xlabel("Time")
+    ylabel("Sum of Currents")
     end
 end
 
@@ -371,8 +447,8 @@ if true
 fig = figure()
 for (j,L) in enumerate(Ls)
 #plot(strens,real.(secderiv_nrg[j]),c="r",label="NRG $L")
-scatter(real_strens[1],real.(secderiv_ham[j]),label="HamOp $L")
-xlabel("Phi")
+plot(fulltimes,real.(secderiv_ham[j]) .- real(secderiv_ham[j][1]),"-p",label="HamOp $L")
+xlabel("Time`")
 ylabel("Second Derivative")
 legend()
 end

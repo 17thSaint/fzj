@@ -364,9 +364,9 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 		if typeof(psi_ortho) != Vector{MPS}
 			psi_ortho = [psi_ortho]
 		end
-		E, psi = dmrg(H, psi_ortho, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = 0)
+		E, psi = dmrg(H, psi_ortho, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = 1E-14)
 	else
-		E, psi = dmrg(H, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = 0)
+		E, psi = dmrg(H, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = 1E-14)
 	end
 	
 	if if_save_data
@@ -508,6 +508,22 @@ function log_sum(all_values)
 		end
 		return consecutive[1]
 	end
+end
+
+function entanglement_spectrum(psi::MPS, bond::Int)
+    # Split the MPS at the bond using svd
+    l, s, r = svd(psi[bond], linkind(psi, bond))
+
+    # Form the reduced density matrix of the left part
+    rho = l * s * dag(l)
+
+    # Diagonalize the reduced density matrix to get the eigenvalues
+    evals = eigvals(matrix(rho))
+
+    # The entanglement spectrum is given by the negative logarithm of these eigenvalues
+    spectrum = -log.(evals)
+
+    return spectrum
 end
 
 function density_matrix(wavefunc::MPS; kwargs...)
