@@ -193,6 +193,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	vpinning = get(kwargs, :vpinning, 2.5)
 	no_magF = get(kwargs, :no_magF, false)
 	chem_strength = get(kwargs, :chem_strength, 0.0)
+	centralflux_strength = get(kwargs, :centralflux_strength, 0.0)
 	
 	long_range_strengths = long_range_scaling(scaling_distance,virt_edge_length,nn_int_strength; kwargs...)
 	if_interaction = !all(long_range_strengths.==0)
@@ -200,6 +201,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	lat = TTNKit.physical_lattice(net)
 	
 	if if_hopping
+		if_periodic_phys ? nothing : centralflux_strength = 0.0
 		hopping = TTNKit.OpSum()
 		#
 		for (s1,s2) in TTNKit.nearest_neighbours(lat,collect(1:TTNKit.number_of_sites(lat)))
@@ -208,9 +210,13 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 						
 			coeff = get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
 			
-			#if s1_coord[1] == s2_coord[1]
-			#	coeff *= 500
-			#end
+			if s1_coord[2] == s2_coord[2]
+				if s1_coord[1] > s2_coord[1]
+					coeff *= exp(im*2*pi*centralflux_strength/size(lat)[1])
+				else
+					coeff *= exp(-im*2*pi*centralflux_strength/size(lat)[1])
+				end
+			end
 			
 			hopping += (coeff,"Adag",s1_coord,"A",s2_coord)
 			hopping += (conj(coeff),"Adag",s2_coord,"A",s1_coord)
@@ -232,6 +238,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 				s1_coord = (1,i)
 				s2_coord = (phys_edge_length,i)
 				coeff = get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
+				coeff *= exp(im*2*pi*centralflux_strength/size(lat)[1])
 				hopping += (coeff,"Adag",(1,i),"A",(phys_edge_length,i))
 				hopping += (conj(coeff),"Adag",(phys_edge_length,i),"A",(1,i))
 			end
@@ -493,6 +500,60 @@ function deriv_bulk_dens(ttn1,ttn2,alpha_change,bulk_width_phys=1,bulk_width_vir
 	return deriv
 end
 
+function get_position_pairs(phys_length,virt_length)
+	position_pairs = []
+	reverse_position_pairs = []
+	for i in 1:phys_length
+		for j in 1:virt_length
+			left_site = i + phys_length*(j-1)
+			right_site = left_site+1
+			if right_site > phys_length*j
+				right_site = phys_length*(j-1) + 1
+			end
+			append!(position_pairs,[(left_site,right_site)])
+			append!(reverse_position_pairs,[(right_site,left_site)])
+		end
+	end
+	return sort(position_pairs)
+end
+
+function reorder_vector_to_matrix(left_moving,right_moving)
+	side_length = Int(sqrt(length(left_moving)))
+	left_moving_mat = zeros(side_length,side_length) .* im
+	right_moving_mat = zeros(side_length,side_length) .* im
+	for i in 1:side_length
+			left_moving_mat[i,:] = left_moving[side_length*(i-1)+1:side_length*i]
+			right_moving_mat[i,:] = right_moving[side_length*(i-1)+1:side_length*i]
+	end
+	return right_moving_mat .+ left_moving_mat
+end
+
+function ttn_current_site(psi::TreeTensorNetwork,virt_site; kwargs...)
+	centralflux_strength = get(kwargs, :centralflux_strength, 0.0)
+	phys_length,virt_length = get_lattice_dims(psi)
+	phys_left = (virt_site-1)*phys_length + Int(phys_length/2)
+	coeff = im*2*pi*exp(im*2*pi*centralflux_strength/phys_length)
+	left_moving = conj(coeff)*TTNKit.correlation(psi,"Adag","A",phys_left,phys_left+1)
+	right_moving = coeff*TTNKit.correlation(psi,"Adag","A",phys_left+1,phys_left)
+	return right_moving + left_moving
+end
+
+function ttn_current(psi::TreeTensorNetwork; kwargs...)
+	centralflux_strength = get(kwargs, :centralflux_strength, 0.0)
+	phys_length,virt_length = get_lattice_dims(psi)
+	position_pairs = get_position_pairs(phys_length,virt_length)
+	right_moving = [0.0*im for i in 1:length(position_pairs)]
+	left_moving = [0.0*im for i in 1:length(position_pairs)]
+	coeff = im*2*pi*exp(im*2*pi*centralflux_strength/phys_length)
+	for i in 1:length(position_pairs)
+		left_site,right_site = position_pairs[i]
+		left_moving[i] = TTNKit.correlation(psi,"Adag","A",left_site,right_site)
+		right_moving[i] = TTNKit.correlation(psi,"Adag","A",right_site,left_site)
+	end
+	total_current = coeff*sum(right_moving) + conj(coeff)*sum(left_moving)
+	return total_current,reorder_vector_to_matrix(conj(coeff) .* left_moving,coeff .* right_moving)
+end
+
 #
 if true
 
@@ -501,7 +562,7 @@ layers = 4
 lr = 0#Int(sqrt(2^layers))-1
 #for nnst in nn_strens
 
-	params_dict = Dict([("if_pinning",false),("layers",layers),("mdim",50),("mag_off",false),("lr",lr),("if_nn_int",false),("nn_strength",nnst)])
+	params_dict = Dict([("if_pinning",false),("layers",layers),("mdim",50),("mag_off",true),("lr",lr),("if_nn_int",false),("nn_strength",nnst)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
@@ -585,9 +646,14 @@ lr = 0#Int(sqrt(2^layers))-1
 	=#
 	alpha = mag_off ? 0.0 : 1 * num_particles / tot_sites
 	wavefuncs = []
+	currents = []
+	nrgs = []
 	#display(alphas)
-	#for (idx,alpha) in enumerate(alphas)
+	counting = 20
+	strens = range(0.1,stop=1.0,length=counting)
+	for (idx,centralflux_strength) in enumerate(strens)
 
+		#centralflux_strength = 0.25
 		filename_dict = Dict([("if_pinning",if_pinning),("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys),("nn_strength",nnst),("mdim",mdim)])
 
 
@@ -596,7 +662,7 @@ lr = 0#Int(sqrt(2^layers))-1
 		#else
 			datafile_name = make_parameters_filename(filename_dict)
 		#end
-		model_paras = (if_pinning_pot=if_pinning,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=nnst,if_chem=chemical,chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,limit=limit,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=noise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc)
+		model_paras = (centralflux_strength=centralflux_strength,if_pinning_pot=if_pinning,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=nnst,if_chem=chemical,chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,limit=limit,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=noise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc)
 		
 		metadata_dict = merge(named_tuple_to_dict(model_paras),filename_dict)
 
@@ -613,7 +679,10 @@ lr = 0#Int(sqrt(2^layers))-1
 		total_time = time() - starting
 		println("Running time = $total_time")
 		append!(wavefuncs,[dm_sp.ttn])
-		get_occupancy(dm_sp.ttn; plot_title = "Alpha = $(round(alpha,digits=4))")
+		append!(currents,[[ttn_current_site(dm_sp.ttn,i; centralflux_strength=centralflux_strength) for i in 1:edge_sites]])
+		append!(nrgs,[dm_sp.current_energy])
+
+		#get_occupancy(dm_sp.ttn; plot_title = "Alpha = $(round(alpha,digits=4))")
 		#get_greenfunc(dm_sp.ttn,"phys")
 		#get_greenfunc(dm_sp.ttn,"virt")
 		#=
@@ -622,29 +691,63 @@ lr = 0#Int(sqrt(2^layers))-1
 		scatter(collect(1:mdim),-log.(specs))
 		=#
 		#end
-	#end
+	end
 
 end
+#
+fig = figure()
+for j in 1:edge_sites
+plot(strens,[real(currents[i][j]) for i in 1:counting],"-p",label="$j")
+legend()
+end
 
+fig2 = figure()
+plot(strens,nrgs,"-p")
+xlabel("Central Flux Strength")
+ylabel("Energy")
+
+#=
 include("time_evolution.jl")
 
 psi_gs = wavefuncs[1]
+if_states = true
 
-if true
-	time_end = 0.5
+alloccs = [get_occupancy(psi_gs; if_plot=false)]
+whatmeasuring = Dict([("occs",(get_occupancy,(if_plot=false,))),("currents",(ttn_current,(centralflux_strength=centralflux_strength,)))])
+
+if false
+	time_end = 1.0
 	time_change = 0.1
 	tilt_stren = 0.00
 
-	swphndler = evolve_in_time(psi_gs,time_end,time_change,ham)	
+	rez,swphndler = evolve_in_time(psi_gs,time_end,time_change,ham; if_states=if_states,obs_measures=whatmeasuring)
+	append!(wavefuncs,rez.measurement_results["states"])
+	append!(alloccs,rez.measurement_results["occs"])
+	times = [[0.0]; rez.times]
 end
-#end
+
 #
+fig = figure()
+plot(times[2:end],rez.energy,"-p")
+xlabel("Time")
+ylabel("Energy")
 
-#occs1 = get_occupancy(dm_sp.ttn; if_plot=true,if_save_fig=false,if_save_data=false)
-#
+avgpos = average_position(alloccs)
+fig2 = figure()
+plot(times,[avgpos[i][1] for i in 1:length(alloccs)],"-p",label="Real")
+plot(times,[avgpos[i][2] for i in 1:length(alloccs)],"-p",label="Synth")
+xlabel("Time")
+legend()
+ylabel("Average Position")
 
-
-
+allcurrents = [[ttn_current(psi_gs; centralflux_strength=centralflux_strength)]; rez.measurement_results["currents"]]
+alltotals = [allcurrents[i][1] for i in 1:length(allcurrents)]
+allmats = [allcurrents[i][2] for i in 1:length(allcurrents)]
+fig3 = figure()
+plot(times,real.(alltotals),"-p")
+xlabel("Time")
+ylabel("Current")
+=#
 
 
 

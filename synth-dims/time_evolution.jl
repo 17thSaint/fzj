@@ -2,7 +2,7 @@ if true
 #include("../other-funcs/data-storage-funcs.jl")
 #include("long-range-ttn.jl")
 #include("fqh_effective.jl")
-using ITensorTDVP, Observers
+using ITensorTDVP, Observers, NumericalIntegration
 end
 
 function current_nrg(; psi, bond, half_sweep)
@@ -21,11 +21,6 @@ function current_nrgvar(; psi, bond, half_sweep)
     return nothing
 end
 
-function ttn_time(; ttn)
-    println("Doing Time things")
-    return typeof(ttn)
-end
-
 function get_time(; current_time, bond, half_sweep)
     if bond == 1 && half_sweep == 2
 	  return -imag(current_time)
@@ -38,6 +33,10 @@ function return_state(; psi, bond, half_sweep)
 	  return psi
 	end
 	return nothing
+end
+
+function return_state_ttn(psi)
+    return psi
 end
 
 function current_occ(; psi, bond, half_sweep, current_time)
@@ -144,11 +143,65 @@ function energy_variance(psi,H)
 	return abs(fo_nrg^2 - inner(H,psi,H,psi) / inner(psi,psi))
 end
 
+mutable struct TTNObserver <: AbstractObserver
+    energy::Vector{Float64}
+    times::Vector{Float64}
+    measurement_operators::Dict{String,Any}
+    measurement_results::Dict{String,Any}
+
+    function TTNObserver(what_to_measure::Dict{String,Any})
+        measurements = Dict(key => Any[] for key in keys(what_to_measure))
+        return new(Float64[], Float64[], what_to_measure, measurements)
+    end
+end
+
+function ITensors.measure!(ob::TTNObserver; kwargs...)
+    tdvp = kwargs[:sweep_handler]
+    time_now = tdvp.current_time
+
+
+    #((tdvp.dirloop !== :backward) || (pos !== tdvp.path[2])) && return
+
+    topPos = (TTNKit.number_of_layers(TTNKit.network(tdvp.ttn)), 1)
+    n_sites = TTNKit.number_of_sites(TTNKit.network(tdvp.ttn))
+
+    action = TTNKit.∂A(tdvp.pTPO, topPos)
+    T = tdvp.ttn[topPos]
+    actionT = action(T)
+
+    push!(ob.energy, real(ITensors.scalar(dag(T)*actionT)))
+    push!(ob.times, time_now)
+
+    for (key,val) in ob.measurement_operators
+        params = ()
+        func = val
+        try
+            if length(val) > 1
+                func = val[1]
+                params = val[2]
+            else
+                func = val[1]
+            end
+        catch
+            func = val
+        end
+        result = func(tdvp.ttn; params...)
+        if typeof(result) == Vector
+            append!(ob.measurement_results[key],result)
+        else
+            append!(ob.measurement_results[key],[result])
+        end
+    end
+
+end
+
+
 function evolve_in_time(psi0,final_time,dt,ham; kwargs...)
-    obs_measures = get(kwargs,:obs_measures,nothing)
+    obs_measures::Dict{String,Any} = get(kwargs,:obs_measures,Dict{String,Any}())
     outputlevel = get(kwargs,:outputlevel,1)
     mdim = get(kwargs,:mdim,10)
     if_save_data = get(kwargs,:if_save_data,false)
+    if_states = get(kwargs,:if_states,true)
 
     metadata = get(kwargs, :metadata, Dict())
     metadata["time_end"] = final_time
@@ -172,15 +225,17 @@ function evolve_in_time(psi0,final_time,dt,ham; kwargs...)
     #
     if typeof(psi0) == MPS
         obs = Observer("times" => get_time)
+        if_states ? obs["states"] = return_state : nothing
+        if obs_measures != nothing
+            for (key,val) in obs_measures
+                obs[key] = val
+            end
+        end
     else
-        obs = Observer("times" => ttn_time)
+        if_states ? obs_measures["states"] = (return_state_ttn,()) : nothing
+        obs = TTNObserver(obs_measures)
     end
     #obs = Observer("times" => current_time)#,"states" => return_state)#, "occs" => current_occ)
-    if obs_measures != nothing
-        for (key,val) in obs_measures
-            obs[key] = val
-        end
-    end
     println("Made Observer")
     #
 
@@ -188,7 +243,7 @@ function evolve_in_time(psi0,final_time,dt,ham; kwargs...)
     if typeof(psi0) == MPS
         psit = tdvp(H,psi0,-im*dt; nsweeps=time_steps,outputlevel=outputlevel,maxdim=mdim,(observer!)=obs)
     else
-        time_ttnswp = TTNKit.tdvp(psi0,H; timestep=dt,finaltime=final_time, (observer!)=obs)
+        time_ttnswp = TTNKit.tdvp(psi0,H; timestep=dt,finaltime=final_time-dt, observer=obs)
     end
     time_end = time()
 
@@ -204,7 +259,7 @@ function evolve_in_time(psi0,final_time,dt,ham; kwargs...)
     if typeof(psi0) == MPS
         return obs,H
     else
-        return time_ttnswp,obs
+        return obs,time_ttnswp
     end
 end
 

@@ -200,7 +200,7 @@ for (i,chi) in enumerate(strens)
     if_exists,found_data = check_data_exists("mps-"*filename*".jld2","mps";location=dataloc)
 
     if if_exists
-        #psi_gs = found_data
+        psi_gs = found_data
     else
         dmrg_params = (ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=dataloc,observer=obs)
         psi_gs = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
