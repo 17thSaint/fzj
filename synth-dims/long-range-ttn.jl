@@ -649,8 +649,8 @@ lr = 0#Int(sqrt(2^layers))-1
 	currents = []
 	nrgs = []
 	#display(alphas)
-	counting = 20
-	strens = range(0.1,stop=1.0,length=counting)
+	counting = 50
+	strens = range(-0.5,stop=1.5,length=counting)
 	for (idx,centralflux_strength) in enumerate(strens)
 
 		#centralflux_strength = 0.25
