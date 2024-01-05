@@ -554,15 +554,75 @@ function ttn_current(psi::TreeTensorNetwork; kwargs...)
 	return total_current,reorder_vector_to_matrix(conj(coeff) .* left_moving,coeff .* right_moving)
 end
 
+function momentum_occupation(psi::TreeTensorNetwork,p_count::Int,p_end::Real; kwargs...)
+	if_neg = get(kwargs, :if_neg, true)
+	if_save_data = get(kwargs, :if_save_data, false)
+	if_plot = get(kwargs, :if_plot, false)
+	p_start = get(kwargs, :p_start, 0.0)
+	if_fermion = get(kwargs, :if_fermion, false)
+	creation = if_fermion ? "Cdag" : "Adag"
+	annihilation = if_fermion ? "C" : "A"
+
+	if if_neg
+		p_start = -p_end
+	end
+
+	phys_length,virt_length = get_lattice_dims(psi)
+
+	momenta = range(p_start,stop=p_end,length=p_count)
+	mom_occs = zeros(p_count) .* im
+	for (i,p) in enumerate(momenta)
+		for s in 1:virt_length
+			for j in 1:phys_length
+				mom_occs[i] += TTNKit.correlation(psi,creation,annihilation,s,j) * exp(im*p*pi*(s-j))
+			end
+		end
+	end
+
+	if_plot ? plot_momentum_occupation(momenta,real.(mom_occs); kwargs...) : nothing
+
+	return momenta,mom_occs
+end
+
+function plot_momentum_occupation(momenta,mom_occ; kwargs...)
+	title_string = "Momentum Distribution, " * get(kwargs, :plot_title, "")
+	plot_label = get(kwargs, :plot_label, "")
+	isempty(plot_label) ? fig = figure() : nothing
+	plot(momenta,mom_occ,"-p",label=plot_label)
+	if_log = get(kwargs, :if_log, false)
+	if if_log
+		yscale("log")
+		xscale("log")
+	end
+	xlabel("Momenta / pi")
+	ylabel("Occupation")
+	title(title_string)
+	
+end
+
+
+#= Momentum occupation testing
+lnet = build_HH_net(4; syms=true)
+states = fill("0", 16)
+old_ttn = TTNKit.ProductTreeTensorNetwork(lnet,states)
+ttn = initialize_ttn(old_ttn,50,1)
+freeboson_ham = long_range_HH_ham(lnet,1.0,0.0)
+old, hamilt, dm_sp = find_ground_state(4,1,1.0; ham_op=freeboson_ham,ttn_net=lnet,seed_ttn=ttn,sweep_type="dmrg",output_level=1,mdim=50,num_sweeps=10,if_save_data=false)
+fb_gs = dm_sp.ttn
+fb_occ_mat = get_occupancy(fb_gs)
+=#
+	
+
+
 #
 if true
 
 nnst = 0.0
-layers = 4
+layers = 6
 lr = 0#Int(sqrt(2^layers))-1
 #for nnst in nn_strens
 
-	params_dict = Dict([("if_pinning",false),("layers",layers),("mdim",50),("mag_off",true),("lr",lr),("if_nn_int",false),("nn_strength",nnst)])
+	params_dict = Dict([("if_pinning",false),("layers",layers),("mdim",150),("mag_off",false),("lr",lr),("if_nn_int",false),("nn_strength",nnst)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
@@ -644,16 +704,18 @@ lr = 0#Int(sqrt(2^layers))-1
 	alphas = [alpha_start + (i-1)*(alpha_end-alpha_start)/(alpha_count-1) for i in 1:alpha_count] .- change/2
 	alphas = [alphas; alphas .+ change]
 	=#
-	alpha = mag_off ? 0.0 : 1 * num_particles / tot_sites
+	alpha_center = mag_off ? 0.0 : 1 * num_particles / tot_sites
 	wavefuncs = []
 	currents = []
 	nrgs = []
 	#display(alphas)
 	counting = 50
-	strens = range(-0.5,stop=1.5,length=counting)
-	for (idx,centralflux_strength) in enumerate(strens)
+	centralflux_strength = 0.0
+	strens = range(0.05,0.2,length=counting)
+	display(num_particles ./ (strens .* tot_sites))
+	centermoms = [0.0 for i in 1:counting] .* im
+	for (idx,alpha) in enumerate(strens)
 
-		#centralflux_strength = 0.25
 		filename_dict = Dict([("if_pinning",if_pinning),("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys),("nn_strength",nnst),("mdim",mdim)])
 
 
@@ -682,6 +744,13 @@ lr = 0#Int(sqrt(2^layers))-1
 		append!(currents,[[ttn_current_site(dm_sp.ttn,i; centralflux_strength=centralflux_strength) for i in 1:edge_sites]])
 		append!(nrgs,[dm_sp.current_energy])
 
+		centermoms[idx] = momentum_occupation(dm_sp.ttn,1,0.0; if_plot=false)[2][1]
+		if idx > 1
+			plot([num_particles/(strens[idx-1]*tot_sites),num_particles/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
+		else
+			scatter([num_particles/(alpha*tot_sites)],[centermoms[idx]],c="b")
+		end
+
 		#get_occupancy(dm_sp.ttn; plot_title = "Alpha = $(round(alpha,digits=4))")
 		#get_greenfunc(dm_sp.ttn,"phys")
 		#get_greenfunc(dm_sp.ttn,"virt")
@@ -694,7 +763,10 @@ lr = 0#Int(sqrt(2^layers))-1
 	end
 
 end
-#
+
+#plot(strens,real.(centermoms),"-p")
+
+#=
 fig = figure()
 for j in 1:edge_sites
 plot(strens,[real(currents[i][j]) for i in 1:counting],"-p",label="$j")
@@ -705,7 +777,7 @@ fig2 = figure()
 plot(strens,nrgs,"-p")
 xlabel("Central Flux Strength")
 ylabel("Energy")
-
+=#
 #=
 include("time_evolution.jl")
 
