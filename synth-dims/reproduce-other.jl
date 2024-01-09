@@ -136,21 +136,21 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
 end
 
 #
-if_save_data = true
+if_save_data = false
 dataloc = "/home/patrick/fzj/main-git/cluster-data/synth-dims/"
 
 nrgvar_tol = 1E-10
 mdim = 100
 
 #geo_params = [()] # (L,nf,nb)
-Ls = [4,5,6,7,8,9,10,11,12,13,14,15]
+#Ls = [4,5,6,7,8,9,10,11,12,13,14,15]
 
-nu = 1.0
+#nu = 1.0
 #
 states = []
-for L in Ls
-#L = 8
-nflavors = Int(ceil(0.75*L))
+#for L in Ls
+L = 8
+nflavors = 5#Int(ceil(0.75*L))
 part_count = nflavors
 #chi = 0.0#part_count / (nu*L*nflavors)
 tilt = 0.0
@@ -158,7 +158,7 @@ tilt = 0.0
 if_per_phys = true
 if_per_virt = false
 
-centralflux_strength = 0.0
+centralflux_strength = 0.25
 
 naming_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",part_count),("mdim",mdim),("centralflux_strength",centralflux_strength)])
 metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodic_virt",if_per_virt),("tilt_strength",tilt),("location",dataloc),("if_save_data",if_save_data),("nrgvar_tol",nrgvar_tol),("mdim",mdim)]))
@@ -169,16 +169,35 @@ metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodi
 
 #
 if true
-counting = 20
+counting = 5
 scaling = 64
-strens = [part_count / (nu*L*nflavors)]#range(0.1,stop=0.15,length=counting)#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
-nrgs = zeros(length(strens)) .* im
-currents = zeros(nflavors,length(strens)) .* im
-drudes = zeros(nflavors,length(strens)) .* im
-
-println("Chi = ",part_count / (nu*L*nflavors))
+#strens = 0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
+#nrgs = zeros(length(strens)) .* im
+#currents = zeros(nflavors,length(strens)) .* im
+#drudes = zeros(nflavors,length(strens)) .* im
 #
-for (i,chi) in enumerate(strens)
+chi = 0.0
+params_dict = Dict([("L",L),("nbosons",part_count),("nflavors",nflavors),("chi",chi)])
+loc = "/home/patrick/fzj/main-git/cluster-data/synth-dims/"
+all_files = find_data_file(params_dict,"mps","jld2",loc)
+display(all_files)
+
+strens = zeros(length(all_files))
+nrgs = zeros(length(all_files)) .* im
+currents = zeros(nflavors,length(all_files)) .* im
+drudes = zeros(nflavors,length(all_files)) .* im
+
+#println("Chi = ",part_count / (nu*L*nflavors))
+#
+#for (i,chi) in enumerate(strens)
+for (i,f) in enumerate(all_files)
+    found_data, found_metadata = read_data_jld2(f,loc)
+    centralflux_strength = found_metadata["centralflux_strength"]
+    strens[i] = centralflux_strength
+    psi_gs = found_data["mps"]
+    ham_params = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
+    #display(found_metadata)
+    #=
     metadata["chi"] = chi
     naming_dict["chi"] = round(chi,digits=5)
     #=
@@ -206,17 +225,22 @@ for (i,chi) in enumerate(strens)
         psi_gs = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
         println("Energy Variance = ",energy_variance(psi_gs,ham_start)," at Chi = ",chi)
     end
+    =#
 
     #append!(states,[psi_gs])
-    nrgs[i] = calculate_energy(psi_gs,ham_start)
-
+    
+    if true
+    nrgs[i] = calculate_energy(psi_gs,found_metadata["ham"])
+    currents[:,i] = [calc_deriv(1,psi_gs,s,Int(L/2),nflavors,chi,ham_params) for s in 1:nflavors]
+    drudes[:,i] = [calc_deriv(2,psi_gs,s,Int(L/2),nflavors,chi,ham_params) for s in 1:nflavors]
+    end
+    
+    #=
     centersite = Int(ceil(L/2))
     u,s,v = svd(psi_gs[centersite],linkind(psi_gs,centersite))
     ents = sum([s[n,n]^2 * 2 * log(s[n,n]) for n in 1:size(s)[1]])
     scatter([L],[ents],c="b")
-
-    #currents[:,i] = [calc_deriv(1,psi_gs,s,Int(L/2),nflavors,chi,ham_params) for s in 1:nflavors]
-    #drudes[:,i] = [calc_deriv(2,psi_gs,s,Int(L/2),nflavors,chi,ham_params) for s in 1:nflavors]
+    =#
     #=fig = figure()
     imshow(real.(drude))
     title("Drudes at Current Strength = $(centralflux_strength)")
@@ -226,27 +250,29 @@ for (i,chi) in enumerate(strens)
     =#
 end
 #
-#=
+#
 fig = figure()
 plot(strens,real.(nrgs),"-p",label="Energy")
-xlabel("Phi")
+xlabel("Central Flux Strength")
 legend()
+#
 fig2 = figure()
 for i in 1:nflavors
     plot(strens,real.(currents[i,:]),"-p",label="Current $i")
 end
-xlabel("Phi")
+xlabel("Central Flux Strength")
 legend()
+
 fig3 = figure()
 for i in 1:nflavors
     plot(strens,real.(drudes[i,:]),"-p",label="Drude $i")
 end
-xlabel("Phi")
+xlabel("Central Flux Strength")
 legend()
-=#
-end
 #
 end
+#
+#end
 #
 
 #

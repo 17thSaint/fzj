@@ -575,7 +575,7 @@ function momentum_occupation(psi::TreeTensorNetwork,p_count::Int,p_end::Real,dir
 	
 	for s=1:virt_length, j=1:phys_length
 		for ss=1:virt_length, jj=1:phys_length
-			corr_val = TTNKit.correlation(psi,creation,annihilation,(s,j),(ss,jj))
+			corr_val = TTNKit.correlation(psi,creation,annihilation,(s,j),(ss,jj)) + TTNKit.correlation(psi,creation,annihilation,(ss,jj),(s,j))
 			for (i,p) in enumerate(momenta)
 				pvec = direction == "phys" ? [other_p,p] : [p,other_p]
 				mom_occs[i] += corr_val * exp(im*pi*dot(pvec,[s-ss,j-jj]))
@@ -697,11 +697,11 @@ fb_occ_mat = get_occupancy(fb_gs)
 if true
 
 nnst = 0.0
-layers = 4
+layers = 6
 lr = 0#Int(sqrt(2^layers))-1
 #for nnst in nn_strens
 
-	params_dict = Dict([("if_pinning",false),("layers",layers),("mdim",50),("mag_off",false),("lr",lr),("if_nn_int",false),("nn_strength",nnst)])
+	params_dict = Dict([("if_pinning",false),("layers",layers),("mdim",50),("mag_off",true),("lr",lr),("if_nn_int",false),("nn_strength",nnst)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
@@ -732,10 +732,10 @@ lr = 0#Int(sqrt(2^layers))-1
 	end
 	if layer_count % 2 == 0
 		edge_sites = Int(sqrt(2^layer_count))
-		num_particles = get(params_dict, "particles", Int(edge_sites/2))
+		#num_particles = edge_sites#get(params_dict, "particles", Int(edge_sites/2))
 	else
 		edge_sites = Int(sqrt(2^(layer_count+1)))
-		num_particles = get(params_dict, "particles", Int(sqrt(2^(layer_count+1))/2))
+		#num_particles = get(params_dict, "particles", Int(sqrt(2^(layer_count+1))/2))
 	end
 
 	#
@@ -764,7 +764,7 @@ lr = 0#Int(sqrt(2^layers))-1
 	=#
 	nswps = 5
 	#alpha = 7/64
-	num_particles = Int(sqrt(2^layer_count)/2)#Int(alpha * tot_sites * nu)
+	#num_particles = Int(sqrt(2^layer_count)/2)#Int(alpha * tot_sites * nu)
 	
 
 	plotting = false
@@ -788,15 +788,16 @@ lr = 0#Int(sqrt(2^layers))-1
 	currents = []
 	nrgs = []
 	#display(alphas)
-	counting = 50
+	counting = 100
 	centralflux_strength = 0.0
-	strens = range(0.06,0.5,length=counting)
-	display(num_particles ./ (strens .* tot_sites))
+	parts = [i for i in 1:Int(tot_sites/2)]
+	#fillings = range(0.2,3.0,length=counting)
+	#strens = range(num_particles/(0.2*tot_sites),num_particles/(10.0*tot_sites),length=counting) #range(0.02,0.25,length=counting)
 	centermoms = [0.0 for i in 1:counting] .* im
-	for (idx,alpha) in enumerate(strens)
-
+	#for (idx,alpha) in enumerate(strens)
+	for (idx,num_particles) in enumerate(parts)
+		alpha = 0.0
 		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys),("nn_strength",nnst),("mdim",mdim)])
-
 
 		#if length(keys(params_dict)) == 0
 		#	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
@@ -820,15 +821,17 @@ lr = 0#Int(sqrt(2^layers))-1
 		total_time = time() - starting
 		println("Running time = $total_time")
 		append!(wavefuncs,[dm_sp.ttn])
-		append!(currents,[[ttn_current_site(dm_sp.ttn,i; centralflux_strength=centralflux_strength) for i in 1:edge_sites]])
-		append!(nrgs,[dm_sp.current_energy])
+		#append!(currents,[[ttn_current_site(dm_sp.ttn,i; centralflux_strength=centralflux_strength) for i in 1:edge_sites]])
+		#append!(nrgs,[dm_sp.current_energy])
 
 		allmoms = momentum_occupation(dm_sp.ttn,1,0.0)
 		centermoms[idx] = allmoms[2][1]
 		if idx > 1
-			plot([num_particles/(strens[idx-1]*tot_sites),num_particles/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
+			#plot([num_particles/(strens[idx-1]*tot_sites),num_particles/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
+			plot([(num_particles-1)/tot_sites,num_particles/tot_sites],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
 		else
-			scatter([num_particles/(alpha*tot_sites)],[centermoms[idx]],c="b")
+			#scatter([num_particles/(alpha*tot_sites)],[centermoms[idx]],c="b")
+			scatter([num_particles/tot_sites],[centermoms[idx]],c="b")
 		end
 
 		#get_occupancy(dm_sp.ttn; plot_title = "Alpha = $(round(alpha,digits=4))")
@@ -843,7 +846,7 @@ lr = 0#Int(sqrt(2^layers))-1
 	end
 
 end
-
+#
 #plot(strens,real.(centermoms),"-p")
 
 #=
