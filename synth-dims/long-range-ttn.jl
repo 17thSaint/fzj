@@ -554,11 +554,12 @@ function ttn_current(psi::TreeTensorNetwork; kwargs...)
 	return total_current,reorder_vector_to_matrix(conj(coeff) .* left_moving,coeff .* right_moving)
 end
 
-function momentum_occupation(psi::TreeTensorNetwork,p_count::Int,p_end::Real; kwargs...)
+function momentum_occupation(psi::TreeTensorNetwork,p_count::Int,p_end::Real,direction="phys"; kwargs...)
 	if_neg = get(kwargs, :if_neg, true)
 	if_save_data = get(kwargs, :if_save_data, false)
-	if_plot = get(kwargs, :if_plot, false)
+	if_plot = p_count != 1 ? get(kwargs, :if_plot, false) : false
 	p_start = get(kwargs, :p_start, 0.0)
+	other_p = get(kwargs, :other_p, 0.0)
 	if_fermion = get(kwargs, :if_fermion, false)
 	creation = if_fermion ? "Cdag" : "Adag"
 	annihilation = if_fermion ? "C" : "A"
@@ -571,12 +572,39 @@ function momentum_occupation(psi::TreeTensorNetwork,p_count::Int,p_end::Real; kw
 
 	momenta = range(p_start,stop=p_end,length=p_count)
 	mom_occs = zeros(p_count) .* im
-	for (i,p) in enumerate(momenta)
-		for s in 1:virt_length
-			for j in 1:phys_length
-				mom_occs[i] += TTNKit.correlation(psi,creation,annihilation,s,j) * exp(im*p*pi*(s-j))
+	
+	for s=1:virt_length, j=1:phys_length
+		for ss=1:virt_length, jj=1:phys_length
+			corr_val = TTNKit.correlation(psi,creation,annihilation,(s,j),(ss,jj))
+			for (i,p) in enumerate(momenta)
+				pvec = direction == "phys" ? [other_p,p] : [p,other_p]
+				mom_occs[i] += corr_val * exp(im*pi*dot(pvec,[s-ss,j-jj]))
 			end
 		end
+	end
+
+	if_plot ? plot_momentum_occupation(momenta,abs2.(mom_occs); kwargs...) : nothing
+
+	return momenta,mom_occs
+end
+
+function momentum_occupation(psi::TreeTensorNetwork,p_count::Int,p_end::Real; kwargs...)
+	if_neg = get(kwargs, :if_neg, true)
+	p_start = get(kwargs, :p_start, 0.0)
+	if_plot = get(kwargs, :if_plot, false)
+
+	mom_occs = zeros(p_count,p_count) .* im
+	momenta = Matrix{Tuple{Float64,Float64}}(undef,p_count,p_count)
+
+	if if_neg
+		p_start = -p_end
+	end
+	other_momenta = range(p_start*1.0,stop=p_end*1.0,length=p_count)
+
+	for (idx,other_p) in enumerate(other_momenta)
+		virt_moms, local_occs = momentum_occupation(psi,p_count,p_end,"phys"; kwargs...,other_p=other_p,if_plot=false)
+		momenta[idx,:] = [(virt_moms[i],other_p) for i in 1:length(virt_moms)]
+		mom_occs[idx,:] = local_occs
 	end
 
 	if_plot ? plot_momentum_occupation(momenta,real.(mom_occs); kwargs...) : nothing
@@ -584,7 +612,7 @@ function momentum_occupation(psi::TreeTensorNetwork,p_count::Int,p_end::Real; kw
 	return momenta,mom_occs
 end
 
-function plot_momentum_occupation(momenta,mom_occ; kwargs...)
+function plot_momentum_occupation(momenta::Vector,mom_occ::Vector; kwargs...)
 	title_string = "Momentum Distribution, " * get(kwargs, :plot_title, "")
 	plot_label = get(kwargs, :plot_label, "")
 	isempty(plot_label) ? fig = figure() : nothing
@@ -597,8 +625,59 @@ function plot_momentum_occupation(momenta,mom_occ; kwargs...)
 	xlabel("Momenta / pi")
 	ylabel("Occupation")
 	title(title_string)
-	
 end
+
+function plot_momentum_occupation(momenta::Matrix,mom_occ::Matrix; kwargs...)
+	title_string = "Momentum Distribution, " * get(kwargs, :plot_title, "")
+	plot_label = get(kwargs, :plot_label, "")
+	fig = figure()
+	imshow(mom_occ, extent=[momenta[1,1][2],momenta[end,1][2],momenta[1,1][1],momenta[1,end][1]])
+	title(title_string)
+	colorbar()
+	xlabel("Virtual Momenta / pi")
+	ylabel("Physical Momenta / pi")
+end
+
+function loop_sites(starting_site,which_quadrant,phys_length,virt_length; kwargs...)
+	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
+	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
+	loop_length = get(kwargs, :loop_length, 1)
+
+    # Determine the direction of the loop based on the quadrant
+    dx = (which_quadrant in [1,4]) ? loop_length : -loop_length
+    dy = (which_quadrant in [1,2]) ? loop_length : -loop_length
+
+    # The second point is one step to the right or left
+    first_x_move = if_periodic_phys ? (mod1(starting_site[1] + dx,phys_length), starting_site[2]) : (starting_site[1] + dx, starting_site[2])
+
+    # The third point is one step up or down from the second point
+    first_y_move = if_periodic_virt ? (mod1(first_x_move[1],virt_length), first_x_move[2] + dy) : (first_x_move[1], first_x_move[2] + dy)
+
+    # The fourth point is one step to the left or right from the third point
+    second_x_move = if_periodic_phys ? (mod1(first_y_move[1] - dx,phys_length), first_y_move[2]) : (first_y_move[1] - dx, first_y_move[2])
+
+    # Return the four pointsYour location
+    return [starting_site,first_x_move,first_y_move,second_x_move]
+end
+
+
+function closed_loop(psi::TreeTensorNetwork, starting_site; kwargs...)
+	phys_length,virt_length = get_lattice_dims(psi)
+	which_direction = get(kwargs, :direction, 3)
+	loop_length = get(kwargs, :loop_length, 1)
+	if_fermion = get(kwargs, :if_fermion, false)
+	creation = if_fermion ? "Cdag" : "Adag"
+	annihilation = if_fermion ? "C" : "A"
+
+	sites_to_loop = loop_sites(starting_site,which_direction,phys_length,virt_length; kwargs...)
+	calced_values = zeros(length(sites_to_loop)) .* im
+	for (idx,s) in enumerate(sites_to_loop)
+		next_site = idx == length(sites_to_loop) ? sites_to_loop[1] : sites_to_loop[idx+1]
+		calced_values[idx] = TTNKit.correlation(psi,creation,annihilation,next_site,s)
+	end
+end
+
+
 
 
 #= Momentum occupation testing
@@ -618,11 +697,11 @@ fb_occ_mat = get_occupancy(fb_gs)
 if true
 
 nnst = 0.0
-layers = 6
+layers = 4
 lr = 0#Int(sqrt(2^layers))-1
 #for nnst in nn_strens
 
-	params_dict = Dict([("if_pinning",false),("layers",layers),("mdim",150),("mag_off",false),("lr",lr),("if_nn_int",false),("nn_strength",nnst)])
+	params_dict = Dict([("if_pinning",false),("layers",layers),("mdim",50),("mag_off",false),("lr",lr),("if_nn_int",false),("nn_strength",nnst)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
@@ -692,7 +771,7 @@ lr = 0#Int(sqrt(2^layers))-1
 	save_plot = false
 	save_data = false
 
-	loc = "../cluster-data/orsay-sept23"
+	loc = "../cluster-data/synth-dims"
 	if_cliff = false
 	sc_type = "flat"
 	dists = [i for i in 1:2*edge_sites]
@@ -711,12 +790,12 @@ lr = 0#Int(sqrt(2^layers))-1
 	#display(alphas)
 	counting = 50
 	centralflux_strength = 0.0
-	strens = range(0.05,0.2,length=counting)
+	strens = range(0.06,0.5,length=counting)
 	display(num_particles ./ (strens .* tot_sites))
 	centermoms = [0.0 for i in 1:counting] .* im
 	for (idx,alpha) in enumerate(strens)
 
-		filename_dict = Dict([("if_pinning",if_pinning),("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys),("nn_strength",nnst),("mdim",mdim)])
+		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys),("nn_strength",nnst),("mdim",mdim)])
 
 
 		#if length(keys(params_dict)) == 0
@@ -744,7 +823,8 @@ lr = 0#Int(sqrt(2^layers))-1
 		append!(currents,[[ttn_current_site(dm_sp.ttn,i; centralflux_strength=centralflux_strength) for i in 1:edge_sites]])
 		append!(nrgs,[dm_sp.current_energy])
 
-		centermoms[idx] = momentum_occupation(dm_sp.ttn,1,0.0; if_plot=false)[2][1]
+		allmoms = momentum_occupation(dm_sp.ttn,1,0.0)
+		centermoms[idx] = allmoms[2][1]
 		if idx > 1
 			plot([num_particles/(strens[idx-1]*tot_sites),num_particles/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
 		else
