@@ -136,11 +136,11 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
 end
 
 #
-if_save_data = false
+if_save_data = true
 dataloc = "/home/patrick/fzj/main-git/cluster-data/synth-dims/"
 
 nrgvar_tol = 1E-10
-mdim = 100
+mdim = 500
 
 #geo_params = [()] # (L,nf,nb)
 #Ls = [4,5,6,7,8,9,10,11,12,13,14,15]
@@ -158,7 +158,7 @@ tilt = 0.0
 if_per_phys = true
 if_per_virt = false
 
-centralflux_strength = 0.25
+centralflux_strength = 0.0
 
 naming_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",part_count),("mdim",mdim),("centralflux_strength",centralflux_strength)])
 metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodic_virt",if_per_virt),("tilt_strength",tilt),("location",dataloc),("if_save_data",if_save_data),("nrgvar_tol",nrgvar_tol),("mdim",mdim)]))
@@ -169,35 +169,41 @@ metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodi
 
 #
 if true
-counting = 5
-scaling = 64
-#strens = 0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
+counting = 50
+#scaling = 64
+strens = range(part_count/(0.01*L*nflavors),part_count/(0.2*L*nflavors),length=counting)#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
+sf_orderparams = zeros(length(strens))
 #nrgs = zeros(length(strens)) .* im
 #currents = zeros(nflavors,length(strens)) .* im
 #drudes = zeros(nflavors,length(strens)) .* im
 #
-chi = 0.0
-params_dict = Dict([("L",L),("nbosons",part_count),("nflavors",nflavors),("chi",chi)])
+#=chi = 0.0
+params_dict = Dict([("L",L),("nbosons",part_count),("nflavors",nflavors),("centralflux_strength",centralflux_strength)])
 loc = "/home/patrick/fzj/main-git/cluster-data/synth-dims/"
-all_files = find_data_file(params_dict,"mps","jld2",loc)
+all_files = find_data_file(params_dict,"mps",loc)
 display(all_files)
+=#
 
+#=
 strens = zeros(length(all_files))
 nrgs = zeros(length(all_files)) .* im
 currents = zeros(nflavors,length(all_files)) .* im
 drudes = zeros(nflavors,length(all_files)) .* im
+sf_orderparams = zeros(length(all_files))
+=#
 
 #println("Chi = ",part_count / (nu*L*nflavors))
 #
-#for (i,chi) in enumerate(strens)
-for (i,f) in enumerate(all_files)
-    found_data, found_metadata = read_data_jld2(f,loc)
-    centralflux_strength = found_metadata["centralflux_strength"]
-    strens[i] = centralflux_strength
-    psi_gs = found_data["mps"]
-    ham_params = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
+for (idx,chi) in enumerate(strens)
+#for (idx,f) in enumerate(all_files)
+    #found_data, found_metadata = read_data_jld2(f,loc)
+    #centralflux_strength = found_metadata["centralflux_strength"]
+    #chi = found_metadata["chi"]
+    #strens[idx] = chi
+    #psi_gs = found_data["mps"]
+    #ham_params = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
     #display(found_metadata)
-    #=
+    #
     metadata["chi"] = chi
     naming_dict["chi"] = round(chi,digits=5)
     #=
@@ -225,11 +231,22 @@ for (i,f) in enumerate(all_files)
         psi_gs = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
         println("Energy Variance = ",energy_variance(psi_gs,ham_start)," at Chi = ",chi)
     end
-    =#
+    #
 
-    #append!(states,[psi_gs])
+    append!(states,[psi_gs])
+
+    sf_orderparams[idx] = abs(momentum_occupation(psi_gs,1,0.0)[2][1])
+
+    if idx > 1
+        plot([part_count/(strens[idx-1]*L*nflavors),part_count/(chi*L*nflavors)],[sf_orderparams[idx-1],sf_orderparams[idx]],"-p",c="b")
+        #plot([(part_count-1)/(strens[idx-1]*tot_sites),part_count/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
+    else
+        scatter([part_count/(chi*L*nflavors)],[sf_orderparams[idx]],c="b")
+        #scatter([part_count/(strens[idx]*tot_sites)],[centermoms[idx]],c="b")
+    end
+
     
-    if true
+    if false
     nrgs[i] = calculate_energy(psi_gs,found_metadata["ham"])
     currents[:,i] = [calc_deriv(1,psi_gs,s,Int(L/2),nflavors,chi,ham_params) for s in 1:nflavors]
     drudes[:,i] = [calc_deriv(2,psi_gs,s,Int(L/2),nflavors,chi,ham_params) for s in 1:nflavors]
@@ -250,7 +267,7 @@ for (i,f) in enumerate(all_files)
     =#
 end
 #
-#
+#=
 fig = figure()
 plot(strens,real.(nrgs),"-p",label="Energy")
 xlabel("Central Flux Strength")
@@ -269,7 +286,7 @@ for i in 1:nflavors
 end
 xlabel("Central Flux Strength")
 legend()
-#
+=#
 end
 #
 #end

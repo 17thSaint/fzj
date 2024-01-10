@@ -159,7 +159,8 @@ function get_folder_location(folder_name,central_loc="fzj")
 	return full_location
 end
 
-function find_data_file(params_dict,calc_type,file_type="jld2",location="/home/patrick/fzj/main-git/cluster-data")
+function find_data_file(params_dict,calc_type,location="/home/patrick/fzj/main-git/cluster-data"; kwargs...)
+	file_type = get(kwargs, :file_type, "jld2")
 	og_loc = pwd()
 	cd(location)
 	
@@ -234,7 +235,23 @@ function check_plot_label(file_name,version)
 	return file_name
 end
 
-function check_data_exists(filename,data_type="observer"; kwargs...)
+function check_data_exists(params_dict::Dict,data_type::String; kwargs...)
+	location = get(kwargs, :location, "/home/patrick/fzj/main-git/cluster-data")
+	possible_files = find_data_file(params_dict,data_type,location; kwargs...)
+	if length(possible_files) == 0
+		return false,nothing
+	else
+		if length(possible_files) > 1
+			println("Too Many files")
+			return false,nothing
+		else
+			return true,read_data_jld2(possible_files[1],location)
+		end
+	end
+end
+	
+
+function check_data_exists(filename::String,data_type="observer"; kwargs...)
     location = get(kwargs, :location, pwd())
     here = pwd()
     cd(location)

@@ -554,6 +554,65 @@ function ttn_current(psi::TreeTensorNetwork; kwargs...)
 	return total_current,reorder_vector_to_matrix(conj(coeff) .* left_moving,coeff .* right_moving)
 end
 
+function find_dist(p1::Tuple{Int,Int}, p2::Tuple{Int,Int}, size::Tuple{Int,Int}, periodic::Tuple{Bool,Bool}=(false, false))
+    dx = abs(p1[1] - p2[1])
+    dy = abs(p1[2] - p2[2])
+
+    if periodic[1]
+        dx = min(dx, size[1] - dx)
+    end
+
+    if periodic[2]
+        dy = min(dy, size[2] - dy)
+    end
+
+    return sqrt(dx^2 + dy^2)
+end
+
+function distance_correlation(psi::TreeTensorNetwork; kwargs...)
+	if_plot = get(kwargs, :if_plot, true)
+	if_periodic_phys = get(kwargs, :if_periodic_phys, true)
+	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
+
+	phys_length,virt_length = get_lattice_dims(psi)
+	all_corrs = []
+	dists = []
+	for s=1:virt_length, j=1:phys_length
+		println(round(100*s/(virt_length),digits=2),"%")
+		for ss=1:virt_length, jj=1:phys_length
+			corr_val = TTNKit.correlation(psi,"Adag","A",(s,j),(ss,jj)) + TTNKit.correlation(psi,"Adag","A",(ss,jj),(s,j))
+			dist_btw = find_dist((s,j),(ss,jj),(virt_length,phys_length),(if_periodic_virt,if_periodic_phys))
+			if dist_btw in dists
+				append!(all_corrs[findfirst(x -> x == dist_btw,dists)],corr_val)
+			else
+				append!(dists,[dist_btw])
+				sort!(dists)
+				insert!(all_corrs,findfirst(x -> x == dist_btw,dists),[corr_val])
+			end
+		end
+	end
+
+	corrs = ([mean(all_corrs[i]) for i in 1:length(all_corrs)])
+	corr_errors = [std(all_corrs[i]) for i in 1:length(all_corrs)]
+
+	if_plot ? plot_distance_correlation(dists,corrs,corr_errors; kwargs...) : nothing
+
+	return dists,corrs,corr_errors
+end
+
+function plot_distance_correlation(dists,corrs,corr_errors; kwargs...)
+	title_string = "Distance Correlation, " * get(kwargs, :plot_title, "")
+	if_errors = get(kwargs, :if_errors, false)
+	if_log = get(kwargs, :if_log, false)
+	plot_label = get(kwargs, :plot_label, "")
+	isempty(plot_label) ? fig = figure() : nothing
+	if_errors ? errorbar(dists,corrs,yerr=[corr_errors,corr_errors]) : plot(dists,abs.(corrs),"-p",label=plot_label)
+	if_log ? yscale("log") : nothing
+	xlabel("Distance")
+	ylabel("Correlation")
+	title(title_string)
+end
+
 function momentum_occupation(psi::TreeTensorNetwork,p_count::Int,p_end::Real,direction="phys"; kwargs...)
 	if_neg = get(kwargs, :if_neg, true)
 	if_save_data = get(kwargs, :if_save_data, false)
@@ -575,7 +634,8 @@ function momentum_occupation(psi::TreeTensorNetwork,p_count::Int,p_end::Real,dir
 	
 	for s=1:virt_length, j=1:phys_length
 		for ss=1:virt_length, jj=1:phys_length
-			corr_val = TTNKit.correlation(psi,creation,annihilation,(s,j),(ss,jj)) + TTNKit.correlation(psi,creation,annihilation,(ss,jj),(s,j))
+			corr_val = TTNKit.correlation(psi,creation,annihilation,(s,j),(ss,jj))
+			corr_val += conj(corr_val)
 			for (i,p) in enumerate(momenta)
 				pvec = direction == "phys" ? [other_p,p] : [p,other_p]
 				mom_occs[i] += corr_val * exp(im*pi*dot(pvec,[s-ss,j-jj]))
@@ -602,6 +662,7 @@ function momentum_occupation(psi::TreeTensorNetwork,p_count::Int,p_end::Real; kw
 	other_momenta = range(p_start*1.0,stop=p_end*1.0,length=p_count)
 
 	for (idx,other_p) in enumerate(other_momenta)
+		println(round(100*idx/length(other_momenta),digits=2),"%")
 		virt_moms, local_occs = momentum_occupation(psi,p_count,p_end,"phys"; kwargs...,other_p=other_p,if_plot=false)
 		momenta[idx,:] = [(virt_moms[i],other_p) for i in 1:length(virt_moms)]
 		mom_occs[idx,:] = local_occs
@@ -732,10 +793,10 @@ lr = 0#Int(sqrt(2^layers))-1
 	end
 	if layer_count % 2 == 0
 		edge_sites = Int(sqrt(2^layer_count))
-		#num_particles = edge_sites#get(params_dict, "particles", Int(edge_sites/2))
+		num_particles = get(params_dict, "particles", Int(edge_sites/2))
 	else
 		edge_sites = Int(sqrt(2^(layer_count+1)))
-		#num_particles = get(params_dict, "particles", Int(sqrt(2^(layer_count+1))/2))
+		num_particles = get(params_dict, "particles", Int(sqrt(2^(layer_count+1))/2))
 	end
 
 	#
@@ -769,7 +830,7 @@ lr = 0#Int(sqrt(2^layers))-1
 
 	plotting = false
 	save_plot = false
-	save_data = false
+	save_data = true
 
 	loc = "../cluster-data/synth-dims"
 	if_cliff = false
@@ -788,16 +849,16 @@ lr = 0#Int(sqrt(2^layers))-1
 	currents = []
 	nrgs = []
 	#display(alphas)
-	counting = 100
+	counting = 50
 	centralflux_strength = 0.0
-	parts = [i for i in 1:Int(tot_sites/2)]
+	#parts = [i for i in 1:Int(tot_sites/2)]
 	#fillings = range(0.2,3.0,length=counting)
-	#strens = range(num_particles/(0.2*tot_sites),num_particles/(10.0*tot_sites),length=counting) #range(0.02,0.25,length=counting)
-	centermoms = [0.0 for i in 1:counting] .* im
-	#for (idx,alpha) in enumerate(strens)
-	for (idx,num_particles) in enumerate(parts)
-		alpha = 0.0
-		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys),("nn_strength",nnst),("mdim",mdim)])
+	strens = [0.0]#range(num_particles/(0.2*tot_sites),num_particles/(3.0*tot_sites),length=counting) #range(0.02,0.25,length=counting)
+	centermoms = [0.0 for i in 1:counting]# .* im
+	for (idx,alpha) in enumerate(strens)
+	#for (idx,num_particles) in enumerate(parts)
+		#alpha = 0.0
+		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys),("nn_strength",nnst)])
 
 		#if length(keys(params_dict)) == 0
 		#	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
@@ -810,30 +871,44 @@ lr = 0#Int(sqrt(2^layers))-1
 
 		#
 		println(datafile_name)
-		title_string = "Np = $num_particles, LR = $longrange_dist at $limit"
-		println("Starting Script using $num_particles particles on $tot_sites sites with $(!mag_off) Mag Field, Bond Dim = $mdim, and Long Range Dist = $longrange_dist")
-		#if true
-		starting = time()
-		net = build_HH_net(layer_count; syms=true)
-		println("here")
-		ham = long_range_HH_ham(net,ts,alpha; model_paras...)
-		og_ttn, hamilt, dm_sp = find_ground_state(layer_count,num_particles,ts; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
-		total_time = time() - starting
-		println("Running time = $total_time")
-		append!(wavefuncs,[dm_sp.ttn])
+		if_exists,found_data = check_data_exists(filename_dict,"ttn";location=loc)
+
+		if if_exists
+			println("Found Data")
+			wavefunc = found_data[1]["ttn"]
+			ham = found_data[2]["ham"]
+			append!(wavefuncs,[wavefunc])
+		else
+			#title_string = "Np = $num_particles, LR = $longrange_dist at $limit"
+			println("Starting Script using $num_particles particles on $tot_sites sites with $(!mag_off) Mag Field, Bond Dim = $mdim, and Long Range Dist = $longrange_dist")
+			#if true
+			starting = time()
+			net = build_HH_net(layer_count; syms=true)
+			ham = long_range_HH_ham(net,ts,alpha; model_paras...)
+			og_ttn, hamilt, dm_sp = find_ground_state(layer_count,num_particles,ts; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
+			total_time = time() - starting
+			println("Running time = $total_time")
+			append!(wavefuncs,[dm_sp.ttn])
+		end
 		#append!(currents,[[ttn_current_site(dm_sp.ttn,i; centralflux_strength=centralflux_strength) for i in 1:edge_sites]])
 		#append!(nrgs,[dm_sp.current_energy])
 
-		allmoms = momentum_occupation(dm_sp.ttn,1,0.0)
-		centermoms[idx] = allmoms[2][1]
-		if idx > 1
-			#plot([num_particles/(strens[idx-1]*tot_sites),num_particles/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
-			plot([(num_particles-1)/tot_sites,num_particles/tot_sites],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
-		else
-			#scatter([num_particles/(alpha*tot_sites)],[centermoms[idx]],c="b")
-			scatter([num_particles/tot_sites],[centermoms[idx]],c="b")
-		end
+		momentum_occupation(wavefuncs[idx],50,1.0; if_plot=true)
 
+		#rez = distance_correlation(wavefuncs[idx]; if_plot=false)#plot_title = "Nu = $(round(num_particles/(alpha*tot_sites),digits=4))")
+		#centermoms[idx] = minimum(abs.(rez[2]))
+
+		if false
+		#allmoms = momentum_occupation(dm_sp.ttn,1,0.0)
+		#centermoms[idx] = allmoms[2][1]
+		if idx > 1
+			plot([num_particles/(strens[idx-1]*tot_sites),num_particles/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
+			#plot([(num_particles-1)/(strens[idx-1]*tot_sites),num_particles/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
+		else
+			scatter([num_particles/(alpha*tot_sites)],[centermoms[idx]],c="b")
+			#scatter([num_particles/(strens[idx]*tot_sites)],[centermoms[idx]],c="b")
+		end
+		end
 		#get_occupancy(dm_sp.ttn; plot_title = "Alpha = $(round(alpha,digits=4))")
 		#get_greenfunc(dm_sp.ttn,"phys")
 		#get_greenfunc(dm_sp.ttn,"virt")
@@ -846,6 +921,7 @@ lr = 0#Int(sqrt(2^layers))-1
 	end
 
 end
+
 #
 #plot(strens,real.(centermoms),"-p")
 

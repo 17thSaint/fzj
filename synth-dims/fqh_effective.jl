@@ -544,6 +544,97 @@ function density_matrix(wavefunc::MPS; kwargs...)
 	return densmat
 end
 
+function momentum_occupation(wavefunc::MPS,p_count::Int,p_end::Real,direction="phys"; kwargs...)
+	if_neg = get(kwargs, :if_neg, true)
+	if_save_data = get(kwargs, :if_save_data, false)
+	if_plot = p_count != 1 ? get(kwargs, :if_plot, false) : false
+	p_start = get(kwargs, :p_start, 0.0)
+	other_p = get(kwargs, :other_p, 0.0)
+	if_fermion = get(kwargs, :if_fermion, false)
+	creation = if_fermion ? "Cdag" : "Adag"
+	annihilation = if_fermion ? "C" : "A"
+
+	if if_neg
+		p_start = -p_end
+	end
+
+	phys_length,virt_length = get_mps_dims(wavefunc)
+
+	momenta = range(p_start,stop=p_end,length=p_count)
+	mom_occs = zeros(p_count) .* im
+	
+	for s=1:virt_length, ss=1:virt_length
+		corr_val = correlation_matrix(wavefunc,"Cr$(s)","Anh$(ss)")
+		corr_val += conj(transpose(corr_val))
+		for (i,p) in enumerate(momenta)
+			pvec = direction == "virt" ? [other_p,p] : [p,other_p]
+
+			dotprod_mat = zeros(phys_length,phys_length) .* im
+			for j=1:phys_length, jj=1:phys_length
+				dotprod_mat[j,jj] = exp(im*pi*dot(pvec,[s-ss,j-jj]))
+			end
+
+			mom_occs[i] += sum(corr_val .* dotprod_mat)
+		end
+	end
+
+	if_plot ? plot_momentum_occupation(collect(momenta),abs.(mom_occs); kwargs...) : nothing
+
+	return momenta,mom_occs
+end
+
+function momentum_occupation(psi::MPS,p_count::Int,p_end::Real; kwargs...)
+	if_neg = get(kwargs, :if_neg, true)
+	p_start = get(kwargs, :p_start, 0.0)
+	if_plot = get(kwargs, :if_plot, false)
+
+	mom_occs = zeros(p_count,p_count) .* im
+	momenta = Matrix{Tuple{Float64,Float64}}(undef,p_count,p_count)
+
+	if if_neg
+		p_start = -p_end
+	end
+	other_momenta = range(p_start*1.0,stop=p_end*1.0,length=p_count)
+
+	for (idx,other_p) in enumerate(other_momenta)
+		println(round(100*idx/length(other_momenta),digits=2),"%")
+		virt_moms, local_occs = momentum_occupation(psi,p_count,p_end,"phys"; kwargs...,other_p=other_p,if_plot=false)
+		momenta[idx,:] = [(virt_moms[i],other_p) for i in 1:length(virt_moms)]
+		mom_occs[idx,:] = local_occs
+	end
+
+	if_plot ? plot_momentum_occupation(momenta,abs.(mom_occs); kwargs...) : nothing
+
+	return momenta,mom_occs
+end
+
+function plot_momentum_occupation(momenta::Vector,mom_occ::Vector; kwargs...)
+	title_string = "Momentum Distribution, " * get(kwargs, :plot_title, "")
+	plot_label = get(kwargs, :plot_label, "")
+	isempty(plot_label) ? fig = figure() : nothing
+	plot(momenta,mom_occ,"-p",label=plot_label)
+	if_log = get(kwargs, :if_log, false)
+	if if_log
+		yscale("log")
+		xscale("log")
+	end
+	xlabel("Momenta / pi")
+	ylabel("Occupation")
+	title(title_string)
+end
+
+function plot_momentum_occupation(momenta::Matrix,mom_occ::Matrix; kwargs...)
+	title_string = "Momentum Distribution, " * get(kwargs, :plot_title, "")
+	plot_label = get(kwargs, :plot_label, "")
+	fig = figure()
+	imshow(mom_occ, extent=[momenta[1,1][2],momenta[end,1][2],momenta[1,1][1],momenta[1,end][1]])
+	title(title_string)
+	colorbar()
+	xlabel("Virtual Momenta / pi")
+	ylabel("Physical Momenta / pi")
+end
+
+
 function normalize_densmat(dens_mat::Matrix,part_count::Int; kwargs...)
 	if_log = get(kwargs, :if_log, false)
 	L = size(dens_mat)[1]
@@ -675,7 +766,7 @@ function get_current(all_psis::Vector{MPS},dir="phys"; kwargs...)
 		return [get_current_synth(psi; kwargs...)[1] for psi in all_psis]
 	end
 end
-
+#=
 function momentum_occupation(wavefunc::MPS,part_count::Int,p_count::Int64,p_end=8.0,p_start=0.0; kwargs...)
 	num_sites = length(siteinds(wavefunc))
 	dimension = dim(siteinds(wavefunc)[1])
@@ -709,22 +800,7 @@ function momentum_occupation(wavefunc::MPS,part_count::Int,p_count::Int64,p_end=
 	
 	return momenta,mom_occ
 end
-
-function plot_momentum_occupation(momenta,mom_occ,part_count::Int; kwargs...)
-	title_string = "Momentum Distribution, " * get(kwargs, :plot_title, "")
-	plot_label = get(kwargs, :plot_label, "")
-	isempty(plot_label) ? fig = figure() : nothing
-	plot(momenta./pi,mom_occ./part_count,"-p",label=plot_label)
-	if_log = get(kwargs, :if_log, true)
-	if if_log
-		yscale("log")
-		xscale("log")
-	end
-	xlabel("p/pi")
-	ylabel("Occupation / nparticles")
-	title(title_string)
-	
-end
+=#
 
 function get_densdens_corrs(wavefunc::MPS,distances=nothing; kwargs...)
 	phys_edge_length,virt_edge_length = get_mps_dims(wavefunc)
