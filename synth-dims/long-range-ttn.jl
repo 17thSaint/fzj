@@ -762,9 +762,9 @@ layers = 6
 lr = 0#Int(sqrt(2^layers))-1
 #for nnst in nn_strens
 
-	params_dict = Dict([("if_pinning",false),("layers",layers),("mdim",50),("mag_off",true),("lr",lr),("if_nn_int",false),("nn_strength",nnst)])
+	#params_dict = Dict([("if_pinning",false),("layers",layers),("mdim",150),("mag_off",true),("lr",lr),("if_nn_int",false),("nn_strength",nnst)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
-	#params_dict = make_args_dict(ARGS)
+	params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
 	if typeof(open_cores) != String
 		BLAS.set_num_threads(open_cores)	
@@ -823,7 +823,7 @@ lr = 0#Int(sqrt(2^layers))-1
 		end
 	end
 	=#
-	nswps = 5
+	nswps = 10
 	#alpha = 7/64
 	#num_particles = Int(sqrt(2^layer_count)/2)#Int(alpha * tot_sites * nu)
 	
@@ -832,7 +832,7 @@ lr = 0#Int(sqrt(2^layers))-1
 	save_plot = false
 	save_data = true
 
-	loc = "../cluster-data/synth-dims"
+	#loc = "../cluster-data/synth-dims"
 	if_cliff = false
 	sc_type = "flat"
 	dists = [i for i in 1:2*edge_sites]
@@ -853,8 +853,8 @@ lr = 0#Int(sqrt(2^layers))-1
 	centralflux_strength = 0.0
 	#parts = [i for i in 1:Int(tot_sites/2)]
 	#fillings = range(0.2,3.0,length=counting)
-	strens = [0.0]#range(num_particles/(0.2*tot_sites),num_particles/(3.0*tot_sites),length=counting) #range(0.02,0.25,length=counting)
-	centermoms = [0.0 for i in 1:counting]# .* im
+	strens = range(num_particles/(0.2*tot_sites),num_particles/(2.0*tot_sites),length=counting) #range(0.02,0.25,length=counting)
+	#centermoms = [0.0 for i in 1:counting]# .* im
 	for (idx,alpha) in enumerate(strens)
 	#for (idx,num_particles) in enumerate(parts)
 		#alpha = 0.0
@@ -877,7 +877,7 @@ lr = 0#Int(sqrt(2^layers))-1
 			println("Found Data")
 			wavefunc = found_data[1]["ttn"]
 			ham = found_data[2]["ham"]
-			append!(wavefuncs,[wavefunc])
+			#append!(wavefuncs,[wavefunc])
 		else
 			#title_string = "Np = $num_particles, LR = $longrange_dist at $limit"
 			println("Starting Script using $num_particles particles on $tot_sites sites with $(!mag_off) Mag Field, Bond Dim = $mdim, and Long Range Dist = $longrange_dist")
@@ -888,16 +888,17 @@ lr = 0#Int(sqrt(2^layers))-1
 			og_ttn, hamilt, dm_sp = find_ground_state(layer_count,num_particles,ts; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
 			total_time = time() - starting
 			println("Running time = $total_time")
-			append!(wavefuncs,[dm_sp.ttn])
+			#append!(wavefuncs,[dm_sp.ttn])
 		end
 		#append!(currents,[[ttn_current_site(dm_sp.ttn,i; centralflux_strength=centralflux_strength) for i in 1:edge_sites]])
 		#append!(nrgs,[dm_sp.current_energy])
 
-		momentum_occupation(wavefuncs[idx],50,1.0; if_plot=true)
+		#momentum_occupation(wavefuncs[idx],50,1.0; if_plot=true)
 
 		#rez = distance_correlation(wavefuncs[idx]; if_plot=false)#plot_title = "Nu = $(round(num_particles/(alpha*tot_sites),digits=4))")
 		#centermoms[idx] = minimum(abs.(rez[2]))
 
+		#=
 		if false
 		#allmoms = momentum_occupation(dm_sp.ttn,1,0.0)
 		#centermoms[idx] = allmoms[2][1]
@@ -909,6 +910,7 @@ lr = 0#Int(sqrt(2^layers))-1
 			#scatter([num_particles/(strens[idx]*tot_sites)],[centermoms[idx]],c="b")
 		end
 		end
+		=#
 		#get_occupancy(dm_sp.ttn; plot_title = "Alpha = $(round(alpha,digits=4))")
 		#get_greenfunc(dm_sp.ttn,"phys")
 		#get_greenfunc(dm_sp.ttn,"virt")

@@ -550,9 +550,6 @@ function momentum_occupation(wavefunc::MPS,p_count::Int,p_end::Real,direction="p
 	if_plot = p_count != 1 ? get(kwargs, :if_plot, false) : false
 	p_start = get(kwargs, :p_start, 0.0)
 	other_p = get(kwargs, :other_p, 0.0)
-	if_fermion = get(kwargs, :if_fermion, false)
-	creation = if_fermion ? "Cdag" : "Adag"
-	annihilation = if_fermion ? "C" : "A"
 
 	if if_neg
 		p_start = -p_end
@@ -634,6 +631,65 @@ function plot_momentum_occupation(momenta::Matrix,mom_occ::Matrix; kwargs...)
 	ylabel("Physical Momenta / pi")
 end
 
+function find_dist(p1::Tuple{Int,Int}, p2::Tuple{Int,Int}, size::Tuple{Int,Int}, periodic::Tuple{Bool,Bool}=(false, false))
+    dx = abs(p1[1] - p2[1])
+    dy = abs(p1[2] - p2[2])
+
+    if periodic[1]
+        dx = min(dx, size[1] - dx)
+    end
+
+    if periodic[2]
+        dy = min(dy, size[2] - dy)
+    end
+
+    return sqrt(dx^2 + dy^2)
+end
+
+function distance_correlation(psi::MPS; kwargs...)
+	if_plot = get(kwargs, :if_plot, true)
+	if_periodic_phys = get(kwargs, :if_periodic_phys, true)
+	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
+
+	phys_length,virt_length = get_mps_dims(psi)
+	all_corrs = []
+	dists = []
+	for s=1:virt_length, ss=1:virt_length
+		println(round(100*s/(virt_length),digits=2),"%")
+		corr_val = correlation_matrix(psi,"Cr$(s)","Anh$(ss)")
+		corr_val += conj(transpose(corr_val))
+		for j=1:phys_length, jj=1:phys_length
+			dist_btw = find_dist((s,j),(ss,jj),(virt_length,phys_length),(if_periodic_virt,if_periodic_phys))
+			if dist_btw in dists
+				append!(all_corrs[findfirst(x -> x == dist_btw,dists)],corr_val[j,jj])
+			else
+				append!(dists,[dist_btw])
+				sort!(dists)
+				insert!(all_corrs,findfirst(x -> x == dist_btw,dists),[corr_val[j,jj]])
+			end
+		end
+	end
+
+	corrs = ([mean(all_corrs[i]) for i in 1:length(all_corrs)])
+	corr_errors = [std(all_corrs[i]) for i in 1:length(all_corrs)]
+
+	if_plot ? plot_distance_correlation(dists,corrs,corr_errors; kwargs...) : nothing
+
+	return dists,corrs,corr_errors
+end
+
+function plot_distance_correlation(dists,corrs,corr_errors; kwargs...)
+	title_string = "Distance Correlation, " * get(kwargs, :plot_title, "")
+	if_errors = get(kwargs, :if_errors, false)
+	if_log = get(kwargs, :if_log, false)
+	plot_label = get(kwargs, :plot_label, "")
+	isempty(plot_label) ? fig = figure() : nothing
+	if_errors ? errorbar(dists,corrs,yerr=[corr_errors,corr_errors]) : plot(dists,abs.(corrs),"-p",label=plot_label)
+	if_log ? yscale("log") : nothing
+	xlabel("Distance")
+	ylabel("Correlation")
+	title(title_string)
+end
 
 function normalize_densmat(dens_mat::Matrix,part_count::Int; kwargs...)
 	if_log = get(kwargs, :if_log, false)

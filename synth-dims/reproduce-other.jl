@@ -169,10 +169,12 @@ metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodi
 
 #
 if true
-counting = 50
+counting = 30
 #scaling = 64
-strens = range(part_count/(0.01*L*nflavors),part_count/(0.2*L*nflavors),length=counting)#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
+strens = range(part_count/(0.2*L*nflavors),part_count/(1.2*L*nflavors),length=counting)#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
 sf_orderparams = zeros(length(strens))
+bonddims = zeros(length(strens))
+distcorrs = zeros(length(strens))
 #nrgs = zeros(length(strens)) .* im
 #currents = zeros(nflavors,length(strens)) .* im
 #drudes = zeros(nflavors,length(strens)) .* im
@@ -182,28 +184,32 @@ params_dict = Dict([("L",L),("nbosons",part_count),("nflavors",nflavors),("centr
 loc = "/home/patrick/fzj/main-git/cluster-data/synth-dims/"
 all_files = find_data_file(params_dict,"mps",loc)
 display(all_files)
-=#
+#
 
-#=
+#
 strens = zeros(length(all_files))
 nrgs = zeros(length(all_files)) .* im
 currents = zeros(nflavors,length(all_files)) .* im
 drudes = zeros(nflavors,length(all_files)) .* im
 sf_orderparams = zeros(length(all_files))
+bonddims = zeros(length(all_files))
+distcorrs = zeros(length(all_files))
 =#
 
 #println("Chi = ",part_count / (nu*L*nflavors))
 #
 for (idx,chi) in enumerate(strens)
 #for (idx,f) in enumerate(all_files)
-    #found_data, found_metadata = read_data_jld2(f,loc)
+    if false
+    found_data, found_metadata = read_data_jld2(f,loc)
     #centralflux_strength = found_metadata["centralflux_strength"]
-    #chi = found_metadata["chi"]
-    #strens[idx] = chi
-    #psi_gs = found_data["mps"]
+    chi = found_metadata["chi"]
+    strens[idx] = chi
+    psi_gs = found_data["mps"]
+    end
     #ham_params = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
     #display(found_metadata)
-    #
+    if true
     metadata["chi"] = chi
     naming_dict["chi"] = round(chi,digits=5)
     #=
@@ -231,20 +237,25 @@ for (idx,chi) in enumerate(strens)
         psi_gs = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
         println("Energy Variance = ",energy_variance(psi_gs,ham_start)," at Chi = ",chi)
     end
-    #
+    
+    end
 
     append!(states,[psi_gs])
 
+    bonddims[idx] = maxlinkdim(psi_gs)
     sf_orderparams[idx] = abs(momentum_occupation(psi_gs,1,0.0)[2][1])
+    distcorrs[idx] = minimum(abs.(distance_correlation(psi_gs; if_plot=false)[2]))
 
+
+    if true
     if idx > 1
         plot([part_count/(strens[idx-1]*L*nflavors),part_count/(chi*L*nflavors)],[sf_orderparams[idx-1],sf_orderparams[idx]],"-p",c="b")
         #plot([(part_count-1)/(strens[idx-1]*tot_sites),part_count/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
     else
-        scatter([part_count/(chi*L*nflavors)],[sf_orderparams[idx]],c="b")
+        scatter([part_count/(strens[idx]*L*nflavors)],[sf_orderparams[idx]],c="b")
         #scatter([part_count/(strens[idx]*tot_sites)],[centermoms[idx]],c="b")
     end
-
+    end
     
     if false
     nrgs[i] = calculate_energy(psi_gs,found_metadata["ham"])
@@ -288,6 +299,24 @@ xlabel("Central Flux Strength")
 legend()
 =#
 end
+
+#
+fig1 = figure()
+scatter(part_count ./ (strens .* (L*nflavors)),bonddims)
+xlabel("Filling Factor")
+ylabel("Bond Dimension")
+
+fig2 = figure()
+plot(part_count ./ (strens .* (L*nflavors)),distcorrs,"-p")
+xlabel("Filling Factor")
+ylabel("Distance Correlation")
+
+fig3 = figure()
+plot(part_count ./ (strens .* (L*nflavors)),sf_orderparams,"-p")
+xlabel("Filling Factor")
+ylabel("SF Order Parameter")
+#
+
 #
 #end
 #
