@@ -101,8 +101,8 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
                         continue
                     end
                 end
-                ampo += (-tp * exp(im*chi*(s-s0)/(nflavors)) * exp(im*2*pi*centralflux_strength/L), "Cr$s", j, "Anh$s", next_site)
-                ampo += (-tp * exp(-im*chi*(s-s0)/(nflavors)) * exp(-im*2*pi*centralflux_strength/L), "Anh$s", j, "Cr$s", next_site)
+                ampo += (-tp * exp(im*2*pi*chi*(s-s0)) * exp(im*2*pi*centralflux_strength/L), "Cr$s", j, "Anh$s", next_site)
+                ampo += (-tp * exp(-im*2*pi*chi*(s-s0)) * exp(-im*2*pi*centralflux_strength/L), "Anh$s", j, "Cr$s", next_site)
             end
         end
         
@@ -136,12 +136,12 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
 end
 
 #
-if_save_data = true
+if_save_data = false
 dataloc = "/home/patrick/fzj/main-git/cluster-data/synth-dims/"
 if_densmat = true
 
-nrgvar_tol = 1E-10
-mdim = 500
+nrgvar_tol = 1E-8
+mdim = 300
 
 #geo_params = [()] # (L,nf,nb)
 #Ls = [4,5,6,7,8,9,10,11,12,13,14,15]
@@ -150,9 +150,9 @@ mdim = 500
 #
 states = []
 #for L in Ls
-L = 8
-nflavors = 5#Int(ceil(0.75*L))
-part_count = nflavors
+L = 6
+nflavors = 4#Int(ceil(0.75*L))
+part_count = Int(L/2)
 #chi = 0.0#part_count / (nu*L*nflavors)
 tilt = 0.0
 
@@ -161,26 +161,23 @@ if_per_virt = false
 
 centralflux_strength = 0.0
 
-naming_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",part_count),("mdim",mdim),("centralflux_strength",centralflux_strength)])
+naming_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",part_count),("centralflux_strength",centralflux_strength)])
 metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodic_virt",if_per_virt),("tilt_strength",tilt),("location",dataloc),("if_save_data",if_save_data),("nrgvar_tol",nrgvar_tol),("mdim",mdim)]))
 
-
-
-#current_strength = 0.00
-
 #
-if false
-counting = 30
+if true
+counting = 50
 #scaling = 64
-#strens = range(part_count/(0.2*L*nflavors),part_count/(1.2*L*nflavors),length=counting)#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
-#sf_orderparams = zeros(length(strens))
-#bonddims = zeros(length(strens))
-#distcorrs = zeros(length(strens))
+strens = range(part_count/(0.2*L*nflavors),part_count/(3.0*L*nflavors),length=counting)#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
+sf_orderparams = zeros(length(strens))
+bonddims = zeros(length(strens))
+distcorrs = zeros(length(strens))
+ees = zeros(length(strens))
 #nrgs = zeros(length(strens)) .* im
 #currents = zeros(nflavors,length(strens)) .* im
 #drudes = zeros(nflavors,length(strens)) .* im
 #
-#chi = 0.0
+#=chi = 0.0
 params_dict = Dict([("L",L),("nbosons",part_count),("nflavors",nflavors),("centralflux_strength",centralflux_strength)])
 loc = "/home/patrick/fzj/main-git/cluster-data/synth-dims/"
 all_files = find_data_file(params_dict,"mps",loc)
@@ -196,13 +193,13 @@ sf_orderparams = zeros(length(all_files))
 bonddims = zeros(length(all_files))
 distcorrs = zeros(length(all_files))
 ees = zeros(length(all_files))
-#
+=#
 
 #println("Chi = ",part_count / (nu*L*nflavors))
 #
-#for (idx,chi) in enumerate(strens)
-for (idx,f) in enumerate(all_files)
-    if true
+for (idx,chi) in enumerate(strens)
+#for (idx,f) in enumerate(all_files)
+    if false
     found_data, found_metadata = read_data_jld2(f,loc)
     #centralflux_strength = found_metadata["centralflux_strength"]
     chi = found_metadata["chi"]
@@ -211,7 +208,7 @@ for (idx,f) in enumerate(all_files)
     end
     #ham_params = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
     #display(found_metadata)
-    if false
+    if true
     metadata["chi"] = chi
     naming_dict["chi"] = round(chi,digits=5)
     #=
@@ -236,26 +233,26 @@ for (idx,f) in enumerate(all_files)
         psi_gs = found_data
     else
         dmrg_params = (ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=dataloc,observer=obs,if_densmat=if_densmat)
-        psi_gs = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
+        psi_gs, densmat = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
         println("Energy Variance = ",energy_variance(psi_gs,ham_start)," at Chi = ",chi)
     end
     
     end
 
-    append!(states,[psi_gs])
+    #append!(states,[psi_gs])
 
     bonddims[idx] = maxlinkdim(psi_gs)
-    #sf_orderparams[idx] = abs(momentum_occupation(psi_gs,1,0.0)[2][1])
-    #distcorrs[idx] = minimum(abs.(distance_correlation(psi_gs; if_plot=false)[2]))
+    sf_orderparams[idx] = abs(momentum_occupation(psi_gs,1,0.0; densmat=densmat)[2][1])
+    distcorrs[idx] = minimum(abs.(distance_correlation(psi_gs; if_plot=false)[2]))
     ees[idx] = entanglement_entropy(psi_gs)
 
 
-    if false
+    if true
     if idx > 1
-        plot([part_count/(strens[idx-1]*L*nflavors),part_count/(chi*L*nflavors)],[sf_orderparams[idx-1],sf_orderparams[idx]],"-p",c="b")
+        plot([part_count/(strens[idx-1]*nflavors*L),part_count/(chi*nflavors*L)],[sf_orderparams[idx-1],sf_orderparams[idx]],"-p",c="b")
         #plot([(part_count-1)/(strens[idx-1]*tot_sites),part_count/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
     else
-        scatter([part_count/(strens[idx]*L*nflavors)],[sf_orderparams[idx]],c="b")
+        scatter([part_count/(strens[idx]*nflavors*L)],[sf_orderparams[idx]],c="b")
         #scatter([part_count/(strens[idx]*tot_sites)],[centermoms[idx]],c="b")
     end
     end
@@ -303,29 +300,32 @@ legend()
 =#
 end
 
-#=
+
+xvals = part_count ./ (strens .* (L*nflavors))
+#
 fig1 = figure()
-scatter(part_count ./ (strens .* (L*nflavors)),bonddims)
+scatter(xvals,bonddims)
 xlabel("Filling Factor")
 ylabel("Bond Dimension")
 
 #
 fig2 = figure()
-plot(part_count ./ (strens .* (L*nflavors)),distcorrs,"-p")
+plot(xvals,distcorrs,"-p")
 xlabel("Filling Factor")
 ylabel("Distance Correlation")
 
 fig3 = figure()
-plot(part_count ./ (strens .* (L*nflavors)),sf_orderparams,"-p")
+plot(xvals,sf_orderparams,"-p")
 xlabel("Filling Factor")
 ylabel("SF Order Parameter")
-=#
+#
 
 fig4 = figure()
-plot(part_count ./ (strens .* (L*nflavors)),ees,"-p")
-plot(part_count ./ (strens .* (L*nflavors)),log.(bonddims),"-p")
+plot(xvals,ees,"-p")
+plot(xvals,log.(bonddims),"-p")
 xlabel("Filling Factor")
 ylabel("Entanglement Entropy")
+#
 #
 
 #

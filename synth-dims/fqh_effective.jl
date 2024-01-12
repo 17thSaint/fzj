@@ -246,8 +246,8 @@ function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 					continue
 				end
 			end
-			ampo += (-t1 * exp(im*phi*s*0.0), "Cr$s", j, "Anh$s", next_site)
-			ampo += (-t1 * exp(-im*phi*s*0.0), "Anh$s", j, "Cr$s", next_site)
+			ampo += (-t1 * exp(im*phi*s*1.0), "Cr$s", j, "Anh$s", next_site)
+			ampo += (-t1 * exp(-im*phi*s*1.0), "Anh$s", j, "Cr$s", next_site)
 		end
 
 		# attractive physical nearest neighbor density interaction
@@ -290,8 +290,8 @@ function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 					continue
 				end
 			end
-			ampo += (-t2 * exp(im*phi*j*1.0), "Cr$(next_site) * Anh$(s)", j)
-			ampo += (-t2 * exp(-im*phi*j*1.0), "Cr$(s) * Anh$(next_site)", j)
+			ampo += (-t2 * exp(im*phi*j*0.0), "Cr$(next_site) * Anh$(s)", j)
+			ampo += (-t2 * exp(-im*phi*j*0.0), "Cr$(s) * Anh$(next_site)", j)
 			#ampo += (-t2 * exp(-im*phi*j), "Anh$(next_site) * Cr$(s)", j)
 		end
 	end
@@ -311,11 +311,11 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	psi_ortho = get(kwargs, :psi_ortho, nothing)
 	opl = get(kwargs, :outputlevel, 1)
 	conserve_qns = get(kwargs, :conserve_qns, true)
-	nsweeps = get(kwargs, :nsweeps, 50)
+	nsweeps = get(kwargs, :nsweeps, 500)
 	psi0 = get(kwargs, :psi_guess, nothing)
 	ham = get(kwargs, :ham, nothing)
 	mdim = get(kwargs, :mdim, 100)
-	if mdim == 100
+	if mdim >= 100
 		mdim = [Int(floor(mdim/4)),Int(floor(mdim/2)), mdim]
 	end
 	noise = get(kwargs, :noise, 0.0)
@@ -369,6 +369,8 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	else
 		E, psi = dmrg(H, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = 1E-14)
 	end
+
+	if_densmat ? densmat = density_matrix(psi) : nothing
 	
 	if if_save_data
 		location = get(kwargs, :location, pwd())
@@ -376,14 +378,22 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 		metadata["maxlinkdim"] = maxlinkdim(psi)
 		metadata["final_nrg_variance"] = energy_variance(psi,H)
 		data_dict = Dict([("mps",psi)])
-		if_densmat ? data_dict["densmat"] = density_matrix(psi) : nothing
+		if_densmat ? data_dict["densmat"] = densmat : nothing
 		write_data_jld2(filename,data_dict,location,metadata)
 	end
 	
 	if if_nrg
-		return psi, E
+		if if_densmat
+			return psi, densmat, E
+		else
+			return psi, E
+		end
 	else
-		return psi
+		if if_densmat
+			return psi, densmat
+		else
+			return psi
+		end
 	end
 end
 
@@ -543,7 +553,7 @@ function density_matrix(wavefunc::MPS; kwargs...)
 	densmat = zeros(L*nflavors,L*nflavors) .* im
 	for s in 1:nflavors
 		for sp in 1:nflavors
-			println(s,", ",sp)
+			#println(s,", ",sp)
 			local_mat = correlation_matrix(wavefunc,"Cr$(s)","Anh$(sp)")
 			densmat[L*(s-1)+1:L*s,L*(sp-1)+1:L*sp] = local_mat
 			#=fig = figure()
@@ -668,14 +678,20 @@ function distance_correlation(psi::MPS; kwargs...)
 	if_plot = get(kwargs, :if_plot, true)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, true)
 	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
+	densmat = get(kwargs, :densmat, nothing)
 
 	phys_length,virt_length = get_mps_dims(psi)
 	all_corrs = []
 	dists = []
 	for s=1:virt_length, ss=1:virt_length
 		println(round(100*s/(virt_length),digits=2),"%")
-		corr_val = correlation_matrix(psi,"Cr$(s)","Anh$(ss)")
-		corr_val += conj(transpose(corr_val))
+		if isnothing(densmat)
+			corr_val = correlation_matrix(psi,"Cr$(s)","Anh$(ss)")
+			corr_val += conj(transpose(corr_val))
+		else
+			corr_val = densmat[phys_length*(s-1)+1:phys_length*s,phys_length*(ss-1)+1:phys_length*ss]
+			corr_val += conj(transpose(corr_val))
+		end
 		for j=1:phys_length, jj=1:phys_length
 			dist_btw = find_dist((s,j),(ss,jj),(virt_length,phys_length),(if_periodic_virt,if_periodic_phys))
 			if dist_btw in dists

@@ -573,6 +573,9 @@ function distance_correlation(psi::TreeTensorNetwork; kwargs...)
 	if_plot = get(kwargs, :if_plot, true)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, true)
 	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
+	densmat = get(kwargs, :densmat, nothing)
+
+	lat = TTNKit.physical_lattice(TTNKit.network(psi))
 
 	phys_length,virt_length = get_lattice_dims(psi)
 	all_corrs = []
@@ -580,7 +583,12 @@ function distance_correlation(psi::TreeTensorNetwork; kwargs...)
 	for s=1:virt_length, j=1:phys_length
 		println(round(100*s/(virt_length),digits=2),"%")
 		for ss=1:virt_length, jj=1:phys_length
-			corr_val = TTNKit.correlation(psi,"Adag","A",(s,j),(ss,jj)) + TTNKit.correlation(psi,"Adag","A",(ss,jj),(s,j))
+			if isnothing(densmat)
+				corr_val = TTNKit.correlation(psi,"Adag","A",(s,j),(ss,jj)) + TTNKit.correlation(psi,"Adag","A",(ss,jj),(s,j))
+			else
+				corr_val = densmat[TTNKit.linear_ind(lat,(s,j)),TTNKit.linear_ind(lat,(ss,jj))]
+				corr_val += conj(corr_val)
+			end
 			dist_btw = find_dist((s,j),(ss,jj),(virt_length,phys_length),(if_periodic_virt,if_periodic_phys))
 			if dist_btw in dists
 				append!(all_corrs[findfirst(x -> x == dist_btw,dists)],corr_val)
@@ -886,12 +894,18 @@ lr = 0#Int(sqrt(2^layers))-1
 		if if_exists
 			println("Found Data")
 			wavefunc = found_data[1]["ttn"]
+			try
+				densmat = found_data[1]["densmat"]
+			catch
+				densmat = nothing
+			end
 			ham = found_data[2]["ham"]
 			#append!(wavefuncs,[wavefunc])
 		else
 			#title_string = "Np = $num_particles, LR = $longrange_dist at $limit"
 			println("Starting Script using $num_particles particles on $tot_sites sites with $(!mag_off) Mag Field, Bond Dim = $mdim, and Long Range Dist = $longrange_dist")
 			#if true
+			densmat = nothing
 			starting = time()
 			net = build_HH_net(layer_count; syms=true)
 			ham = long_range_HH_ham(net,ts,alpha; model_paras...)
@@ -911,7 +925,7 @@ lr = 0#Int(sqrt(2^layers))-1
 
 		#
 		if true
-		allmoms = momentum_occupation(wavefunc,1,0.0)
+		allmoms = momentum_occupation(wavefunc,1,0.0; densmat=densmat)
 		centermoms[idx] = allmoms[2][1]
 		if idx > 1
 			plot([num_particles/(strens[idx-1]*tot_sites),num_particles/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
