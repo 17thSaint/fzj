@@ -624,7 +624,7 @@ function momentum_occupation(psi::TreeTensorNetwork,p_count::Int,p_end::Real,dir
 	creation = if_fermion ? "Cdag" : "Adag"
 	annihilation = if_fermion ? "C" : "A"
 
-	lat = TTNKit.physical_lattice(psi)
+	lat = TTNKit.physical_lattice(TTNKit.network(psi))
 
 	if if_neg
 		p_start = -p_end
@@ -778,6 +778,7 @@ lr = 0#Int(sqrt(2^layers))-1
 		BLAS.set_num_threads(open_cores)	
 	end
 	#
+	nrgtol = get(params_dict, "nrgtol", 1E-5)
 	if_NN = get(params_dict, "if_nn_int", false)
 	if_pinning = get(params_dict, "if_pinning", false)
 	if_gpu = get(params_dict, "if_gpu", false)
@@ -832,7 +833,7 @@ lr = 0#Int(sqrt(2^layers))-1
 		end
 	end
 	=#
-	nswps = 10
+	nswps = 50
 	#alpha = 7/64
 	#num_particles = Int(sqrt(2^layer_count)/2)#Int(alpha * tot_sites * nu)
 	
@@ -874,7 +875,7 @@ lr = 0#Int(sqrt(2^layers))-1
 		#else
 			datafile_name = make_parameters_filename(filename_dict)
 		#end
-		model_paras = (if_densmat=if_densmat,centralflux_strength=centralflux_strength,if_pinning_pot=if_pinning,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=nnst,if_chem=chemical,chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,limit=limit,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=noise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc)
+		model_paras = (nrgtol=nrgtol,if_densmat=if_densmat,centralflux_strength=centralflux_strength,if_pinning_pot=if_pinning,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=nnst,if_chem=chemical,chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,limit=limit,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=noise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc)
 		
 		metadata_dict = merge(named_tuple_to_dict(model_paras),filename_dict)
 
@@ -894,7 +895,7 @@ lr = 0#Int(sqrt(2^layers))-1
 			starting = time()
 			net = build_HH_net(layer_count; syms=true)
 			ham = long_range_HH_ham(net,ts,alpha; model_paras...)
-			og_ttn, hamilt, dm_sp = find_ground_state(layer_count,num_particles,ts; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
+			og_ttn, hamilt, dm_sp, rezobs, runtime = find_ground_state(layer_count,num_particles,ts; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
 			total_time = time() - starting
 			println("Running time = $total_time")
 			wavefunc = dm_sp.ttn
@@ -909,7 +910,7 @@ lr = 0#Int(sqrt(2^layers))-1
 		#centermoms[idx] = minimum(abs.(rez[2]))
 
 		#
-		if false
+		if true
 		allmoms = momentum_occupation(wavefunc,1,0.0)
 		centermoms[idx] = allmoms[2][1]
 		if idx > 1

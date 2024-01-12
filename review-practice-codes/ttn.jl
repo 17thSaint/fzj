@@ -831,7 +831,7 @@ function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 					end
 					warmed_results = warming(new_ttn,new_ham,new_sp,particle_count,warming_limit;kwargs...)
 					#return warmed_results
-					ttn,ham,sp = warmed_results
+					ttn,ham,sp,obs = warmed_results
 				end
 			else
 				ttn,ham,sp,obs = new_ttn,new_ham,new_sp,new_obs
@@ -843,6 +843,11 @@ function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 		if if_save_data
 			#try
 			metadata["runtime"] = end_time-start_time
+			try
+				metadata["energies"] = obs.nrg
+			catch
+				nothing
+			end
 			ttn_data_dict::Dict{String,Any} = if_gpu ? Dict([("ttn",back2cpu(sp.ttn))]) : Dict([("ttn",sp.ttn)])
 			if_densmat ? ttn_data_dict["densmat"] = density_matrix(sp.ttn) : nothing
 			write_data_jld2(filename,ttn_data_dict,location,metadata)
@@ -879,25 +884,11 @@ function TTNKit.ITensors.checkdone!(o::NRGVarObserver;kwargs...)
 	if abs(o.nrg[end] - o.nrg[end-1]) < o.var_tol
 		outputlevel > 0 ? println("Energy Converged. Stopping DMRG") : nothing
 		return true
+	else
+  		# Otherwise, keep going
+		return false
 	end
-  	# Otherwise, keep going
-	return false
 end
-
-#
-lnet = TTNKit.BinaryRectangularNetwork(4, TTNKit.ITensorNode, "Boson";conserve_qns=true,dim=2)#build_HH_net(4; syms=true)
-states = fill("0", 16)
-old_ttn = TTNKit.ProductTreeTensorNetwork(lnet,states)
-println("Pre Initialize")
-ttn = initialize_ttn(old_ttn,10,1)
-#freeboson_ham = long_range_HH_ham(lnet,1.0,0.0)
-freeboson_ham = get_hofstadter_interacting_hamilt(lnet,0.5,0.0)
-println("Starting DMRG")
-#
-old, hamilt, dm_sp, rezobs, runtime = find_ground_state(4,1,1.0; ham_op=freeboson_ham,ttn_net=lnet,seed_ttn=ttn,sweep_type="dmrg",output_level=1,mdim=10,num_sweeps=5,if_save_data=false)#,nrgtol=1E-5)
-fb_gs = dm_sp.ttn
-#fb_occ_mat = get_occupancy(fb_gs)
-#
 
 function plot_grid(virt_edge_length,phys_edge_length)
 	for i in 1:virt_edge_length
