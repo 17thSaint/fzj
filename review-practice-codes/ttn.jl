@@ -656,7 +656,7 @@ function do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
 	if isnothing(etol)
 		observer = NoObserver()
 	else
-		observer = DMRGObserver(;energy_tol=etol)
+		observer = NRGVarObserver(etol)
 	end
 	#println("PreSweep Link Dim = ",TTNKit.maxlinkdim(ttn))
 	#get_position_dims(ttn)
@@ -682,12 +682,12 @@ function do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
 		sp = TTNKit.SimpleSweepHandler(ttnc,proj_tpo,func,num_sweeps,[max_dim],[noise],expander)
 		#println("Sweep Built Link Dim = ",TTNKit.maxlinkdim(sp.ttn))
 		TTNKit.sweep(ttnc,sp;outputlevel=opl);
-		return ttnc,ham,sp
+		return ttnc,ham,sp,observer
 		#println("PostSweep TTN Link Dim = ",TTNKit.maxlinkdim(ttn))
 		#println("PostSweep SP-TTN Link Dim = ",TTNKit.maxlinkdim(sp.ttn))
 	end
 	
-	return ttn,ham,sp
+	return ttn,ham,sp,observer
 end
 
 function warming(ttn,ham,sp,particle_count,warming_limit; kwargs...)
@@ -704,16 +704,16 @@ function warming(ttn,ham,sp,particle_count,warming_limit; kwargs...)
 	while frozen && warming_count < warming_limit
 		new_maxdim = Int(ceil((warming_count+10)*max_dim/10))
 		reexpanded_ttn = TTNKit.adjust_tree_tensor_dimensions(old_data[1],new_maxdim)
-		new_ttn, new_ham, new_sp = do_sweep(reexpanded_ttn,ham,sweep_type,particle_count; kwargs...)
+		new_ttn, new_ham, new_sp, new_obs = do_sweep(reexpanded_ttn,ham,sweep_type,particle_count; kwargs...)
 		println("Max Dim = ",TTNKit.maxlinkdim(new_sp.ttn),", Expected = $new_maxdim")
 		if_frozen,why = check_if_frozen(new_sp.ttn)
 		if if_frozen
 			#get_occupancy(new_sp.ttn; plot_title="Attempt $warming_count")
 			warming_count += 1
-			global old_data = [new_sp.ttn,new_ham,new_sp]
+			global old_data = [new_sp.ttn,new_ham,new_sp,new_obs]
 		else
 			println("Stable Result Found in $warming_count Attempts")
-			return new_sp.ttn,new_ham,new_sp
+			return new_sp.ttn,new_ham,new_sp,new_obs
 		end
 	end
 	println("Hit warming limit, still frozen")
@@ -763,6 +763,9 @@ function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 	location = get(kwargs, :location, pwd())
 	filename = get(kwargs, :name, "ttn")
 	metadata = get(kwargs, :metadata, Dict())
+	if_densmat = get(kwargs, :if_densmat, true)
+	
+	obs = NoObserver()
 	
 	display(metadata)
 	
@@ -810,7 +813,7 @@ function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 	if if_sweep
 		for i in 1:sweep_iter
 			time_start = time()
-			new_ttn, new_ham, new_sp = do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
+			new_ttn, new_ham, new_sp, new_obs = do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
 			time_end = time()
 			append!(times,[time_end - time_start])
 			#return sp.ttn, ham, sp
@@ -819,7 +822,7 @@ function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 				if !if_frozen
 					#get_position_dims(sp.ttn)
 					#return new_sp.ttn, new_ham, new_sp
-					ttn,ham,sp = new_ttn,new_ham,new_sp
+					ttn,ham,sp,obs = new_ttn,new_ham,new_sp,new_obs
 				else
 					if why == "frozen"
 						println("Frozen on First Attempt, Starting Warming")
@@ -831,7 +834,7 @@ function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 					ttn,ham,sp = warmed_results
 				end
 			else
-				ttn,ham,sp = new_ttn,new_ham,new_sp
+				ttn,ham,sp,obs = new_ttn,new_ham,new_sp,new_obs
 			end
 		end
 		
@@ -840,7 +843,8 @@ function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 		if if_save_data
 			#try
 			metadata["runtime"] = end_time-start_time
-			ttn_data_dict = if_gpu ? Dict([("ttn",back2cpu(sp.ttn))]) : Dict([("ttn",sp.ttn)])
+			ttn_data_dict::Dict{String,Any} = if_gpu ? Dict([("ttn",back2cpu(sp.ttn))]) : Dict([("ttn",sp.ttn)])
+			if_densmat ? ttn_data_dict["densmat"] = density_matrix(sp.ttn) : nothing
 			write_data_jld2(filename,ttn_data_dict,location,metadata)
 			#catch
 			#	println("Saving Didn't work")
@@ -848,12 +852,52 @@ function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 		end
 
 		
-		return ttn, ham, sp, end_time-start_time
+		return ttn, ham, sp, obs, end_time-start_time
 	end
 	
 	end_time = time()
 	return ttn,ham,"no sweep",end_time-start_time
 end
+
+mutable struct NRGVarObserver <: AbstractObserver
+    var_tol::Float64
+    nrg::Vector{Float64}
+ 
+    NRGVarObserver(var_tol=0.0) = new(var_tol,[10000.0,1000.0])
+end
+
+function TTNKit.ITensors.measure!(o::NRGVarObserver; kwargs...)
+    nrgs = o.nrg
+    var_tol = o.var_tol
+    dmrg = kwargs[:sweep_handler]
+    #o.nrg[1] = o.nrg[2]
+    append!(o.nrg,[dmrg.current_energy])
+end
+
+function TTNKit.ITensors.checkdone!(o::NRGVarObserver;kwargs...)
+	outputlevel = kwargs[:outputlevel]
+	if abs(o.nrg[end] - o.nrg[end-1]) < o.var_tol
+		outputlevel > 0 ? println("Energy Converged. Stopping DMRG") : nothing
+		return true
+	end
+  	# Otherwise, keep going
+	return false
+end
+
+#
+lnet = TTNKit.BinaryRectangularNetwork(4, TTNKit.ITensorNode, "Boson";conserve_qns=true,dim=2)#build_HH_net(4; syms=true)
+states = fill("0", 16)
+old_ttn = TTNKit.ProductTreeTensorNetwork(lnet,states)
+println("Pre Initialize")
+ttn = initialize_ttn(old_ttn,10,1)
+#freeboson_ham = long_range_HH_ham(lnet,1.0,0.0)
+freeboson_ham = get_hofstadter_interacting_hamilt(lnet,0.5,0.0)
+println("Starting DMRG")
+#
+old, hamilt, dm_sp, rezobs, runtime = find_ground_state(4,1,1.0; ham_op=freeboson_ham,ttn_net=lnet,seed_ttn=ttn,sweep_type="dmrg",output_level=1,mdim=10,num_sweeps=5,if_save_data=false)#,nrgtol=1E-5)
+fb_gs = dm_sp.ttn
+#fb_occ_mat = get_occupancy(fb_gs)
+#
 
 function plot_grid(virt_edge_length,phys_edge_length)
 	for i in 1:virt_edge_length
@@ -1548,7 +1592,7 @@ function density_matrix(ttn; kwargs...)
 		end
 	end
 	
-	if_save_data = get(kwargs,:if_save_data, true)
+	if_save_data = get(kwargs,:if_save_data, false)
 	if if_save_data
 		try
 			location = get(kwargs, :location, pwd())

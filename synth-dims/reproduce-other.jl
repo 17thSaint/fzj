@@ -138,6 +138,7 @@ end
 #
 if_save_data = true
 dataloc = "/home/patrick/fzj/main-git/cluster-data/synth-dims/"
+if_densmat = true
 
 nrgvar_tol = 1E-10
 mdim = 500
@@ -168,18 +169,18 @@ metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodi
 #current_strength = 0.00
 
 #
-if true
+if false
 counting = 30
 #scaling = 64
-strens = range(part_count/(0.2*L*nflavors),part_count/(1.2*L*nflavors),length=counting)#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
-sf_orderparams = zeros(length(strens))
-bonddims = zeros(length(strens))
-distcorrs = zeros(length(strens))
+#strens = range(part_count/(0.2*L*nflavors),part_count/(1.2*L*nflavors),length=counting)#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
+#sf_orderparams = zeros(length(strens))
+#bonddims = zeros(length(strens))
+#distcorrs = zeros(length(strens))
 #nrgs = zeros(length(strens)) .* im
 #currents = zeros(nflavors,length(strens)) .* im
 #drudes = zeros(nflavors,length(strens)) .* im
 #
-#=chi = 0.0
+#chi = 0.0
 params_dict = Dict([("L",L),("nbosons",part_count),("nflavors",nflavors),("centralflux_strength",centralflux_strength)])
 loc = "/home/patrick/fzj/main-git/cluster-data/synth-dims/"
 all_files = find_data_file(params_dict,"mps",loc)
@@ -188,19 +189,20 @@ display(all_files)
 
 #
 strens = zeros(length(all_files))
-nrgs = zeros(length(all_files)) .* im
-currents = zeros(nflavors,length(all_files)) .* im
-drudes = zeros(nflavors,length(all_files)) .* im
+#nrgs = zeros(length(all_files)) .* im
+#currents = zeros(nflavors,length(all_files)) .* im
+#drudes = zeros(nflavors,length(all_files)) .* im
 sf_orderparams = zeros(length(all_files))
 bonddims = zeros(length(all_files))
 distcorrs = zeros(length(all_files))
-=#
+ees = zeros(length(all_files))
+#
 
 #println("Chi = ",part_count / (nu*L*nflavors))
 #
-for (idx,chi) in enumerate(strens)
-#for (idx,f) in enumerate(all_files)
-    if false
+#for (idx,chi) in enumerate(strens)
+for (idx,f) in enumerate(all_files)
+    if true
     found_data, found_metadata = read_data_jld2(f,loc)
     #centralflux_strength = found_metadata["centralflux_strength"]
     chi = found_metadata["chi"]
@@ -209,7 +211,7 @@ for (idx,chi) in enumerate(strens)
     end
     #ham_params = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
     #display(found_metadata)
-    if true
+    if false
     metadata["chi"] = chi
     naming_dict["chi"] = round(chi,digits=5)
     #=
@@ -233,7 +235,7 @@ for (idx,chi) in enumerate(strens)
     if if_exists
         psi_gs = found_data
     else
-        dmrg_params = (ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=dataloc,observer=obs)
+        dmrg_params = (ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=dataloc,observer=obs,if_densmat=if_densmat)
         psi_gs = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
         println("Energy Variance = ",energy_variance(psi_gs,ham_start)," at Chi = ",chi)
     end
@@ -243,11 +245,12 @@ for (idx,chi) in enumerate(strens)
     append!(states,[psi_gs])
 
     bonddims[idx] = maxlinkdim(psi_gs)
-    sf_orderparams[idx] = abs(momentum_occupation(psi_gs,1,0.0)[2][1])
-    distcorrs[idx] = minimum(abs.(distance_correlation(psi_gs; if_plot=false)[2]))
+    #sf_orderparams[idx] = abs(momentum_occupation(psi_gs,1,0.0)[2][1])
+    #distcorrs[idx] = minimum(abs.(distance_correlation(psi_gs; if_plot=false)[2]))
+    ees[idx] = entanglement_entropy(psi_gs)
 
 
-    if true
+    if false
     if idx > 1
         plot([part_count/(strens[idx-1]*L*nflavors),part_count/(chi*L*nflavors)],[sf_orderparams[idx-1],sf_orderparams[idx]],"-p",c="b")
         #plot([(part_count-1)/(strens[idx-1]*tot_sites),part_count/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
@@ -300,12 +303,13 @@ legend()
 =#
 end
 
-#
+#=
 fig1 = figure()
 scatter(part_count ./ (strens .* (L*nflavors)),bonddims)
 xlabel("Filling Factor")
 ylabel("Bond Dimension")
 
+#
 fig2 = figure()
 plot(part_count ./ (strens .* (L*nflavors)),distcorrs,"-p")
 xlabel("Filling Factor")
@@ -315,6 +319,13 @@ fig3 = figure()
 plot(part_count ./ (strens .* (L*nflavors)),sf_orderparams,"-p")
 xlabel("Filling Factor")
 ylabel("SF Order Parameter")
+=#
+
+fig4 = figure()
+plot(part_count ./ (strens .* (L*nflavors)),ees,"-p")
+plot(part_count ./ (strens .* (L*nflavors)),log.(bonddims),"-p")
+xlabel("Filling Factor")
+ylabel("Entanglement Entropy")
 #
 
 #

@@ -619,9 +619,12 @@ function momentum_occupation(psi::TreeTensorNetwork,p_count::Int,p_end::Real,dir
 	if_plot = p_count != 1 ? get(kwargs, :if_plot, false) : false
 	p_start = get(kwargs, :p_start, 0.0)
 	other_p = get(kwargs, :other_p, 0.0)
+	densmat = get(kwargs, :densmat, nothing)
 	if_fermion = get(kwargs, :if_fermion, false)
 	creation = if_fermion ? "Cdag" : "Adag"
 	annihilation = if_fermion ? "C" : "A"
+
+	lat = TTNKit.physical_lattice(psi)
 
 	if if_neg
 		p_start = -p_end
@@ -634,8 +637,13 @@ function momentum_occupation(psi::TreeTensorNetwork,p_count::Int,p_end::Real,dir
 	
 	for s=1:virt_length, j=1:phys_length
 		for ss=1:virt_length, jj=1:phys_length
-			corr_val = TTNKit.correlation(psi,creation,annihilation,(s,j),(ss,jj))
-			corr_val += conj(corr_val)
+			if isnothing(densmat)
+				corr_val = TTNKit.correlation(psi,creation,annihilation,(s,j),(ss,jj))
+				corr_val += conj(corr_val)
+			else
+				corr_val = densmat[TTNKit.linear_ind(lat,(s,j)),TTNKit.linear_ind(lat,(ss,jj))]
+				corr_val += conj(corr_val)
+			end
 			for (i,p) in enumerate(momenta)
 				pvec = direction == "phys" ? [other_p,p] : [p,other_p]
 				mom_occs[i] += corr_val * exp(im*pi*dot(pvec,[s-ss,j-jj]))
@@ -762,9 +770,9 @@ layers = 6
 lr = 0#Int(sqrt(2^layers))-1
 #for nnst in nn_strens
 
-	#params_dict = Dict([("if_pinning",false),("layers",layers),("mdim",150),("mag_off",true),("lr",lr),("if_nn_int",false),("nn_strength",nnst)])
+	params_dict = Dict([("if_pinning",false),("layers",layers),("mdim",200),("mag_off",false),("lr",lr),("if_nn_int",false),("nn_strength",nnst)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
-	params_dict = make_args_dict(ARGS)
+	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
 	if typeof(open_cores) != String
 		BLAS.set_num_threads(open_cores)	
@@ -774,6 +782,7 @@ lr = 0#Int(sqrt(2^layers))-1
 	if_pinning = get(params_dict, "if_pinning", false)
 	if_gpu = get(params_dict, "if_gpu", false)
 	if_change = get(params_dict, "if_change", false)
+	if_densmat = get(params_dict, :if_densmat, true)
 	change = get(params_dict, "change", 0.0001)
 	limit = get(params_dict, "nn_strength", 1.0)
 	layer_count = get(params_dict, "layers", 4)
@@ -832,7 +841,7 @@ lr = 0#Int(sqrt(2^layers))-1
 	save_plot = false
 	save_data = true
 
-	#loc = "../cluster-data/synth-dims"
+	loc = "../cluster-data/synth-dims"
 	if_cliff = false
 	sc_type = "flat"
 	dists = [i for i in 1:2*edge_sites]
@@ -853,8 +862,8 @@ lr = 0#Int(sqrt(2^layers))-1
 	centralflux_strength = 0.0
 	#parts = [i for i in 1:Int(tot_sites/2)]
 	#fillings = range(0.2,3.0,length=counting)
-	strens = range(num_particles/(0.2*tot_sites),num_particles/(2.0*tot_sites),length=counting) #range(0.02,0.25,length=counting)
-	#centermoms = [0.0 for i in 1:counting]# .* im
+	strens = range(num_particles/(0.2*tot_sites),num_particles/(3.0*tot_sites),length=counting) #range(0.02,0.25,length=counting)
+	centermoms = [0.0 for i in 1:counting]# .* im
 	for (idx,alpha) in enumerate(strens)
 	#for (idx,num_particles) in enumerate(parts)
 		#alpha = 0.0
@@ -865,7 +874,7 @@ lr = 0#Int(sqrt(2^layers))-1
 		#else
 			datafile_name = make_parameters_filename(filename_dict)
 		#end
-		model_paras = (centralflux_strength=centralflux_strength,if_pinning_pot=if_pinning,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=nnst,if_chem=chemical,chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,limit=limit,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=noise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc)
+		model_paras = (if_densmat=if_densmat,centralflux_strength=centralflux_strength,if_pinning_pot=if_pinning,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=nnst,if_chem=chemical,chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,limit=limit,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=noise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc)
 		
 		metadata_dict = merge(named_tuple_to_dict(model_paras),filename_dict)
 
@@ -888,6 +897,7 @@ lr = 0#Int(sqrt(2^layers))-1
 			og_ttn, hamilt, dm_sp = find_ground_state(layer_count,num_particles,ts; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
 			total_time = time() - starting
 			println("Running time = $total_time")
+			wavefunc = dm_sp.ttn
 			#append!(wavefuncs,[dm_sp.ttn])
 		end
 		#append!(currents,[[ttn_current_site(dm_sp.ttn,i; centralflux_strength=centralflux_strength) for i in 1:edge_sites]])
@@ -898,10 +908,10 @@ lr = 0#Int(sqrt(2^layers))-1
 		#rez = distance_correlation(wavefuncs[idx]; if_plot=false)#plot_title = "Nu = $(round(num_particles/(alpha*tot_sites),digits=4))")
 		#centermoms[idx] = minimum(abs.(rez[2]))
 
-		#=
+		#
 		if false
-		#allmoms = momentum_occupation(dm_sp.ttn,1,0.0)
-		#centermoms[idx] = allmoms[2][1]
+		allmoms = momentum_occupation(wavefunc,1,0.0)
+		centermoms[idx] = allmoms[2][1]
 		if idx > 1
 			plot([num_particles/(strens[idx-1]*tot_sites),num_particles/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
 			#plot([(num_particles-1)/(strens[idx-1]*tot_sites),num_particles/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
@@ -910,7 +920,7 @@ lr = 0#Int(sqrt(2^layers))-1
 			#scatter([num_particles/(strens[idx]*tot_sites)],[centermoms[idx]],c="b")
 		end
 		end
-		=#
+		#
 		#get_occupancy(dm_sp.ttn; plot_title = "Alpha = $(round(alpha,digits=4))")
 		#get_greenfunc(dm_sp.ttn,"phys")
 		#get_greenfunc(dm_sp.ttn,"virt")

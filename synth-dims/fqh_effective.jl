@@ -325,6 +325,7 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	t1 = 1.0
 	t2 = 1.0
 	if_nrg = get(kwargs, :if_nrg, false)
+	if_densmat = get(kwargs, :if_densmat, true)
 
 	metadata = get(kwargs, :metadata, Dict())
 	metadata["psi_ortho"] = psi_ortho
@@ -375,6 +376,7 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 		metadata["maxlinkdim"] = maxlinkdim(psi)
 		metadata["final_nrg_variance"] = energy_variance(psi,H)
 		data_dict = Dict([("mps",psi)])
+		if_densmat ? data_dict["densmat"] = density_matrix(psi) : nothing
 		write_data_jld2(filename,data_dict,location,metadata)
 	end
 	
@@ -521,9 +523,19 @@ function entanglement_spectrum(psi::MPS, bond::Int)
     evals = eigvals(matrix(rho))
 
     # The entanglement spectrum is given by the negative logarithm of these eigenvalues
-    spectrum = -log.(evals)
+    spectrum = evals
 
     return spectrum
+end
+
+function entanglement_entropy(psi::MPS)
+	# Get the entanglement spectrum
+	spectrum = entanglement_spectrum(psi, Int(floor(length(psi)/2)))
+
+	# Form the entanglement entropy by summing the spectrum
+	entropy = -sum(spectrum .* log.(spectrum))
+
+	return abs.(entropy)
 end
 
 function density_matrix(wavefunc::MPS; kwargs...)
@@ -550,6 +562,7 @@ function momentum_occupation(wavefunc::MPS,p_count::Int,p_end::Real,direction="p
 	if_plot = p_count != 1 ? get(kwargs, :if_plot, false) : false
 	p_start = get(kwargs, :p_start, 0.0)
 	other_p = get(kwargs, :other_p, 0.0)
+	densmat = get(kwargs, :densmat, nothing)
 
 	if if_neg
 		p_start = -p_end
@@ -561,8 +574,13 @@ function momentum_occupation(wavefunc::MPS,p_count::Int,p_end::Real,direction="p
 	mom_occs = zeros(p_count) .* im
 	
 	for s=1:virt_length, ss=1:virt_length
-		corr_val = correlation_matrix(wavefunc,"Cr$(s)","Anh$(ss)")
-		corr_val += conj(transpose(corr_val))
+		if isnothing(densmat)
+			corr_val = correlation_matrix(wavefunc,"Cr$(s)","Anh$(ss)")
+			corr_val += conj(transpose(corr_val))
+		else
+			corr_val = densmat[phys_length*(s-1)+1:phys_length*s,phys_length*(ss-1)+1:phys_length*ss]
+			corr_val += conj(transpose(corr_val))
+		end
 		for (i,p) in enumerate(momenta)
 			pvec = direction == "virt" ? [other_p,p] : [p,other_p]
 
