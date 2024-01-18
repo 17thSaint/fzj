@@ -101,8 +101,8 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
                         continue
                     end
                 end
-                ampo += (-tp * exp(im*2*pi*chi*(s-s0)) * exp(im*2*pi*centralflux_strength/L), "Cr$s", j, "Anh$s", next_site)
-                ampo += (-tp * exp(-im*2*pi*chi*(s-s0)) * exp(-im*2*pi*centralflux_strength/L), "Anh$s", j, "Cr$s", next_site)
+                ampo += (-tp * exp(im*pi*chi*(s-s0)) * exp(im*2*pi*centralflux_strength/L), "Cr$s", j, "Anh$s", next_site)
+                ampo += (-tp * exp(-im*pi*chi*(s-s0)) * exp(-im*2*pi*centralflux_strength/L), "Anh$s", j, "Cr$s", next_site)
             end
         end
         
@@ -136,12 +136,14 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
 end
 
 #
-if_save_data = false
+if_save_data = true
 dataloc = "/home/patrick/fzj/main-git/cluster-data/synth-dims/"
 if_densmat = true
 
-nrgvar_tol = 1E-8
+nsweeps = 100
+nrgvar_tol = 1E-7
 mdim = 300
+noise = [0.0]
 
 #geo_params = [()] # (L,nf,nb)
 #Ls = [4,5,6,7,8,9,10,11,12,13,14,15]
@@ -150,8 +152,8 @@ mdim = 300
 #
 states = []
 #for L in Ls
-L = 6
-nflavors = 4#Int(ceil(0.75*L))
+L = 8
+nflavors = 6#Int(ceil(0.75*L))
 part_count = Int(L/2)
 #chi = 0.0#part_count / (nu*L*nflavors)
 tilt = 0.0
@@ -166,9 +168,9 @@ metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodi
 
 #
 if true
-counting = 50
-#scaling = 64
-strens = range(part_count/(0.2*L*nflavors),part_count/(3.0*L*nflavors),length=counting)#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
+counting = 10
+#=scaling = 64
+strens = range(part_count/(0.324*L*nflavors),part_count/(0.329*L*nflavors),length=counting)#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
 sf_orderparams = zeros(length(strens))
 bonddims = zeros(length(strens))
 distcorrs = zeros(length(strens))
@@ -176,8 +178,8 @@ ees = zeros(length(strens))
 #nrgs = zeros(length(strens)) .* im
 #currents = zeros(nflavors,length(strens)) .* im
 #drudes = zeros(nflavors,length(strens)) .* im
-#
-#=chi = 0.0
+=#
+#chi = 0.0
 params_dict = Dict([("L",L),("nbosons",part_count),("nflavors",nflavors),("centralflux_strength",centralflux_strength)])
 loc = "/home/patrick/fzj/main-git/cluster-data/synth-dims/"
 all_files = find_data_file(params_dict,"mps",loc)
@@ -193,61 +195,81 @@ sf_orderparams = zeros(length(all_files))
 bonddims = zeros(length(all_files))
 distcorrs = zeros(length(all_files))
 ees = zeros(length(all_files))
-=#
+#
 
 #println("Chi = ",part_count / (nu*L*nflavors))
 #
-for (idx,chi) in enumerate(strens)
-#for (idx,f) in enumerate(all_files)
-    if false
-    found_data, found_metadata = read_data_jld2(f,loc)
-    #centralflux_strength = found_metadata["centralflux_strength"]
-    chi = found_metadata["chi"]
-    strens[idx] = chi
-    psi_gs = found_data["mps"]
+#for (idx,chi) in enumerate(strens)
+for (idx,f) in enumerate(all_files)
+    if true
+        found_data, found_metadata = read_data_jld2(f,loc)
+        #centralflux_strength = found_metadata["centralflux_strength"]
+        chi = found_metadata["chi"]
+        strens[idx] = chi
+        psi_gs = found_data["mps"]
+        #
+        if "final_nrg_variance" in keys(found_metadata)
+            fn_nrg_var = found_metadata["final_nrg_variance"]
+            #println("Found in Metadata")
+        else
+            fn_nrg_var = energy_variance(psi_gs,found_metadata["ham"])
+            #println("Didn't have it stored")
+        end
+        if fn_nrg_var > nrgvar_tol
+            run_again(f; location=loc)
+        end
+        #
+        try
+            densmat = found_data["densmat"]
+        catch
+            densmat = nothing
+        end
     end
     #ham_params = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
     #display(found_metadata)
-    if true
-    metadata["chi"] = chi
-    naming_dict["chi"] = round(chi,digits=5)
-    #=
-    metadata["centralflux_strength"] = centralflux_strength
-    if centralflux_strength < 0.0
-        naming_dict["centralflux_strength"] = "n" * string(-round(centralflux_strength,digits=5))
-    else
-        naming_dict["centralflux_strength"] = round(centralflux_strength,digits=5)
-    end
-    =#
-    filename = make_parameters_filename(naming_dict)
-    metadata["name"] = filename
-    display(filename)
+    if false
+        metadata["chi"] = chi
+        naming_dict["chi"] = round(chi,digits=5)
+        #=
+        metadata["centralflux_strength"] = centralflux_strength
+        if centralflux_strength < 0.0
+            naming_dict["centralflux_strength"] = "n" * string(-round(centralflux_strength,digits=5))
+        else
+            naming_dict["centralflux_strength"] = round(centralflux_strength,digits=5)
+        end
+        =#
+        filename = make_parameters_filename(naming_dict)
+        metadata["name"] = filename
+        display(filename)
 
-    ham_params = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
-    ham_start = hamiltonian_universal(L,nflavors,chi; ham_params...)
-    obs = NRGVarObserver(nrgvar_tol,ham_start)
+        ham_params = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
+        ham_start = hamiltonian_universal(L,nflavors,chi; ham_params...)
+        obs = NRGVarObserver(nrgvar_tol,ham_start)
 
-    if_exists,found_data = check_data_exists("mps-"*filename*".jld2","mps";location=dataloc)
-
-    if if_exists
-        psi_gs = found_data
-    else
-        dmrg_params = (ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=dataloc,observer=obs,if_densmat=if_densmat)
-        psi_gs, densmat = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
-        println("Energy Variance = ",energy_variance(psi_gs,ham_start)," at Chi = ",chi)
-    end
-    
+        if_exists,found_data = check_data_exists(naming_dict,"mps";location=dataloc)
+        #
+        if if_exists
+            psi_gs = found_data[1]["mps"]
+            densmat = found_data[1]["densmat"]
+        else
+            dmrg_params = (ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=dataloc,observer=obs,if_densmat=if_densmat,nsweeps=nsweeps,noise=noise)
+            psi_gs, densmat = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
+            println("Energy Variance = ",energy_variance(psi_gs,ham_start)," at Chi = ",chi)
+        end
+        
     end
 
     #append!(states,[psi_gs])
 
-    bonddims[idx] = maxlinkdim(psi_gs)
+    #=bonddims[idx] = maxlinkdim(psi_gs)
     sf_orderparams[idx] = abs(momentum_occupation(psi_gs,1,0.0; densmat=densmat)[2][1])
     distcorrs[idx] = minimum(abs.(distance_correlation(psi_gs; if_plot=false)[2]))
     ees[idx] = entanglement_entropy(psi_gs)
+    =#
+    
+    #physical_distance_correlation(psi_gs)
 
-
-    if true
+    if false
     if idx > 1
         plot([part_count/(strens[idx-1]*nflavors*L),part_count/(chi*nflavors*L)],[sf_orderparams[idx-1],sf_orderparams[idx]],"-p",c="b")
         #plot([(part_count-1)/(strens[idx-1]*tot_sites),part_count/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")

@@ -307,7 +307,22 @@ function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 	return ampo
 end
 
+function run_again(filename; kwargs...)
+	location = get(kwargs, :location, pwd())
+	if_densmat = get(kwargs, :if_densmat, true)
+	nrgvar_tol = get(kwargs, :nrgvar_tol, 10^-7)
+
+	data,metadata = read_data_jld2(filename,location)
+	
+	obs = NRGVarObserver(nrgvar_tol,metadata["ham"])
+	new_metadata = merge(metadata,Dict([("observer",obs),("nrgvar_tol",nrgvar_tol),("psi_guess",data["mps"])]))
+
+	new_gs,new_densmat = execute_mps(nothing,nothing,metadata["chi"],metadata["L"],metadata["nflavors"],metadata["nbosons"]; dict_to_symbols(new_metadata)...,if_densmat=if_densmat,metadata=new_metadata,mdim=maximum(metadata["mdim"]),running_again=true)
+	println("Energy Variance = ",energy_variance(new_gs,metadata["ham"]))
+end
+
 function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
+	running_again = get(kwargs, :running_again, false)
 	psi_ortho = get(kwargs, :psi_ortho, nothing)
 	opl = get(kwargs, :outputlevel, 1)
 	conserve_qns = get(kwargs, :conserve_qns, true)
@@ -315,7 +330,7 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	psi0 = get(kwargs, :psi_guess, nothing)
 	ham = get(kwargs, :ham, nothing)
 	mdim = get(kwargs, :mdim, 100)
-	if mdim >= 100
+	if mdim >= 100 && !running_again
 		mdim = [Int(floor(mdim/4)),Int(floor(mdim/2)), mdim]
 	end
 	noise = get(kwargs, :noise, 0.0)
@@ -334,7 +349,6 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	metadata["ham"] = ham
 	metadata["mdim"] = mdim
 	metadata["noise"] = noise
-	metadata["observer"] = obs
 	metadata["if_gpu"] = if_gpu
 	filename = get(kwargs, :name, "mps")
 	filename = check_plot_label(filename,"mps")
@@ -370,6 +384,7 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 		E, psi = dmrg(H, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = 1E-14)
 	end
 
+	metadata["observer"] = obs
 	if_densmat ? densmat = density_matrix(psi) : nothing
 	
 	if if_save_data
@@ -377,7 +392,7 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 		metadata["final_energy"] = E
 		metadata["maxlinkdim"] = maxlinkdim(psi)
 		metadata["final_nrg_variance"] = energy_variance(psi,H)
-		data_dict = Dict([("mps",psi)])
+		data_dict::Dict{String,Any} = Dict([("mps",psi)])
 		if_densmat ? data_dict["densmat"] = densmat : nothing
 		write_data_jld2(filename,data_dict,location,metadata)
 	end
@@ -674,6 +689,41 @@ function find_dist(p1::Tuple{Int,Int}, p2::Tuple{Int,Int}, size::Tuple{Int,Int},
     return sqrt(dx^2 + dy^2)
 end
 
+function physical_distance_correlation(psi::MPS; kwargs...)
+	if_plot = get(kwargs, :if_plot, true)
+
+	phys_length,virt_length = get_mps_dims(psi)
+	all_corrs = [[] for i in 1:virt_length]
+	dists = [i for i in 0:phys_length-1]
+	for s in 1:virt_length
+		corr_val = correlation_matrix(psi,"Cr$(s)","Anh$(s)")
+		corr_val += conj(transpose(corr_val))
+		all_corrs[s] = [mean(diag(corr_val,i)) for i in 0:phys_length-1]
+	end
+
+	if if_plot
+		fig = figure()
+		for s in 1:virt_length
+			plot(dists,abs.(all_corrs[s]),"-p",label="$s")
+		end
+		xlabel("Distance")
+		ylabel("Correlation")
+		title("Physical Distance Correlation")
+		legend()
+	end
+
+	return dists,all_corrs
+end
+
+function correlation_length(psi::MPS; kwargs...)
+	if_plot = get(kwargs, :if_plot, false)
+
+	exp_fit(x,p) = p[1]*exp(-x/p[2]) + p[3]
+
+	dists,phys_correlations = physical_distance_correlation(psi; if_plot=false)
+
+end
+
 function distance_correlation(psi::MPS; kwargs...)
 	if_plot = get(kwargs, :if_plot, true)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, true)
@@ -964,36 +1014,73 @@ end
 mutable struct NRGVarObserver <: AbstractObserver
     var_tol::Float64
     local_ham
-    nrg_var::Float64
+    nrg_var::Vector{Float64}
  
-    NRGVarObserver(var_tol=0.0,local_ham=10.0) = new(var_tol,local_ham,1000.0)
+    NRGVarObserver(var_tol=0.0,local_ham=10.0) = new(var_tol,local_ham,[1000.0])
  end
 
 function ITensors.checkdone!(o::NRGVarObserver;kwargs...)
   sw = kwargs[:sweep]
   psi = kwargs[:psi]
   ham = o.local_ham
-  if o.nrg_var < o.var_tol
+  if o.nrg_var[end] < o.var_tol
     #println("Stopping DMRG after sweep $sw")
     return true
+  #elseif length(o.nrg_var) > 10 && std(o.nrg_var[end-10:end])/o.nrg_var[end] < 0.03
+  	# if variance has not changed by more than 1% in the last 10 sweeps, stop
+  	#return true
   end
   # Otherwise, update last_energy and keep going
-  o.nrg_var = energy_variance(psi,ham) 
+  append!(o.nrg_var,[energy_variance(psi,ham)])
   return false
 end
 
 function ITensors.measure!(o::NRGVarObserver; kwargs...)
-    nrg_var = o.nrg_var
-    var_tol = o.var_tol
     #display(kwargs)
     half_sweep = kwargs[:half_sweep]
     bond = kwargs[:bond]
     outputlevel = kwargs[:outputlevel]
-    
   
     if bond == 1 && half_sweep == 2 && outputlevel > 0
-      #println("The energy variance is $nrg_var for tolerance $var_tol")
+		percent_change = length(o.nrg_var) > 10 ? round(100*std(o.nrg_var[end-10:end]/o.nrg_var[end]),digits=2) : round(100*std(o.nrg_var[2:end])/o.nrg_var[end],digits=2)
+		println("The energy variance is $(round(o.nrg_var[end],digits=9)) for tolerance $(o.var_tol), AVG = $percent_change %")
     end
+end
+
+mutable struct NRGErrorObserver <: AbstractObserver
+	var_tol::Float64
+	local_ham
+	nrgs::Vector{Float64}
+    nrg_var::Vector{Float64}
+ 
+    NRGErrorObserver(var_tol=0.0,local_ham=10.0) = new(var_tol,local_ham,[10000.0,1000.0],[0.0])
+ end
+
+function ITensors.checkdone!(o::NRGErrorObserver;kwargs...)
+	sw = kwargs[:sweep]
+	#psi = kwargs[:psi]
+	#ham = o.local_ham
+	if o.nrg_var[end] < o.var_tol && abs(o.nrgs[end] - o.nrgs[end-1]) < o.nrg_var[end]
+	  return true
+	end
+	#o.nrgs[1] = o.nrgs[2]
+	return false
+end
+  
+function ITensors.measure!(o::NRGErrorObserver; kwargs...)
+	  half_sweep = kwargs[:half_sweep]
+	  bond = kwargs[:bond]
+	  outputlevel = kwargs[:outputlevel]
+	
+	  if bond == 1 && half_sweep == 2 && outputlevel > 0
+		psi = kwargs[:psi]
+	    ham = o.local_ham
+	    append!(o.nrg_var,[energy_variance(psi,ham)])
+	    append!(o.nrgs,[real(calculate_energy(psi,ham))])
+		if outputlevel > 0
+			println("The energy variance is $(round(o.nrg_var[end],digits=10)) with energy change $(round(abs(o.nrgs[end] - o.nrgs[end-1]),digits=10))")
+		end
+	end
 end
 
 # ╔═╡ 12309987-d529-4820-bf06-5c3407a977b3
