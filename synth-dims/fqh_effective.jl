@@ -691,6 +691,7 @@ end
 
 function physical_distance_correlation(psi::MPS; kwargs...)
 	if_plot = get(kwargs, :if_plot, true)
+	if_corr_lengths = get(kwargs, :if_corr_lengths, true)
 
 	phys_length,virt_length = get_mps_dims(psi)
 	all_corrs = [[] for i in 1:virt_length]
@@ -698,8 +699,10 @@ function physical_distance_correlation(psi::MPS; kwargs...)
 	for s in 1:virt_length
 		corr_val = correlation_matrix(psi,"Cr$(s)","Anh$(s)")
 		corr_val += conj(transpose(corr_val))
-		all_corrs[s] = [mean(diag(corr_val,i)) for i in 0:phys_length-1]
+		all_corrs[s] = abs.([mean(diag(corr_val,i)) for i in 0:phys_length-1])
 	end
+
+	if_corr_lengths ? corr_lengths = correlation_length(dists,all_corrs; kwargs...) : nothing
 
 	if if_plot
 		fig = figure()
@@ -712,16 +715,20 @@ function physical_distance_correlation(psi::MPS; kwargs...)
 		legend()
 	end
 
-	return dists,all_corrs
+	if if_corr_lengths
+		return dists,all_corrs,corr_lengths
+	else
+		return dists,all_corrs
+	end
 end
 
-function correlation_length(psi::MPS; kwargs...)
-	if_plot = get(kwargs, :if_plot, false)
+function correlation_length(dists,phys_correlations; kwargs...)
 
-	exp_fit(x,p) = p[1]*exp(-x/p[2]) + p[3]
+	exp_fit(x,p) = p[1].* exp.(-x ./ p[2]) .+ p[3]
 
-	dists,phys_correlations = physical_distance_correlation(psi; if_plot=false)
-
+	all_fits = [curve_fit(exp_fit,dists,phys_correlations[i],[1.0,1.0,0.0]) for i in 1:length(phys_correlations)]
+	corr_lengths = [all_fits[i].param[2] for i in 1:length(all_fits)]
+	return corr_lengths
 end
 
 function distance_correlation(psi::MPS; kwargs...)
