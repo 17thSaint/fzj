@@ -53,17 +53,56 @@ function find_slope(times,values; kwargs...)
     return a
 end
 
-nflavors = 5
-L = 8
-centralflux_strength = 0.25
+layers = 6
+edge_length = Int(sqrt(2^layers))
+num_parts = 4
 
 #
 if true
-params_dict = Dict([("L",L),("nbosons",5),("nflavors",nflavors),("centralflux_strength",0.0)])
-loc = "/home/patrick/fzj/main-git/cluster-data/synth-dims/"
-all_files = find_data_file(params_dict,"mps","jld2",loc)
+params_dict = Dict([("layers",layers),("particles",num_parts)])
+loc = get_folder_location("cluster-data/synth-dims","fzj")
+all_files = find_data_file(params_dict,"ttn",loc)
 display(all_files)
+#=
+for (idx,f) in enumerate(all_files)
+	name_data = get_params_dict_from_filename(f)
+	filling = name_data["particles"] / (2^(name_data["layers"]) * name_data["alpha"])
+	#if isapprox(filling,0.5,atol=0.1)
+		println(idx,", ",filling)
+	#end
+end
+#
+chosenfile = all_files[2]
+data,metadata = read_data_jld2(chosenfile,loc)
+wavefunc = data["ttn"]
+=#
+end
 
+#
+allberries = [zeros(edge_length-2,edge_length-2) for i in 1:length(all_files)]
+avgberries = [0.0 for i in 1:length(all_files)]
+fillings = [0.0 for i in 1:length(all_files)]
+for (idx,f) in enumerate(all_files)
+	data,metadata = read_data_jld2(f,loc)
+	wavefunc = data["ttn"]
+	fillings[idx] = metadata["particles"] / (2^(metadata["layers"]) * metadata["alpha"])
+	for i in 3:edge_length-2
+		for j in 3:edge_length-2
+			println(i,", ",j)
+			allberries[idx][i-2,j] = closed_loop(wavefunc,(i,j))[1]
+			if allberries[idx][i-2,j] < 0.0
+				newval = 2*pi + allberries[idx][i-2,j]
+				allberries[idx][i-2,j] = newval
+			end
+		end
+	end
+	avgberries[idx] = mean(allberries[idx])
+end
+#
+plot(fillings,avgberries,"-p")
+#
+
+#=
 chis = []
 all_states = []
 for f in all_files
@@ -72,6 +111,7 @@ for f in all_files
 	append!(all_states,[read_data_jld2(f,loc)[1]["mps"]])
 end
 end
+=#
 
 #=
 entrops = []
@@ -83,13 +123,13 @@ end
 plot(5 ./ (chis .* (L*nflavors)) ,log.(entrops),"-p")
 =#
 
-#
+#=
 currents = zeros(nflavors,length(all_files)) .* im
 for (i,psi) in enumerate(all_states)
 	ham_params = (if_periodic_phys=true,if_periodic_synth=false,centralflux_strength=centralflux_strength,tilt_strength=0.0)
 	currents[:,i] = [calc_deriv(1,psi,s,Int(L/2),nflavors,chi,ham_params) for s in 1:nflavors]
 end
-#=
+#
 hall_currents = abs.((currents[1,:] .- currents[nflavors,:])/2)
 plot(chis,hall_currents,"-p")
 xlabel("Flux Density")

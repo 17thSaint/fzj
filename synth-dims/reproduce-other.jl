@@ -1,7 +1,8 @@
 include("fqh_effective.jl")
 include("time_evolution.jl")
 include("../other-funcs/data-storage-funcs.jl")
-using Statistics,PyPlot,Observers,ITensorTDVP,LsqFit
+using Statistics,Observers,ITensorTDVP,LsqFit
+using PyPlot
 
 lin_model(x,p) = p[1].* x .+ p[2]
 
@@ -137,7 +138,7 @@ end
 
 #
 if_save_data = false
-dataloc = get_folder_location("cluster-data/synth-dims","geraghty")
+dataloc = get_folder_location("cluster-data/synth-dims","fzj")
 if_densmat = true
 
 nsweeps = 100
@@ -283,8 +284,8 @@ for (idx,chi) in enumerate(strens)
     
     
     #physical_distance_correlation(psi_gs)
-
-    if true
+    #=
+    if false
     if idx > 1
         plot([part_count/(strens[idx-1]*nflavors*L),part_count/(chi*nflavors*L)],[corrlengs[1][idx-1],corrlengs[1][idx]],"-p",c="b")
         #plot([(part_count-1)/(strens[idx-1]*tot_sites),part_count/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
@@ -293,6 +294,7 @@ for (idx,chi) in enumerate(strens)
         #scatter([part_count/(strens[idx]*tot_sites)],[centermoms[idx]],c="b")
     end
     end
+    =#
     
     if false
     nrgs[i] = calculate_energy(psi_gs,found_metadata["ham"])
@@ -339,7 +341,7 @@ end
 
 
 xvals = part_count ./ (strens .* (L*nflavors))
-#
+#=
 fig1 = figure()
 scatter(xvals,bonddims)
 xlabel("Filling Factor")
@@ -371,13 +373,13 @@ xlabel("Filling Factor")
 ylabel("Correlation Length")
 legend()
 #
-#
+=#
 
 #
 #end
 #
 
-#
+#=
 if false
     time_end = 10.0
     time_change = 0.1
@@ -455,7 +457,7 @@ if false
     title("Null")
     =#
 end
-#
+=#
 
 
 

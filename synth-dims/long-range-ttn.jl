@@ -715,6 +715,10 @@ function plot_momentum_occupation(momenta::Matrix,mom_occ::Matrix; kwargs...)
 	ylabel("Physical Momenta / pi")
 end
 
+function is_within_lattice(point::Tuple{Int,Int}, lattice_size::Tuple{Int,Int})
+    return 1 <= point[1] <= lattice_size[1] && 1 <= point[2] <= lattice_size[2]
+end
+
 function loop_sites(starting_site,which_quadrant,phys_length,virt_length; kwargs...)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
 	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
@@ -733,25 +737,45 @@ function loop_sites(starting_site,which_quadrant,phys_length,virt_length; kwargs
     # The fourth point is one step to the left or right from the third point
     second_x_move = if_periodic_phys ? (mod1(first_y_move[1] - dx,phys_length), first_y_move[2]) : (first_y_move[1] - dx, first_y_move[2])
 
-    # Return the four pointsYour location
-    return [starting_site,first_x_move,first_y_move,second_x_move]
+	resulting_loop = [starting_site,first_x_move,first_y_move,second_x_move]
+
+	# check that the loop is inside the lattice
+	if any([!is_within_lattice(p,(phys_length,virt_length)) for p in resulting_loop])
+		#println("Loop is outside lattice")
+		return nothing
+	else
+    	# Return the four pointsYour location
+    	return resulting_loop
+	end
 end
 
 
 function closed_loop(psi::TreeTensorNetwork, starting_site; kwargs...)
 	phys_length,virt_length = get_lattice_dims(psi)
-	which_direction = get(kwargs, :direction, 3)
+	which_direction = get(kwargs, :direction, 1)
 	loop_length = get(kwargs, :loop_length, 1)
 	if_fermion = get(kwargs, :if_fermion, false)
 	creation = if_fermion ? "Cdag" : "Adag"
 	annihilation = if_fermion ? "C" : "A"
 
+	# find loop to use by trying all directions
 	sites_to_loop = loop_sites(starting_site,which_direction,phys_length,virt_length; kwargs...)
+	while isnothing(sites_to_loop) && which_direction < 4
+		which_direction += 1
+		sites_to_loop = loop_sites(starting_site,which_direction,phys_length,virt_length; kwargs...)
+	end
+	if isnothing(sites_to_loop)
+		println("No loop found")
+		return nothing
+	end
+		
 	calced_values = zeros(length(sites_to_loop)) .* im
 	for (idx,s) in enumerate(sites_to_loop)
 		next_site = idx == length(sites_to_loop) ? sites_to_loop[1] : sites_to_loop[idx+1]
 		calced_values[idx] = TTNKit.correlation(psi,creation,annihilation,next_site,s)
 	end
+
+	return angle(prod(calced_values)),calced_values,sites_to_loop
 end
 
 
@@ -771,7 +795,7 @@ fb_occ_mat = get_occupancy(fb_gs)
 
 
 #
-if true
+if false
 
 nnst = 0.0
 layers = 6
@@ -924,7 +948,7 @@ lr = 0#Int(sqrt(2^layers))-1
 		#centermoms[idx] = minimum(abs.(rez[2]))
 
 		#
-		if true
+		if false
 		allmoms = momentum_occupation(wavefunc,1,0.0; densmat=densmat)
 		centermoms[idx] = allmoms[2][1]
 		if idx > 1
