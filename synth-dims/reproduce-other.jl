@@ -137,12 +137,12 @@ end
 
 #
 if_save_data = false
-dataloc = "/home/patrick/fzj/main-git/cluster-data/synth-dims/"
+dataloc = get_folder_location("cluster-data/synth-dims","geraghty")
 if_densmat = true
 
 nsweeps = 100
 nrgvar_tol = 1E-7
-mdim = 100
+mdim = 500
 noise = [0.0]
 
 #geo_params = [()] # (L,nf,nb)

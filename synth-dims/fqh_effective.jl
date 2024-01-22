@@ -1033,9 +1033,9 @@ function ITensors.checkdone!(o::NRGVarObserver;kwargs...)
   if o.nrg_var[end] < o.var_tol
     #println("Stopping DMRG after sweep $sw")
     return true
-  #elseif length(o.nrg_var) > 10 && std(o.nrg_var[end-10:end])/o.nrg_var[end] < 0.03
-  	# if variance has not changed by more than 1% in the last 10 sweeps, stop
-  	#return true
+  elseif length(o.nrg_var) > 10 && o.nrg_var[end] < o.var_tol*1E1 && std(o.nrg_var[end-10:end])/o.nrg_var[end] < 0.03
+  	# if variance has not changed by more than 1% in the last 10 sweeps and is close to tolerance, stop
+  	return true
   end
   # Otherwise, update last_energy and keep going
   append!(o.nrg_var,[energy_variance(psi,ham)])
