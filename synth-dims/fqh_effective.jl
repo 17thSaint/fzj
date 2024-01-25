@@ -331,7 +331,11 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	ham = get(kwargs, :ham, nothing)
 	mdim = get(kwargs, :mdim, 100)
 	if mdim >= 100 && !running_again
-		mdim = [Int(floor(mdim/4)),Int(floor(mdim/2)), mdim]
+		if mdim >= 400
+			mdim = [Int(floor(mdim/4)),Int(floor(mdim/4)),Int(floor(mdim/4)),Int(floor(mdim/2)),Int(floor(mdim/2)),Int(floor(mdim/2)),Int(floor(mdim/2)),Int(floor(mdim/2)), mdim]
+		else
+			mdim = [Int(floor(mdim/4)),Int(floor(mdim/2)), mdim]
+		end
 	end
 	noise = get(kwargs, :noise, 0.0)
 	obs = get(kwargs, :observer, NoObserver())

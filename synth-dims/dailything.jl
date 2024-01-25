@@ -2,7 +2,7 @@ if false
 include("long-range-ttn.jl")
 include("fqh_effective.jl")
 include("time_evolution.jl")
-include("reproduce-other.jl")
+#include("reproduce-other.jl")
 #using PyPlot,Observers,ITensorTDVP,LsqFit
 end
 #=
@@ -53,17 +53,30 @@ function find_slope(times,values; kwargs...)
     return a
 end
 
+if true
+L = 16
+nflavors = 8
+nbosons = 8
+params_dict = Dict([("L",L),("nflavors",nflavors)])
+loc = get_folder_location("cluster-data/synth-dims","fzj")
+all_files = find_data_file(params_dict,"mps",loc)
+data,metadata = read_data_jld2(all_files[1],loc)
+psi = data["mps"]
+rho = data["densmat"]
+
+
+#=
 layers = 6
 edge_length = Int(sqrt(2^layers))
 num_parts = 4
 
-#
-if true
+
+if false
 params_dict = Dict([("layers",layers),("particles",num_parts)])
 loc = get_folder_location("cluster-data/synth-dims","fzj")
 all_files = find_data_file(params_dict,"ttn",loc)
 display(all_files)
-#=
+#
 for (idx,f) in enumerate(all_files)
 	name_data = get_params_dict_from_filename(f)
 	filling = name_data["particles"] / (2^(name_data["layers"]) * name_data["alpha"])
@@ -78,7 +91,7 @@ wavefunc = data["ttn"]
 =#
 end
 
-#
+#=
 allberries = [zeros(edge_length-2,edge_length-2) for i in 1:length(all_files)]
 avgberries = [0.0 for i in 1:length(all_files)]
 fillings = [0.0 for i in 1:length(all_files)]
@@ -100,7 +113,7 @@ for (idx,f) in enumerate(all_files)
 end
 #
 plot(fillings,avgberries,"-p")
-#
+=#
 
 #=
 chis = []

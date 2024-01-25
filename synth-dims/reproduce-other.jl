@@ -2,7 +2,7 @@ include("fqh_effective.jl")
 include("time_evolution.jl")
 include("../other-funcs/data-storage-funcs.jl")
 using Statistics,Observers,ITensorTDVP,LsqFit
-using PyPlot
+#using PyPlot
 
 lin_model(x,p) = p[1].* x .+ p[2]
 
@@ -137,13 +137,13 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
 end
 
 #
-if_save_data = false
-dataloc = get_folder_location("cluster-data/synth-dims","fzj")
+if_save_data = true
+dataloc = get_folder_location("cluster-data/synth-dims","geraghty")
 if_densmat = true
 
 nsweeps = 100
 nrgvar_tol = 1E-7
-mdim = 500
+mdim = 700
 noise = [0.0]
 
 #geo_params = [()] # (L,nf,nb)
@@ -340,8 +340,8 @@ legend()
 end
 
 
-xvals = part_count ./ (strens .* (L*nflavors))
-#=
+#=xvals = part_count ./ (strens .* (L*nflavors))
+
 fig1 = figure()
 scatter(xvals,bonddims)
 xlabel("Filling Factor")
