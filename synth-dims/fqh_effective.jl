@@ -376,8 +376,8 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 		psi0 = randomMPS(sidx, states)
 	end
 	if if_gpu
-		H = ITensorsGPU.gpu(H)
-		psi0 = ITensorsGPU.gpu(psi0)
+		H = ITensorsGPU.cu(H)
+		psi0 = ITensorsGPU.cu(psi0)
 	end
 	if !isnothing(psi_ortho)
 		if typeof(psi_ortho) != Vector{MPS}

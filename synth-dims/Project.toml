@@ -1,4 +1,6 @@
 [deps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+ITensorGPU = "d89171c1-af8f-46b3-badf-d2a472317c15"
 ITensorTDVP = "25707e16-a4db-4a07-99d9-4d67b7af0342"
 ITensors = "9136182c-28ba-11e9-034c-db9fb085ebd5"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"

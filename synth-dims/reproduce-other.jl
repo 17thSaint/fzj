@@ -1,7 +1,7 @@
 include("fqh_effective.jl")
 include("time_evolution.jl")
 include("../other-funcs/data-storage-funcs.jl")
-using Statistics,Observers,ITensorTDVP,LsqFit
+using Statistics,Observers,ITensorTDVP,LsqFit,ITensorsGPU
 #using PyPlot
 
 lin_model(x,p) = p[1].* x .+ p[2]
@@ -161,17 +161,18 @@ tilt = 0.0
 
 if_per_phys = true
 if_per_virt = false
+if_gpu = true
 
 centralflux_strength = 0.0
 
 naming_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",part_count),("centralflux_strength",centralflux_strength)])
-metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodic_virt",if_per_virt),("tilt_strength",tilt),("location",dataloc),("if_save_data",if_save_data),("nrgvar_tol",nrgvar_tol),("mdim",mdim)]))
+metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodic_virt",if_per_virt),("tilt_strength",tilt),("location",dataloc),("if_save_data",if_save_data),("nrgvar_tol",nrgvar_tol),("if_gpu",if_gpu),("mdim",mdim)]))
 
 #
 if true
 counting = 20
 #scaling = 64
-strens = range(part_count/(0.3*L*nflavors),part_count/(0.37*L*nflavors),length=counting)#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
+strens = [0.0]#range(part_count/(0.3*L*nflavors),part_count/(0.37*L*nflavors),length=counting)#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
 sf_orderparams = zeros(length(strens))
 bonddims = zeros(length(strens))
 distcorrs = zeros(length(strens))
@@ -211,11 +212,7 @@ for (idx,chi) in enumerate(strens)
         strens[idx] = chi
         psi_gs = found_data["mps"]
 
-        if part_count/(chi*nflavors*L) == 0.28 || isapprox(part_count/(chi*nflavors*L),0.38;atol=0.01)
-            get_occupancy(psi_gs; plot_title="Chi = $(chi)")
-        else
-            continue
-        end
+        #get_occupancy(psi_gs; plot_title="nu = $(round(part_count/(chi*nflavors*L),digits=4))")
         #=
         if "final_nrg_variance" in keys(found_metadata)
             fn_nrg_var = found_metadata["final_nrg_variance"]
@@ -261,7 +258,7 @@ for (idx,chi) in enumerate(strens)
             psi_gs = found_data[1]["mps"]
             densmat = found_data[1]["densmat"]
         else
-            dmrg_params = (ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=dataloc,observer=obs,if_densmat=if_densmat,nsweeps=nsweeps,noise=noise)
+            dmrg_params = (if_gpu=if_gpu,ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=dataloc,observer=obs,if_densmat=if_densmat,nsweeps=nsweeps,noise=noise)
             psi_gs, densmat = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
             println("Energy Variance = ",energy_variance(psi_gs,ham_start)," at Chi = ",chi)
         end
@@ -281,10 +278,8 @@ for (idx,chi) in enumerate(strens)
     #
     
     
-    
-    
     #physical_distance_correlation(psi_gs)
-    #=
+    #
     if false
     if idx > 1
         plot([part_count/(strens[idx-1]*nflavors*L),part_count/(chi*nflavors*L)],[corrlengs[1][idx-1],corrlengs[1][idx]],"-p",c="b")
@@ -294,7 +289,7 @@ for (idx,chi) in enumerate(strens)
         #scatter([part_count/(strens[idx]*tot_sites)],[centermoms[idx]],c="b")
     end
     end
-    =#
+    #
     
     if false
     nrgs[i] = calculate_energy(psi_gs,found_metadata["ham"])
@@ -339,19 +334,15 @@ legend()
 =#
 end
 
+#
+xvals = part_count ./ (strens .* (L*nflavors))
 
-#=xvals = part_count ./ (strens .* (L*nflavors))
-
+#=
 fig1 = figure()
 scatter(xvals,bonddims)
 xlabel("Filling Factor")
 ylabel("Bond Dimension")
-
-#
-fig2 = figure()
-plot(xvals,distcorrs,"-p")
-xlabel("Filling Factor")
-ylabel("Distance Correlation")
+=#
 
 fig3 = figure()
 plot(xvals,sf_orderparams,"-p")
@@ -373,7 +364,7 @@ xlabel("Filling Factor")
 ylabel("Correlation Length")
 legend()
 #
-=#
+#
 
 #
 #end
