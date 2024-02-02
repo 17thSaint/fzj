@@ -2,7 +2,8 @@ if true
 #include("../other-funcs/data-storage-funcs.jl")
 #include("long-range-ttn.jl")
 #include("fqh_effective.jl")
-using ITensorTDVP, Observers, NumericalIntegration
+using Observers, NumericalIntegration
+using ITensorTDVP
 end
 
 function current_nrg(; psi, bond, half_sweep)
