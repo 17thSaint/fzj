@@ -140,8 +140,8 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
         return ampo
 end
 
-#params_dict = make_args_dict(ARGS)
-params_dict = Dict([("L",16),("nflavors",8)])
+params_dict = make_args_dict(ARGS)
+#params_dict = Dict([("L",8),("nflavors",7)])
 #
 open_cores = get(params_dict, "open_cores", "all")
 if typeof(open_cores) != String
@@ -192,20 +192,21 @@ metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodi
 
 #
 if true
-counting = 2
-#=scaling = 64
-strens = range(part_count/(0.2*L*nflavors),part_count/(0.5*L*nflavors),length=counting)#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
+counting = 5
+#scaling = 64
+strens = range(part_count/(0.3*L*nflavors),part_count/(0.6*L*nflavors),length=counting)#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
 sf_orderparams = zeros(length(strens))
 bonddims = zeros(length(strens))
 distcorrs = zeros(length(strens))
 ees = zeros(length(strens))
 corrlengs = [zeros(length(strens)) for i in 1:nflavors]
+nrgs = zeros(length(strens))
 #
 #nrgs = zeros(length(strens)) .* im
 #currents = zeros(nflavors,length(strens)) .* im
 #drudes = zeros(nflavors,length(strens)) .* im
-=#
-#chi = 0.0
+#
+#=chi = 0.0
 finding_dict = Dict([("L",L),("nbosons",part_count),("nflavors",nflavors),("centralflux_strength",centralflux_strength)])
 loc = "/home/patrick/fzj/main-git/cluster-data/synth-dims/"
 all_files = find_data_file(finding_dict,"mps",loc)
@@ -214,7 +215,7 @@ display(all_files)
 
 #
 strens = zeros(length(all_files))
-#nrgs = zeros(length(all_files)) .* im
+nrgs = zeros(length(all_files))
 #currents = zeros(nflavors,length(all_files)) .* im
 #drudes = zeros(nflavors,length(all_files)) .* im
 sf_orderparams = zeros(length(all_files))
@@ -222,24 +223,26 @@ bonddims = zeros(length(all_files))
 distcorrs = zeros(length(all_files))
 ees = zeros(length(all_files))
 corrlengs = [zeros(length(all_files)) for i in 1:nflavors]
-
+=#
 sf_orderparams_null = 0.0
 bonddims_null = 0.0
 distcorrs_null = 0.0
 ees_null = 0.0
 corrlengs_null = [0.0 for i in 1:nflavors]
+nrgs_null = 0.0
 #
 
 #println("Chi = ",part_count / (nu*L*nflavors))
 #for (idx,chi) in enumerate(strens)
-for (idx,f) in enumerate(all_files)
+#for (idx,f) in enumerate(all_files)
     #
-    if true
+    if false
         found_data, found_metadata = read_data_jld2(f,loc)
         #centralflux_strength = found_metadata["centralflux_strength"]
         chi = found_metadata["chi"]
         chi != 0.0 ? strens[idx] = chi : nothing
         psi_gs = found_data["mps"]
+        this_ham = found_metadata["ham"]
 
         #get_occupancy(psi_gs; plot_title="nu = $(round(part_count/(chi*nflavors*L),digits=4))")
         #=
@@ -263,7 +266,7 @@ for (idx,f) in enumerate(all_files)
     #
     #ham_params = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
     #display(found_metadata)
-    if false
+    if true
         metadata["chi"] = chi
         naming_dict["chi"] = round(chi,digits=5)
         #=
@@ -282,6 +285,8 @@ for (idx,f) in enumerate(all_files)
         ham_start = hamiltonian_universal(L,nflavors,chi; ham_params...)
         obs = NRGVarObserver(nrgvar_tol,ham_start)
 
+        this_ham = ham_start
+
         if_exists,found_data = check_data_exists(naming_dict,"mps";location=dataloc)
         #
         if if_exists
@@ -295,37 +300,40 @@ for (idx,f) in enumerate(all_files)
         
     end
 
-    #append!(states,[psi_gs])
+    #=append!(states,[psi_gs])
 
     if chi == 0.0
         println("Doing no magnetic field")
-        global sf_orderparams_null = abs(momentum_occupation(psi_gs,1,0.0; densmat=densmat)[2][1])
+        #global sf_orderparams_null = abs(momentum_occupation(psi_gs,1,0.0; densmat=densmat)[2][1])
         global bonddims_null = maxlinkdim(psi_gs)
         #distcorrs_null = minimum(abs.(distance_correlation(psi_gs; if_plot=false)[2]))
-        global ees_null = entanglement_entropy(psi_gs)
+        #=global ees_null = entanglement_entropy(psi_gs)
         virt_corr_lengths = physical_distance_correlation(psi_gs; if_plot=false)[3]
         for i in 1:nflavors
             corrlengs_null[i] = virt_corr_lengths[i]
         end
+        =#
+        global nrgs_null = real(calculate_energy(psi_gs,this_ham))
         println("Results are: ",sf_orderparams_null,", ",bonddims_null,", ",distcorrs_null,", ",ees_null,", ",corrlengs_null)
     else
         bonddims[idx] = maxlinkdim(psi_gs)
-        sf_orderparams[idx] = abs(momentum_occupation(psi_gs,1,0.0; densmat=densmat)[2][1])
+        #sf_orderparams[idx] = abs(momentum_occupation(psi_gs,1,0.0; densmat=densmat)[2][1])
         #distcorrs[idx] = minimum(abs.(distance_correlation(psi_gs; if_plot=false)[2]))
         ees[idx] = entanglement_entropy(psi_gs)
-        virt_corr_lengths = physical_distance_correlation(psi_gs; if_plot=false)[3]
+        #=virt_corr_lengths = physical_distance_correlation(psi_gs; if_plot=false)[3]
         for i in 1:nflavors
             corrlengs[i][idx] = virt_corr_lengths[i]
-        end
+        end=#
+        nrgs[idx] = real(calculate_energy(psi_gs,this_ham))
     end
     #
     
     
     #physical_distance_correlation(psi_gs)
-    #=
-    if false
+    #
+    if true
     if idx > 1
-        plot([part_count/(strens[idx-1]*nflavors*L),part_count/(chi*nflavors*L)],[corrlengs[1][idx-1],corrlengs[1][idx]],"-p",c="b")
+        plot([part_count/(strens[idx-1]*nflavors*L),part_count/(chi*nflavors*L)],[sf_orderparams[idx-1],sf_orderparams[idx]],"-p",c="b")
         #plot([(part_count-1)/(strens[idx-1]*tot_sites),part_count/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
     else
         #scatter([part_count/(strens[idx]*nflavors*L)],[sf_orderparams[idx]],c="b")
@@ -333,7 +341,7 @@ for (idx,f) in enumerate(all_files)
     end
     end
     #
-    
+    #
     if false
     nrgs[i] = calculate_energy(psi_gs,found_metadata["ham"])
     currents[:,i] = [calc_deriv(1,psi_gs,s,Int(L/2),nflavors,chi,ham_params) for s in 1:nflavors]
@@ -354,7 +362,7 @@ for (idx,f) in enumerate(all_files)
     ylabel("Synthetic Site")
     colorbar()
     =#
-end
+#end
 #
 #=
 fig = figure()
@@ -377,8 +385,8 @@ xlabel("Central Flux Strength")
 legend()
 =#
 end
-println("Results are: ",sf_orderparams_null,", ",bonddims_null,", ",distcorrs_null,", ",ees_null,", ",corrlengs_null)
-#
+#println("Results are: ",sf_orderparams_null,", ",bonddims_null,", ",distcorrs_null,", ",ees_null,", ",corrlengs_null)
+#=
 xvals = part_count ./ (strens .* (L*nflavors))
 
 #
@@ -394,6 +402,12 @@ plot(xvals,sf_orderparams,"-p")
 plot(xvals,zeros(length(xvals)) .+ sf_orderparams_null,c="r")
 xlabel("Filling Factor")
 ylabel("SF Order Parameter")
+
+fig6 = figure()
+plot(xvals,nrgs,"-p")
+plot(xvals,zeros(length(xvals)) .+ nrgs_null,c="r")
+xlabel("Filling Factor")
+ylabel("Energy")
 
 #=
 fig4 = figure()
@@ -412,8 +426,7 @@ end
 xlabel("Filling Factor")
 ylabel("Correlation Length")
 legend()
-#
-#
+=#
 
 #
 #end
