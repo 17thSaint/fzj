@@ -88,6 +88,7 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
         tilt_strength = get(kwargs, :tilt_strength, 0.0)
         centralflux_strength = get(kwargs, :centralflux_strength, 0.0)
         if_s0 = get(kwargs, :if_s0, true)
+        if_sephc = get(kwargs, :if_sephc, nothing)
         
         s0 = 0.0
         if if_s0
@@ -106,8 +107,15 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
                         continue
                     end
                 end
-                ampo += (-tp * exp(im*pi*chi*(s-s0)) * exp(im*2*pi*centralflux_strength/L), "Cr$s", j, "Anh$s", next_site)
-                ampo += (-tp * exp(-im*pi*chi*(s-s0)) * exp(-im*2*pi*centralflux_strength/L), "Anh$s", j, "Cr$s", next_site)
+                coeff = -tp * exp(im*pi*chi*(s-s0)) * exp(im*2*pi*centralflux_strength/L)
+                if isnothing(if_sephc)
+                    ampo += (coeff, "Cr$s", j, "Anh$s", next_site)
+                    ampo += (conj(coeff), "Anh$s", j, "Cr$s", next_site)
+                elseif if_sephc == "hc"
+                    ampo += (conj(coeff), "Anh$s", j, "Cr$s", next_site)
+                else
+                    ampo += (coeff, "Cr$s", j, "Anh$s", next_site)
+                end
             end
         end
         
@@ -122,9 +130,14 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
                         continue
                     end
                 end
-                ampo += (-ts * 1.0, "Cr$(next_site) * Anh$(s)", j)
-                ampo += (-ts * 1.0, "Cr$(s) * Anh$(next_site)", j)
-                #ampo += (-t2 * exp(-im*phi*j), "Anh$(next_site) * Cr$(s)", j)
+                if isnothing(if_sephc)
+                    ampo += (-ts * 1.0, "Cr$(next_site) * Anh$(s)", j)
+                    ampo += (-ts * 1.0, "Cr$(s) * Anh$(next_site)", j)
+                elseif if_sephc == "norm"
+                    ampo += (-ts * 1.0, "Cr$(s) * Anh$(next_site)", j)
+                else
+                    ampo += (-ts * 1.0, "Cr$(next_site) * Anh$(s)", j)
+                end
             end
         end
         
@@ -140,8 +153,9 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
         return ampo
 end
 
-params_dict = make_args_dict(ARGS)
-#params_dict = Dict([("L",8),("nflavors",7)])
+
+#params_dict = make_args_dict(ARGS)
+params_dict = Dict([("L",6),("nflavors",5)])
 #
 open_cores = get(params_dict, "open_cores", "all")
 if typeof(open_cores) != String
@@ -151,9 +165,9 @@ if_save_data = get(params_dict,"if_save_data",true)
 dataloc = get_folder_location("cluster-data/synth-dims","fzj")
 if_densmat = true
 
-nsweeps = 100
+nsweeps = 500
 nrgvar_tol = 1E-7
-mdim = get(params_dict,"mdim",700)
+mdim = get(params_dict,"mdim",300)
 noise = [0.0]
 
 #geo_params = [()] # (L,nf,nb)
@@ -165,9 +179,9 @@ states = []
 #for L in Ls
 L = Int(get(params_dict,"L",16))
 nflavors = Int(get(params_dict,"nflavors",8))
-part_count = Int(get(params_dict,"nbosons",Int(L/2)))
+part_count = Int(get(params_dict,"nbosons",Int(floor(L/2))))
 filling = get(params_dict,"filling",nothing)
-chi = get(params_dict,"chi",nothing)
+#=chi = get(params_dict,"chi",nothing)
 if isnothing(filling)
     if isnothing(chi)
         filling = 1.0
@@ -177,7 +191,7 @@ if isnothing(filling)
     end
 else
     chi = part_count / (filling * L * nflavors)
-end
+end=#
 
 tilt = 0.0
 
@@ -192,21 +206,23 @@ metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodi
 
 #
 if true
-counting = 5
-#scaling = 64
-strens = range(part_count/(0.3*L*nflavors),part_count/(0.6*L*nflavors),length=counting)#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
+counting = 20
+#=scaling = 64
+strens = collect(range(part_count/(0.35*L*nflavors),part_count/(2.0*L*nflavors),length=counting))#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
+append!(strens,[0.0])
 sf_orderparams = zeros(length(strens))
 bonddims = zeros(length(strens))
 distcorrs = zeros(length(strens))
 ees = zeros(length(strens))
 corrlengs = [zeros(length(strens)) for i in 1:nflavors]
 nrgs = zeros(length(strens))
+excited_nrgs = zeros(length(strens))
 #
 #nrgs = zeros(length(strens)) .* im
 #currents = zeros(nflavors,length(strens)) .* im
 #drudes = zeros(nflavors,length(strens)) .* im
-#
-#=chi = 0.0
+=#
+#chi = 0.0
 finding_dict = Dict([("L",L),("nbosons",part_count),("nflavors",nflavors),("centralflux_strength",centralflux_strength)])
 loc = "/home/patrick/fzj/main-git/cluster-data/synth-dims/"
 all_files = find_data_file(finding_dict,"mps",loc)
@@ -216,6 +232,7 @@ display(all_files)
 #
 strens = zeros(length(all_files))
 nrgs = zeros(length(all_files))
+excited_nrgs = zeros(length(all_files))
 #currents = zeros(nflavors,length(all_files)) .* im
 #drudes = zeros(nflavors,length(all_files)) .* im
 sf_orderparams = zeros(length(all_files))
@@ -223,18 +240,19 @@ bonddims = zeros(length(all_files))
 distcorrs = zeros(length(all_files))
 ees = zeros(length(all_files))
 corrlengs = [zeros(length(all_files)) for i in 1:nflavors]
-=#
+#
 sf_orderparams_null = 0.0
 bonddims_null = 0.0
 distcorrs_null = 0.0
 ees_null = 0.0
 corrlengs_null = [0.0 for i in 1:nflavors]
 nrgs_null = 0.0
+excited_nrgs_null = 0.0
 #
 
 #println("Chi = ",part_count / (nu*L*nflavors))
 #for (idx,chi) in enumerate(strens)
-#for (idx,f) in enumerate(all_files)
+for (idx,f) in enumerate(all_files)
     #
     if false
         found_data, found_metadata = read_data_jld2(f,loc)
@@ -242,7 +260,11 @@ nrgs_null = 0.0
         chi = found_metadata["chi"]
         chi != 0.0 ? strens[idx] = chi : nothing
         psi_gs = found_data["mps"]
-        this_ham = found_metadata["ham"]
+        full_ham = found_metadata["ham"]
+
+        ham_params = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
+        ham_hc = hamiltonian_universal(L,nflavors,chi; ham_params...,if_sephc="hc")
+        ham_norm = hamiltonian_universal(L,nflavors,chi; ham_params...,if_sephc="norm")
 
         #get_occupancy(psi_gs; plot_title="nu = $(round(part_count/(chi*nflavors*L),digits=4))")
         #=
@@ -267,6 +289,8 @@ nrgs_null = 0.0
     #ham_params = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
     #display(found_metadata)
     if true
+        chi = get_params_dict_from_filename(f)["chi"]
+
         metadata["chi"] = chi
         naming_dict["chi"] = round(chi,digits=5)
         #=
@@ -285,55 +309,123 @@ nrgs_null = 0.0
         ham_start = hamiltonian_universal(L,nflavors,chi; ham_params...)
         obs = NRGVarObserver(nrgvar_tol,ham_start)
 
-        this_ham = ham_start
+        full_ham = ham_start
 
         if_exists,found_data = check_data_exists(naming_dict,"mps";location=dataloc)
         #
         if if_exists
             psi_gs = found_data[1]["mps"]
             densmat = found_data[1]["densmat"]
+            if true # find next highest energy level
+                strens[idx] = chi
+                new_loc = get_folder_location("cluster-data/synth-dims/higher-states","fzj")
+                if_exists_higher,found_data_higher = check_data_exists(naming_dict,"mps";location=new_loc)
+                
+                if if_exists_higher
+                    println("Already found higher energy state")
+                    psi_higher = found_data_higher[1]["mps"]
+                    densmat_higher = found_data_higher[1]["densmat"]
+                else
+                    metadata["nrg_level"] = "1"
+                    dmrg_params = (psi_ortho=psi_gs,if_gpu=if_gpu,ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=new_loc,observer=obs,if_densmat=if_densmat,nsweeps=nsweeps,noise=noise)
+                    psi_higher, densmat_higher = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
+                    println("Energy Variance = ",energy_variance(psi_higher,ham_start)," at Chi = ",chi)
+                end
+            end
         else
             dmrg_params = (if_gpu=if_gpu,ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=dataloc,observer=obs,if_densmat=if_densmat,nsweeps=nsweeps,noise=noise)
             psi_gs, densmat = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
             println("Energy Variance = ",energy_variance(psi_gs,ham_start)," at Chi = ",chi)
+
+            if false
+                new_loc = get_folder_location("cluster-data/synth-dims/higher-states","fzj")
+                if_exists_higher,found_data_higher = check_data_exists(naming_dict,"mps";location=new_loc)
+
+                if if_exists_higher
+                    psi_higher = found_data_higher[1]["mps"]
+                    densmat_higher = found_data_higher[1]["densmat"]
+                else
+                    metadata["nrg_level"] = "1"
+                    dmrg_params_higher = (psi_ortho=psi_gs,if_gpu=if_gpu,ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=new_loc,observer=obs,if_densmat=if_densmat,nsweeps=nsweeps,noise=noise)
+                    psi_higher, densmat_higher = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params_higher...)
+                    println("Energy Variance = ",energy_variance(psi_higher,ham_start)," at Chi = ",chi)
+                end
+            end
         end
         
     end
 
-    #=append!(states,[psi_gs])
+    #append!(states,[psi_gs])
 
+    #=
     if chi == 0.0
+        #
         println("Doing no magnetic field")
-        #global sf_orderparams_null = abs(momentum_occupation(psi_gs,1,0.0; densmat=densmat)[2][1])
+        global sf_orderparams_null = abs(2*sum(densmat))#abs(momentum_occupation(psi_gs,1,0.0; densmat=densmat)[2][1])
         global bonddims_null = maxlinkdim(psi_gs)
         #distcorrs_null = minimum(abs.(distance_correlation(psi_gs; if_plot=false)[2]))
-        #=global ees_null = entanglement_entropy(psi_gs)
+        global ees_null = entanglement_entropy(psi_gs)
         virt_corr_lengths = physical_distance_correlation(psi_gs; if_plot=false)[3]
         for i in 1:nflavors
             corrlengs_null[i] = virt_corr_lengths[i]
         end
-        =#
-        global nrgs_null = real(calculate_energy(psi_gs,this_ham))
+        #
+        global nrgs_null = real(calculate_energy(psi_gs,full_ham))
         println("Results are: ",sf_orderparams_null,", ",bonddims_null,", ",distcorrs_null,", ",ees_null,", ",corrlengs_null)
+        #
     else
+        sf_orderparams[idx] = abs(2*sum(densmat))#abs(momentum_occupation(psi_gs,1,0.0; densmat=densmat)[2][1])
+        #
         bonddims[idx] = maxlinkdim(psi_gs)
-        #sf_orderparams[idx] = abs(momentum_occupation(psi_gs,1,0.0; densmat=densmat)[2][1])
         #distcorrs[idx] = minimum(abs.(distance_correlation(psi_gs; if_plot=false)[2]))
         ees[idx] = entanglement_entropy(psi_gs)
-        #=virt_corr_lengths = physical_distance_correlation(psi_gs; if_plot=false)[3]
+        virt_corr_lengths = physical_distance_correlation(psi_gs; if_plot=false)[3]
         for i in 1:nflavors
             corrlengs[i][idx] = virt_corr_lengths[i]
-        end=#
-        nrgs[idx] = real(calculate_energy(psi_gs,this_ham))
+        end
+        nrgs[idx] = real(calculate_energy(psi_gs,full_ham))
     end
-    #
+    =#
+
+    if chi == 0.0
+        #
+        println("Doing no magnetic field")
+        global sf_orderparams_null = abs(2*sum(densmat_higher))#abs(momentum_occupation(psi_gs,1,0.0; densmat=densmat)[2][1])
+        global bonddims_null = maxlinkdim(psi_higher)
+        #distcorrs_null = minimum(abs.(distance_correlation(psi_gs; if_plot=false)[2]))
+        global ees_null = entanglement_entropy(psi_higher)
+        virt_corr_lengths = physical_distance_correlation(psi_higher; if_plot=false)[3]
+        for i in 1:nflavors
+            corrlengs_null[i] = virt_corr_lengths[i]
+        end
+        #
+        global excited_nrgs_null = real(calculate_energy(psi_higher,full_ham))
+        global nrgs_null = real(calculate_energy(psi_gs,full_ham))
+        println("Results are: ",sf_orderparams_null,", ",bonddims_null,", ",distcorrs_null,", ",ees_null,", ",corrlengs_null)
+        #
+    else
+        #
+        sf_orderparams[idx] = abs(2*sum(densmat_higher))#abs(momentum_occupation(psi_gs,1,0.0; densmat=densmat)[2][1])
+        bonddims[idx] = maxlinkdim(psi_higher)
+        #distcorrs[idx] = minimum(abs.(distance_correlation(psi_gs; if_plot=false)[2]))
+        ees[idx] = entanglement_entropy(psi_higher)
+        virt_corr_lengths = physical_distance_correlation(psi_higher; if_plot=false)[3]
+        for i in 1:nflavors
+            corrlengs[i][idx] = virt_corr_lengths[i]
+        end
+        #
+        nrgs[idx] = real(calculate_energy(psi_gs,full_ham))
+        excited_nrgs[idx] = real(calculate_energy(psi_higher,full_ham))
+    end
     
     
     #physical_distance_correlation(psi_gs)
     #
-    if true
+    if false
     if idx > 1
-        plot([part_count/(strens[idx-1]*nflavors*L),part_count/(chi*nflavors*L)],[sf_orderparams[idx-1],sf_orderparams[idx]],"-p",c="b")
+        plot([part_count/(strens[idx-1]*nflavors*L),part_count/(chi*nflavors*L)],[excited_nrgs[idx-1],excited_nrgs[idx]],"-p",c="b")
+        plot([part_count/(strens[idx-1]*nflavors*L),part_count/(chi*nflavors*L)],[nrgs[idx-1],nrgs[idx]],"-p",c="r")
+        #scatter([part_count/(chi*nflavors*L)],[nrg_gs - nrgs[idx]],c="r")
         #plot([(part_count-1)/(strens[idx-1]*tot_sites),part_count/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
     else
         #scatter([part_count/(strens[idx]*nflavors*L)],[sf_orderparams[idx]],c="b")
@@ -347,7 +439,7 @@ nrgs_null = 0.0
     currents[:,i] = [calc_deriv(1,psi_gs,s,Int(L/2),nflavors,chi,ham_params) for s in 1:nflavors]
     drudes[:,i] = [calc_deriv(2,psi_gs,s,Int(L/2),nflavors,chi,ham_params) for s in 1:nflavors]
     end
-    =#
+    #
     
     #=
     centersite = Int(ceil(L/2))
@@ -362,7 +454,7 @@ nrgs_null = 0.0
     ylabel("Synthetic Site")
     colorbar()
     =#
-#end
+end
 #
 #=
 fig = figure()
@@ -386,8 +478,17 @@ legend()
 =#
 end
 #println("Results are: ",sf_orderparams_null,", ",bonddims_null,", ",distcorrs_null,", ",ees_null,", ",corrlengs_null)
-#=
+#
 xvals = part_count ./ (strens .* (L*nflavors))
+
+fig7 = figure()
+plot(xvals,excited_nrgs .- nrgs,"-p")
+plot(xvals,zeros(length(xvals)) .+ (excited_nrgs_null - nrgs_null),c="r",label="Zero Field")
+#plot(xvals,nrgs,"-p",label="Excited")
+xlabel("Filling Factor")
+ylabel("Energy - E_GS")
+legend()
+title("Energy Gap for L=$L, nflavors=$nflavors, nbosons=$part_count")
 
 #
 fig1 = figure()
@@ -399,10 +500,11 @@ ylabel("Bond Dimension")
 
 fig3 = figure()
 plot(xvals,sf_orderparams,"-p")
+#plot([0.5*(xvals[i+1]+xvals[i]) for i in 1:length(xvals)-1],[(sf_orderparams[i+1]-sf_orderparams[i])/(xvals[i+1]-xvals[i]) for i in 1:length(xvals)-1],"-p")
 plot(xvals,zeros(length(xvals)) .+ sf_orderparams_null,c="r")
 xlabel("Filling Factor")
 ylabel("SF Order Parameter")
-
+#
 fig6 = figure()
 plot(xvals,nrgs,"-p")
 plot(xvals,zeros(length(xvals)) .+ nrgs_null,c="r")
@@ -421,12 +523,16 @@ ylabel("Entanglement Entropy")
 fig5 = figure()
 for s in 1:nflavors
     plot(xvals,corrlengs[s],"-p",label="$s")
-    plot(xvals,zeros(length(xvals)) .+ corrlengs_null[s],label="Null $s")
+    if s == 1
+        plot(xvals,zeros(length(xvals)) .+ corrlengs_null[s],label="Null $s",c="k")
+    else
+        plot(xvals,zeros(length(xvals)) .+ corrlengs_null[s],c="k")
+    end
 end
 xlabel("Filling Factor")
 ylabel("Correlation Length")
 legend()
-=#
+#
 
 #
 #end

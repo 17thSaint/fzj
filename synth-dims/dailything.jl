@@ -1,7 +1,8 @@
-if false
-include("long-range-ttn.jl")
+if true
+#include("long-range-ttn.jl")
 include("fqh_effective.jl")
 include("time_evolution.jl")
+include("../other-funcs/data-storage-funcs.jl")
 #include("reproduce-other.jl")
 #using PyPlot,Observers,ITensorTDVP,LsqFit
 end
@@ -53,16 +54,133 @@ function find_slope(times,values; kwargs...)
     return a
 end
 
-if true
-L = 16
-nflavors = 8
-nbosons = 8
-params_dict = Dict([("L",L),("nflavors",nflavors)])
+function find_sforderparam_transition(all_files,loc; kwargs...)
+	if_plot = get(kwargs, :if_plot, false)
+
+	fillings = []
+	sf_orderparams = []
+	file_params = get_params_dict_from_filename(all_files[1])
+	for f in all_files
+		data,metadata = read_data_jld2(f,loc)
+		psi = data["mps"]
+		rho = data["densmat"]
+		chi = metadata["chi"]
+		if chi == 0.0
+			continue
+		else
+			append!(fillings,[metadata["nbosons"]/(file_params["L"]*file_params["nflavors"]*metadata["chi"])])
+			sf_op = abs(momentum_occupation(psi,1,0.0; densmat=rho)[2][1])
+			append!(sf_orderparams,[sf_op])
+		end
+	end
+
+	deriv_sf_orderparams = percent_change(sf_orderparams)
+	minval,min_loc = findmin(deriv_sf_orderparams)
+
+	if if_plot
+		#fig = figure()
+		plot(fillings,sf_orderparams ./ (file_params["L"]*file_params["nflavors"]),"-p",label="L = $(file_params["L"]), nf=$(file_params["nflavors"])")
+		#title("SF Order Parameter vs Filling: L = $(file_params["L"]), nflavors = $(file_params["nflavors"])")
+		#plot([fillings[min_loc+1],fillings[min_loc+1]],[minimum(sf_orderparams),maximum(sf_orderparams)],label="Transition Point",c="r")
+		#legend()
+	end
+
+	return fillings[min_loc+1],fillings,sf_orderparams
+end
+
+function find_current_transition(all_files,loc; kwargs...) # adding HC part of current so not exactly equal to current
+	if_plot = get(kwargs, :if_plot, false)
+
+	fillings = []
+	currents = []
+	file_params = get_params_dict_from_filename(all_files[1])
+	for f in all_files
+		data,metadata = read_data_jld2(f,loc)
+		psi = data["mps"]
+		rho = data["densmat"]
+		chi = metadata["chi"]
+		if chi == 0.0
+			continue
+		else
+			append!(fillings,[metadata["nbosons"]/(file_params["L"]*file_params["nflavors"]*metadata["chi"])])
+			loc_curr = real(get_current(data["mps"];alpha=metadata["chi"],densmat=data["densmat"],if_addhc=true)[1])
+			append!(currents,[loc_curr])
+		end
+	end
+
+	deriv_currents = percent_change(currents)
+	minval,min_loc = findmin(deriv_currents)
+
+	if if_plot
+
+		fig = figure()
+		plot(fillings,currents,"-p",label="Real")#,label="L = $(file_params["L"]), nf=$(file_params["nflavors"])")
+		title("Current vs Filling: L = $(file_params["L"]), nflavors = $(file_params["nflavors"])")
+		#plot([fillings[min_loc+1],fillings[min_loc+1]],[minimum(currents),maximum(currents)],label="Transition Point",c="r")
+		legend()
+	end
+
+	return fillings[min_loc+1],fillings,currents
+end
+
+
 loc = get_folder_location("cluster-data/synth-dims","fzj")
-all_files = find_data_file(params_dict,"mps",loc)
-data,metadata = read_data_jld2(all_files[1],loc)
-psi = data["mps"]
-rho = data["densmat"]
+exc_loc = get_folder_location("cluster-data/synth-dims/higher-states","fzj")
+L = 6
+nflavors = 5
+nbosons = 3
+params_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons)])
+gs_files = find_data_file(params_dict,"mps",loc)
+exc_files = find_data_file(params_dict,"mps",exc_loc)
+
+idx = 0
+for f_exc in exc_files[21:40]
+	data_exc,metadata_exc = read_data_jld2(f_exc,exc_loc)
+	psi_exc = data_exc["mps"]
+	filling_exc = nbosons/(L*nflavors*metadata_exc["chi"])
+	fig = figure()
+	max_overlap = 0.0
+	for f_gs in gs_files
+		data_gs,metadata_gs = read_data_jld2(f_gs,loc)
+		psi_gs = data_gs["mps"]
+		filling_gs = nbosons/(L*nflavors*metadata_gs["chi"])
+
+		if isinf(filling_gs) || isinf(filling_exc)
+			continue
+		end
+
+		overlap = abs2(inner(psi_exc,psi_gs))
+		overlap > max_overlap ? max_overlap = overlap : nothing
+		 
+		global idx += 1
+		if (filling_gs < 0.3 && filling_exc < 0.3) || (filling_gs > 0.3 && filling_exc > 0.3)
+			pc = "b"
+		elseif filling_gs == 0.3 || filling_exc == 0.3
+			pc = "r"
+		else
+			pc = "g"
+		end
+		println(idx)
+		scatter([filling_gs],[overlap],c=pc)
+	end
+	plot([filling_exc,filling_exc],[0,max_overlap],c="k")
+end
+title("Overlap of excited state at black line with other GSs")
+
+
+#=
+fig = figure()
+scatter3D(xs,ys,transitions .* ys,"p")
+xlabel("L")
+ylabel("nflavors")
+zlabel("Transition Filling")
+
+fig2 = figure()
+plot(numparts ./ (xs .* ys),transitions,"p")
+xlabel("Density")
+ylabel("Transition Filling")
+=#
+
 
 
 #=
@@ -89,7 +207,6 @@ chosenfile = all_files[2]
 data,metadata = read_data_jld2(chosenfile,loc)
 wavefunc = data["ttn"]
 =#
-end
 
 #=
 allberries = [zeros(edge_length-2,edge_length-2) for i in 1:length(all_files)]

@@ -359,8 +359,10 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	display(metadata)
 	
 	
-	if isnothing(psi0)
+	if isnothing(psi0) && isnothing(psi_ortho)
 		sidx = siteinds("ExtendedHardcore", L; conserve_qns = conserve_qns, nflavors = nflavors)
+	elseif !isnothing(psi_ortho)
+		sidx = siteinds(psi_ortho)
 	else
 		sidx = siteinds(psi0)
 	end
@@ -376,7 +378,6 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 		psi0 = randomMPS(sidx, states)
 	end
 	if if_gpu
-		
 		H = ITensorGPU.cu(H)
 		psi0 = ITensorGPU.cu(psi0)
 	end
@@ -882,18 +883,25 @@ end
 function get_current_phys(wavefunc::MPS; kwargs...)
 	if_exp_part = get(kwargs,:if_exp_part,true)
 	alpha = get(kwargs,:alpha,0.0)
+	densmat = get(kwargs, :densmat, nothing)
+	if_addhc = get(kwargs, :if_addhc, false)
 	L,nflavors = get_mps_dims(wavefunc)
 	m0 = (nflavors)/2
 
 	currents = [0.0*im for i in 1:nflavors]
 	for i in 1:nflavors
-		fullmat = correlation_matrix(wavefunc,"Cr$(i)","Anh$(i)")
-		component,hc_component = diag(fullmat,-1),diag(fullmat,1)
-		if if_exp_part
-			component .*= exp(im*alpha*(i-m0)/1)
-			hc_component .*= exp(-im*alpha*(i-m0)/1)
+		if isnothing(densmat)
+			fullmat = correlation_matrix(wavefunc,"Cr$(i)","Anh$(i)")
+			component,hc_component = diag(fullmat,-1),diag(fullmat,1)
+		else
+			fullmat = densmat[L*(i-1)+1:L*i,L*(i-1)+1:L*i]
+			component,hc_component = diag(fullmat,-1),diag(fullmat,1)
 		end
-		currents[i] = sum(component) - sum(hc_component)
+		if if_exp_part
+			component .*= exp(im*pi*alpha*(i-m0)/1)
+			hc_component .*= exp(-im*pi*alpha*(i-m0)/1)
+		end
+		currents[i] = if_addhc ? sum(component) + sum(hc_component) : sum(component) - sum(hc_component)
 	end
 	return sum(currents), currents
 end
@@ -1035,7 +1043,7 @@ function ITensors.checkdone!(o::NRGVarObserver;kwargs...)
   sw = kwargs[:sweep]
   psi = kwargs[:psi]
   ham = o.local_ham
-  if o.nrg_var[end] < o.var_tol
+  if o.nrg_var[end] < o.var_tol && length(o.nrg_var) > 5
     #println("Stopping DMRG after sweep $sw")
     return true
   elseif length(o.nrg_var) > 10 && o.nrg_var[end] < o.var_tol*1E1 && std(o.nrg_var[end-10:end])/o.nrg_var[end] < 0.03
