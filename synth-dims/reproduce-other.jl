@@ -153,6 +153,8 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
         return ampo
 end
 
+statenames = ["first","second","third","fourth","fifth"]
+higherstatetofind = 3
 
 #params_dict = make_args_dict(ARGS)
 params_dict = Dict([("L",6),("nflavors",5)])
@@ -205,7 +207,7 @@ naming_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",part_count),("centr
 metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodic_virt",if_per_virt),("tilt_strength",tilt),("location",dataloc),("if_save_data",if_save_data),("nrgvar_tol",nrgvar_tol),("if_gpu",if_gpu),("mdim",mdim)]))
 
 #
-if true
+if false
 counting = 20
 #=scaling = 64
 strens = collect(range(part_count/(0.35*L*nflavors),part_count/(2.0*L*nflavors),length=counting))#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
@@ -229,12 +231,16 @@ all_files = find_data_file(finding_dict,"mps",loc)
 display(all_files)
 #
 
-#
+nrgs = Dict()
+for i in 0:higherstatetofind
+    nrgs[string(i)] = zeros(length(all_files))
+end
 strens = zeros(length(all_files))
-nrgs = zeros(length(all_files))
-excited_nrgs = zeros(length(all_files))
-#currents = zeros(nflavors,length(all_files)) .* im
-#drudes = zeros(nflavors,length(all_files)) .* im
+
+#=
+strens = zeros(length(all_files))
+#nrgs = zeros(length(all_files))
+#excited_nrgs = zeros(length(all_files))
 sf_orderparams = zeros(length(all_files))
 bonddims = zeros(length(all_files))
 distcorrs = zeros(length(all_files))
@@ -248,7 +254,7 @@ ees_null = 0.0
 corrlengs_null = [0.0 for i in 1:nflavors]
 nrgs_null = 0.0
 excited_nrgs_null = 0.0
-#
+=#
 
 #println("Chi = ",part_count / (nu*L*nflavors))
 #for (idx,chi) in enumerate(strens)
@@ -293,6 +299,9 @@ for (idx,f) in enumerate(all_files)
 
         metadata["chi"] = chi
         naming_dict["chi"] = round(chi,digits=5)
+        if part_count / (chi*nflavors*L) > 1.0
+            continue
+        end
         #=
         metadata["centralflux_strength"] = centralflux_strength
         if centralflux_strength < 0.0
@@ -311,26 +320,50 @@ for (idx,f) in enumerate(all_files)
 
         full_ham = ham_start
 
-        if_exists,found_data = check_data_exists(naming_dict,"mps";location=dataloc)
+        new_loc = get_folder_location("cluster-data/synth-dims/higher-states","fzj")
+
+        if_exists,found_data = check_data_exists(naming_dict,"mps";location=dataloc,output_level=false)
+
         #
         if if_exists
             psi_gs = found_data[1]["mps"]
             densmat = found_data[1]["densmat"]
-            if true # find next highest energy level
+            if higherstatetofind > 0 # find next highest energy level
                 strens[idx] = chi
-                new_loc = get_folder_location("cluster-data/synth-dims/higher-states","fzj")
-                if_exists_higher,found_data_higher = check_data_exists(naming_dict,"mps";location=new_loc)
+
+                if_exists_levels = append!([true],[false for i in 1:higherstatetofind])
+                all_level_states = [psi_gs]
+                for i in 1:higherstatetofind
+                    if_exists_higher,found_data_higher = check_data_exists(naming_dict,"mps";location=new_loc * "/$(statenames[i])",output_level=false)
+                    if_exists_levels[i+1] = if_exists_higher
+                    if if_exists_higher
+                        all_level_states = append!(all_level_states,[found_data_higher[1]["mps"]])
+                        println("State $i Already Found")
+                    else
+                        println("Need to Find State $i")
+                        display(if_exists_levels)
+                        metadata["nrg_level"] = string(i)
+                        dmrg_params = (psi_ortho=all_level_states[1:i],location=new_loc * "/$(statenames[i])",if_gpu=if_gpu,ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,observer=obs,if_densmat=if_densmat,nsweeps=nsweeps,noise=noise)
+                        psi_higher, densmat_higher = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
+                        println("Energy Variance = ",energy_variance(psi_higher,ham_start)," at Chi = ",chi)
+                        append!(all_level_states,[psi_higher])
+                    end
+                end
+                    
                 
+                
+                #=
                 if if_exists_higher
                     println("Already found higher energy state")
                     psi_higher = found_data_higher[1]["mps"]
                     densmat_higher = found_data_higher[1]["densmat"]
                 else
-                    metadata["nrg_level"] = "1"
+                    metadata["nrg_level"] = string(parse(Int,found_data[1]["metadata"]["nrg_level"]) + 1)
                     dmrg_params = (psi_ortho=psi_gs,if_gpu=if_gpu,ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=new_loc,observer=obs,if_densmat=if_densmat,nsweeps=nsweeps,noise=noise)
                     psi_higher, densmat_higher = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
                     println("Energy Variance = ",energy_variance(psi_higher,ham_start)," at Chi = ",chi)
                 end
+                =#
             end
         else
             dmrg_params = (if_gpu=if_gpu,ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=dataloc,observer=obs,if_densmat=if_densmat,nsweeps=nsweeps,noise=noise)
@@ -356,6 +389,32 @@ for (idx,f) in enumerate(all_files)
     end
 
     #append!(states,[psi_gs])
+
+    for i in 0:higherstatetofind
+        nrgs[string(i)][idx] = real(calculate_energy(all_level_states[i+1],full_ham))
+    end
+
+    col = ["b","g","r","c","m","y","k"]
+
+    if true
+    if idx > 1
+        
+        #=for i in 1:higherstatetofind
+            plot(part_count ./ ((L*nflavors) .* [strens[idx-1],strens[idx]]),[nrgs[string(i)][idx-1] - nrgs[string(i-1)][idx-1],nrgs[string(i)][idx] - nrgs[string(i-1)][idx]],"-p",c=col[i])
+        end=#
+        for i in 0:higherstatetofind
+            plot(part_count ./ ((L*nflavors) .* [strens[idx-1],strens[idx]]),[nrgs[string(i)][idx-1],nrgs[string(i)][idx]],"-p",c=col[i+1])
+        end
+        #=gs_overlap = abs2(inner(all_level_states[1],all_level_states[end]))
+        first_overlap = abs2(inner(all_level_states[2],all_level_states[end]))
+        second_overlap = abs2(inner(all_level_states[3],all_level_states[end]))
+        scatter(part_count ./ ((L*nflavors) .* [strens[idx]]),[log(1-gs_overlap)],c=col[1])
+        #scatter(part_count ./ ((L*nflavors) .* [strens[idx]]),[log(1-first_overlap)],c=col[2])
+        #scatter(part_count ./ ((L*nflavors) .* [strens[idx]]),[log(1-second_overlap)],c=col[3])
+        =#
+    end  
+    end      
+
 
     #=
     if chi == 0.0
@@ -385,7 +444,7 @@ for (idx,f) in enumerate(all_files)
         end
         nrgs[idx] = real(calculate_energy(psi_gs,full_ham))
     end
-    =#
+    #
 
     if chi == 0.0
         #
@@ -417,7 +476,7 @@ for (idx,f) in enumerate(all_files)
         nrgs[idx] = real(calculate_energy(psi_gs,full_ham))
         excited_nrgs[idx] = real(calculate_energy(psi_higher,full_ham))
     end
-    
+    =#
     
     #physical_distance_correlation(psi_gs)
     #
@@ -480,7 +539,7 @@ end
 #println("Results are: ",sf_orderparams_null,", ",bonddims_null,", ",distcorrs_null,", ",ees_null,", ",corrlengs_null)
 #
 xvals = part_count ./ (strens .* (L*nflavors))
-
+#=
 fig7 = figure()
 plot(xvals,excited_nrgs .- nrgs,"-p")
 plot(xvals,zeros(length(xvals)) .+ (excited_nrgs_null - nrgs_null),c="r",label="Zero Field")
@@ -504,12 +563,24 @@ plot(xvals,sf_orderparams,"-p")
 plot(xvals,zeros(length(xvals)) .+ sf_orderparams_null,c="r")
 xlabel("Filling Factor")
 ylabel("SF Order Parameter")
-#
+=#
 fig6 = figure()
-plot(xvals,nrgs,"-p")
-plot(xvals,zeros(length(xvals)) .+ nrgs_null,c="r")
+for i in 0:higherstatetofind
+    plot(xvals,nrgs[string(i)],"-p",label="$i")
+#plot(xvals,zeros(length(xvals)) .+ nrgs_null,c="r")
+end
 xlabel("Filling Factor")
 ylabel("Energy")
+legend()
+
+fig8 = figure()
+for i in 1:higherstatetofind
+    plot(xvals,nrgs[string(i)] .- nrgs[string(i-1)],"-p",label="$(i)-$(i-1)")
+    plot(xvals,zeros(length(xvals)),c="k")
+end
+xlabel("Filling Factor")
+ylabel("Energy Gap")
+legend()
 
 #=
 fig4 = figure()
@@ -518,7 +589,7 @@ plot(xvals,log.(bonddims),"-p")
 plot(xvals,zeros(length(xvals)) .+ ees_null,c="r")
 xlabel("Filling Factor")
 ylabel("Entanglement Entropy")
-=#
+#
 
 fig5 = figure()
 for s in 1:nflavors
@@ -532,7 +603,7 @@ end
 xlabel("Filling Factor")
 ylabel("Correlation Length")
 legend()
-#
+=#
 
 #
 #end

@@ -245,7 +245,7 @@ function check_data_exists(params_dict::Dict,data_type::String; kwargs...)
 			println("Too Many files")
 			return false,nothing
 		else
-			return true,read_data_jld2(possible_files[1],location)
+			return true,read_data_jld2(possible_files[1],location; kwargs...)
 		end
 	end
 end
@@ -257,7 +257,7 @@ function check_data_exists(filename::String,data_type="observer"; kwargs...)
     cd(location)
     if check_duplicates(filename)[1]
         cd(here)
-        return true,read_data_jld2(filename,location)[1][data_type]
+        return true,read_data_jld2(filename,location; kwargs...)[1][data_type]
     end
     cd(here)
     return false,nothing
@@ -352,7 +352,7 @@ function write_data_jld2(file_name,data,location=pwd(),metadata=nothing; kwargs.
 end
 
 function read_data_jld2(file_name,location=pwd(); kwargs...)
-	output_bool = get(kwargs, :output_bool, true)
+	output_bool = get(kwargs, :output_level, true)
 	og_location = pwd()
 	try
 		cd(location)
@@ -400,6 +400,7 @@ function read_data_jld2(file_name,location=pwd(); kwargs...)
 end
 
 function read_data_hdf5(file_name,location=pwd(); kwargs...)
+	output_level = get(kwargs, :output_level, true)
 	og_location = pwd()
 	cd(location)
 
@@ -426,7 +427,7 @@ function read_data_hdf5(file_name,location=pwd(); kwargs...)
 
 	close(binary_file)
 	cd(og_location)
-	println("Data Extracted, File Closed: $file_name")
+	output_level ? println("Data Extracted, File Closed: $file_name") : nothing
 
 	if length(output) < 2
 		return data

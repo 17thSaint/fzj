@@ -123,7 +123,108 @@ function find_current_transition(all_files,loc; kwargs...) # adding HC part of c
 	return fillings[min_loc+1],fillings,currents
 end
 
+#=
+loc = get_folder_location("cluster-data/synth-dims","fzj")
+for L in [6,7,8]#10,16
+	for nflavors in [4,5,6,7,8]
+		for nbosons in [3,4,5,8]
+			params_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons)])
+			all_files = find_data_file(params_dict,"mps",loc)
+			if length(all_files) < 2
+				continue
+			end
+			chis = []
+			sfs = []
+			for f in all_files
+				data,metadata = read_data_jld2(f,loc)
+				rho = data["densmat"]
+				append!(chis,[metadata["chi"]])
+				append!(sfs,[real(2*sum(rho))/(L*nflavors)])
+			end
+			plot(chis,sfs,"-p",label="L=$L,nf=$nflavors,nb=$nbosons")
+			legend()
+		end
+	end
+	xlabel("Flux Density")
+	ylabel("SF Order Parameter")
+end
+=#
 
+# 6,4,3 = 69
+# 6,5,3 = 50
+# 8,6,4 = 78
+
+loc = get_folder_location("cluster-data/synth-dims","fzj")
+#exc_loc = get_folder_location("cluster-data/synth-dims/higher-states","fzj")
+
+L = 6
+nflavors = 5
+nbosons = 3
+
+for (L,nflavors,nbosons) in [(8,6,4)]#(6,5,3),(6,4,3),
+	params_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons)])
+
+	if true # this finds all the files and removes them if not converged
+		gs_files = find_data_file(params_dict,"mps",loc)
+		chis = []
+		badfiles = []
+		for f in gs_files
+			namedata = get_params_dict_from_filename(f)
+			filling = round(nbosons/(L*nflavors*namedata["chi"]),digits=4)
+			data,metadata = read_data_jld2(f,loc)
+			allvars = (metadata["observer"]).nrg_var[2:end]
+			if allvars[end] > 1E-6
+				#=plot(allvars,label="$filling")
+				yscale("log")
+				legend()=#
+				append!(badfiles,[f])
+			elseif namedata["chi"] == 0.0
+				append!(badfiles,[f])
+			elseif nbosons/(L*nflavors*namedata["chi"]) < 0.2
+				append!(badfiles,[f])
+			else
+				append!(chis,[namedata["chi"]])
+			end
+		end
+		filter!(x -> x ∉ badfiles, gs_files)
+	end
+
+	#
+	deltas = []
+	localchis = []
+	fids = []
+	#bonddims = []
+	bulkdenss = []
+	for i in 2:length(gs_files)
+		println(i/length(gs_files))
+		data1,metadata1 = read_data_jld2(gs_files[i-1],loc)
+		data2,metadata2 = read_data_jld2(gs_files[i],loc)
+		delta = abs(metadata1["chi"] - metadata2["chi"])/2
+		append!(deltas,[delta])
+		localchi = (metadata1["chi"] + metadata2["chi"])/2
+		append!(localchis,[localchi])
+		#fid = (-1/(L*nflavors)) * log(abs2(inner(data1["mps"],data2["mps"])))
+		#append!(fids,[fid])
+		#append!(bonddims,maxlinkdim(data1["mps"]))
+		append!(bulkdenss,[bulk_density(data1["mps"],0,1)])
+	end
+	#=
+	fig = figure()
+	plot(nbosons ./ ((L*nflavors) .* localchis),1 .- exp.(-1 .* fids),"-p")
+	plot(nbosons ./ ((L*nflavors) .* localchis),deltas,"-p")
+	xlabel("Filling")
+	ylabel("Infidelity (1-exp(-F))")
+	title("L = $L, nflavors = $nflavors, nbosons = $nbosons")
+	=#
+	fig2 = figure()
+	plot(nbosons ./ ((L*nflavors) .* localchis),bulkdenss,"-p")
+	xlabel("Filling")
+	ylabel("Bond Dim")
+	title("L = $L, nflavors = $nflavors, nbosons = $nbosons")
+end
+
+
+#=
 loc = get_folder_location("cluster-data/synth-dims","fzj")
 exc_loc = get_folder_location("cluster-data/synth-dims/higher-states","fzj")
 L = 6
@@ -166,22 +267,7 @@ for f_exc in exc_files[21:40]
 	plot([filling_exc,filling_exc],[0,max_overlap],c="k")
 end
 title("Overlap of excited state at black line with other GSs")
-
-
-#=
-fig = figure()
-scatter3D(xs,ys,transitions .* ys,"p")
-xlabel("L")
-ylabel("nflavors")
-zlabel("Transition Filling")
-
-fig2 = figure()
-plot(numparts ./ (xs .* ys),transitions,"p")
-xlabel("Density")
-ylabel("Transition Filling")
 =#
-
-
 
 #=
 layers = 6

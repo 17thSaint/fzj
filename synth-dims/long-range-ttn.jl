@@ -473,7 +473,7 @@ function radial_box_dist(ttn)
 	return full_rads,combined_vals
 end
 
-function bulk_density(ttn,bulk_width_phys=1,bulk_width_virt=1; kwargs...)
+function bulk_density(ttn::TreeTensorNetwork,bulk_width_phys=1,bulk_width_virt=1; kwargs...)
 	if isnothing(ttn)
 		occ_mat = get(kwargs, :occ_mat, nothing)
 	else

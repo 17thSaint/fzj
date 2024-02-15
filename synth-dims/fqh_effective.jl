@@ -321,6 +321,46 @@ function run_again(filename; kwargs...)
 	println("Energy Variance = ",energy_variance(new_gs,metadata["ham"]))
 end
 
+function make_vacuum(L,nflavors; kwargs...)
+	sitetype = get(kwargs, :sitetype, "ExtendedHardcore")
+	conserve_qns = get(kwargs, :conserve_qns, true)
+	return randomMPS(siteinds("ExtendedHardcore", L; conserve_qns = conserve_qns, nflavors = nflavors), ["0" for i in 1:L])
+end
+
+function equal_weight(nflavors; kwargs...)
+	return [1/nflavors for i in 1:nflavors]
+end
+
+function creation_physical(phys_site::Index,nflavors; kwargs...)
+	weighting_function = get(kwargs, :weighting_function, equal_weight)
+	
+	weights = weighting_function(nflavors)
+	creation = weights[1] .* op("Cr1", phys_site)
+	for s in 2:nflavors
+		creation += weights[s] .* op("Cr$(s)", phys_site)
+	end
+	return creation
+end
+
+function make_one_particle(L,nflavors; kwargs...)
+
+	for j in 1:L
+		cr_at_phys_site = creation_physical(siteind(vac,1),nflavors)
+	end
+	return cr_site1 * vac
+end
+
+L = 4
+nflavors = 2
+vac = make_vacuum(L,nflavors)
+cr_site1 = creation_physical(siteind(vac,1),nflavors)
+#thisidentity = op("I",siteind(vac,1))
+#M = [thisidentity cr_site1]
+#site1 = ITensor(M)
+
+
+
+
 function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	running_again = get(kwargs, :running_again, false)
 	psi_ortho = get(kwargs, :psi_ortho, nothing)
@@ -362,7 +402,7 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	if isnothing(psi0) && isnothing(psi_ortho)
 		sidx = siteinds("ExtendedHardcore", L; conserve_qns = conserve_qns, nflavors = nflavors)
 	elseif !isnothing(psi_ortho)
-		sidx = siteinds(psi_ortho)
+		sidx = length(psi_ortho) > 1 ? siteinds(psi_ortho[1]) : siteinds(psi_ortho)
 	else
 		sidx = siteinds(psi0)
 	end
@@ -384,6 +424,8 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	if !isnothing(psi_ortho)
 		if typeof(psi_ortho) != Vector{MPS}
 			psi_ortho = [psi_ortho]
+		else
+			println("Using $(length(psi_ortho)) orthogonal states")
 		end
 		E, psi = dmrg(H, psi_ortho, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = 1E-14)
 	else
@@ -961,6 +1003,20 @@ function momentum_occupation(wavefunc::MPS,part_count::Int,p_count::Int64,p_end=
 	return momenta,mom_occ
 end
 =#
+
+function bulk_density(wavefunc::MPS,bulk_width_phys=1,bulk_width_virt=1; kwargs...)
+	if isnothing(wavefunc)
+		occ_mat = get(kwargs, :occ_mat, nothing)
+	else
+		occ_mat = get_occupancy(wavefunc;if_plot=false)
+	end
+	size(occ_mat)[1] == size(occ_mat)[2] ? bulk_width_virt = bulk_width_phys : nothing
+	num_particles = sum(occ_mat)
+	bulk_occ_mat = occ_mat[1+bulk_width_phys:end-bulk_width_phys,1+bulk_width_virt:end-bulk_width_virt]
+	#imshow(bulk_occ_mat)
+	bulk_density = sum(bulk_occ_mat)/prod(size(bulk_occ_mat))
+	return bulk_density
+end
 
 function get_densdens_corrs(wavefunc::MPS,distances=nothing; kwargs...)
 	phys_edge_length,virt_edge_length = get_mps_dims(wavefunc)
