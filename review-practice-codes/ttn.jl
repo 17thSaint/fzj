@@ -1598,7 +1598,6 @@ function density_matrix(ttn; kwargs...)
 		end
 	end
 	
-	return densmat
 end
 
 function integrated_density(occs_diff::Matrix; kwargs...)
@@ -1618,15 +1617,6 @@ function integrated_density(occs_diff::Matrix; kwargs...)
 	end
 
 	return edges,int_dens
-end
-
-function correlation_length(dists,phys_correlations; kwargs...)
-
-	exp_fit(x,p) = p[1].* exp.(-x ./ p[2]) .+ p[3]
-
-	all_fits = [curve_fit(exp_fit,dists,phys_correlations[i],[1.0,1.0,0.0]) for i in 1:length(phys_correlations)]
-	corr_lengths = [all_fits[i].param[2] for i in 1:length(all_fits)]
-	return corr_lengths
 end
 
 #=
