@@ -569,6 +569,72 @@ function find_dist(p1::Tuple{Int,Int}, p2::Tuple{Int,Int}, size::Tuple{Int,Int},
     return sqrt(dx^2 + dy^2)
 end
 
+function physical_distance_correlation(psi::TreeTensorNetwork; kwargs...)
+	if_plot = get(kwargs, :if_plot, false)
+	if_periodic_phys = get(kwargs, :if_periodic_phys, true)
+	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
+	densmat = get(kwargs, :densmat, nothing)
+
+	lat = TTNKit.physical_lattice(TTNKit.network(psi))
+
+	phys_length,virt_length = get_lattice_dims(psi)
+	all_corrs = [[] for i in 1:virt_length]
+	dists = [[] for i in 1:virt_length]
+	for s=1:virt_length
+		for j=1:phys_length
+			top = mod1(j+Int(phys_length/2),phys_length)
+			for jj=j:top#phys_length
+				if isnothing(densmat)
+					corr_val = TTNKit.correlation(psi,"Adag","A",(s,j),(s,jj))
+					corr_val += conj(corr_val)
+				else
+					corr_val = densmat[TTNKit.linear_ind(lat,(s,j)),TTNKit.linear_ind(lat,(s,jj))]
+					corr_val += conj(corr_val)
+				end
+				dist_btw = jj - j#find_dist((s,j),(s,jj),(virt_length,phys_length),(if_periodic_virt,if_periodic_phys))
+				if dist_btw in dists[s]
+					append!(all_corrs[s][findfirst(x -> x == dist_btw,dists[s])],real(corr_val))
+				else
+					append!(dists[s],[dist_btw])
+					sort!(dists[s])
+					insert!(all_corrs[s],findfirst(x -> x == dist_btw,dists[s]),[real(corr_val)])
+				end
+			end
+		end
+	end
+
+	corrs = [[] for i in 1:virt_length]
+	for i in 1:virt_length
+		corrs[i] = ([mean(all_corrs[i][j]) for j in 1:length(all_corrs[i])])
+	end
+
+	corr_lengths = correlation_length(dists[1],corrs; kwargs...)
+
+	return dists,corrs,corr_lengths
+end
+
+function correlation_length(dists,phys_correlations; kwargs...)
+	if_plot = get(kwargs, :if_plot, false)
+
+	exp_fit(x,p) = p[1].* exp.(-x ./ p[2]) .+ p[3]
+
+	all_fits = [curve_fit(exp_fit,dists,phys_correlations[i],[1.0,1.0,0.0]) for i in 1:length(phys_correlations)]
+	corr_lengths = [all_fits[i].param[2] for i in 1:length(all_fits)]
+
+	if if_plot
+		fig = figure()
+		for i in 1:length(phys_correlations)
+			scatter(dists,phys_correlations[i],label="Site $i")
+			plot(dists,exp_fit(dists,all_fits[i].param),"-",label="Fit $i")
+		end
+		xlabel("Distance")
+		ylabel("Correlation")
+		title("Correlation Lengths")
+		legend()
+	end
+	return corr_lengths
+end
+
 function distance_correlation(psi::TreeTensorNetwork; kwargs...)
 	if_plot = get(kwargs, :if_plot, true)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, true)

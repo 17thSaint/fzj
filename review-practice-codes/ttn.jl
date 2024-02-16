@@ -1,5 +1,6 @@
 using Statistics
 using TTNKit
+using LsqFit
 
 function include_other_files(all_files)
 	get_to_fzj = split(pwd(),"fzj")[1]
@@ -1571,13 +1572,14 @@ function density_matrix(ttn; kwargs...)
 	if_fermion = get(kwargs, :if_fermion, false)
 	creation = if_fermion ? "Cdag" : "Adag"
 	annihilation = if_fermion ? "C" : "A"
+	output_level = get(kwargs, :output_level, false)
 	
 	lat = TTNKit.physical_lattice(TTNKit.network(ttn))
 	num_sites = prod(size(lat))
 	densmat = zeros(num_sites,num_sites) .* im
 	for i in 1:num_sites
 		for j in 1:i
-			println(i,", ",j)
+			output_level ? println(i,", ",j) : nothing
 			densmat[i,j] = TTNKit.correlation(ttn,creation,annihilation,i,j)
 			densmat[j,i] = conj(densmat[i,j])
 		end
@@ -1616,6 +1618,15 @@ function integrated_density(occs_diff::Matrix; kwargs...)
 	end
 
 	return edges,int_dens
+end
+
+function correlation_length(dists,phys_correlations; kwargs...)
+
+	exp_fit(x,p) = p[1].* exp.(-x ./ p[2]) .+ p[3]
+
+	all_fits = [curve_fit(exp_fit,dists,phys_correlations[i],[1.0,1.0,0.0]) for i in 1:length(phys_correlations)]
+	corr_lengths = [all_fits[i].param[2] for i in 1:length(all_fits)]
+	return corr_lengths
 end
 
 #=

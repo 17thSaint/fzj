@@ -350,6 +350,7 @@ function make_one_particle(L,nflavors; kwargs...)
 	return cr_site1 * vac
 end
 
+#=
 L = 4
 nflavors = 2
 vac = make_vacuum(L,nflavors)
@@ -357,6 +358,7 @@ cr_site1 = creation_physical(siteind(vac,1),nflavors)
 #thisidentity = op("I",siteind(vac,1))
 #M = [thisidentity cr_site1]
 #site1 = ITensor(M)
+=#
 
 
 
@@ -768,15 +770,6 @@ function physical_distance_correlation(psi::MPS; kwargs...)
 	else
 		return dists,all_corrs
 	end
-end
-
-function correlation_length(dists,phys_correlations; kwargs...)
-
-	exp_fit(x,p) = p[1].* exp.(-x ./ p[2]) .+ p[3]
-
-	all_fits = [curve_fit(exp_fit,dists,phys_correlations[i],[1.0,1.0,0.0]) for i in 1:length(phys_correlations)]
-	corr_lengths = [all_fits[i].param[2] for i in 1:length(all_fits)]
-	return corr_lengths
 end
 
 function distance_correlation(psi::MPS; kwargs...)

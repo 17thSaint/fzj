@@ -1,6 +1,6 @@
 if true
-#include("long-range-ttn.jl")
-include("fqh_effective.jl")
+include("long-range-ttn.jl")
+#include("fqh_effective.jl")
 include("time_evolution.jl")
 include("../other-funcs/data-storage-funcs.jl")
 #include("reproduce-other.jl")
@@ -155,7 +155,7 @@ end
 # 8,6,4 = 78
 
 loc = get_folder_location("cluster-data/synth-dims","fzj")
-#exc_loc = get_folder_location("cluster-data/synth-dims/higher-states","fzj")
+#=exc_loc = get_folder_location("cluster-data/synth-dims/higher-states","fzj")
 
 L = 6
 nflavors = 5
@@ -222,6 +222,7 @@ for (L,nflavors,nbosons) in [(8,6,4)]#(6,5,3),(6,4,3),
 	ylabel("Bond Dim")
 	title("L = $L, nflavors = $nflavors, nbosons = $nbosons")
 end
+=#
 
 
 #=
@@ -270,29 +271,103 @@ title("Overlap of excited state at black line with other GSs")
 =#
 
 #=
+L = 6
+nflavors = 5
+nbosons = 3
+
+col = ["b","g","r","c","m","y","k","w"]
+
+if false
+params_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons)])
+loc = get_folder_location("cluster-data/synth-dims","fzj")
+all_files = find_data_file(params_dict,"mps",loc)
+display(all_files)
+sforderparams = zeros(length(all_files))
+fillings = zeros(length(all_files))
+corrlengths = [zeros(nflavors) for i in 1:length(all_files)]
+#
+for (idx,f) in enumerate(all_files)
+	name_data = get_params_dict_from_filename(f)
+	filling = name_data["nbosons"] / (name_data["L"] * name_data["nflavors"] * name_data["chi"])
+	#if filling < 0.4
+	#	continue
+	#end
+	fillings[idx] = filling
+	data,metadata = read_data_jld2(f,loc)
+	wavefunc = data["mps"]
+	if "densmat" in keys(data)
+		rho = data["densmat"]
+	else
+		rho = density_matrix(wavefunc)
+	end
+	#sforderparams[idx] = abs(momentum_occupation(wavefunc,1,0.0; densmat=rho)[2][1])
+	corrlengths[idx][:] = physical_distance_correlation(wavefunc; densmat=rho)[3]
+	if idx > 1
+		for i in 1:edge_length
+			plot(fillings[idx-1:idx],[corrlengths[idx-1][i],corrlengths[idx][i]],"-p",c=col[i])
+		end
+	end
+end
+end
+fig = figure()
+xvals = fillings#num_parts ./ (fillings .* (edge_length^2))
+for i in 1:edge_length
+	plot(xvals,[corrlengths[j][i] for j in 1:length(all_files)],"-p",label="$i")
+end
+xlabel("Filling")
+ylabel("Physical Correlation Length")
+legend()
+=#
+
+if true
 layers = 6
 edge_length = Int(sqrt(2^layers))
 num_parts = 4
 
+col = ["b","g","r","c","m","y","k","w"]
 
-if false
+if true
 params_dict = Dict([("layers",layers),("particles",num_parts)])
 loc = get_folder_location("cluster-data/synth-dims","fzj")
 all_files = find_data_file(params_dict,"ttn",loc)
 display(all_files)
+sforderparams = zeros(length(all_files))
+fillings = zeros(length(all_files))
+corrlengths = [zeros(Int(edge_length)) for i in 1:length(all_files)]
 #
-for (idx,f) in enumerate(all_files)
+for (idx,f) in enumerate(all_files[2:5])
 	name_data = get_params_dict_from_filename(f)
 	filling = name_data["particles"] / (2^(name_data["layers"]) * name_data["alpha"])
-	#if isapprox(filling,0.5,atol=0.1)
-		println(idx,", ",filling)
-	#end
+	if filling < 0.4
+		continue
+	end
+	fillings[idx] = filling
+	data,metadata = read_data_jld2(f,loc)
+	wavefunc = data["ttn"]
+	if "densmat" in keys(data)
+		rho = data["densmat"]
+	else
+		rho = density_matrix(wavefunc)
+	end
+	#sforderparams[idx] = abs(momentum_occupation(wavefunc,1,0.0; densmat=rho)[2][1])
+	corrlengths[idx][:] = physical_distance_correlation(wavefunc; densmat=rho, if_plot=true)[3]
+	#=if idx > 1
+		for i in 1:edge_length
+			plot(fillings[idx-1:idx],[corrlengths[idx-1][i],corrlengths[idx][i]],"-p",c=col[i])
+		end
+	end=#
 end
-#
-chosenfile = all_files[2]
-data,metadata = read_data_jld2(chosenfile,loc)
-wavefunc = data["ttn"]
-=#
+end
+fig = figure()
+xvals = fillings#num_parts ./ (fillings .* (edge_length^2))
+for i in 1:edge_length
+	plot(xvals,[corrlengths[j][i] for j in 1:length(all_files)],"-p",label="$i")
+end
+xlabel("Filling")
+ylabel("Physical Correlation Length")
+legend()
+end
+
 
 #=
 allberries = [zeros(edge_length-2,edge_length-2) for i in 1:length(all_files)]
