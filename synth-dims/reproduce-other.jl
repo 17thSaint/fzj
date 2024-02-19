@@ -154,7 +154,7 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
 end
 
 statenames = ["first","second","third","fourth","fifth"]
-higherstatetofind = 3
+higherstatetofind = 0
 
 #params_dict = make_args_dict(ARGS)
 params_dict = Dict([("L",6),("nflavors",5)])
@@ -163,13 +163,13 @@ open_cores = get(params_dict, "open_cores", "all")
 if typeof(open_cores) != String
 	BLAS.set_num_threads(open_cores)	
 end
-if_save_data = get(params_dict,"if_save_data",true)
+if_save_data = get(params_dict,"if_save_data",false)
 dataloc = get_folder_location("cluster-data/synth-dims","fzj")
 if_densmat = true
 
 nsweeps = 500
 nrgvar_tol = 1E-7
-mdim = get(params_dict,"mdim",300)
+mdim = get(params_dict,"mdim",100)
 noise = [0.0]
 
 #geo_params = [()] # (L,nf,nb)
@@ -207,11 +207,11 @@ naming_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",part_count),("centr
 metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodic_virt",if_per_virt),("tilt_strength",tilt),("location",dataloc),("if_save_data",if_save_data),("nrgvar_tol",nrgvar_tol),("if_gpu",if_gpu),("mdim",mdim)]))
 
 #
-if false
+if true
 counting = 20
-#=scaling = 64
-strens = collect(range(part_count/(0.35*L*nflavors),part_count/(2.0*L*nflavors),length=counting))#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
-append!(strens,[0.0])
+#scaling = 64
+strens = collect(range(part_count/(1.0*L*nflavors),part_count/(5.0*L*nflavors),length=counting))#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
+#append!(strens,[0.0])
 sf_orderparams = zeros(length(strens))
 bonddims = zeros(length(strens))
 distcorrs = zeros(length(strens))
@@ -223,8 +223,8 @@ excited_nrgs = zeros(length(strens))
 #nrgs = zeros(length(strens)) .* im
 #currents = zeros(nflavors,length(strens)) .* im
 #drudes = zeros(nflavors,length(strens)) .* im
-=#
-#chi = 0.0
+#
+#=chi = 0.0
 finding_dict = Dict([("L",L),("nbosons",part_count),("nflavors",nflavors),("centralflux_strength",centralflux_strength)])
 loc = "/home/patrick/fzj/main-git/cluster-data/synth-dims/"
 all_files = find_data_file(finding_dict,"mps",loc)
@@ -236,6 +236,7 @@ for i in 0:higherstatetofind
     nrgs[string(i)] = zeros(length(all_files))
 end
 strens = zeros(length(all_files))
+=#
 
 #=
 strens = zeros(length(all_files))
@@ -257,8 +258,8 @@ excited_nrgs_null = 0.0
 =#
 
 #println("Chi = ",part_count / (nu*L*nflavors))
-#for (idx,chi) in enumerate(strens)
-for (idx,f) in enumerate(all_files)
+for (idx,chi) in enumerate(strens)
+#for (idx,f) in enumerate(all_files)
     #
     if false
         found_data, found_metadata = read_data_jld2(f,loc)
@@ -295,13 +296,14 @@ for (idx,f) in enumerate(all_files)
     #ham_params = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
     #display(found_metadata)
     if true
-        chi = get_params_dict_from_filename(f)["chi"]
+        #chi = get_params_dict_from_filename(f)["chi"]
 
         metadata["chi"] = chi
         naming_dict["chi"] = round(chi,digits=5)
-        if part_count / (chi*nflavors*L) > 1.0
-            continue
-        end
+        #if part_count / (chi*nflavors*L) > 1.0
+        #    continue
+        #end
+        #
         #=
         metadata["centralflux_strength"] = centralflux_strength
         if centralflux_strength < 0.0
@@ -313,6 +315,7 @@ for (idx,f) in enumerate(all_files)
         filename = make_parameters_filename(naming_dict)
         metadata["name"] = filename
         display(filename)
+        #
 
         ham_params = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
         ham_start = hamiltonian_universal(L,nflavors,chi; ham_params...)
@@ -322,7 +325,7 @@ for (idx,f) in enumerate(all_files)
 
         new_loc = get_folder_location("cluster-data/synth-dims/higher-states","fzj")
 
-        if_exists,found_data = check_data_exists(naming_dict,"mps";location=dataloc,output_level=false)
+        if_exists,found_data = false,nothing#check_data_exists(naming_dict,"mps";location=dataloc,output_level=false)
 
         #
         if if_exists
@@ -388,8 +391,9 @@ for (idx,f) in enumerate(all_files)
         
     end
 
+    sf_orderparams[idx] = abs(2*sum(densmat))
     #append!(states,[psi_gs])
-
+    #=
     for i in 0:higherstatetofind
         nrgs[string(i)][idx] = real(calculate_energy(all_level_states[i+1],full_ham))
     end
@@ -413,7 +417,8 @@ for (idx,f) in enumerate(all_files)
         #scatter(part_count ./ ((L*nflavors) .* [strens[idx]]),[log(1-second_overlap)],c=col[3])
         =#
     end  
-    end      
+    end
+    =#    
 
 
     #=
@@ -480,10 +485,10 @@ for (idx,f) in enumerate(all_files)
     
     #physical_distance_correlation(psi_gs)
     #
-    if false
+    if true
     if idx > 1
-        plot([part_count/(strens[idx-1]*nflavors*L),part_count/(chi*nflavors*L)],[excited_nrgs[idx-1],excited_nrgs[idx]],"-p",c="b")
-        plot([part_count/(strens[idx-1]*nflavors*L),part_count/(chi*nflavors*L)],[nrgs[idx-1],nrgs[idx]],"-p",c="r")
+        plot([part_count/(strens[idx-1]*nflavors*L),part_count/(chi*nflavors*L)],[sf_orderparams[idx-1],sf_orderparams[idx]],"-p",c="b")
+        #plot([part_count/(strens[idx-1]*nflavors*L),part_count/(chi*nflavors*L)],[nrgs[idx-1],nrgs[idx]],"-p",c="r")
         #scatter([part_count/(chi*nflavors*L)],[nrg_gs - nrgs[idx]],c="r")
         #plot([(part_count-1)/(strens[idx-1]*tot_sites),part_count/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
     else
@@ -564,6 +569,7 @@ plot(xvals,zeros(length(xvals)) .+ sf_orderparams_null,c="r")
 xlabel("Filling Factor")
 ylabel("SF Order Parameter")
 =#
+#=
 fig6 = figure()
 for i in 0:higherstatetofind
     plot(xvals,nrgs[string(i)],"-p",label="$i")
@@ -582,7 +588,7 @@ xlabel("Filling Factor")
 ylabel("Energy Gap")
 legend()
 
-#=
+#
 fig4 = figure()
 plot(xvals,ees,"-p")
 plot(xvals,log.(bonddims),"-p")

@@ -224,6 +224,45 @@ function make_wavefunc(L::Int64,nflavors::Int64,organization::Vector; kwargs...)
 	return psi0
 end
 
+function make_vacuum(L,nflavors; kwargs...)
+	sitetype = get(kwargs, :sitetype, "ExtendedHardcore")
+	conserve_qns = get(kwargs, :conserve_qns, true)
+	return randomMPS(siteinds("ExtendedHardcore", L; conserve_qns = conserve_qns, nflavors = nflavors), ["0" for i in 1:L])
+end
+
+function equal_weight(L,nflavors; kwargs...)
+	return ones(nflavors,L) ./ (L * nflavors)
+end
+
+function make_particle(L,nflavors,weight_function)
+
+	weights = weight_function(L,nflavors)
+	make_parts = OpSum()
+	for j in 1:L
+		for s in 1:nflavors-1
+			weight = weights[s,j]
+			make_parts += (weight,"Cr$s",j)
+		end
+	end
+	return make_parts
+end
+
+function initialize_mps(psi::MPS,particle_count::Int; weight_function = equal_weight, kwargs...)
+
+	L = length(psi)
+	nflavors = size(psi[1])[1]
+	sumpart = make_particle(L,nflavors, weight_function)
+	creation_mpo = MPO(sumpart,siteinds(psi))
+	if particle_count > L
+		println("Too many particles: L=$L, nbosons=$particle_count")
+		return nothing
+	end
+	for i in 1:particle_count
+		psi = apply(creation_mpo,psi; cutoff=1E-10, kwargs...)
+	end
+	return psi
+end
+
 function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 	if_nn_int = get(kwargs, :if_nn_int, true)
 	if_2ord_pert = get(kwargs, :if_2ord_pert, true)
@@ -321,47 +360,33 @@ function run_again(filename; kwargs...)
 	println("Energy Variance = ",energy_variance(new_gs,metadata["ham"]))
 end
 
-function make_vacuum(L,nflavors; kwargs...)
-	sitetype = get(kwargs, :sitetype, "ExtendedHardcore")
-	conserve_qns = get(kwargs, :conserve_qns, true)
-	return randomMPS(siteinds("ExtendedHardcore", L; conserve_qns = conserve_qns, nflavors = nflavors), ["0" for i in 1:L])
-end
-
-function equal_weight(nflavors; kwargs...)
-	return [1/nflavors for i in 1:nflavors]
-end
-
-function creation_physical(phys_site::Index,nflavors; kwargs...)
-	weighting_function = get(kwargs, :weighting_function, equal_weight)
+function get_occupancy(wavefunc::MPS; kwargs...)
+	L,nflavors = get_mps_dims(wavefunc)
+	if_squared = get(kwargs, :if_squared, false)
 	
-	weights = weighting_function(nflavors)
-	creation = weights[1] .* op("Cr1", phys_site)
-	for s in 2:nflavors
-		creation += weights[s] .* op("Cr$(s)", phys_site)
+	if_plot = get(kwargs, :if_plot, true)
+	if_save_data = get(kwargs, :if_save_data, false)
+	if if_save_data
+		location = get(kwargs, :location, pwd())
+		filename = get(kwargs, :name, "occs")
+		filename = check_plot_label(filename,"occs")
+		metadata = get(kwargs, :metadata, nothing)
 	end
-	return creation
-end
-
-function make_one_particle(L,nflavors; kwargs...)
-
-	for j in 1:L
-		cr_at_phys_site = creation_physical(siteind(vac,1),nflavors)
+		
+	occ_mat = zeros(L,nflavors)
+	for s in 1:nflavors
+		loc_op = "Ns$(s)"
+		if if_squared
+			loc_op = "Ns$(s) * Ns$(s)"
+		end
+		occ_mat[:, s] = expect(wavefunc, loc_op)
 	end
-	return cr_site1 * vac
+	if_plot ? mps_plot_occupancy(occ_mat,L,nflavors; kwargs...) : nothing
+	data_dict = Dict([("vals",occ_mat)])
+	if_save_data ? write_data_jld2(filename,data_dict,location,metadata) : nothing
+	
+	return occ_mat
 end
-
-#=
-L = 4
-nflavors = 2
-vac = make_vacuum(L,nflavors)
-cr_site1 = creation_physical(siteind(vac,1),nflavors)
-#thisidentity = op("I",siteind(vac,1))
-#M = [thisidentity cr_site1]
-#site1 = ITensor(M)
-=#
-
-
-
 
 function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	running_again = get(kwargs, :running_again, false)
@@ -370,6 +395,7 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	conserve_qns = get(kwargs, :conserve_qns, true)
 	nsweeps = get(kwargs, :nsweeps, 500)
 	psi0 = get(kwargs, :psi_guess, nothing)
+	if_parton = get(kwargs, :if_parton, true)
 	ham = get(kwargs, :ham, nothing)
 	mdim = get(kwargs, :mdim, 100)
 	if mdim >= 100 && !running_again
@@ -388,10 +414,16 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	if_nrg = get(kwargs, :if_nrg, false)
 	if_densmat = get(kwargs, :if_densmat, true)
 
+	if if_parton
+		psi0 = make_vacuum(L,nflavors; kwargs...)
+		psi0 = initialize_mps(psi0, nbosons; maxdim=minimum(mdim))
+	end
+
 	metadata = get(kwargs, :metadata, Dict())
 	metadata["psi_ortho"] = psi_ortho
 	metadata["outputlevel"] = opl
 	metadata["psi0"] = psi0
+	metadata["if_parton"] = if_parton
 	metadata["ham"] = ham
 	metadata["mdim"] = mdim
 	metadata["noise"] = noise
@@ -399,7 +431,6 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	filename = get(kwargs, :name, "mps")
 	filename = check_plot_label(filename,"mps")
 	display(metadata)
-	
 	
 	if isnothing(psi0) && isnothing(psi_ortho)
 		sidx = siteinds("ExtendedHardcore", L; conserve_qns = conserve_qns, nflavors = nflavors)
@@ -523,34 +554,6 @@ function occupancy_variance(wavefunc::MPS; kwargs...)
 	if_plot ? mps_plot_occupancy(occ_var,L,nflavors; kwargs...) : nothing
 	
 	return occ_var
-end
-
-function get_occupancy(wavefunc::MPS; kwargs...)
-	L,nflavors = get_mps_dims(wavefunc)
-	if_squared = get(kwargs, :if_squared, false)
-	
-	if_plot = get(kwargs, :if_plot, true)
-	if_save_data = get(kwargs, :if_save_data, false)
-	if if_save_data
-		location = get(kwargs, :location, pwd())
-		filename = get(kwargs, :name, "occs")
-		filename = check_plot_label(filename,"occs")
-		metadata = get(kwargs, :metadata, nothing)
-	end
-		
-	occ_mat = zeros(L,nflavors)
-	for s in 1:nflavors
-		loc_op = "Ns$(s)"
-		if if_squared
-			loc_op = "Ns$(s) * Ns$(s)"
-		end
-		occ_mat[:, s] = expect(wavefunc, loc_op)
-	end
-	if_plot ? mps_plot_occupancy(occ_mat,L,nflavors; kwargs...) : nothing
-	data_dict = Dict([("vals",occ_mat)])
-	if_save_data ? write_data_jld2(filename,data_dict,location,metadata) : nothing
-	
-	return occ_mat
 end
 
 function mps_plot_occupancy(occ_mat,L,nflavors; kwargs...)
@@ -1151,6 +1154,13 @@ function ITensors.measure!(o::NRGErrorObserver; kwargs...)
 		end
 	end
 end
+
+#virt_link = ind(vac[1],2)
+#cr_site1 = creation_physical(siteind(vac,1),nflavors)
+#M = [I matrix(cr_site1)]
+#site1 = ITensor(M,inds(cr_site1)) # is (1,2) therefore need to double output dimension
+#
+
 
 # ╔═╡ 12309987-d529-4820-bf06-5c3407a977b3
 begin
