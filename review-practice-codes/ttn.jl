@@ -2,13 +2,13 @@ using Statistics
 using TTNKit
 using LsqFit
 
-function include_other_files(all_files)
-	get_to_fzj = split(pwd(),"fzj")[1]
+function include_other_files(all_files,center)
+	get_to_fzj = split(pwd(),center)[1]
 	if typeof(all_files) == String
 		all_files = [all_files]
 	end
 	for file in all_files
-		occursin("main-git",pwd()) ? include(get_to_fzj * "fzj/main-git/" * file) : include(get_to_fzj * "fzj/" * file)
+		occursin("main-git",pwd()) ? include(get_to_fzj * center * "/main-git/" * file) : include(get_to_fzj * center * "/" * file)
 		println("Included $file")
 	end
 end
