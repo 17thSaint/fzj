@@ -1598,6 +1598,7 @@ function density_matrix(ttn; kwargs...)
 		end
 	end
 	
+	return densmat
 end
 
 function integrated_density(occs_diff::Matrix; kwargs...)

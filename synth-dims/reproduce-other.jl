@@ -208,9 +208,9 @@ metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodi
 
 #
 if true
-counting = 20
+counting = 30
 #scaling = 64
-strens = collect(range(part_count/(1.0*L*nflavors),part_count/(5.0*L*nflavors),length=counting))#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
+strens = collect(range(part_count/(0.2*L*nflavors),part_count/(0.5*L*nflavors),length=counting))#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
 #append!(strens,[0.0])
 sf_orderparams = zeros(length(strens))
 bonddims = zeros(length(strens))
@@ -325,7 +325,7 @@ for (idx,chi) in enumerate(strens)
 
         new_loc = get_folder_location("cluster-data/synth-dims/higher-states","fzj")
 
-        if_exists,found_data = false,nothing#check_data_exists(naming_dict,"mps";location=dataloc,output_level=false)
+        if_exists,found_data = check_data_exists(naming_dict,"mps";location=dataloc,output_level=false)
 
         #
         if if_exists
@@ -390,8 +390,8 @@ for (idx,chi) in enumerate(strens)
         end
         
     end
-
-    sf_orderparams[idx] = abs(2*sum(densmat))
+    middle = Int(floor(L*nflavors/2))
+    sf_orderparams[idx] = abs(2*sum([sum(diag(densmat,i) + diag(densmat,-i)) for i in middle+1:Int(L*nflavors)-1]))#abs(2*sum(densmat))
     #append!(states,[psi_gs])
     #=
     for i in 0:higherstatetofind

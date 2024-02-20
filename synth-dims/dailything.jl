@@ -332,25 +332,42 @@ loc = get_folder_location("cluster-data/synth-dims","fzj")
 all_files = find_data_file(params_dict,"ttn",loc)
 display(all_files)
 sforderparams = zeros(length(all_files))
+shortrange = zeros(length(all_files))
+longrange = zeros(length(all_files))
 fillings = zeros(length(all_files))
 corrlengths = [zeros(Int(edge_length)) for i in 1:length(all_files)]
 #
-for (idx,f) in enumerate(all_files[2:5])
+for (idx,f) in enumerate(all_files)
 	name_data = get_params_dict_from_filename(f)
 	filling = name_data["particles"] / (2^(name_data["layers"]) * name_data["alpha"])
-	if filling < 0.4
-		continue
-	end
+	#if filling < 0.4
+	#	continue
+	#end
 	fillings[idx] = filling
 	data,metadata = read_data_jld2(f,loc)
 	wavefunc = data["ttn"]
 	if "densmat" in keys(data)
+		println("Inside data")
 		rho = data["densmat"]
 	else
-		rho = density_matrix(wavefunc)
+		println("Need to make")
+		continue
+		#rho = density_matrix(wavefunc)
 	end
-	#sforderparams[idx] = abs(momentum_occupation(wavefunc,1,0.0; densmat=rho)[2][1])
-	corrlengths[idx][:] = physical_distance_correlation(wavefunc; densmat=rho, if_plot=true)[3]
+	momocc = rho
+	middle = Int((layers^2)/2)
+	longrange[idx] = abs(2*sum([sum(diag(momocc,i) + diag(momocc,-i)) for i in middle+1:layers^2-1]))
+	shortrange[idx] = abs(2*sum([sum(diag(momocc,i) + diag(momocc,-i)) for i in 0:middle]))
+	sforderparams[idx] = abs(2*sum(momocc))
+
+	#
+	#top = [abs(sum(diag(momocc,i))) for i in 1:layers^2-1]
+	#fig = figure()
+	#plot(collect(1:length(top)),top,"-p",label="$(round(filling,digits=3))")
+	#legend()
+	#ylabel("Long Range Correlation")
+	#
+
 	#=if idx > 1
 		for i in 1:edge_length
 			plot(fillings[idx-1:idx],[corrlengths[idx-1][i],corrlengths[idx][i]],"-p",c=col[i])
@@ -358,14 +375,16 @@ for (idx,f) in enumerate(all_files[2:5])
 	end=#
 end
 end
+#
 fig = figure()
 xvals = fillings#num_parts ./ (fillings .* (edge_length^2))
-for i in 1:edge_length
-	plot(xvals,[corrlengths[j][i] for j in 1:length(all_files)],"-p",label="$i")
-end
+plot(xvals,shortrange,"-p",label="Short Range")
+plot(xvals,longrange,"-p",label="Long Range")
+plot(xvals,sforderparams,"-p",label="Total")
 xlabel("Filling")
-ylabel("Physical Correlation Length")
+ylabel("Zero Mom Occs")
 legend()
+#
 end
 
 

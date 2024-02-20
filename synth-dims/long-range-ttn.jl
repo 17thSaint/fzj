@@ -1,4 +1,5 @@
-using PyPlot
+using Pkg
+Pkg.activate(".")
 include("../review-practice-codes/ttn.jl")
 
 function spin_matrix_element(m1,m2,spin,direction::String)
@@ -861,16 +862,16 @@ fb_occ_mat = get_occupancy(fb_gs)
 
 
 #
-if false
+if true
 
-nnst = 0.0
-layers = 6
-lr = 0#Int(sqrt(2^layers))-1
+#nnst = 0.0
+#layers = 6
+#lr = 0#Int(sqrt(2^layers))-1
 #for nnst in nn_strens
 
-	params_dict = Dict([("if_pinning",false),("layers",layers),("mdim",200),("mag_off",false),("lr",lr),("if_nn_int",false),("nn_strength",nnst)])
+	#params_dict = Dict([("if_pinning",false),("layers",layers),("mdim",200),("mag_off",false),("lr",lr),("if_nn_int",false),("nn_strength",nnst)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
-	#params_dict = make_args_dict(ARGS)
+	params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
 	if typeof(open_cores) != String
 		BLAS.set_num_threads(open_cores)	
@@ -884,10 +885,11 @@ lr = 0#Int(sqrt(2^layers))-1
 	if_densmat = get(params_dict, :if_densmat, true)
 	change = get(params_dict, "change", 0.0001)
 	limit = get(params_dict, "nn_strength", 1.0)
-	layer_count = get(params_dict, "layers", 4)
+	layer_count = Int(get(params_dict, "layers", 4))
 	mag_off = get(params_dict, "mag_off", true)
 	mdim = get(params_dict, "mdim", get_mdim(layer_count,(false,1)))
 	longrange_dist = get(params_dict, "lr", 0)
+	centralflux_strength = get(params_dict, "centralflux_strength", 0.0)
 	if if_change in ["pos","neg"]
 		if if_change == "pos"
 			alpha = get(params_dict, "alpha", nothing) + change
@@ -905,6 +907,13 @@ lr = 0#Int(sqrt(2^layers))-1
 	else
 		edge_sites = Int(sqrt(2^(layer_count+1)))
 		num_particles = get(params_dict, "particles", Int(sqrt(2^(layer_count+1))/2))
+	end
+	if isnothing(alpha)
+		filling = get(params_dict, "filling", 1.0)
+		alpha = num_particles/(filling*(2^layer_count))
+		mag_off = false
+	else
+		mag_off = false
 	end
 
 	#
@@ -938,9 +947,9 @@ lr = 0#Int(sqrt(2^layers))-1
 
 	plotting = false
 	save_plot = false
-	save_data = true
+	save_data = get(params_dict, "if_save_data", true)
 
-	loc = "../cluster-data/synth-dims"
+	loc = get_folder_location("cluster-data/synth-dims","fzj")
 	if_cliff = false
 	sc_type = "flat"
 	dists = [i for i in 1:2*edge_sites]
@@ -951,7 +960,7 @@ lr = 0#Int(sqrt(2^layers))-1
 	alpha_count = 5
 	alphas = [alpha_start + (i-1)*(alpha_end-alpha_start)/(alpha_count-1) for i in 1:alpha_count] .- change/2
 	alphas = [alphas; alphas .+ change]
-	=#
+	#
 	alpha_center = mag_off ? 0.0 : 1 * num_particles / tot_sites
 	wavefuncs = []
 	currents = []
@@ -963,17 +972,18 @@ lr = 0#Int(sqrt(2^layers))-1
 	#fillings = range(0.2,3.0,length=counting)
 	strens = range(num_particles/(0.2*tot_sites),num_particles/(3.0*tot_sites),length=counting) #range(0.02,0.25,length=counting)
 	centermoms = [0.0 for i in 1:counting]# .* im
-	for (idx,alpha) in enumerate(strens)
+	=#
+	#for (idx,alpha) in enumerate(strens)
 	#for (idx,num_particles) in enumerate(parts)
 		#alpha = 0.0
-		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys),("nn_strength",nnst)])
+		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys),("nn_strength",limit)])
 
 		#if length(keys(params_dict)) == 0
 		#	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
 		#else
 			datafile_name = make_parameters_filename(filename_dict)
 		#end
-		model_paras = (nrgtol=nrgtol,if_densmat=if_densmat,centralflux_strength=centralflux_strength,if_pinning_pot=if_pinning,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=nnst,if_chem=chemical,chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,limit=limit,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=noise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc)
+		model_paras = (nrgtol=nrgtol,if_densmat=if_densmat,centralflux_strength=centralflux_strength,if_pinning_pot=if_pinning,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=limit,if_chem=chemical,chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,limit=limit,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=noise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc)
 		
 		metadata_dict = merge(named_tuple_to_dict(model_paras),filename_dict)
 
@@ -985,9 +995,9 @@ lr = 0#Int(sqrt(2^layers))-1
 			println("Found Data")
 			wavefunc = found_data[1]["ttn"]
 			try
-				densmat = found_data[1]["densmat"]
+				global densmat = found_data[1]["densmat"]
 			catch
-				densmat = nothing
+				global densmat = nothing
 			end
 			ham = found_data[2]["ham"]
 			#append!(wavefuncs,[wavefunc])
@@ -995,7 +1005,7 @@ lr = 0#Int(sqrt(2^layers))-1
 			#title_string = "Np = $num_particles, LR = $longrange_dist at $limit"
 			println("Starting Script using $num_particles particles on $tot_sites sites with $(!mag_off) Mag Field, Bond Dim = $mdim, and Long Range Dist = $longrange_dist")
 			#if true
-			densmat = nothing
+			global densmat = nothing
 			starting = time()
 			net = build_HH_net(layer_count; syms=true)
 			ham = long_range_HH_ham(net,ts,alpha; model_paras...)
@@ -1013,7 +1023,7 @@ lr = 0#Int(sqrt(2^layers))-1
 		#rez = distance_correlation(wavefuncs[idx]; if_plot=false)#plot_title = "Nu = $(round(num_particles/(alpha*tot_sites),digits=4))")
 		#centermoms[idx] = minimum(abs.(rez[2]))
 
-		#
+		#=
 		if false
 		allmoms = momentum_occupation(wavefunc,1,0.0; densmat=densmat)
 		centermoms[idx] = allmoms[2][1]
@@ -1025,7 +1035,7 @@ lr = 0#Int(sqrt(2^layers))-1
 			#scatter([num_particles/(strens[idx]*tot_sites)],[centermoms[idx]],c="b")
 		end
 		end
-		#
+		=#
 		#get_occupancy(dm_sp.ttn; plot_title = "Alpha = $(round(alpha,digits=4))")
 		#get_greenfunc(dm_sp.ttn,"phys")
 		#get_greenfunc(dm_sp.ttn,"virt")
@@ -1035,9 +1045,10 @@ lr = 0#Int(sqrt(2^layers))-1
 		scatter(collect(1:mdim),-log.(specs))
 		=#
 		#end
-	end
+	#end
 
 end
+
 
 #
 #plot(strens,real.(centermoms),"-p")
