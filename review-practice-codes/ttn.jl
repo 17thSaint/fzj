@@ -2,7 +2,18 @@ using Statistics
 using TTNKit
 using LsqFit
 
-function include_other_files(all_files,center)
+function find_center()
+	all_folders = split(pwd(),"/")
+	rez = findfirst(x -> x == "review-practice-codes", all_folders)
+	if all_folders[rez-1] == "main-git"
+		return "fzj"
+	else
+		return all_folders[rez-1]
+	end
+end
+
+function include_other_files(all_files)
+	center = find_center()
 	get_to_fzj = split(pwd(),center)[1]
 	if typeof(all_files) == String
 		all_files = [all_files]
