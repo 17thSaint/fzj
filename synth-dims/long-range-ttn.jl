@@ -1009,7 +1009,7 @@ if true
 			starting = time()
 			net = build_HH_net(layer_count; syms=true)
 			ham = long_range_HH_ham(net,ts,alpha; model_paras...)
-			og_ttn, hamilt, dm_sp, rezobs, runtime = find_ground_state(layer_count,num_particles,ts; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
+			og_ttn, hamilt, dm_sp, rezobs, runtime, rho = find_ground_state(layer_count,num_particles; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
 			total_time = time() - starting
 			println("Running time = $total_time")
 			wavefunc = dm_sp.ttn
@@ -1049,6 +1049,7 @@ if true
 
 end
 
+display(abs.(rho))
 
 #
 #plot(strens,real.(centermoms),"-p")

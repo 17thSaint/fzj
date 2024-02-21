@@ -8,6 +8,8 @@ function find_center()
 		return "fzj"
 	elseif "local" in all_folders
 		return all_folders[findfirst(x -> all_folders[x] == "local",1:length(all_folders))+1]
+	elseif "Local" in all_folders
+		return all_folders[findfirst(x -> all_folders[x] == "Local",1:length(all_folders))+1]
 	else
 		println("Not sure where the center is: $(pwd())")
 	end
@@ -658,10 +660,10 @@ function check_if_frozen(ttn)
 	end
 end
 
-function do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
+function do_sweep(ttn,ham,sweep_type; kwargs...)
 
 	opl = get(kwargs, :output_level, 0)
-	max_dim = get(kwargs, :mdim, particle_count+1)
+	max_dim = get(kwargs, :mdim, 10)
 	num_sweeps = get(kwargs, :num_sweeps, 1)
 	noise = get(kwargs, :noise, 0.0)
 	expander = get(kwargs, :expander, TTNKit.NoExpander())
@@ -703,7 +705,7 @@ function do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
 	return ttn,ham,sp,observer
 end
 
-function warming(ttn,ham,sp,particle_count,warming_limit; kwargs...)
+function warming(ttn,ham,sp,warming_limit; kwargs...)
 	
 	max_dim = get(kwargs, :max_dim, particle_count+1)
 	num_sweeps = 3#get(kwargs, :num_sweeps, 1)
@@ -717,7 +719,7 @@ function warming(ttn,ham,sp,particle_count,warming_limit; kwargs...)
 	while frozen && warming_count < warming_limit
 		new_maxdim = Int(ceil((warming_count+10)*max_dim/10))
 		reexpanded_ttn = TTNKit.adjust_tree_tensor_dimensions(old_data[1],new_maxdim)
-		new_ttn, new_ham, new_sp, new_obs = do_sweep(reexpanded_ttn,ham,sweep_type,particle_count; kwargs...)
+		new_ttn, new_ham, new_sp, new_obs = do_sweep(reexpanded_ttn,ham,sweep_type; kwargs...)
 		println("Max Dim = ",TTNKit.maxlinkdim(new_sp.ttn),", Expected = $new_maxdim")
 		if_frozen,why = check_if_frozen(new_sp.ttn)
 		if if_frozen
@@ -749,24 +751,16 @@ function throwout_therm_time(times)
 	end
 end
 
-function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
+function find_ground_state(num_layers,particle_count; kwargs...)
 	num_sites = 2^num_layers
-	filling = get(kwargs, :filling, 1/2)
-	max_dim = get(kwargs, :mdim, particle_count+1)
-	num_sweeps = get(kwargs, :num_sweeps, 3)
+	max_dim = get(kwargs, :mdim, 10)
 	sweep_iter = get(kwargs, :sweep_iter, 1)
 	if_sweep = get(kwargs, :if_sweep, true)
 	if_save_data = get(kwargs, :if_save_data, true)
 	sweep_type = get(kwargs, :sweep_type, "simple")
-	noise = get(kwargs, :noise, 0.0)
-	expander = get(kwargs, :expander, TTNKit.NoExpander())
 	max_occ = get(kwargs, :max_occ, Int(round(particle_count/(num_sites))+1) )
-	u_strength = get(kwargs, :u_strength, 100.0)
 	warming_limit = get(kwargs, :warming_limit, 100)
 	conserve_qns = get(kwargs, :syms, true)
-	#excess_particles = get_excess_particles(particle_count,num_sites)
-	#phi = get(kwargs, :phi, excess_particles/(filling * (num_sites)))
-	phi = get(kwargs, :phi, particle_count/(filling * (num_sites)))
 	ham_operator = get(kwargs, :ham_op, nothing)
 	net = get(kwargs, :ttn_net, nothing)
 	ttn = get(kwargs, :seed_ttn, nothing)
@@ -775,18 +769,33 @@ function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 	particle_type = get(kwargs, :part_type, "Boson")
 	location = get(kwargs, :location, pwd())
 	filename = get(kwargs, :name, "ttn")
-	metadata = get(kwargs, :metadata, Dict())
 	if_densmat = get(kwargs, :if_densmat, true)
 	
 	obs = NoObserver()
 	
+	metadata = get(kwargs, :metadata, Dict())
+	metadata["layers"] = num_layers
+	metadata["particles"] = particle_count
+	metadata["max_occ"] = max_occ
+	metadata["sweep_type"] = sweep_type
+	metadata["mdim"] = max_dim
+	metadata["conserve_qns"] = conserve_qns
+	metadata["if_gpu"] = if_gpu
+	metadata["particle_type"] = particle_type
+	metadata["location"] = location
+	metadata["if_densmat"] = if_densmat
+	metadata["nrgtol"] = get(kwargs, :nrgtol, nothing)
 	display(metadata)
+	metadata["ham"] = ham_operator
+	metadata["net"] = net
+	metadata["seed_ttn"] = ttn
 	
 	
 	start_time = time()
 
 	if isnothing(net)
 		net = TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, particle_type;conserve_qns=conserve_qns,dim=max_occ+1)
+		metadata["ttn_net"] = net
 	end
 	lat = TTNKit.physical_lattice(net)
 
@@ -803,6 +812,7 @@ function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 			ttn = TTNKit.increase_dim_tree_tensor_network_zeros(old_ttn, maxdim = max_dim)
 			ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
 		end
+		metadata["seed_ttn"] = ttn
 	end
 	
 	if if_gpu
@@ -810,10 +820,6 @@ function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 		ttn = TTNKit.gpu(ttn)
 	end
 	println("Added States")
-	
-	if isnothing(ham_operator)
-		ham_operator = get_hofstadter_interacting_hamilt(net,t_strength,phi; kwargs...)
-	end
 	
 	ham = TTNKit.TPO(ham_operator,lat)
 	if if_gpu
@@ -826,7 +832,7 @@ function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 	if if_sweep
 		for i in 1:sweep_iter
 			time_start = time()
-			new_ttn, new_ham, new_sp, new_obs = do_sweep(ttn,ham,sweep_type,particle_count; kwargs...)
+			new_ttn, new_ham, new_sp, new_obs = do_sweep(ttn,ham,sweep_type; kwargs...)
 			time_end = time()
 			append!(times,[time_end - time_start])
 			#return sp.ttn, ham, sp
@@ -842,7 +848,7 @@ function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 					elseif why == "variables"
 						println("Bad Variables on First Attempt, Starting Reset")	
 					end
-					warmed_results = warming(new_ttn,new_ham,new_sp,particle_count,warming_limit;kwargs...)
+					warmed_results = warming(new_ttn,new_ham,new_sp,warming_limit;kwargs...)
 					#return warmed_results
 					ttn,ham,sp,obs = warmed_results
 				end
@@ -851,6 +857,9 @@ function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 			end
 		end
 		
+		if_densmat ? densmat = density_matrix(sp.ttn) : nothing
+		metadata["observer"] = obs
+
 		end_time = time()
 		
 		if if_save_data
@@ -861,8 +870,9 @@ function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 			catch
 				nothing
 			end
+			metadata["maxlinkdim"] = TTNKit.maxlinkdim(sp.ttn)
 			ttn_data_dict::Dict{String,Any} = if_gpu ? Dict([("ttn",back2cpu(sp.ttn))]) : Dict([("ttn",sp.ttn)])
-			if_densmat ? ttn_data_dict["densmat"] = density_matrix(sp.ttn) : nothing
+			if_densmat ? ttn_data_dict["densmat"] = densmat : nothing
 			write_data_jld2(filename,ttn_data_dict,location,metadata)
 			#catch
 			#	println("Saving Didn't work")
@@ -870,7 +880,11 @@ function find_ground_state(num_layers,particle_count,t_strength; kwargs...)
 		end
 
 		
-		return ttn, ham, sp, obs, end_time-start_time
+		if if_densmat
+			return ttn, ham, sp, obs, end_time-start_time, densmat
+		else
+			return ttn, ham, sp, obs, end_time-start_time
+		end
 	end
 	
 	end_time = time()
