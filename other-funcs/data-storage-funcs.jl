@@ -1,5 +1,12 @@
 using JLD2,TTNKit
 
+function get_folder_location(folder_name)
+	central_loc=find_center()
+	get_to_center = split(pwd(),central_loc)[1]
+	full_location = occursin("main-git",pwd()) ? get_to_center * "fzj/main-git/" * folder_name : get_to_center * central_loc * "/" * folder_name
+	return full_location
+end
+
 function back2cpu(ttn::TTNKit.TreeTensorNetwork)
 	datagpu = deepcopy(ttn.data)
 	datac = map(datagpu) do layerdata
@@ -151,12 +158,6 @@ function change_numparticles_metadata(filename)
 		println("Had some error for $filename")
 		return "no"
 	end
-end
-
-function get_folder_location(folder_name,central_loc="fzj")
-	get_to_center = split(pwd(),central_loc)[1]
-	full_location = occursin("main-git",pwd()) ? get_to_center * "fzj/main-git/" * folder_name : get_to_center * central_loc * "/" * folder_name
-	return full_location
 end
 
 function find_data_file(params_dict,calc_type,location="/home/patrick/fzj/main-git/cluster-data"; kwargs...)

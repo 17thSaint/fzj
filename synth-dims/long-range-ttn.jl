@@ -949,7 +949,7 @@ if true
 	save_plot = false
 	save_data = get(params_dict, "if_save_data", true)
 
-	loc = get_folder_location("cluster-data/synth-dims","fzj")
+	loc = get_folder_location("cluster-data/synth-dims")
 	if_cliff = false
 	sc_type = "flat"
 	dists = [i for i in 1:2*edge_sites]

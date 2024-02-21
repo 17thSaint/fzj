@@ -164,7 +164,7 @@ if typeof(open_cores) != String
 	BLAS.set_num_threads(open_cores)	
 end
 if_save_data = get(params_dict,"if_save_data",false)
-dataloc = get_folder_location("cluster-data/synth-dims","fzj")
+dataloc = get_folder_location("cluster-data/synth-dims")
 if_densmat = true
 
 nsweeps = 500

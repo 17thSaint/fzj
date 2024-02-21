@@ -4,11 +4,12 @@ using LsqFit
 
 function find_center()
 	all_folders = split(pwd(),"/")
-	rez = findfirst(x -> x == "review-practice-codes", all_folders)
-	if all_folders[rez-1] == "main-git"
+	if "fzj" in all_folders
 		return "fzj"
+	elseif "local" in all_folders
+		return all_folders[findfirst(x -> all_folders[x] == "local",1:length(all_folders))+1]
 	else
-		return all_folders[rez-1]
+		println("Not sure where the center is: $(pwd())")
 	end
 end
 
