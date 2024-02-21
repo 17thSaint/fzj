@@ -154,7 +154,7 @@ end
 # 6,5,3 = 50
 # 8,6,4 = 78
 
-loc = get_folder_location("cluster-data/synth-dims","fzj")
+loc = get_folder_location("cluster-data/synth-dims")
 #=exc_loc = get_folder_location("cluster-data/synth-dims/higher-states","fzj")
 
 L = 6
@@ -319,16 +319,38 @@ ylabel("Physical Correlation Length")
 legend()
 =#
 
+function distcorrs(rho::Matrix,virt_edge_length,phys_edge_length; kwargs...)
+	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
+	if_periodic_phys = get(kwargs, :if_periodic_phys, true)
+	dists = get(kwargs, :dists, nothing)
+
+	if isnothing(dists)
+		dists = zeros(phys_edge_length*virt_edge_length,phys_edge_length*virt_edge_length)
+		for s in 1:virt_edge_length
+			for j in 1:phys_edge_length
+				s1 = (s-1)*phys_edge_length + j
+				for ss in 1:virt_edge_length
+					for jj in 1:phys_edge_length
+						s2 = (ss-1)*phys_edge_length + jj
+						dists[s1,s2] = find_dist((s,j),(ss,jj),(virt_edge_length,phys_edge_length),(if_periodic_virt,if_periodic_phys))
+					end
+				end
+			end
+		end
+	end
+
+end
+
 if true
 layers = 6
 edge_length = Int(sqrt(2^layers))
-num_parts = 4
+num_parts = Int(sqrt(2^layers)/2)
 
 col = ["b","g","r","c","m","y","k","w"]
 
 if true
-params_dict = Dict([("layers",layers),("particles",num_parts)])
-loc = get_folder_location("cluster-data/synth-dims","fzj")
+params_dict = Dict([("layers",layers),("particles",num_parts),("alpha",0.0)])
+loc = get_folder_location("cluster-data/synth-dims")
 all_files = find_data_file(params_dict,"ttn",loc)
 display(all_files)
 sforderparams = zeros(length(all_files))
@@ -336,55 +358,69 @@ shortrange = zeros(length(all_files))
 longrange = zeros(length(all_files))
 fillings = zeros(length(all_files))
 corrlengths = [zeros(Int(edge_length)) for i in 1:length(all_files)]
+bondims = zeros(length(all_files))
+zerorho = zeros(2^layers,2^layers) .* im
 #
 for (idx,f) in enumerate(all_files)
 	name_data = get_params_dict_from_filename(f)
 	filling = name_data["particles"] / (2^(name_data["layers"]) * name_data["alpha"])
-	#if filling < 0.4
+	#if name_data["alpha"] == 0.0
 	#	continue
 	#end
 	fillings[idx] = filling
-	data,metadata = read_data_jld2(f,loc)
+	data,metadata = read_data_jld2(f,loc;outputlevel=0)
 	wavefunc = data["ttn"]
+	bondims[idx] = maxlinkdim(wavefunc)
 	if "densmat" in keys(data)
 		println("Inside data")
 		rho = data["densmat"]
 	else
 		println("Need to make")
-		continue
-		#rho = density_matrix(wavefunc)
+		#continue
+		rho = density_matrix(wavefunc)
 	end
 	momocc = rho
-	middle = Int((layers^2)/2)
-	longrange[idx] = abs(2*sum([sum(diag(momocc,i) + diag(momocc,-i)) for i in middle+1:layers^2-1]))
-	shortrange[idx] = abs(2*sum([sum(diag(momocc,i) + diag(momocc,-i)) for i in 0:middle]))
-	sforderparams[idx] = abs(2*sum(momocc))
+	global zerorho = rho
+	rez = physical_distance_correlation(wavefunc; densmat=rho)
+	for i in 1:length(rez[2])
+		plot(rez[1],rez[2][i],"-p")
+	end
+	#middle = Int((layers^2)/2)
+	#longrange[idx] = abs(2*sum([sum(diag(momocc,i) + diag(momocc,-i)) for i in middle+1:layers^2-1]))
+	#shortrange[idx] = abs(2*sum([sum(diag(momocc,i) + diag(momocc,-i)) for i in 0:middle]))
+	sforderparams[idx] = minimum(rez)#abs(2*sum(momocc)) / (2^layers)
+	
 
-	#
-	#top = [abs(sum(diag(momocc,i))) for i in 1:layers^2-1]
+	#=
+	top = [abs(sum(diag(momocc,i))) for i in 1:layers^2-1]
 	#fig = figure()
-	#plot(collect(1:length(top)),top,"-p",label="$(round(filling,digits=3))")
-	#legend()
-	#ylabel("Long Range Correlation")
-	#
+	plot(collect(1:length(top)),top,"-p",label="$(round(filling,digits=3))")
+	legend()
+	ylabel("Long Range Correlation")
+	=#
 
-	#=if idx > 1
-		for i in 1:edge_length
-			plot(fillings[idx-1:idx],[corrlengths[idx-1][i],corrlengths[idx][i]],"-p",c=col[i])
-		end
-	end=#
+	if idx > 1
+		#for i in 1:edge_length
+			plot(fillings[idx-1:idx],[sforderparams[idx-1],sforderparams[idx]],"-p",c="b")
+		#end
+	end
 end
 end
-#
+#=
 fig = figure()
 xvals = fillings#num_parts ./ (fillings .* (edge_length^2))
-plot(xvals,shortrange,"-p",label="Short Range")
-plot(xvals,longrange,"-p",label="Long Range")
+#plot(xvals,shortrange,"-p",label="Short Range")
+#plot(xvals,longrange,"-p",label="Long Range")
 plot(xvals,sforderparams,"-p",label="Total")
 xlabel("Filling")
 ylabel("Zero Mom Occs")
 legend()
-#
+
+fig2 = figure()
+plot(xvals,bondims,"-p")
+xlabel("Filling")
+ylabel("Max Link Dim")
+=#
 end
 
 

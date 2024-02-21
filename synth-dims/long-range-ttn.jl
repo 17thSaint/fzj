@@ -592,7 +592,7 @@ function physical_distance_correlation(psi::TreeTensorNetwork; kwargs...)
 					corr_val = densmat[TTNKit.linear_ind(lat,(s,j)),TTNKit.linear_ind(lat,(s,jj))]
 					corr_val += conj(corr_val)
 				end
-				dist_btw = jj - j#find_dist((s,j),(s,jj),(virt_length,phys_length),(if_periodic_virt,if_periodic_phys))
+				dist_btw = find_dist((s,j),(s,jj),(virt_length,phys_length),(if_periodic_virt,if_periodic_phys))
 				if dist_btw in dists[s]
 					append!(all_corrs[s][findfirst(x -> x == dist_btw,dists[s])],real(corr_val))
 				else
@@ -667,7 +667,7 @@ function distance_correlation(psi::TreeTensorNetwork; kwargs...)
 		end
 	end
 
-	corrs = ([mean(all_corrs[i]) for i in 1:length(all_corrs)])
+	corrs = ([sum(all_corrs[i]) for i in 1:length(all_corrs)])
 	corr_errors = [std(all_corrs[i]) for i in 1:length(all_corrs)]
 
 	if_plot ? plot_distance_correlation(dists,corrs,corr_errors; kwargs...) : nothing
@@ -862,16 +862,16 @@ fb_occ_mat = get_occupancy(fb_gs)
 
 
 #
-if true
+if false
 
 #nnst = 0.0
 #layers = 6
 #lr = 0#Int(sqrt(2^layers))-1
 #for nnst in nn_strens
 
-	#params_dict = Dict([("if_pinning",false),("layers",layers),("mdim",200),("mag_off",false),("lr",lr),("if_nn_int",false),("nn_strength",nnst)])
+	params_dict = Dict([("layers",4),("mdim",100)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
-	params_dict = make_args_dict(ARGS)
+	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
 	if typeof(open_cores) != String
 		BLAS.set_num_threads(open_cores)	
@@ -884,7 +884,7 @@ if true
 	if_change = get(params_dict, "if_change", false)
 	if_densmat = get(params_dict, :if_densmat, true)
 	change = get(params_dict, "change", 0.0001)
-	limit = get(params_dict, "nn_strength", 1.0)
+	limit = get(params_dict, "nn_strength", 0.0)
 	layer_count = Int(get(params_dict, "layers", 4))
 	mag_off = get(params_dict, "mag_off", true)
 	mdim = get(params_dict, "mdim", get_mdim(layer_count,(false,1)))
@@ -901,6 +901,7 @@ if true
 	else
 		alpha = get(params_dict, "alpha", nothing)
 	end
+	#
 	if layer_count % 2 == 0
 		edge_sites = Int(sqrt(2^layer_count))
 		num_particles = get(params_dict, "particles", Int(edge_sites/2))
@@ -908,6 +909,7 @@ if true
 		edge_sites = Int(sqrt(2^(layer_count+1)))
 		num_particles = get(params_dict, "particles", Int(sqrt(2^(layer_count+1))/2))
 	end
+	#=
 	if isnothing(alpha)
 		filling = get(params_dict, "filling", 1.0)
 		alpha = num_particles/(filling*(2^layer_count))
@@ -915,6 +917,8 @@ if true
 	else
 		mag_off = false
 	end
+	=#
+	mag_off = false
 
 	#
 	#nu = 1.0
@@ -926,8 +930,8 @@ if true
 	chemical = false
 	mu = 0.0
 	#max_occupation = 3
-	expan = TTNKit.DefaultExpander(0.5)#TTNKit.NoExpander()
-	noise = [0.0]#[1E-2, 1E-2, 1E-2,0.0]
+	expan = TTNKit.DefaultExpander(1.0)#TTNKit.NoExpander()
+	herenoise = [0.0]#[1E-2, 1E-2, 1E-2,0.0]
 	ts = 0.500
 	tot_sites = 2^layer_count
 	#=
@@ -940,21 +944,24 @@ if true
 		end
 	end
 	=#
-	nswps = 50
+	nswps = 100
 	#alpha = 7/64
 	#num_particles = Int(sqrt(2^layer_count)/2)#Int(alpha * tot_sites * nu)
 	
 
 	plotting = false
 	save_plot = false
-	save_data = get(params_dict, "if_save_data", true)
+	save_data = false#get(params_dict, "if_save_data", true)
 
-	loc = get_folder_location("cluster-data/synth-dims")
+	loc = get(params_dict, "dataloc", get_folder_location("cluster-data/synth-dims"))
 	if_cliff = false
 	sc_type = "flat"
 	dists = [i for i in 1:2*edge_sites]
 	lr_scaling = long_range_scaling(longrange_dist,edge_sites,limit; cliff=if_cliff,limit=limit,scaling=sc_type,if_plot=false)
 	
+	counting = 20
+	strens = range(num_particles/(0.49*tot_sites),num_particles/(0.51*tot_sites),length=counting) #range(0.02,0.25,length=counting)
+	sforderparams = zeros(counting)
 	#=alpha_start = 0.0525
 	alpha_end = 0.0725
 	alpha_count = 5
@@ -973,7 +980,7 @@ if true
 	strens = range(num_particles/(0.2*tot_sites),num_particles/(3.0*tot_sites),length=counting) #range(0.02,0.25,length=counting)
 	centermoms = [0.0 for i in 1:counting]# .* im
 	=#
-	#for (idx,alpha) in enumerate(strens)
+	for (idx,alpha) in enumerate(strens)
 	#for (idx,num_particles) in enumerate(parts)
 		#alpha = 0.0
 		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys),("nn_strength",limit)])
@@ -983,7 +990,7 @@ if true
 		#else
 			datafile_name = make_parameters_filename(filename_dict)
 		#end
-		model_paras = (nrgtol=nrgtol,if_densmat=if_densmat,centralflux_strength=centralflux_strength,if_pinning_pot=if_pinning,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=limit,if_chem=chemical,chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,limit=limit,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=noise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc)
+		model_paras = (nrgtol=nrgtol,if_densmat=if_densmat,centralflux_strength=centralflux_strength,if_pinning_pot=if_pinning,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=limit,if_chem=chemical,chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,limit=limit,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=herenoise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc)
 		
 		metadata_dict = merge(named_tuple_to_dict(model_paras),filename_dict)
 
@@ -991,13 +998,13 @@ if true
 		println(datafile_name)
 		if_exists,found_data = check_data_exists(filename_dict,"ttn";location=loc)
 
-		if if_exists
+		if false#if_exists
 			println("Found Data")
 			wavefunc = found_data[1]["ttn"]
 			try
-				global densmat = found_data[1]["densmat"]
+				rho = found_data[1]["densmat"]
 			catch
-				global densmat = nothing
+				rho = nothing
 			end
 			ham = found_data[2]["ham"]
 			#append!(wavefuncs,[wavefunc])
@@ -1005,7 +1012,7 @@ if true
 			#title_string = "Np = $num_particles, LR = $longrange_dist at $limit"
 			println("Starting Script using $num_particles particles on $tot_sites sites with $(!mag_off) Mag Field, Bond Dim = $mdim, and Long Range Dist = $longrange_dist")
 			#if true
-			global densmat = nothing
+			#densmat = nothing
 			starting = time()
 			net = build_HH_net(layer_count; syms=true)
 			ham = long_range_HH_ham(net,ts,alpha; model_paras...)
@@ -1015,6 +1022,13 @@ if true
 			wavefunc = dm_sp.ttn
 			#append!(wavefuncs,[dm_sp.ttn])
 		end
+
+		sforderparams[idx] = abs(2*sum(rho)) / (2^layer_count)
+
+		if idx > 1
+			plot(num_particles ./ ((2^layer_count) .* [strens[idx-1],strens[idx]]),[sforderparams[idx-1],sforderparams[idx]],"-p",c="b")
+		end
+
 		#append!(currents,[[ttn_current_site(dm_sp.ttn,i; centralflux_strength=centralflux_strength) for i in 1:edge_sites]])
 		#append!(nrgs,[dm_sp.current_energy])
 
@@ -1045,11 +1059,9 @@ if true
 		scatter(collect(1:mdim),-log.(specs))
 		=#
 		#end
-	#end
+	end
 
 end
-
-display(abs.(rho))
 
 #
 #plot(strens,real.(centermoms),"-p")

@@ -676,6 +676,7 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	#println("PreSweep Link Dim = ",TTNKit.maxlinkdim(ttn))
 	#get_position_dims(ttn)
 	if sweep_type == "dmrg"
+		println("Before starting DMRG the bond dim is ",TTNKit.maxlinkdim(ttn))
 		sp = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer)
 	elseif sweep_type == "simple"
 		proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
@@ -902,6 +903,7 @@ function TTNKit.ITensors.measure!(o::NRGVarObserver; kwargs...)
     nrgs = o.nrg
     var_tol = o.var_tol
     dmrg = kwargs[:sweep_handler]
+	println("Link dimension right now is ",TTNKit.maxlinkdim(dmrg.ttn))
     #o.nrg[1] = o.nrg[2]
     append!(o.nrg,[dmrg.current_energy])
 end

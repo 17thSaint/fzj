@@ -72,7 +72,7 @@ function make_args_dict(args,parameter_iteration=0)
 		else
 			value = get_integer
 		end
-		parameters_dict[key] = i == 1 ? value + parameter_shift : value
+		parameters_dict[key] = value#i == 1 ? value + parameter_shift : value
 	end
 	return parameters_dict
 end
