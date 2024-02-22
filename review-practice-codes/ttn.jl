@@ -68,8 +68,8 @@ end
 function get_lattice_dims(input_data)
 	num_layers = TTNKit.number_of_layers(input_data)
 	if num_layers % 2 != 0
-		physical_edge_length = Int(sqrt(2^(num_layers-1)))
-		virt_edge_length = physical_edge_length * 2
+		physical_edge_length = Int(sqrt(2^(num_layers+1)))
+		virt_edge_length = Int(physical_edge_length / 2)
 		return physical_edge_length,virt_edge_length
 		
 	else
@@ -803,16 +803,16 @@ function find_ground_state(num_layers,particle_count; kwargs...)
 	println("Finished Building Network")
 	
 	if isnothing(ttn)
-		if particle_type .== "Boson"
+		#=if particle_type .== "Boson"
 			states = fill("0", num_sites)
 			old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
 			ttn = initialize_ttn(old_ttn,max_dim,particle_count; kwargs...)
-		else
+		else=#
 			states = fill_states(particle_count,num_sites,1)
 			old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
 			ttn = TTNKit.increase_dim_tree_tensor_network_zeros(old_ttn, maxdim = max_dim)
 			ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
-		end
+		#end
 		metadata["seed_ttn"] = ttn
 	end
 	
@@ -903,14 +903,15 @@ function TTNKit.ITensors.measure!(o::NRGVarObserver; kwargs...)
     nrgs = o.nrg
     var_tol = o.var_tol
     dmrg = kwargs[:sweep_handler]
-	println("Link dimension right now is ",TTNKit.maxlinkdim(dmrg.ttn))
+	println("Link dimension right now is ",TTNKit.maxlinkdim(dmrg.ttn)," while the maxdim is ",TTNKit.maxdim(dmrg))
     #o.nrg[1] = o.nrg[2]
     append!(o.nrg,[dmrg.current_energy])
 end
 
 function TTNKit.ITensors.checkdone!(o::NRGVarObserver;kwargs...)
 	outputlevel = kwargs[:outputlevel]
-	if abs(o.nrg[end] - o.nrg[end-1]) < o.var_tol
+	sweep_num = kwargs[:sweep_handler].current_sweep
+	if sweep_num > 5 && abs(o.nrg[end] - o.nrg[end-1]) < o.var_tol
 		outputlevel > 0 ? println("Energy Converged. Stopping DMRG") : nothing
 		return true
 	else
@@ -1178,6 +1179,8 @@ function plot_occupancy(exp_occ; kwargs...)
 	plot_title = get(kwargs, :plot_title, "")
 	title_string = "Occupancy, " * plot_title
 	title(title_string)
+	xlabel("Synthetic")
+	ylabel("Physical")
 	
 	if get(kwargs, :if_save_fig, false)
 		location = get(kwargs, :location, pwd())

@@ -180,6 +180,7 @@ end
 function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	resulting_ham = []
 	phys_edge_length,virt_edge_length = get_lattice_dims(net)
+	println("Phys = ",phys_edge_length,", Virt = ",virt_edge_length)
 	
 	u_strength = get(kwargs, :u_strength, 1.0)
 	scaling_distance = get(kwargs, :scaling_dist, 0) #[[u_strength/2]; [0 for i in 1:virt_edge_length-1]]
@@ -225,23 +226,23 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 		end
 		#
 		if if_periodic_virt
-			for i in 1:virt_edge_length
+			for i in 1:phys_edge_length
 				s1_coord = (i,1)
 				s2_coord = (i,virt_edge_length)
 				coeff = get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
-				hopping += (coeff,"Adag",(i,1),"A",(i,virt_edge_length))
-				hopping += (conj(coeff),"Adag",(i,virt_edge_length),"A",(i,1))
+				hopping += (coeff,"Adag",s1_coord,"A",s2_coord)
+				hopping += (conj(coeff),"Adag",s2_coord,"A",s1_coord)
 			end
 		end
 
 		if if_periodic_phys
-			for i in 1:phys_edge_length
+			for i in 1:virt_edge_length
 				s1_coord = (1,i)
 				s2_coord = (phys_edge_length,i)
 				coeff = get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
 				coeff *= exp(im*2*pi*centralflux_strength/size(lat)[1])
-				hopping += (coeff,"Adag",(1,i),"A",(phys_edge_length,i))
-				hopping += (conj(coeff),"Adag",(phys_edge_length,i),"A",(1,i))
+				hopping += (coeff,"Adag",s1_coord,"A",s2_coord)
+				hopping += (conj(coeff),"Adag",s2_coord,"A",s1_coord)
 			end
 		end
 
@@ -583,22 +584,25 @@ function physical_distance_correlation(psi::TreeTensorNetwork; kwargs...)
 	dists = [[] for i in 1:virt_length]
 	for s=1:virt_length
 		for j=1:phys_length
-			top = mod1(j+Int(phys_length/2),phys_length)
-			for jj=j:top#phys_length
+			top = phys_length#mod1(j+Int(phys_length/2),phys_length)
+			for jj=1:top#phys_length
 				if isnothing(densmat)
 					corr_val = TTNKit.correlation(psi,"Adag","A",(s,j),(s,jj))
-					corr_val += conj(corr_val)
+					corr_val /= sqrt(TTNKit.expect(psi,"N",(s,j)) * TTNKit.expect(psi,"N",(s,jj)))
+					#corr_val += conj(corr_val)
 				else
-					corr_val = densmat[TTNKit.linear_ind(lat,(s,j)),TTNKit.linear_ind(lat,(s,jj))]
-					corr_val += conj(corr_val)
+					corr_val = densmat[TTNKit.linear_ind(lat,(j,s)),TTNKit.linear_ind(lat,(jj,s))]
+					normalization = sqrt(densmat[TTNKit.linear_ind(lat,(j,s)),TTNKit.linear_ind(lat,(j,s))] * densmat[TTNKit.linear_ind(lat,(jj,s)),TTNKit.linear_ind(lat,(jj,s))]) 
+					corr_val /= normalization
+					#corr_val += conj(corr_val)
 				end
-				dist_btw = find_dist((s,j),(s,jj),(virt_length,phys_length),(if_periodic_virt,if_periodic_phys))
+				dist_btw = abs(j-jj)#find_dist((s,j),(s,jj),(virt_length,phys_length),(if_periodic_virt,if_periodic_phys))
 				if dist_btw in dists[s]
-					append!(all_corrs[s][findfirst(x -> x == dist_btw,dists[s])],real(corr_val))
+					append!(all_corrs[s][findfirst(x -> x == dist_btw,dists[s])],abs(corr_val))
 				else
 					append!(dists[s],[dist_btw])
 					sort!(dists[s])
-					insert!(all_corrs[s],findfirst(x -> x == dist_btw,dists[s]),[real(corr_val)])
+					insert!(all_corrs[s],findfirst(x -> x == dist_btw,dists[s]),[abs(corr_val)])
 				end
 			end
 		end
@@ -609,7 +613,20 @@ function physical_distance_correlation(psi::TreeTensorNetwork; kwargs...)
 		corrs[i] = ([mean(all_corrs[i][j]) for j in 1:length(all_corrs[i])])
 	end
 
-	corr_lengths = correlation_length(dists[1],corrs; kwargs...)
+	corr_lengths = correlation_length(dists[1],corrs; if_plot=false)
+
+	if if_plot
+		fig = figure()
+		title_string = get(kwargs, :plot_title, "")
+		for i in 1:virt_length
+			plot(dists[i],abs.(corrs[i]),"-p",label="$i")
+			yscale("log")
+		end
+		legend()
+		xlabel("Distance")
+		ylabel("Correlation")
+		title(title_string)
+	end
 
 	return dists,corrs,corr_lengths
 end
@@ -869,9 +886,9 @@ if false
 #lr = 0#Int(sqrt(2^layers))-1
 #for nnst in nn_strens
 
-	params_dict = Dict([("layers",4),("mdim",100)])
+	#params_dict = Dict([("layers",6),("mdim",20)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
-	#params_dict = make_args_dict(ARGS)
+	params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
 	if typeof(open_cores) != String
 		BLAS.set_num_threads(open_cores)	
@@ -909,7 +926,7 @@ if false
 		edge_sites = Int(sqrt(2^(layer_count+1)))
 		num_particles = get(params_dict, "particles", Int(sqrt(2^(layer_count+1))/2))
 	end
-	#=
+	#
 	if isnothing(alpha)
 		filling = get(params_dict, "filling", 1.0)
 		alpha = num_particles/(filling*(2^layer_count))
@@ -917,7 +934,7 @@ if false
 	else
 		mag_off = false
 	end
-	=#
+	#
 	mag_off = false
 
 	#
@@ -931,7 +948,7 @@ if false
 	mu = 0.0
 	#max_occupation = 3
 	expan = TTNKit.DefaultExpander(1.0)#TTNKit.NoExpander()
-	herenoise = [0.0]#[1E-2, 1E-2, 1E-2,0.0]
+	herenoise = [0.0]
 	ts = 0.500
 	tot_sites = 2^layer_count
 	#=
@@ -951,7 +968,7 @@ if false
 
 	plotting = false
 	save_plot = false
-	save_data = false#get(params_dict, "if_save_data", true)
+	save_data = true#get(params_dict, "if_save_data", true)
 
 	loc = get(params_dict, "dataloc", get_folder_location("cluster-data/synth-dims"))
 	if_cliff = false
@@ -959,9 +976,9 @@ if false
 	dists = [i for i in 1:2*edge_sites]
 	lr_scaling = long_range_scaling(longrange_dist,edge_sites,limit; cliff=if_cliff,limit=limit,scaling=sc_type,if_plot=false)
 	
-	counting = 20
-	strens = range(num_particles/(0.49*tot_sites),num_particles/(0.51*tot_sites),length=counting) #range(0.02,0.25,length=counting)
-	sforderparams = zeros(counting)
+	#counting = 50
+	#strens = range(num_particles/(0.2*tot_sites),num_particles/(2.0*tot_sites),length=counting) #range(0.02,0.25,length=counting)
+	#sforderparams = zeros(counting)
 	#=alpha_start = 0.0525
 	alpha_end = 0.0725
 	alpha_count = 5
@@ -980,7 +997,7 @@ if false
 	strens = range(num_particles/(0.2*tot_sites),num_particles/(3.0*tot_sites),length=counting) #range(0.02,0.25,length=counting)
 	centermoms = [0.0 for i in 1:counting]# .* im
 	=#
-	for (idx,alpha) in enumerate(strens)
+	#for (idx,alpha) in enumerate(strens)
 	#for (idx,num_particles) in enumerate(parts)
 		#alpha = 0.0
 		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys),("nn_strength",limit)])
@@ -998,13 +1015,13 @@ if false
 		println(datafile_name)
 		if_exists,found_data = check_data_exists(filename_dict,"ttn";location=loc)
 
-		if false#if_exists
+		if if_exists
 			println("Found Data")
 			wavefunc = found_data[1]["ttn"]
 			try
-				rho = found_data[1]["densmat"]
+				dens = found_data[1]["densmat"]
 			catch
-				rho = nothing
+				dens = nothing
 			end
 			ham = found_data[2]["ham"]
 			#append!(wavefuncs,[wavefunc])
@@ -1016,18 +1033,22 @@ if false
 			starting = time()
 			net = build_HH_net(layer_count; syms=true)
 			ham = long_range_HH_ham(net,ts,alpha; model_paras...)
-			og_ttn, hamilt, dm_sp, rezobs, runtime, rho = find_ground_state(layer_count,num_particles; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
+			og_ttn, hamilt, dm_sp, rezobs, runtime, dens = find_ground_state(layer_count,num_particles; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
 			total_time = time() - starting
 			println("Running time = $total_time")
 			wavefunc = dm_sp.ttn
 			#append!(wavefuncs,[dm_sp.ttn])
 		end
 
-		sforderparams[idx] = abs(2*sum(rho)) / (2^layer_count)
+		#=sforderparams[idx] = abs(2*sum(dens)) / (2^layer_count)
 
 		if idx > 1
 			plot(num_particles ./ ((2^layer_count) .* [strens[idx-1],strens[idx]]),[sforderparams[idx-1],sforderparams[idx]],"-p",c="b")
-		end
+		end=#
+
+		#physical_distance_correlation(wavefunc; densmat=dens,if_plot=true)
+
+		#get_occupancy(wavefunc)
 
 		#append!(currents,[[ttn_current_site(dm_sp.ttn,i; centralflux_strength=centralflux_strength) for i in 1:edge_sites]])
 		#append!(nrgs,[dm_sp.current_energy])
@@ -1059,7 +1080,7 @@ if false
 		scatter(collect(1:mdim),-log.(specs))
 		=#
 		#end
-	end
+	#end
 
 end
 
