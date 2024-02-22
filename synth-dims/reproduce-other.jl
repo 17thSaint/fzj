@@ -156,8 +156,8 @@ end
 statenames = ["first","second","third","fourth","fifth"]
 higherstatetofind = 0
 
-#params_dict = make_args_dict(ARGS)
-params_dict = Dict([("L",6),("nflavors",5)])
+params_dict = make_args_dict(ARGS)
+#params_dict = Dict([("L",4),("nflavors",2),("if_save_data",false),("mdim",10),("filling",1.0)])
 #
 open_cores = get(params_dict, "open_cores", "all")
 if typeof(open_cores) != String
@@ -165,25 +165,18 @@ if typeof(open_cores) != String
 end
 if_save_data = get(params_dict,"if_save_data",false)
 dataloc = get_folder_location("cluster-data/synth-dims")
-if_densmat = true
+if_densmat = get(params_dict,"if_densmat",true)
 
-nsweeps = 500
-nrgvar_tol = 1E-7
+nsweeps = get(params_dict,"nsweeps",100)
+nrgvar_tol = get(params_dict,"nrgvar_tol",1E-7)
 mdim = get(params_dict,"mdim",100)
 noise = [0.0]
 
-#geo_params = [()] # (L,nf,nb)
-#Ls = [4,5,6,7,8,9,10,11,12,13,14,15]
-
-#nu = 1.0
-#
-states = []
-#for L in Ls
 L = Int(get(params_dict,"L",16))
 nflavors = Int(get(params_dict,"nflavors",8))
 part_count = Int(get(params_dict,"nbosons",Int(floor(L/2))))
 filling = get(params_dict,"filling",nothing)
-#=chi = get(params_dict,"chi",nothing)
+chi = get(params_dict,"chi",nothing)
 if isnothing(filling)
     if isnothing(chi)
         filling = 1.0
@@ -193,22 +186,22 @@ if isnothing(filling)
     end
 else
     chi = part_count / (filling * L * nflavors)
-end=#
+end
 
 tilt = 0.0
 
-if_per_phys = true
-if_per_virt = false
+if_per_phys = get(params_dict,"if_periodic_phys",true)
+if_per_virt = get(params_dict,"if_periodic_virt",false)
 if_gpu = get(params_dict,"if_gpu",false)
 
-centralflux_strength = 0.0
+centralflux_strength = get(params_dict,"centralflux_strength",0.0)
 
-naming_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",part_count),("centralflux_strength",centralflux_strength)])
-metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodic_virt",if_per_virt),("tilt_strength",tilt),("location",dataloc),("if_save_data",if_save_data),("nrgvar_tol",nrgvar_tol),("if_gpu",if_gpu),("mdim",mdim)]))
+naming_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",part_count),("chi",chi)])
+metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodic_virt",if_per_virt),("tilt_strength",tilt),("location",dataloc),("if_save_data",if_save_data),("nrgvar_tol",nrgvar_tol),("if_gpu",if_gpu),("mdim",mdim),("centralflux_strength",centralflux_strength)]))
 
 #
 if true
-counting = 30
+#=counting = 30
 #scaling = 64
 strens = collect(range(part_count/(0.2*L*nflavors),part_count/(0.5*L*nflavors),length=counting))#0.5 .+ [sort([-i/scaling for i in 1:counting]); [0.0]; [i/scaling for i in 1:counting]]
 #append!(strens,[0.0])
@@ -219,7 +212,7 @@ ees = zeros(length(strens))
 corrlengs = [zeros(length(strens)) for i in 1:nflavors]
 nrgs = zeros(length(strens))
 excited_nrgs = zeros(length(strens))
-#
+=#
 #nrgs = zeros(length(strens)) .* im
 #currents = zeros(nflavors,length(strens)) .* im
 #drudes = zeros(nflavors,length(strens)) .* im
@@ -258,9 +251,9 @@ excited_nrgs_null = 0.0
 =#
 
 #println("Chi = ",part_count / (nu*L*nflavors))
-for (idx,chi) in enumerate(strens)
+#for (idx,chi) in enumerate(strens)
 #for (idx,f) in enumerate(all_files)
-    #
+    #=
     if false
         found_data, found_metadata = read_data_jld2(f,loc)
         #centralflux_strength = found_metadata["centralflux_strength"]
@@ -273,49 +266,22 @@ for (idx,chi) in enumerate(strens)
         ham_hc = hamiltonian_universal(L,nflavors,chi; ham_params...,if_sephc="hc")
         ham_norm = hamiltonian_universal(L,nflavors,chi; ham_params...,if_sephc="norm")
 
-        #get_occupancy(psi_gs; plot_title="nu = $(round(part_count/(chi*nflavors*L),digits=4))")
-        #=
-        if "final_nrg_variance" in keys(found_metadata)
-            fn_nrg_var = found_metadata["final_nrg_variance"]
-            #println("Found in Metadata")
-        else
-            fn_nrg_var = energy_variance(psi_gs,found_metadata["ham"])
-            #println("Didn't have it stored")
-        end
-        if fn_nrg_var > nrgvar_tol
-            run_again(f; location=loc)
-        end
-        =#
         try
             densmat = found_data["densmat"]
         catch
             densmat = nothing
         end
     end
-    #
-    #ham_params = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
-    #display(found_metadata)
+    =#
     if true
         #chi = get_params_dict_from_filename(f)["chi"]
 
         metadata["chi"] = chi
         naming_dict["chi"] = round(chi,digits=5)
-        #if part_count / (chi*nflavors*L) > 1.0
-        #    continue
-        #end
-        #
-        #=
-        metadata["centralflux_strength"] = centralflux_strength
-        if centralflux_strength < 0.0
-            naming_dict["centralflux_strength"] = "n" * string(-round(centralflux_strength,digits=5))
-        else
-            naming_dict["centralflux_strength"] = round(centralflux_strength,digits=5)
-        end
-        =#
+      
         filename = make_parameters_filename(naming_dict)
         metadata["name"] = filename
         display(filename)
-        #
 
         ham_params = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
         ham_start = hamiltonian_universal(L,nflavors,chi; ham_params...)
@@ -323,11 +289,10 @@ for (idx,chi) in enumerate(strens)
 
         full_ham = ham_start
 
-        new_loc = get_folder_location("cluster-data/synth-dims/higher-states","fzj")
+        new_loc = get_folder_location("cluster-data/synth-dims/higher-states")
 
         if_exists,found_data = check_data_exists(naming_dict,"mps";location=dataloc,output_level=false)
 
-        #
         if if_exists
             psi_gs = found_data[1]["mps"]
             densmat = found_data[1]["densmat"]
@@ -340,41 +305,26 @@ for (idx,chi) in enumerate(strens)
                     if_exists_higher,found_data_higher = check_data_exists(naming_dict,"mps";location=new_loc * "/$(statenames[i])",output_level=false)
                     if_exists_levels[i+1] = if_exists_higher
                     if if_exists_higher
-                        all_level_states = append!(all_level_states,[found_data_higher[1]["mps"]])
+                        global all_level_states = append!(all_level_states,[found_data_higher[1]["mps"]])
                         println("State $i Already Found")
                     else
                         println("Need to Find State $i")
                         display(if_exists_levels)
                         metadata["nrg_level"] = string(i)
-                        dmrg_params = (psi_ortho=all_level_states[1:i],location=new_loc * "/$(statenames[i])",if_gpu=if_gpu,ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,observer=obs,if_densmat=if_densmat,nsweeps=nsweeps,noise=noise)
+                        global dmrg_params = (psi_ortho=all_level_states[1:i],location=new_loc * "/$(statenames[i])",if_gpu=if_gpu,ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,observer=obs,if_densmat=if_densmat,nsweeps=nsweeps,noise=noise)
                         psi_higher, densmat_higher = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
                         println("Energy Variance = ",energy_variance(psi_higher,ham_start)," at Chi = ",chi)
                         append!(all_level_states,[psi_higher])
                     end
                 end
-                    
-                
-                
-                #=
-                if if_exists_higher
-                    println("Already found higher energy state")
-                    psi_higher = found_data_higher[1]["mps"]
-                    densmat_higher = found_data_higher[1]["densmat"]
-                else
-                    metadata["nrg_level"] = string(parse(Int,found_data[1]["metadata"]["nrg_level"]) + 1)
-                    dmrg_params = (psi_ortho=psi_gs,if_gpu=if_gpu,ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=new_loc,observer=obs,if_densmat=if_densmat,nsweeps=nsweeps,noise=noise)
-                    psi_higher, densmat_higher = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
-                    println("Energy Variance = ",energy_variance(psi_higher,ham_start)," at Chi = ",chi)
-                end
-                =#
             end
         else
-            dmrg_params = (if_gpu=if_gpu,ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=dataloc,observer=obs,if_densmat=if_densmat,nsweeps=nsweeps,noise=noise)
+            global dmrg_params = (if_gpu=if_gpu,ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=dataloc,observer=obs,if_densmat=if_densmat,nsweeps=nsweeps,noise=noise)
             psi_gs, densmat = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
             println("Energy Variance = ",energy_variance(psi_gs,ham_start)," at Chi = ",chi)
-
+            #=
             if false
-                new_loc = get_folder_location("cluster-data/synth-dims/higher-states","fzj")
+                new_loc = get_folder_location("cluster-data/synth-dims/higher-states")
                 if_exists_higher,found_data_higher = check_data_exists(naming_dict,"mps";location=new_loc)
 
                 if if_exists_higher
@@ -386,12 +336,13 @@ for (idx,chi) in enumerate(strens)
                     psi_higher, densmat_higher = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params_higher...)
                     println("Energy Variance = ",energy_variance(psi_higher,ham_start)," at Chi = ",chi)
                 end
-            end
+            end=#
         end
         
     end
-    middle = Int(floor(L*nflavors/2))
-    sf_orderparams[idx] = abs(2*sum([sum(diag(densmat,i) + diag(densmat,-i)) for i in middle+1:Int(L*nflavors)-1]))#abs(2*sum(densmat))
+    #display(real.(densmat))
+    #middle = Int(floor(L*nflavors/2))
+    #sf_orderparams[idx] = abs(2*sum([sum(diag(densmat,i) + diag(densmat,-i)) for i in middle+1:Int(L*nflavors)-1]))#abs(2*sum(densmat))
     #append!(states,[psi_gs])
     #=
     for i in 0:higherstatetofind
@@ -484,7 +435,7 @@ for (idx,chi) in enumerate(strens)
     =#
     
     #physical_distance_correlation(psi_gs)
-    #
+    #=
     if true
     if idx > 1
         plot([part_count/(strens[idx-1]*nflavors*L),part_count/(chi*nflavors*L)],[sf_orderparams[idx-1],sf_orderparams[idx]],"-p",c="b")
@@ -503,7 +454,7 @@ for (idx,chi) in enumerate(strens)
     currents[:,i] = [calc_deriv(1,psi_gs,s,Int(L/2),nflavors,chi,ham_params) for s in 1:nflavors]
     drudes[:,i] = [calc_deriv(2,psi_gs,s,Int(L/2),nflavors,chi,ham_params) for s in 1:nflavors]
     end
-    #
+    =#
     
     #=
     centersite = Int(ceil(L/2))
@@ -519,32 +470,10 @@ for (idx,chi) in enumerate(strens)
     colorbar()
     =#
 end
-#
-#=
-fig = figure()
-plot(strens,real.(nrgs),"-p",label="Energy")
-xlabel("Central Flux Strength")
-legend()
-#
-fig2 = figure()
-for i in 1:nflavors
-    plot(strens,real.(currents[i,:]),"-p",label="Current $i")
-end
-xlabel("Central Flux Strength")
-legend()
-
-fig3 = figure()
-for i in 1:nflavors
-    plot(strens,real.(drudes[i,:]),"-p",label="Drude $i")
-end
-xlabel("Central Flux Strength")
-legend()
-=#
-end
 #println("Results are: ",sf_orderparams_null,", ",bonddims_null,", ",distcorrs_null,", ",ees_null,", ",corrlengs_null)
 #
-xvals = part_count ./ (strens .* (L*nflavors))
 #=
+xvals = part_count ./ (strens .* (L*nflavors))
 fig7 = figure()
 plot(xvals,excited_nrgs .- nrgs,"-p")
 plot(xvals,zeros(length(xvals)) .+ (excited_nrgs_null - nrgs_null),c="r",label="Zero Field")
@@ -595,107 +524,7 @@ plot(xvals,log.(bonddims),"-p")
 plot(xvals,zeros(length(xvals)) .+ ees_null,c="r")
 xlabel("Filling Factor")
 ylabel("Entanglement Entropy")
-#
-
-fig5 = figure()
-for s in 1:nflavors
-    plot(xvals,corrlengs[s],"-p",label="$s")
-    if s == 1
-        plot(xvals,zeros(length(xvals)) .+ corrlengs_null[s],label="Null $s",c="k")
-    else
-        plot(xvals,zeros(length(xvals)) .+ corrlengs_null[s],c="k")
-    end
-end
-xlabel("Filling Factor")
-ylabel("Correlation Length")
-legend()
 =#
-
-#
-#end
-#
-
-#=
-if false
-    time_end = 10.0
-    time_change = 0.1
-    mdim_time = 50
-
-    chi = strens[1]
-    println("Chi = ",chi)
-    #
-    tilts = [0.00]
-    time_states = [[] for i in 1:length(tilts)]
-    time_occs = [[] for i in 1:length(tilts)]
-    alltimes = [[] for i in 1:length(tilts)]
-    time_currents = [zeros(nflavors,Int(time_end/time_change)+1) .* im for i in 1:length(tilts)]
-    for (i,tilt) in enumerate(tilts)
-        ham_params_evolve = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=tilt)
-        ham_evolve = hamiltonian_universal(L,nflavors,chi; ham_params_evolve...)
-
-        psi_gs = states[1]
-        #time_currents[i][:,1] = [calc_deriv(1,psi_gs,s,Int(L/2),nflavors,chi,ham_params_evolve) for s in 1:nflavors]
-        #rez0, otherham0 = evolve_in_time(psi_gs,time_end,time_change,ham_start; mdim=mdim_time,obs_measures=Dict("occs" => current_occ, "states" => return_state, "nrg_vars" => current_nrgvar, "nrgs" => current_nrg))
-        rez, otherham = evolve_in_time(psi_gs,time_end,time_change,ham_evolve; mdim=mdim_time,obs_measures=Dict("occs" => current_occ, "states" => return_state))
-        times = [[0.0]; rez["times"].results]
-        time_states[i] = [[psi_gs]; rez["states"].results]
-        time_occs[i] = [[get_occupancy(psi_gs;if_plot=false)]; rez["occs"].results]
-        alltimes[i] = times
-    end
-    #
-
-    times = alltimes[1]
-    ham_params_evolve = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
-    for j in 1:length(times)-1
-        #fig = figure()
-        #imshow(real.(allsite_deriv(1,rez["states"].results[j],nflavors,chi,ham_params_evolve)))
-        #colorbar()
-        time_currents[1][:,j+1] = [calc_deriv(1,time_states[1][j],s,Int(L/2),nflavors,chi,ham_params_evolve) for s in 1:nflavors]
-    end
-
-    sumcurrents = [0.0 for i in 1:length(times)]
-    for j in 1:length(times)
-        sumcurrents[j] = real(sum(allsite_deriv(1,time_states[1][j],nflavors,chi,ham_params_evolve)))
-    end
-    fig = figure()
-    plot(times,sumcurrents,"-p")
-    xlabel("Time")
-    ylabel("Total Current")
-
-    #println(length(times),", ",length())
-    fig = figure()
-    for j in 1:nflavors
-        plot(times,real.(time_currents[1][j,:]) .- real.(time_currents[1][j,1]),"-p",label="$j")
-    end
-    xlabel("Time")
-    ylabel("Current")
-    title("Tilt = $(round(tilt,digits=3)), Chi = $(round(chi,digits=3))")
-    legend()
-
-    denspols = [density_polarization(nothing,time_occs[1][j]) for j in 1:length(times)]
-    fig2 = figure()
-    plot(times,real.(denspols) .- real(denspols[1]),"-p")
-    xlabel("Times")
-    ylabel("Density Polarization")
-
-    spacdenspols = [spacial_density_polarization(nothing,time_occs[1][j])[2] for j in 1:length(times)]
-    fig2 = figure()
-    for i in 1:nflavors
-        yvals = real.([spacdenspols[j][i] for j in 1:length(times)])
-        plot(times,yvals .- yvals[1],"-p",label="$i")
-    end
-    legend()
-    xlabel("Times")
-    ylabel("Spacial Density Polarization")
-
-    #=fig2 = figure()
-    plot(times,imag.(currents_null),"-p")
-    title("Null")
-    =#
-end
-=#
-
-
 
 
 

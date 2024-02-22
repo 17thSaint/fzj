@@ -430,7 +430,12 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	metadata["if_gpu"] = if_gpu
 	filename = get(kwargs, :name, "mps")
 	filename = check_plot_label(filename,"mps")
-	display(metadata)
+	
+	gs_search_params = copy(metadata)
+	delete!(gs_search_params,"ham")
+	delete!(gs_search_params,"psi_ortho")
+	delete!(gs_search_params,"psi0")
+	display(gs_search_params)
 	
 	if isnothing(psi0) && isnothing(psi_ortho)
 		sidx = siteinds("ExtendedHardcore", L; conserve_qns = conserve_qns, nflavors = nflavors)
