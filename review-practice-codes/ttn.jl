@@ -786,10 +786,16 @@ function find_ground_state(num_layers,particle_count; kwargs...)
 	metadata["location"] = location
 	metadata["if_densmat"] = if_densmat
 	metadata["nrgtol"] = get(kwargs, :nrgtol, nothing)
-	display(metadata)
+
 	metadata["ham"] = ham_operator
 	metadata["net"] = net
 	metadata["seed_ttn"] = ttn
+
+	gs_search_params = copy(metadata)
+	delete!(gs_search_params,"ham")
+	delete!(gs_search_params,"net")
+	delete!(gs_search_params,"seed_ttn")
+	display(gs_search_params)
 	
 	
 	start_time = time()

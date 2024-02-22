@@ -886,7 +886,7 @@ if true
 #lr = 0#Int(sqrt(2^layers))-1
 #for nnst in nn_strens
 
-	#params_dict = Dict([("layers",6),("mdim",20)])
+	#params_dict = Dict([("layers",3),("mdim",20),("if_save_data",false),("filling",0.5)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
