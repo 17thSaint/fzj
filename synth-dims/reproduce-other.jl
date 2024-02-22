@@ -89,6 +89,9 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
         centralflux_strength = get(kwargs, :centralflux_strength, 0.0)
         if_s0 = get(kwargs, :if_s0, true)
         if_sephc = get(kwargs, :if_sephc, nothing)
+        if_remapping = get(kwargs, :if_remapping, false)
+        
+        remap = if_remapping ? remapping_nnn(L) : nothing
         
         s0 = 0.0
         if if_s0
@@ -107,6 +110,9 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
                         continue
                     end
                 end
+                if if_remapping
+                    next_site = remap[next_site]
+                end
                 coeff = -tp * exp(im*pi*chi*(s-s0)) * exp(im*2*pi*centralflux_strength/L)
                 if isnothing(if_sephc)
                     ampo += (coeff, "Cr$s", j, "Anh$s", next_site)
@@ -120,6 +126,11 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
         end
         
         for j in 1:L
+            if if_remapping
+                phys_site = remap[j]
+            else
+                phys_site = j
+            end
             for s in 1:nflavors
                 # synthetic dimension hopping
                 next_site = s+1
@@ -131,12 +142,12 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
                     end
                 end
                 if isnothing(if_sephc)
-                    ampo += (-ts * 1.0, "Cr$(next_site) * Anh$(s)", j)
-                    ampo += (-ts * 1.0, "Cr$(s) * Anh$(next_site)", j)
+                    ampo += (-ts * 1.0, "Cr$(next_site) * Anh$(s)", phys_site)
+                    ampo += (-ts * 1.0, "Cr$(s) * Anh$(next_site)", phys_site)
                 elseif if_sephc == "norm"
-                    ampo += (-ts * 1.0, "Cr$(s) * Anh$(next_site)", j)
+                    ampo += (-ts * 1.0, "Cr$(s) * Anh$(next_site)", phys_site)
                 else
-                    ampo += (-ts * 1.0, "Cr$(next_site) * Anh$(s)", j)
+                    ampo += (-ts * 1.0, "Cr$(next_site) * Anh$(s)", phys_site)
                 end
             end
         end
@@ -144,8 +155,13 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
         if_tilt = tilt_strength != 0.0
         if if_tilt
             for j in 1:L
+                if if_remapping
+                    phys_site = remap[j]
+                else
+                    phys_site = j
+                end
                 for s in 1:nflavors
-                    ampo += (-tilt_strength*j, "Ns$(s)", j)
+                    ampo += (-tilt_strength*j, "Ns$(s)", phys_site)
                 end
             end
         end
@@ -156,8 +172,8 @@ end
 statenames = ["first","second","third","fourth","fifth"]
 higherstatetofind = 0
 
-params_dict = make_args_dict(ARGS)
-#params_dict = Dict([("L",4),("nflavors",2),("if_save_data",false),("mdim",10),("filling",1.0)])
+#params_dict = make_args_dict(ARGS)
+params_dict = Dict([("L",8),("nflavors",4),("if_save_data",false),("mdim",100),("chi",0.0)])
 #
 open_cores = get(params_dict, "open_cores", "all")
 if typeof(open_cores) != String
@@ -166,11 +182,13 @@ end
 if_save_data = get(params_dict,"if_save_data",false)
 dataloc = get_folder_location("cluster-data/synth-dims")
 if_densmat = get(params_dict,"if_densmat",true)
+if_remapping = get(params_dict,"if_remapping",true)
 
-nsweeps = get(params_dict,"nsweeps",100)
+nsweeps = get(params_dict,"nsweeps",30)
 nrgvar_tol = get(params_dict,"nrgvar_tol",1E-7)
 mdim = get(params_dict,"mdim",100)
 noise = [0.0]
+conserve_qns = get(params_dict,"conserve_qns",true)
 
 L = Int(get(params_dict,"L",16))
 nflavors = Int(get(params_dict,"nflavors",8))
@@ -197,7 +215,7 @@ if_gpu = get(params_dict,"if_gpu",false)
 centralflux_strength = get(params_dict,"centralflux_strength",0.0)
 
 naming_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",part_count),("chi",chi)])
-metadata = merge(naming_dict,Dict([("if_periodic_phys",if_per_phys),("if_periodic_virt",if_per_virt),("tilt_strength",tilt),("location",dataloc),("if_save_data",if_save_data),("nrgvar_tol",nrgvar_tol),("if_gpu",if_gpu),("mdim",mdim),("centralflux_strength",centralflux_strength)]))
+metadata = merge(naming_dict,Dict([("if_remapping",if_remapping),("conserve_qns",conserve_qns),("if_periodic_phys",if_per_phys),("if_periodic_virt",if_per_virt),("tilt_strength",tilt),("location",dataloc),("if_save_data",if_save_data),("nrgvar_tol",nrgvar_tol),("if_gpu",if_gpu),("mdim",mdim),("centralflux_strength",centralflux_strength)]))
 
 #
 if true
@@ -283,7 +301,7 @@ excited_nrgs_null = 0.0
         metadata["name"] = filename
         display(filename)
 
-        ham_params = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
+        ham_params = (if_remapping=if_remapping,if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
         ham_start = hamiltonian_universal(L,nflavors,chi; ham_params...)
         obs = NRGVarObserver(nrgvar_tol,ham_start)
 
@@ -291,7 +309,7 @@ excited_nrgs_null = 0.0
 
         new_loc = get_folder_location("cluster-data/synth-dims/higher-states")
 
-        if_exists,found_data = check_data_exists(naming_dict,"mps";location=dataloc,output_level=false)
+        if_exists,found_data = false,nothing#check_data_exists(naming_dict,"mps";location=dataloc,output_level=false)
 
         if if_exists
             psi_gs = found_data[1]["mps"]
@@ -319,7 +337,7 @@ excited_nrgs_null = 0.0
                 end
             end
         else
-            global dmrg_params = (if_gpu=if_gpu,ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=dataloc,observer=obs,if_densmat=if_densmat,nsweeps=nsweeps,noise=noise)
+            global dmrg_params = (conserve_qns=conserve_qns,if_gpu=if_gpu,ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=dataloc,observer=obs,if_densmat=if_densmat,nsweeps=nsweeps,noise=noise)
             psi_gs, densmat = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
             println("Energy Variance = ",energy_variance(psi_gs,ham_start)," at Chi = ",chi)
             #=
@@ -340,6 +358,7 @@ excited_nrgs_null = 0.0
         end
         
     end
+    get_occupancy(psi_gs; if_remapping=true)
     #display(real.(densmat))
     #middle = Int(floor(L*nflavors/2))
     #sf_orderparams[idx] = abs(2*sum([sum(diag(densmat,i) + diag(densmat,-i)) for i in middle+1:Int(L*nflavors)-1]))#abs(2*sum(densmat))

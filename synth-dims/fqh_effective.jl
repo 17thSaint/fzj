@@ -224,6 +224,20 @@ function make_wavefunc(L::Int64,nflavors::Int64,organization::Vector; kwargs...)
 	return psi0
 end
 
+function remapping_nnn(L) # this function remaps the periodic in physical dimension hamiltonian to nearest neighbor hopping only for the physical dimension
+    remap = Int.(ones(L))
+    shift = L % 2 == 0.0 ? 0 : -1
+    for i in 1:Int(ceil(L/2))
+         remap[i] = 2*i-1
+    end
+    remap[Int(ceil(L/2))+1] = L + shift
+    for i in Int(ceil(L/2))+2:L
+        remap[i] = remap[i-1] - 2
+    end
+
+    return remap
+end
+
 function make_vacuum(L,nflavors; kwargs...)
 	sitetype = get(kwargs, :sitetype, "ExtendedHardcore")
 	conserve_qns = get(kwargs, :conserve_qns, true)
@@ -363,6 +377,9 @@ end
 function get_occupancy(wavefunc::MPS; kwargs...)
 	L,nflavors = get_mps_dims(wavefunc)
 	if_squared = get(kwargs, :if_squared, false)
+	if_remapping = get(kwargs, :if_remapping, false)
+
+	remap = if_remapping ? remapping_nnn(L) : nothing
 	
 	if_plot = get(kwargs, :if_plot, true)
 	if_save_data = get(kwargs, :if_save_data, false)
@@ -379,7 +396,14 @@ function get_occupancy(wavefunc::MPS; kwargs...)
 		if if_squared
 			loc_op = "Ns$(s) * Ns$(s)"
 		end
-		occ_mat[:, s] = expect(wavefunc, loc_op)
+		if if_remapping
+			linearoccs = expect(wavefunc, loc_op)
+			for i in 1:L
+				occ_mat[i, s] = linearoccs[remap[i]] 
+			end
+		else
+			occ_mat[:, s] = expect(wavefunc, loc_op)
+		end
 	end
 	if_plot ? mps_plot_occupancy(occ_mat,L,nflavors; kwargs...) : nothing
 	data_dict = Dict([("vals",occ_mat)])
@@ -392,7 +416,7 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	running_again = get(kwargs, :running_again, false)
 	psi_ortho = get(kwargs, :psi_ortho, nothing)
 	opl = get(kwargs, :outputlevel, 1)
-	conserve_qns = get(kwargs, :conserve_qns, true)
+	conserve_qns = get(kwargs, :conserve_qns, false)
 	nsweeps = get(kwargs, :nsweeps, 500)
 	psi0 = get(kwargs, :psi_guess, nothing)
 	if_parton = get(kwargs, :if_parton, true)
@@ -758,9 +782,10 @@ function physical_distance_correlation(psi::MPS; kwargs...)
 		corr_val = correlation_matrix(psi,"Cr$(s)","Anh$(s)")
 		corr_val += conj(transpose(corr_val))
 		all_corrs[s] = abs.([mean(diag(corr_val,i)) for i in 0:phys_length-1])
+		#all_corrs[s] = abs.([diag(corr_val,i)[1] for i in 0:phys_length-1])
 	end
 
-	if_corr_lengths ? corr_lengths = correlation_length(dists,all_corrs; kwargs...) : nothing
+	#if_corr_lengths ? corr_lengths = correlation_length(dists,all_corrs; kwargs...) : nothing
 
 	if if_plot
 		fig = figure()
@@ -773,11 +798,11 @@ function physical_distance_correlation(psi::MPS; kwargs...)
 		legend()
 	end
 
-	if if_corr_lengths
-		return dists,all_corrs,corr_lengths
-	else
+	#if if_corr_lengths
+	#	return dists,all_corrs,corr_lengths
+	#else
 		return dists,all_corrs
-	end
+	#end
 end
 
 function distance_correlation(psi::MPS; kwargs...)
