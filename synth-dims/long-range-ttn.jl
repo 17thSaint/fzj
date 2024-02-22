@@ -879,7 +879,7 @@ fb_occ_mat = get_occupancy(fb_gs)
 
 
 #
-if false
+if true
 
 #nnst = 0.0
 #layers = 6
@@ -968,7 +968,7 @@ if false
 
 	plotting = false
 	save_plot = false
-	save_data = true#get(params_dict, "if_save_data", true)
+	save_data = get(params_dict, "if_save_data", true)
 
 	loc = get(params_dict, "dataloc", get_folder_location("cluster-data/synth-dims"))
 	if_cliff = false

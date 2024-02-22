@@ -803,16 +803,16 @@ function find_ground_state(num_layers,particle_count; kwargs...)
 	println("Finished Building Network")
 	
 	if isnothing(ttn)
-		#=if particle_type .== "Boson"
+		if particle_type .== "Boson"
 			states = fill("0", num_sites)
 			old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
 			ttn = initialize_ttn(old_ttn,max_dim,particle_count; kwargs...)
-		else=#
+		else
 			states = fill_states(particle_count,num_sites,1)
 			old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
 			ttn = TTNKit.increase_dim_tree_tensor_network_zeros(old_ttn, maxdim = max_dim)
 			ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
-		#end
+		end
 		metadata["seed_ttn"] = ttn
 	end
 	
