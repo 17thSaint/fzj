@@ -358,7 +358,7 @@ excited_nrgs_null = 0.0
         end
         
     end
-    get_occupancy(psi_gs; if_remapping=true)
+    physical_distance_correlation(psi_gs)
     #display(real.(densmat))
     #middle = Int(floor(L*nflavors/2))
     #sf_orderparams[idx] = abs(2*sum([sum(diag(densmat,i) + diag(densmat,-i)) for i in middle+1:Int(L*nflavors)-1]))#abs(2*sum(densmat))

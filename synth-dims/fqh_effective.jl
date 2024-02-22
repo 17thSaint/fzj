@@ -774,13 +774,26 @@ end
 function physical_distance_correlation(psi::MPS; kwargs...)
 	if_plot = get(kwargs, :if_plot, true)
 	if_corr_lengths = get(kwargs, :if_corr_lengths, true)
+	if_remapping = get(kwargs, :if_remapping, false)
+
+	remap = if_remapping ? remapping_nnn(L) : nothing
 
 	phys_length,virt_length = get_mps_dims(psi)
 	all_corrs = [[] for i in 1:virt_length]
 	dists = [i for i in 0:phys_length-1]
 	for s in 1:virt_length
-		corr_val = correlation_matrix(psi,"Cr$(s)","Anh$(s)")
-		corr_val += conj(transpose(corr_val))
+		if if_remapping
+			linear_corrval = correlation_matrix(psi,"Cr$(s)","Anh$(s)")
+			corr_val = zeros(phys_length,phys_length) .* im
+			for i in 1:phys_length, j in 1:phys_length
+				corr_val[i,j] = linear_corrval[remap[i],remap[j]]
+			end
+			corr_val ./= expect(psi,"Ns$(s)",sites=1)
+		else
+			corr_val = correlation_matrix(psi,"Cr$(s)","Anh$(s)")
+			corr_val ./= expect(psi,"Ns$(s)",sites=1)
+		end
+		#corr_val += conj(transpose(corr_val))
 		all_corrs[s] = abs.([mean(diag(corr_val,i)) for i in 0:phys_length-1])
 		#all_corrs[s] = abs.([diag(corr_val,i)[1] for i in 0:phys_length-1])
 	end
