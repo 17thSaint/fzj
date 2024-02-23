@@ -50,33 +50,54 @@ function hamiltonian_remapped(L,tp=1.0; kwargs...)
         return ampo
 end
 
+open_cores = "all"#get(params_dict, "open_cores", "all")
+if typeof(open_cores) != String
+	BLAS.set_num_threads(open_cores)	
+end
+
 nrgvar_tol = 1E-6
 Ls = range(6,step=4,length=10)
 linear_bonddims = zeros(length(Ls))
 remapped_bonddims = zeros(length(Ls))
-
+#=
 for (idx,L) in enumerate(Ls)
+    println("Working on L = $L")
     remap = remapping_nnn(L)
     for if_remapping in [true,false]
         ham = hamiltonian_remapped(L; if_remapping=if_remapping)
         obs = NRGVarObserver(nrgvar_tol,ham)
 
         part_count = Int(floor(L/2))
-        mdim = 250
+        mdim = [100,250,500,700,1000]
 
         dmrg_params = (if_densmat=false,nsweeps=50,if_parton=false,particle_type="Boson",conserve_qns=true,ham=ham,mdim=mdim,observer=obs)
 
         psi_gs = execute_mps(nothing,nothing,nothing,L,1,part_count; dmrg_params...)
+        mld = maxlinkdim(psi_gs)
+        while mld < 2
+            obs = NRGVarObserver(nrgvar_tol,ham)
+            psi_gs = execute_mps(nothing,nothing,nothing,L,1,part_count; dmrg_params...)
+            mld = maxlinkdim(psi_gs)
+        end
 
         if_remapping ? remapped_bonddims[idx] = maxlinkdim(psi_gs) : linear_bonddims[idx] = maxlinkdim(psi_gs)
     end
+    if linear_bonddims[idx] > 900
+        break
+    end
 end
+=#
+linear_bonddims = [8.0,32.0,111.0,259.0,416.0,592.0,772.0,958.0]
+remapped_bonddims = [8.0,32.0,114.0,259.0,415.0,595.0,782.0,967.0]
 
-plot(Ls,linear_bonddims,"-p",label="Linear")
-plot(Ls,remapped_bonddims,"-p",label="Remapped")
+
+
+plot(Ls[1:length(linear_bonddims)],abs.(linear_bonddims .- remapped_bonddims) ./ linear_bonddims,"-p")
+#plot(Ls[1:length(remapped_bonddims)],remapped_bonddims,"-p",label="Remapped")
 legend()
-xlabel("System size")
-ylabel("Max bond dimension")
+xlabel("System size (Density = 1/2)")
+ylabel("Percent Max bond dimension difference")
+title("Percent Difference Bond Dim Linear vs NNN-Remap")
 
 #=
 corrmat = correlation_matrix(psi_gs, "Adag", "A")
