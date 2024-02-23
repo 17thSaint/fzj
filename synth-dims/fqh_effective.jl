@@ -484,9 +484,9 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 		else
 			println("Using $(length(psi_ortho)) orthogonal states")
 		end
-		E, psi = dmrg(H, psi_ortho, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = 1E-12)
+		E, psi = dmrg(H, psi_ortho, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = 1E-8)
 	else
-		E, psi = dmrg(H, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = 1E-12)
+		E, psi = dmrg(H, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = 1E-8)
 	end
 
 	metadata["observer"] = obs

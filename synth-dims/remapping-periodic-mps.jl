@@ -59,65 +59,119 @@ function hamiltonian_remapped(L,tp=1.0; kwargs...)
         return ampo
 end
 
+function get_1D_gs(L,if_remapping,nrg_tol,mdim; kwargs...)
+    part_count = Int(floor(L/2))
+    
+    states = make_states(L,part_count,1)
+    sidx = siteinds("Boson", L; conserve_qns = true, dim=2)
+    psi0 = randomMPS(sidx, states)
+
+    ham = hamiltonian_remapped(L; if_remapping=if_remapping)
+    obs = NRGObserver(nrg_tol,ham)
+    dmrg_params = (outputlevel=1,psi_guess=psi0,if_densmat=false,nsweeps=50,if_parton=false,particle_type="Boson",conserve_qns=true,ham=ham,mdim=mdim,observer=obs)
+    psi = execute_mps(nothing,nothing,nothing,L,1,part_count; dmrg_params...)
+    
+    return psi
+end
+
+function get_corrs(psi::MPS,if_remapping::Bool; kwargs...)
+    if_plot = get(kwargs, :if_plot, true)
+
+    L = length(psi)
+    remap = remapping_nnn(L)
+    dists = collect(0:L-1)
+    corrmat = correlation_matrix(psi, "Adag", "A")
+
+    if if_remapping
+        remapped_corrmat = zeros(L,L)
+        for i in 1:L
+            for j in 1:L
+                remapped_corrmat[i,j] = corrmat[remap[i],remap[j]]
+            end
+        end
+        remapped_corrs = [mean(diag(remapped_corrmat,i)) for i in 0:L-1] ./ remapped_corrmat[1,1]
+        if if_plot
+            plot(dists,remapped_corrs,"-p",label="Remap")
+            xlabel("Distance")
+            ylabel("Correlations")
+            yscale("log")
+            legend()
+        end
+    else
+        corrs = [mean(diag(corrmat,i)) for i in 0:L-1] ./ corrmat[1,1]
+        if if_plot
+            plot(dists,corrs,"-p",label="Linear")
+            xlabel("Distance")
+            ylabel("Correlations")
+            yscale("log")
+            legend()
+        end
+    end
+
+    if if_remapping
+        return dists,remapped_corrs
+    else
+        return dists,corrs
+    end
+end
+
+
+    
+
 open_cores = "all"#get(params_dict, "open_cores", "all")
 if typeof(open_cores) != String
 	BLAS.set_num_threads(open_cores)	
 end
 
 nrg_tol = 1E-10
-Ls = range(10,step=2,length=10)
+Ls = range(10,step=2,length=20)
 linear_bonddims = zeros(length(Ls))
 remapped_bonddims = zeros(length(Ls))
 mdim = [100,250,500]
-L = 16
-dists = collect(0:L-1)
 
-println("Working on L = $L")
-remap = remapping_nnn(L)
-part_count = Int(floor(L/2))
+corrdiffs_linear = zeros(length(Ls))
+corrdiffs_remap = zeros(length(Ls))
 
-states = make_states(L,part_count,1)
-sidx = siteinds("Boson", L; conserve_qns = true, dim=2)
-psi0 = randomMPS(sidx, states)
+for (idx,L) in enumerate(Ls)
 
-rerun = true
+    println("Working on L = $L")
+    psi_linear = get_1D_gs(L,false,nrg_tol,mdim)
+    mld = maxlinkdim(psi_linear)
+    while mld < 2
+        psi_linear = get_1D_gs(L,false,nrg_tol,mdim)
+        mld = maxlinkdim(psi_linear)
+    end
+    #dists_linear,corrs_linear = get_corrs(psi_linear,false;if_plot=false)
 
-if rerun
-ham_remapped = hamiltonian_remapped(L; if_remapping=true)
-obs_remapped = NRGObserver(nrg_tol,ham_remapped)
-dmrg_params_remapped = (outputlevel=1,psi_guess=psi0,if_densmat=false,nsweeps=50,if_parton=false,particle_type="Boson",conserve_qns=true,ham=ham_remapped,mdim=mdim,observer=obs_remapped)
-psi_remapped = execute_mps(nothing,nothing,nothing,L,1,part_count; dmrg_params_remapped...)
-end
-corrmat_remap = correlation_matrix(psi_remapped, "Adag", "A")
-remapped_corrmat = zeros(L,L)
-for i in 1:L
-    for j in 1:L
-        remapped_corrmat[i,j] = corrmat_remap[remap[i],remap[j]]
+    psi_remap = get_1D_gs(L,true,nrg_tol,mdim)
+    mldr = maxlinkdim(psi_remap)
+    while mldr < 2
+        psi_remap = get_1D_gs(L,true,nrg_tol,mdim)
+        mldr = maxlinkdim(psi_remap)
+    end
+    #dists_remap,corrs_remap = get_corrs(psi_remap,true;if_plot=false)
+    
+    #middle = Int(ceil(3*L/4))
+    corrdiffs_linear[idx] = abs(correlation_matrix(psi_linear,"Adag","A";sites=(1,L))[1,2] - correlation_matrix(psi_linear,"Adag","A";sites=(1,2))[1,2])
+    corrdiffs_remap[idx] = abs(correlation_matrix(psi_remap,"Adag","A";sites=(1,L))[1,2] - correlation_matrix(psi_remap,"Adag","A";sites=(1,2))[1,2])
+
+    println("Linear is ",corrdiffs_linear[idx]," and Remap is ",corrdiffs_remap[idx])
+
+    if idx > 1
+        plot(Ls[idx-1:idx],corrdiffs_linear[idx-1:idx],"-p",c="b")
+        plot(Ls[idx-1:idx],corrdiffs_remap[idx-1:idx],"-p",c="r")
+        yscale("log")
     end
 end
-remapped_corrs = [mean(diag(remapped_corrmat,i)) for i in 0:L-1] #./ remapped_corrmat[1,1]
-plot(dists,remapped_corrs,"-p",label="Remap")
 
-if rerun
-ham_linear = hamiltonian_remapped(L; if_remapping=false)
-obs_linear = NRGObserver(nrg_tol,ham_linear)
-dmrg_params_linear = (outputlevel=1,psi_guess=psi0,if_densmat=false,nsweeps=50,if_parton=false,particle_type="Boson",conserve_qns=true,ham=ham_linear,mdim=mdim,observer=obs_linear)
-psi_linear = execute_mps(nothing,nothing,nothing,L,1,part_count; dmrg_params_linear...)
-end
-corrmat = correlation_matrix(psi_linear, "Adag", "A")
-corrs = [mean(diag(corrmat,i)) for i in 0:L-1] #./ corrmat[1,1]
-plot(dists,corrs,"-p",label="Linear")
-
-xlabel("Distance")
-ylabel("Correlations")
+fig2 = figure()
+plot(Ls,corrdiffs_linear,"-p",label="Linear")
+plot(Ls,corrdiffs_remap,"-p",label="Remap")
 yscale("log")
-legend()
+xlabel("System Size")
+ylabel("AVG(Adag_i A_i+L-1) - AVG(Adag_i A_i+)")
+title("Long Range Correlation Difference Linear vs NNN Remap")
 
-#end
-#=
-linear_bonddims = [8.0,32.0,111.0,259.0,416.0,592.0,772.0,958.0]
-remapped_bonddims = [8.0,32.0,114.0,259.0,415.0,595.0,782.0,967.0]
-=#
 
 
 
