@@ -437,6 +437,7 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	t2 = 1.0
 	if_nrg = get(kwargs, :if_nrg, false)
 	if_densmat = get(kwargs, :if_densmat, true)
+	particle_type = get(kwargs, :particle_type, "ExtendedHardcore")
 
 	if if_parton
 		psi0 = make_vacuum(L,nflavors; kwargs...)
@@ -462,7 +463,11 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	display(gs_search_params)
 	
 	if isnothing(psi0) && isnothing(psi_ortho)
-		sidx = siteinds("ExtendedHardcore", L; conserve_qns = conserve_qns, nflavors = nflavors)
+		if particle_type == "ExtendedHardcore"
+			sidx = siteinds(particle_type, L; conserve_qns = conserve_qns, nflavors = nflavors)
+		else
+			sidx = siteinds(particle_type, L; conserve_qns = conserve_qns)
+		end
 	elseif !isnothing(psi_ortho)
 		sidx = length(psi_ortho) > 1 ? siteinds(psi_ortho[1]) : siteinds(psi_ortho)
 	else

@@ -1,6 +1,6 @@
 if true
-include("long-range-ttn.jl")
-#include("fqh_effective.jl")
+#include("long-range-ttn.jl")
+include("fqh_effective.jl")
 include("time_evolution.jl")
 include("../other-funcs/data-storage-funcs.jl")
 #include("reproduce-other.jl")
