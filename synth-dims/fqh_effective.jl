@@ -377,9 +377,6 @@ end
 function get_occupancy(wavefunc::MPS; kwargs...)
 	L,nflavors = get_mps_dims(wavefunc)
 	if_squared = get(kwargs, :if_squared, false)
-	if_remapping = get(kwargs, :if_remapping, false)
-
-	remap = if_remapping ? remapping_nnn(L) : nothing
 	
 	if_plot = get(kwargs, :if_plot, true)
 	if_save_data = get(kwargs, :if_save_data, false)
@@ -396,14 +393,7 @@ function get_occupancy(wavefunc::MPS; kwargs...)
 		if if_squared
 			loc_op = "Ns$(s) * Ns$(s)"
 		end
-		if if_remapping
-			linearoccs = expect(wavefunc, loc_op)
-			for i in 1:L
-				occ_mat[i, s] = linearoccs[remap[i]] 
-			end
-		else
-			occ_mat[:, s] = expect(wavefunc, loc_op)
-		end
+		occ_mat[:, s] = expect(wavefunc, loc_op)
 	end
 	if_plot ? mps_plot_occupancy(occ_mat,L,nflavors; kwargs...) : nothing
 	data_dict = Dict([("vals",occ_mat)])
@@ -494,9 +484,9 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 		else
 			println("Using $(length(psi_ortho)) orthogonal states")
 		end
-		E, psi = dmrg(H, psi_ortho, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = 1E-14)
+		E, psi = dmrg(H, psi_ortho, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = 1E-12)
 	else
-		E, psi = dmrg(H, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = 1E-14)
+		E, psi = dmrg(H, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = 1E-12)
 	end
 
 	metadata["observer"] = obs
@@ -779,25 +769,13 @@ end
 function physical_distance_correlation(psi::MPS; kwargs...)
 	if_plot = get(kwargs, :if_plot, true)
 	if_corr_lengths = get(kwargs, :if_corr_lengths, true)
-	if_remapping = get(kwargs, :if_remapping, false)
-
-	remap = if_remapping ? remapping_nnn(L) : nothing
 
 	phys_length,virt_length = get_mps_dims(psi)
 	all_corrs = [[] for i in 1:virt_length]
 	dists = [i for i in 0:phys_length-1]
 	for s in 1:virt_length
-		if if_remapping
-			linear_corrval = correlation_matrix(psi,"Cr$(s)","Anh$(s)")
-			corr_val = zeros(phys_length,phys_length) .* im
-			for i in 1:phys_length, j in 1:phys_length
-				corr_val[i,j] = linear_corrval[remap[i],remap[j]]
-			end
-			corr_val ./= expect(psi,"Ns$(s)",sites=1)
-		else
-			corr_val = correlation_matrix(psi,"Cr$(s)","Anh$(s)")
-			corr_val ./= expect(psi,"Ns$(s)",sites=1)
-		end
+		corr_val = correlation_matrix(psi,"Cr$(s)","Anh$(s)")
+		corr_val ./= expect(psi,"Ns$(s)",sites=1)
 		#corr_val += conj(transpose(corr_val))
 		all_corrs[s] = abs.([mean(diag(corr_val,i)) for i in 0:phys_length-1])
 		#all_corrs[s] = abs.([diag(corr_val,i)[1] for i in 0:phys_length-1])
@@ -1143,7 +1121,7 @@ function ITensors.checkdone!(o::NRGVarObserver;kwargs...)
   sw = kwargs[:sweep]
   psi = kwargs[:psi]
   ham = o.local_ham
-  if o.nrg_var[end] < o.var_tol && length(o.nrg_var) > 5
+  if o.nrg_var[end] < o.var_tol && length(o.nrg_var) > 10
     #println("Stopping DMRG after sweep $sw")
     return true
   elseif length(o.nrg_var) > 10 && o.nrg_var[end] < o.var_tol*1E1 && std(o.nrg_var[end-10:end])/o.nrg_var[end] < 0.03
@@ -1166,6 +1144,73 @@ function ITensors.measure!(o::NRGVarObserver; kwargs...)
 		println("The energy variance is $(round(o.nrg_var[end],digits=9)) for tolerance $(o.var_tol), AVG = $percent_change %")
     end
 end
+
+mutable struct NRGObserver <: AbstractObserver
+    nrg_tol::Float64
+    local_ham
+    nrg::Vector{Float64}
+ 
+    NRGObserver(nrg_tol=0.0,local_ham=10.0) = new(nrg_tol,local_ham,[1000.0])
+end
+
+function ITensors.checkdone!(o::NRGObserver;kwargs...)
+	if abs(o.nrg[end] - o.nrg[end-1]) < o.nrg_tol && length(o.nrg) > 10
+	  #println("Stopping DMRG after sweep $sw")
+	  return true
+	end
+	return false
+end
+  
+function ITensors.measure!(o::NRGObserver; kwargs...)
+	  #display(kwargs)
+	  half_sweep = kwargs[:half_sweep]
+	  bond = kwargs[:bond]
+	  outputlevel = kwargs[:outputlevel]
+
+	  psi = kwargs[:psi]
+	  ham = o.local_ham
+	
+	  if bond == 1 && half_sweep == 2
+		# Update last_energy and keep going
+		append!(o.nrg,[calculate_energy(psi,ham)])
+		if outputlevel > 0
+			println("The energy change is $(round(abs(o.nrg[end] - o.nrg[end-1]),digits=7)) for tolerance $(o.nrg_tol)")
+		end
+	  end
+end
+
+mutable struct LinkDimObserver <: AbstractObserver
+    mlds::Vector{Int64}
+ 
+    LinkDimObserver() = new([10000])
+end
+
+function ITensors.checkdone!(o::LinkDimObserver;kwargs...)
+	if length(o.mlds) > 10
+		if all(o.mlds[end-5:end] .== o.mlds[end])
+			return true
+		end
+	end
+	return false
+end
+  
+function ITensors.measure!(o::LinkDimObserver; kwargs...)
+	  #display(kwargs)
+	  half_sweep = kwargs[:half_sweep]
+	  bond = kwargs[:bond]
+	  outputlevel = kwargs[:outputlevel]
+
+	  psi = kwargs[:psi]
+	
+	  if bond == 1 && half_sweep == 2
+		# Update max link dim
+		append!(o.mlds,[maxlinkdim(psi)])
+		if outputlevel > 0 && length(o.mlds) > 5
+			println("Current Percent Change = ",round(100*std(o.mlds[end-5:end])/mean(o.mlds[end-5:end]),digits=2))
+		end
+	  end
+end
+
 
 mutable struct NRGErrorObserver <: AbstractObserver
 	var_tol::Float64

@@ -89,9 +89,6 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
         centralflux_strength = get(kwargs, :centralflux_strength, 0.0)
         if_s0 = get(kwargs, :if_s0, true)
         if_sephc = get(kwargs, :if_sephc, nothing)
-        if_remapping = get(kwargs, :if_remapping, false)
-        
-        remap = if_remapping ? remapping_nnn(L) : nothing
         
         s0 = 0.0
         if if_s0
@@ -110,9 +107,6 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
                         continue
                     end
                 end
-                if if_remapping
-                    next_site = remap[next_site]
-                end
                 coeff = -tp * exp(im*pi*chi*(s-s0)) * exp(im*2*pi*centralflux_strength/L)
                 if isnothing(if_sephc)
                     ampo += (coeff, "Cr$s", j, "Anh$s", next_site)
@@ -126,11 +120,7 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
         end
         
         for j in 1:L
-            if if_remapping
-                phys_site = remap[j]
-            else
-                phys_site = j
-            end
+            phys_site = j
             for s in 1:nflavors
                 # synthetic dimension hopping
                 next_site = s+1
@@ -155,11 +145,7 @@ function hamiltonian_universal(L,nflavors,chi,tp=1.0,ts=1.0; kwargs...)
         if_tilt = tilt_strength != 0.0
         if if_tilt
             for j in 1:L
-                if if_remapping
-                    phys_site = remap[j]
-                else
-                    phys_site = j
-                end
+                phys_site = j
                 for s in 1:nflavors
                     ampo += (-tilt_strength*j, "Ns$(s)", phys_site)
                 end
@@ -182,7 +168,6 @@ end
 if_save_data = get(params_dict,"if_save_data",false)
 dataloc = get_folder_location("cluster-data/synth-dims")
 if_densmat = get(params_dict,"if_densmat",true)
-if_remapping = get(params_dict,"if_remapping",true)
 
 nsweeps = get(params_dict,"nsweeps",30)
 nrgvar_tol = get(params_dict,"nrgvar_tol",1E-7)
@@ -215,7 +200,7 @@ if_gpu = get(params_dict,"if_gpu",false)
 centralflux_strength = get(params_dict,"centralflux_strength",0.0)
 
 naming_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",part_count),("chi",chi)])
-metadata = merge(naming_dict,Dict([("if_remapping",if_remapping),("conserve_qns",conserve_qns),("if_periodic_phys",if_per_phys),("if_periodic_virt",if_per_virt),("tilt_strength",tilt),("location",dataloc),("if_save_data",if_save_data),("nrgvar_tol",nrgvar_tol),("if_gpu",if_gpu),("mdim",mdim),("centralflux_strength",centralflux_strength)]))
+metadata = merge(naming_dict,Dict([("conserve_qns",conserve_qns),("if_periodic_phys",if_per_phys),("if_periodic_virt",if_per_virt),("tilt_strength",tilt),("location",dataloc),("if_save_data",if_save_data),("nrgvar_tol",nrgvar_tol),("if_gpu",if_gpu),("mdim",mdim),("centralflux_strength",centralflux_strength)]))
 
 #
 if true
@@ -301,7 +286,7 @@ excited_nrgs_null = 0.0
         metadata["name"] = filename
         display(filename)
 
-        ham_params = (if_remapping=if_remapping,if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
+        ham_params = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
         ham_start = hamiltonian_universal(L,nflavors,chi; ham_params...)
         obs = NRGVarObserver(nrgvar_tol,ham_start)
 
