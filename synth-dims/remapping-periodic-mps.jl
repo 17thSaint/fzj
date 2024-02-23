@@ -124,11 +124,11 @@ if typeof(open_cores) != String
 end
 
 nrg_tol = 1E-10
-Ls = range(10,step=2,length=20)
+Ls = range(10,step=2,length=40)
 linear_bonddims = zeros(length(Ls))
 remapped_bonddims = zeros(length(Ls))
 mdim = [100,250,500]
-
+#
 corrdiffs_linear = zeros(length(Ls))
 corrdiffs_remap = zeros(length(Ls))
 
@@ -152,8 +152,9 @@ for (idx,L) in enumerate(Ls)
     #dists_remap,corrs_remap = get_corrs(psi_remap,true;if_plot=false)
     
     #middle = Int(ceil(3*L/4))
-    corrdiffs_linear[idx] = abs(correlation_matrix(psi_linear,"Adag","A";sites=(1,L))[1,2] - correlation_matrix(psi_linear,"Adag","A";sites=(1,2))[1,2])
-    corrdiffs_remap[idx] = abs(correlation_matrix(psi_remap,"Adag","A";sites=(1,L))[1,2] - correlation_matrix(psi_remap,"Adag","A";sites=(1,2))[1,2])
+    remap = remapping_nnn(L)
+    corrdiffs_linear[idx] = abs(correlation_matrix(psi_linear,"Adag","A";sites=(1,L))[1,2] - correlation_matrix(psi_linear,"Adag","A";sites=(1,2))[1,2]) / correlation_matrix(psi_linear,"Adag","A";sites=(1,2))[1,2]
+    corrdiffs_remap[idx] = abs(correlation_matrix(psi_remap,"Adag","A";sites=(1,remap[L]))[1,2] - correlation_matrix(psi_remap,"Adag","A";sites=(1,remap[2]))[1,2]) / correlation_matrix(psi_remap,"Adag","A";sites=(1,remap[2]))[1,2]
 
     println("Linear is ",corrdiffs_linear[idx]," and Remap is ",corrdiffs_remap[idx])
 
@@ -163,14 +164,23 @@ for (idx,L) in enumerate(Ls)
         yscale("log")
     end
 end
+#
+
+exp_fit(x,p) = p[1].* exp.(x ./ p[2]) .+ p[3]
+
+fit_linear = curve_fit(exp_fit,Ls[4:end],corrdiffs_linear[4:end],[1.0,1.0,0.0])
+fit_remap = curve_fit(exp_fit,Ls[3:end],corrdiffs_remap[3:end],[1.0,1.0,0.0])
 
 fig2 = figure()
-plot(Ls,corrdiffs_linear,"-p",label="Linear")
-plot(Ls,corrdiffs_remap,"-p",label="Remap")
+scatter(Ls,corrdiffs_linear,label="Linear")
+plot(Ls[4:end],exp_fit(Ls[4:end],fit_linear.param))
+scatter(Ls,corrdiffs_remap,label="Remap")
+plot(Ls[3:end],exp_fit(Ls[3:end],fit_remap.param))
 yscale("log")
 xlabel("System Size")
-ylabel("AVG(Adag_i A_i+L-1) - AVG(Adag_i A_i+)")
-title("Long Range Correlation Difference Linear vs NNN Remap")
+ylabel("(Adag_1 A_2 - Adag_1 A_L) / Adag_1 A_2")
+title("Percent Long Range Correlation Diff Linear vs NNN Remap")
+legend()
 
 
 
