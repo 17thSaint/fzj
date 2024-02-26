@@ -969,7 +969,8 @@ if true
 	plotting = false
 	save_plot = false
 	save_data = get(params_dict, "if_save_data", true)
-	if_continuous_saving = get(params_dict, "if_continuous_saving", layer_count >= 6 ? true : false)
+	if_cluster = any([occursin("local",pwd()),occursin("Local",pwd()),occursin("geraghty",pwd())])
+	if_continuous_saving = get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 6)
 
 	loc = get(params_dict, "dataloc", get_folder_location("cluster-data/synth-dims"))
 	if_cliff = false

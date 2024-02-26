@@ -166,7 +166,8 @@ if typeof(open_cores) != String
 	BLAS.set_num_threads(open_cores)	
 end
 if_save_data = get(params_dict,"if_save_data",false)
-if_continuous_saving = get(params_dict,"if_continuous_saving",false)
+if_cluster = any([occursin("local",pwd()),occursin("Local",pwd()),occursin("geraghty",pwd())])
+if_continuous_saving = get(params_dict,"if_continuous_saving",if_cluster)
 dataloc = get_folder_location("cluster-data/synth-dims")
 if_densmat = get(params_dict,"if_densmat",true)
 
