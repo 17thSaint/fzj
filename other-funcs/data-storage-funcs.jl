@@ -1,18 +1,5 @@
 using JLD2,TTNKit
 
-function find_center()
-	all_folders = split(pwd(),"/")
-	if "fzj" in all_folders
-		return "fzj"
-	elseif "local" in all_folders
-		return all_folders[findfirst(x -> all_folders[x] == "local",1:length(all_folders))+1]
-	elseif "Local" in all_folders
-		return all_folders[findfirst(x -> all_folders[x] == "Local",1:length(all_folders))+1]
-	else
-		println("Not sure where the center is: $(pwd())")
-	end
-end
-
 function get_folder_location(folder_name)
 	central_loc=find_center()
 	get_to_center = split(pwd(),central_loc)[1]

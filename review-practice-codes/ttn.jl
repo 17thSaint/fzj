@@ -2,6 +2,19 @@ using Statistics
 using TTNKit
 using LsqFit
 
+function find_center()
+	all_folders = split(pwd(),"/")
+	if "fzj" in all_folders
+		return "fzj"
+	elseif "local" in all_folders
+		return all_folders[findfirst(x -> all_folders[x] == "local",1:length(all_folders))+1]
+	elseif "Local" in all_folders
+		return all_folders[findfirst(x -> all_folders[x] == "Local",1:length(all_folders))+1]
+	else
+		println("Not sure where the center is: $(pwd())")
+	end
+end
+
 function include_other_files(all_files)
 	center = find_center()
 	get_to_fzj = split(pwd(),center)[1]
