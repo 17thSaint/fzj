@@ -417,6 +417,7 @@ function get_occupancy(wavefunc::MPS; kwargs...)
 end
 
 function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
+	cutoff = get(kwargs, :cutoff, 1E-8)
 	running_again = get(kwargs, :running_again, false)
 	psi_ortho = get(kwargs, :psi_ortho, nothing)
 	opl = get(kwargs, :outputlevel, 1)
@@ -442,6 +443,9 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	if_nrg = get(kwargs, :if_nrg, false)
 	if_densmat = get(kwargs, :if_densmat, true)
 	particle_type = get(kwargs, :particle_type, "ExtendedHardcore")
+	if_continuous_saving = get(kwargs, :if_continuous_saving, false)
+	if_save_data ? nothing : if_continuous_saving = false
+	location = get(kwargs, :location, pwd())
 
 	if if_parton
 		psi0 = make_vacuum(L,nflavors; kwargs...)
@@ -450,6 +454,7 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 
 	metadata = get(kwargs, :metadata, Dict())
 	metadata["psi_ortho"] = psi_ortho
+	metadata["cutoff"] = cutoff
 	metadata["outputlevel"] = opl
 	metadata["psi0"] = psi0
 	metadata["if_parton"] = if_parton
@@ -492,28 +497,39 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 		H = ITensorGPU.cu(H)
 		psi0 = ITensorGPU.cu(psi0)
 	end
+
+	if if_continuous_saving
+		actual_filename = write_data_jld2(filename,Dict([("mps",psi0)]),location,metadata)
+		obs.file_path = location * "/" * actual_filename
+	end
+
 	if !isnothing(psi_ortho)
 		if typeof(psi_ortho) != Vector{MPS}
 			psi_ortho = [psi_ortho]
 		else
 			println("Using $(length(psi_ortho)) orthogonal states")
 		end
-		E, psi = dmrg(H, psi_ortho, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = 1E-8)
+		E, psi = dmrg(H, psi_ortho, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = cutoff)
 	else
-		E, psi = dmrg(H, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = 1E-8)
+		E, psi = dmrg(H, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = cutoff)
 	end
 
-	metadata["observer"] = obs
 	if_densmat ? densmat = density_matrix(psi) : nothing
 	
 	if if_save_data
-		location = get(kwargs, :location, pwd())
+		metadata["observer"] = obs
 		metadata["final_energy"] = E
 		metadata["maxlinkdim"] = maxlinkdim(psi)
 		metadata["final_nrg_variance"] = energy_variance(psi,H)
 		data_dict::Dict{String,Any} = Dict([("mps",psi)])
 		if_densmat ? data_dict["densmat"] = densmat : nothing
-		write_data_jld2(filename,data_dict,location,metadata)
+		if if_continuous_saving
+			new_metadata = Dict([("observer",metadata["observer"]),("final_energy",metadata["final_energy"]),("maxlinkdim",metadata["maxlinkdim"]),("final_nrg_variance",metadata["final_nrg_variance"])])
+			modify_data_jld2(new_metadata,location * "/" * actual_filename,"metadata")
+			modify_data_jld2(data_dict,location * "/" * actual_filename,"all_data")
+		else
+			write_data_jld2(filename,data_dict,location,metadata)
+		end
 	end
 	
 	if if_nrg
@@ -1129,7 +1145,7 @@ mutable struct NRGVarObserver <: AbstractObserver
     nrg_var::Vector{Float64}
  
     NRGVarObserver(var_tol=0.0,local_ham=10.0) = new(var_tol,local_ham,[1000.0])
- end
+end
 
 function ITensors.checkdone!(o::NRGVarObserver;kwargs...)
   sw = kwargs[:sweep]
@@ -1158,6 +1174,49 @@ function ITensors.measure!(o::NRGVarObserver; kwargs...)
 		println("The energy variance is $(round(o.nrg_var[end],digits=9)) for tolerance $(o.var_tol), AVG = $percent_change %")
     end
 end
+
+mutable struct SavingNRGVarObserver <: AbstractObserver
+    file_path::String
+	var_tol::Float64
+    local_ham
+    nrg_var::Vector{Float64}
+ 
+    SavingNRGVarObserver(file_path="mps.jld2",var_tol=0.0,local_ham=10.0) = new(file_path,var_tol,local_ham,[1000.0])
+end
+
+function ITensors.checkdone!(o::SavingNRGVarObserver;kwargs...)
+  sw = kwargs[:sweep]
+  psi = kwargs[:psi]
+  ham = o.local_ham
+  if o.nrg_var[end] < o.var_tol && length(o.nrg_var) > 10
+    #println("Stopping DMRG after sweep $sw")
+    return true
+  elseif length(o.nrg_var) > 10 && o.nrg_var[end] < o.var_tol*1E1 && std(o.nrg_var[end-10:end])/o.nrg_var[end] < 0.03
+  	# if variance has not changed by more than 1% in the last 10 sweeps and is close to tolerance, stop
+  	return true
+  end
+  # Otherwise, update last_energy and keep going
+  append!(o.nrg_var,[energy_variance(psi,ham)])
+
+  modify_data_jld2("mps",psi,o.file_path,"all_data")
+  metadata_update = Dict([("observer",o),("maxlinkdim",maxlinkdim(psi))])
+  modify_data_jld2(metadata_update,o.file_path,"metadata")
+
+  return false
+end
+
+function ITensors.measure!(o::SavingNRGVarObserver; kwargs...)
+    #display(kwargs)
+    half_sweep = kwargs[:half_sweep]
+    bond = kwargs[:bond]
+    outputlevel = kwargs[:outputlevel]
+  
+    if bond == 1 && half_sweep == 2 && outputlevel > 0
+		percent_change = length(o.nrg_var) > 10 ? round(100*std(o.nrg_var[end-10:end]/o.nrg_var[end]),digits=2) : round(100*std(o.nrg_var[2:end])/o.nrg_var[end],digits=2)
+		outputlevel > 0 ? println("The energy variance is $(round(o.nrg_var[end],digits=9)) for tolerance $(o.var_tol), AVG = $percent_change %") : nothing
+    end
+end
+
 
 mutable struct NRGObserver <: AbstractObserver
     nrg_tol::Float64

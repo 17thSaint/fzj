@@ -349,7 +349,7 @@ function write_data_jld2(file_name,data,location=pwd(),metadata=nothing; kwargs.
 	close(binary_file)
 	cd(og_location)
 	println("Data Added, File Closed: $file_name")
-	return
+	return file_name
 end
 
 function read_data_jld2(file_name,location=pwd(); kwargs...)
@@ -398,6 +398,62 @@ function read_data_jld2(file_name,location=pwd(); kwargs...)
 	else
 		return output
 	end
+end
+
+function modify_data_jld2(key_to_modify::String, new_value, file_path, which_group="all_data"; kwargs...)
+	output_level = get(kwargs, :output_level, 0)
+	
+	file_name = split(file_path,"/")[end]
+	file_name = make_sure_file_type(file_name,"jld2")
+	file_path = join(split(file_path,"/")[1:end-1],"/") * "/" * file_name
+
+	# Open the JLD2 file in write mode
+    jld_file = jldopen(file_path, "a+")
+	data_dict = jld_file[which_group]
+
+    # Check if the key exists in the file
+    if haskey(data_dict, key_to_modify)
+        # Modify the value associated with the given key
+		delete!(data_dict, key_to_modify)
+        data_dict[key_to_modify] = new_value
+        output_level > 1 ? println("Value associated with key $key_to_modify has been modified.") : nothing
+    else
+        output_level > 1 ? println("Key $key_to_modify does not exist in the file. Making it") : nothing
+		data_dict[key_to_modify] = new_value
+    end
+	#
+    
+    # Close the JLD2 file
+    close(jld_file)
+end
+
+function modify_data_jld2(to_modify_dict::Dict,file_path, which_group="all_data"; kwargs...)
+	output_level = get(kwargs, :output_level, 0)
+
+	file_name = split(file_path,"/")[end]
+	file_name = make_sure_file_type(file_name,"jld2")
+	file_path = join(split(file_path,"/")[1:end-1],"/") * "/" * file_name
+
+	# Open the JLD2 file in write mode
+	jld_file = jldopen(file_path, "a+")
+	data_dict = jld_file[which_group]
+
+	# Check if the key exists in the file
+	for (key_to_modify,new_value) in to_modify_dict
+		if haskey(data_dict, key_to_modify)
+			# Modify the value associated with the given key
+			delete!(data_dict, key_to_modify)
+			data_dict[key_to_modify] = new_value
+			output_level > 1 ? println("Value associated with key $key_to_modify has been modified.") : nothing
+		else
+			output_level > 1 ? println("Key $key_to_modify does not exist in the file. Making it") : nothing
+			data_dict[key_to_modify] = new_value
+		end
+	end
+	#
+
+	# Close the JLD2 file
+	close(jld_file)
 end
 
 function read_data_hdf5(file_name,location=pwd(); kwargs...)

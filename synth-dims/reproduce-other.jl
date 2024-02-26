@@ -158,14 +158,15 @@ end
 statenames = ["first","second","third","fourth","fifth"]
 higherstatetofind = 0
 
-#params_dict = make_args_dict(ARGS)
-params_dict = Dict([("L",8),("nflavors",4),("if_save_data",false),("mdim",100),("chi",0.0)])
+params_dict = make_args_dict(ARGS)
+#params_dict = Dict([("L",4),("nflavors",4),("if_save_data",true),("if_continuous_saving",true),("mdim",10),("chi",0.0)])
 #
 open_cores = get(params_dict, "open_cores", "all")
 if typeof(open_cores) != String
 	BLAS.set_num_threads(open_cores)	
 end
 if_save_data = get(params_dict,"if_save_data",false)
+if_continuous_saving = get(params_dict,"if_continuous_saving",false)
 dataloc = get_folder_location("cluster-data/synth-dims")
 if_densmat = get(params_dict,"if_densmat",true)
 
@@ -200,7 +201,7 @@ if_gpu = get(params_dict,"if_gpu",false)
 centralflux_strength = get(params_dict,"centralflux_strength",0.0)
 
 naming_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",part_count),("chi",chi)])
-metadata = merge(naming_dict,Dict([("conserve_qns",conserve_qns),("if_periodic_phys",if_per_phys),("if_periodic_virt",if_per_virt),("tilt_strength",tilt),("location",dataloc),("if_save_data",if_save_data),("nrgvar_tol",nrgvar_tol),("if_gpu",if_gpu),("mdim",mdim),("centralflux_strength",centralflux_strength)]))
+metadata = merge(naming_dict,Dict([("if_continuous_saving",if_continuous_saving),("conserve_qns",conserve_qns),("if_periodic_phys",if_per_phys),("if_periodic_virt",if_per_virt),("tilt_strength",tilt),("location",dataloc),("if_save_data",if_save_data),("nrgvar_tol",nrgvar_tol),("if_gpu",if_gpu),("mdim",mdim),("centralflux_strength",centralflux_strength)]))
 
 #
 if true
@@ -288,7 +289,7 @@ excited_nrgs_null = 0.0
 
         ham_params = (if_periodic_phys=if_per_phys,if_periodic_synth=if_per_virt,centralflux_strength=centralflux_strength,tilt_strength=0.0)
         ham_start = hamiltonian_universal(L,nflavors,chi; ham_params...)
-        obs = NRGVarObserver(nrgvar_tol,ham_start)
+        obs = SavingNRGVarObserver(dataloc*filename,nrgvar_tol,ham_start)
 
         full_ham = ham_start
 
@@ -322,7 +323,7 @@ excited_nrgs_null = 0.0
                 end
             end
         else
-            global dmrg_params = (conserve_qns=conserve_qns,if_gpu=if_gpu,ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=dataloc,observer=obs,if_densmat=if_densmat,nsweeps=nsweeps,noise=noise)
+            global dmrg_params = (if_continuous_saving=if_continuous_saving,conserve_qns=conserve_qns,if_gpu=if_gpu,ham=ham_start,mdim=mdim,if_save_data=if_save_data,metadata=metadata,name=filename,location=dataloc,observer=obs,if_densmat=if_densmat,nsweeps=nsweeps,noise=noise)
             psi_gs, densmat = execute_mps(nothing,nothing,chi,L,nflavors,part_count; dmrg_params...)
             println("Energy Variance = ",energy_variance(psi_gs,ham_start)," at Chi = ",chi)
             #=
@@ -343,7 +344,7 @@ excited_nrgs_null = 0.0
         end
         
     end
-    physical_distance_correlation(psi_gs)
+    #physical_distance_correlation(psi_gs)
     #display(real.(densmat))
     #middle = Int(floor(L*nflavors/2))
     #sf_orderparams[idx] = abs(2*sum([sum(diag(densmat,i) + diag(densmat,-i)) for i in middle+1:Int(L*nflavors)-1]))#abs(2*sum(densmat))

@@ -886,7 +886,7 @@ if true
 #lr = 0#Int(sqrt(2^layers))-1
 #for nnst in nn_strens
 
-	#params_dict = Dict([("layers",3),("mdim",20),("if_save_data",false),("filling",0.5)])
+	#params_dict = Dict([("layers",4),("mdim",20),("if_save_data",true),("filling",0.5)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
@@ -969,6 +969,7 @@ if true
 	plotting = false
 	save_plot = false
 	save_data = get(params_dict, "if_save_data", true)
+	if_continuous_saving = get(params_dict, "if_continuous_saving", layer_count >= 6 ? true : false)
 
 	loc = get(params_dict, "dataloc", get_folder_location("cluster-data/synth-dims"))
 	if_cliff = false
@@ -1007,7 +1008,7 @@ if true
 		#else
 			datafile_name = make_parameters_filename(filename_dict)
 		#end
-		model_paras = (nrgtol=nrgtol,if_densmat=if_densmat,centralflux_strength=centralflux_strength,if_pinning_pot=if_pinning,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=limit,if_chem=chemical,chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,limit=limit,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=herenoise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc)
+		model_paras = (if_continuous_saving=if_continuous_saving,nrgtol=nrgtol,if_densmat=if_densmat,centralflux_strength=centralflux_strength,if_pinning_pot=if_pinning,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=limit,if_chem=chemical,chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,limit=limit,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=herenoise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc)
 		
 		metadata_dict = merge(named_tuple_to_dict(model_paras),filename_dict)
 

@@ -668,16 +668,20 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	noise = get(kwargs, :noise, 0.0)
 	expander = get(kwargs, :expander, TTNKit.NoExpander())
 	etol = get(kwargs, :nrgtol, nothing)
+	if_continuous_saving = get(kwargs, :if_continuous_saving, false)
+	file_path = get(kwargs, :file_path, "")
 	if isnothing(etol)
 		observer = NoObserver()
+	elseif if_continuous_saving
+		observer = SavingNRGVarObserver(file_path,etol)
 	else
 		observer = NRGVarObserver(etol)
 	end
 	#println("PreSweep Link Dim = ",TTNKit.maxlinkdim(ttn))
 	#get_position_dims(ttn)
 	if sweep_type == "dmrg"
-		println("Before starting DMRG the bond dim is ",TTNKit.maxlinkdim(ttn))
-		sp = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer)
+		#println("Before starting DMRG the bond dim is ",TTNKit.maxlinkdim(ttn))
+		sp = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=1E-6)
 	elseif sweep_type == "simple"
 		proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
 		#println("Finished Making Hamiltonian")
@@ -758,6 +762,8 @@ function find_ground_state(num_layers,particle_count; kwargs...)
 	sweep_iter = get(kwargs, :sweep_iter, 1)
 	if_sweep = get(kwargs, :if_sweep, true)
 	if_save_data = get(kwargs, :if_save_data, true)
+	if_continuous_saving = get(kwargs, :if_continuous_saving, false)
+	if_save_data ? nothing : if_continuous_saving = false
 	sweep_type = get(kwargs, :sweep_type, "simple")
 	max_occ = get(kwargs, :max_occ, Int(round(particle_count/(num_sites))+1) )
 	warming_limit = get(kwargs, :warming_limit, 100)
@@ -821,6 +827,11 @@ function find_ground_state(num_layers,particle_count; kwargs...)
 		end
 		metadata["seed_ttn"] = ttn
 	end
+
+	if if_continuous_saving
+		ttn_data_dict::Dict{String,Any} = if_gpu ? Dict([("ttn",back2cpu(ttn))]) : Dict([("ttn",ttn)])
+		actual_filename = write_data_jld2(filename,ttn_data_dict,location,metadata)
+	end
 	
 	if if_gpu
 		println("Doing GPU TTN")
@@ -839,7 +850,7 @@ function find_ground_state(num_layers,particle_count; kwargs...)
 	if if_sweep
 		for i in 1:sweep_iter
 			time_start = time()
-			new_ttn, new_ham, new_sp, new_obs = do_sweep(ttn,ham,sweep_type; kwargs...)
+			new_ttn, new_ham, new_sp, new_obs = do_sweep(ttn,ham,sweep_type; kwargs...,file_path = location * "/" * actual_filename)
 			time_end = time()
 			append!(times,[time_end - time_start])
 			#return sp.ttn, ham, sp
@@ -865,12 +876,12 @@ function find_ground_state(num_layers,particle_count; kwargs...)
 		end
 		
 		if_densmat ? densmat = density_matrix(sp.ttn) : nothing
-		metadata["observer"] = obs
 
 		end_time = time()
 		
 		if if_save_data
 			#try
+			metadata["observer"] = obs
 			metadata["runtime"] = end_time-start_time
 			try
 				metadata["energies"] = obs.nrg
@@ -878,12 +889,15 @@ function find_ground_state(num_layers,particle_count; kwargs...)
 				nothing
 			end
 			metadata["maxlinkdim"] = TTNKit.maxlinkdim(sp.ttn)
-			ttn_data_dict::Dict{String,Any} = if_gpu ? Dict([("ttn",back2cpu(sp.ttn))]) : Dict([("ttn",sp.ttn)])
+			ttn_data_dict = if_gpu ? Dict([("ttn",back2cpu(sp.ttn))]) : Dict([("ttn",sp.ttn)])
 			if_densmat ? ttn_data_dict["densmat"] = densmat : nothing
-			write_data_jld2(filename,ttn_data_dict,location,metadata)
-			#catch
-			#	println("Saving Didn't work")
-			#end
+			if if_continuous_saving
+				new_metadata = Dict([("observer",metadata["observer"]),("runtime",metadata["runtime"]),("energies",metadata["energies"]),("maxlinkdim",metadata["maxlinkdim"])])
+				modify_data_jld2(new_metadata,location * "/" * actual_filename,"metadata")
+				modify_data_jld2(ttn_data_dict,location * "/" * actual_filename,"all_data")
+			else
+				write_data_jld2(filename,ttn_data_dict,location,metadata)
+			end
 		end
 
 		
@@ -916,7 +930,43 @@ end
 
 function TTNKit.ITensors.checkdone!(o::NRGVarObserver;kwargs...)
 	outputlevel = kwargs[:outputlevel]
-	sweep_num = kwargs[:sweep_handler].current_sweep
+	sh = kwargs[:sweep_handler]
+	sweep_num = sh.current_sweep
+
+	if sweep_num > 5 && abs(o.nrg[end] - o.nrg[end-1]) < o.var_tol
+		outputlevel > 0 ? println("Energy Converged. Stopping DMRG") : nothing
+		return true
+	else
+  		# Otherwise, keep going
+		return false
+	end
+end
+
+mutable struct SavingNRGVarObserver <: AbstractObserver
+    file_path::String
+	var_tol::Float64
+    nrg::Vector{Float64}
+ 
+    SavingNRGVarObserver(file_path="ttn.jld2",var_tol=0.0) = new(file_path,var_tol,[10000.0,1000.0])
+end
+
+function TTNKit.ITensors.measure!(o::SavingNRGVarObserver; kwargs...)
+    nrgs = o.nrg
+    var_tol = o.var_tol
+    dmrg = kwargs[:sweep_handler]
+    #o.nrg[1] = o.nrg[2]
+    append!(o.nrg,[dmrg.current_energy])
+
+	modify_data_jld2("ttn",dmrg.ttn,o.file_path,"all_data")
+	metadata_update = Dict([("observer",o),("maxlinkdim",TTNKit.maxlinkdim(dmrg.ttn))])
+	modify_data_jld2(metadata_update,o.file_path,"metadata")
+end
+
+function TTNKit.ITensors.checkdone!(o::SavingNRGVarObserver;kwargs...)
+	outputlevel = kwargs[:outputlevel]
+	sh = kwargs[:sweep_handler]
+	sweep_num = sh.current_sweep
+
 	if sweep_num > 5 && abs(o.nrg[end] - o.nrg[end-1]) < o.var_tol
 		outputlevel > 0 ? println("Energy Converged. Stopping DMRG") : nothing
 		return true
