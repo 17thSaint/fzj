@@ -831,6 +831,8 @@ function find_ground_state(num_layers,particle_count; kwargs...)
 	if if_continuous_saving
 		ttn_data_dict::Dict{String,Any} = if_gpu ? Dict([("ttn",back2cpu(ttn))]) : Dict([("ttn",ttn)])
 		actual_filename = write_data_jld2(filename,ttn_data_dict,location,metadata)
+	else
+		actual_filename = filename
 	end
 	
 	if if_gpu
@@ -941,7 +943,7 @@ function TTNKit.ITensors.checkdone!(o::NRGVarObserver;kwargs...)
 		return false
 	end
 end
-
+#
 mutable struct SavingNRGVarObserver <: AbstractObserver
     file_path::String
 	var_tol::Float64
@@ -949,7 +951,7 @@ mutable struct SavingNRGVarObserver <: AbstractObserver
  
     SavingNRGVarObserver(file_path="ttn.jld2",var_tol=0.0) = new(file_path,var_tol,[10000.0,1000.0])
 end
-
+#
 function TTNKit.ITensors.measure!(o::SavingNRGVarObserver; kwargs...)
     nrgs = o.nrg
     var_tol = o.var_tol

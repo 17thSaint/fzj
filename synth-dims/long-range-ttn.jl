@@ -138,7 +138,7 @@ function build_HH_net(num_layers; kwargs...)
 	conserve_qns = get(kwargs, :syms, true)
 	if_fermion = get(kwargs, :if_fermion, false)
 	particle_type = if_fermion ? "Fermion" : "Boson"
-	max_occ = 1
+	max_occ = get(kwargs,:max_occ,1)
 	
 	net = if_fermion ? TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, particle_type;conserve_nf=conserve_qns,conserve_nfparity=false) : TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, particle_type;conserve_qns=conserve_qns,dim=max_occ+1)
 	
@@ -182,22 +182,22 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	phys_edge_length,virt_edge_length = get_lattice_dims(net)
 	println("Phys = ",phys_edge_length,", Virt = ",virt_edge_length)
 	
-	u_strength = get(kwargs, :u_strength, 1.0)
-	scaling_distance = get(kwargs, :scaling_dist, 0) #[[u_strength/2]; [0 for i in 1:virt_edge_length-1]]
+	scaling_distance = get(kwargs, :scaling_dist, 0)
 	
 	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
 	if_hopping = get(kwargs, :if_hopping, true)
 	if_chem = get(kwargs, :if_chem, false)
 	if_nn_int = get(kwargs, :if_nn_int, false)
-	nn_int_strength = get(kwargs, :nn_int_strength, 0.0)
+	onsite_strength = get(kwargs, :onsite_strength, 0.0)
 	if_pinning_pot = get(kwargs, :if_pinning_pot, false)
 	vpinning = get(kwargs, :vpinning, 2.5)
 	no_magF = get(kwargs, :no_magF, false)
 	chem_strength = get(kwargs, :chem_strength, 0.0)
 	centralflux_strength = get(kwargs, :centralflux_strength, 0.0)
+	twist_angle = get(kwargs, :twist_angle, 0.0)
 	
-	long_range_strengths = long_range_scaling(scaling_distance,virt_edge_length,nn_int_strength; kwargs...)
+	long_range_strengths = long_range_scaling(scaling_distance,virt_edge_length,onsite_strength; kwargs...)
 	if_interaction = !all(long_range_strengths.==0)
 	
 	lat = TTNKit.physical_lattice(net)
@@ -241,6 +241,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 				s2_coord = (phys_edge_length,i)
 				coeff = get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
 				coeff *= exp(im*2*pi*centralflux_strength/size(lat)[1])
+				coeff *= exp(im*twist_angle*2*pi)
 				hopping += (coeff,"Adag",s1_coord,"A",s2_coord)
 				hopping += (conj(coeff),"Adag",s2_coord,"A",s1_coord)
 			end
@@ -272,7 +273,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 		end
 		append!(resulting_ham,[interaction])
 	end
-	#=
+	#
 	if if_interaction
 		interaction = TTNKit.OpSum()
 		for i in 1:length(long_range_strengths)
@@ -308,7 +309,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 		end
 		append!(resulting_ham,[nn_int])
 	end
-	=#
+	#
 	if if_chem && chem_strength != 0.0
 		chem = TTNKit.OpSum()
 		for i in TTNKit.eachindex(lat)
@@ -583,12 +584,13 @@ function physical_distance_correlation(psi::TreeTensorNetwork; kwargs...)
 	all_corrs = [[] for i in 1:virt_length]
 	dists = [[] for i in 1:virt_length]
 	for s=1:virt_length
-		for j=1:phys_length
+		for j=1:1#phys_length
 			top = phys_length#mod1(j+Int(phys_length/2),phys_length)
+			println("Doing site ",(j,s))
 			for jj=1:top#phys_length
 				if isnothing(densmat)
-					corr_val = TTNKit.correlation(psi,"Adag","A",(s,j),(s,jj))
-					corr_val /= sqrt(TTNKit.expect(psi,"N",(s,j)) * TTNKit.expect(psi,"N",(s,jj)))
+					corr_val = TTNKit.correlation(psi,"Adag","A",(j,s),(jj,s))
+					corr_val /= sqrt(TTNKit.expect(psi,"N",(j,s)) * TTNKit.expect(psi,"N",(jj,s)))
 					#corr_val += conj(corr_val)
 				else
 					corr_val = densmat[TTNKit.linear_ind(lat,(j,s)),TTNKit.linear_ind(lat,(jj,s))]
@@ -883,10 +885,17 @@ if true
 
 #nnst = 0.0
 #layers = 6
-#lr = 0#Int(sqrt(2^layers))-1
-#for nnst in nn_strens
+#=layers = 4
+num_parts = 2
+ref_dict = Dict([("layers",layers),("particles",num_parts)])
+loc = get_folder_location("cluster-data/synth-dims")
+all_files = find_data_file(ref_dict,"ttn",loc)
+alphas = zeros(length(all_files))
+for (idx,file) in enumerate(all_files)
+	alphas[idx] = get_params_dict_from_filename(file)["alpha"]
+end=#
 
-	#params_dict = Dict([("layers",4),("mdim",20),("if_save_data",true),("filling",0.5)])
+	#params_dict = Dict([("layers",layers),("mdim",100),("if_save_data",false),("alpha",alpha),("twist_angle",twist_angle)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
@@ -901,12 +910,13 @@ if true
 	if_change = get(params_dict, "if_change", false)
 	if_densmat = get(params_dict, :if_densmat, true)
 	change = get(params_dict, "change", 0.0001)
-	limit = get(params_dict, "nn_strength", 0.0)
+	onsite_strength = get(params_dict, "onsite_strength", 0.0)
 	layer_count = Int(get(params_dict, "layers", 4))
 	mag_off = get(params_dict, "mag_off", true)
 	mdim = get(params_dict, "mdim", get_mdim(layer_count,(false,1)))
 	longrange_dist = get(params_dict, "lr", 0)
 	centralflux_strength = get(params_dict, "centralflux_strength", 0.0)
+	twist_angle = get(params_dict, "twist_angle", 0.0)
 	if if_change in ["pos","neg"]
 		if if_change == "pos"
 			alpha = get(params_dict, "alpha", nothing) + change
@@ -940,7 +950,7 @@ if true
 	#
 	#nu = 1.0
 	sweep_type = "dmrg"
-	max_occ = 2
+	max_occ = get(params_dict, "max_occ", 2)
 	if_per_phys = true
 	if_per_virt = false
 	evolve = true
@@ -976,7 +986,8 @@ if true
 	if_cliff = false
 	sc_type = "flat"
 	dists = [i for i in 1:2*edge_sites]
-	lr_scaling = long_range_scaling(longrange_dist,edge_sites,limit; cliff=if_cliff,limit=limit,scaling=sc_type,if_plot=false)
+	lr_scaling = long_range_scaling(longrange_dist,edge_sites,onsite_strength; cliff=if_cliff,scaling=sc_type,if_plot=false)
+
 	
 	#counting = 50
 	#strens = range(num_particles/(0.2*tot_sites),num_particles/(2.0*tot_sites),length=counting) #range(0.02,0.25,length=counting)
@@ -1002,20 +1013,20 @@ if true
 	#for (idx,alpha) in enumerate(strens)
 	#for (idx,num_particles) in enumerate(parts)
 		#alpha = 0.0
-		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys),("nn_strength",limit)])
-
+		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys)])
+		twist_angle != 0.0 ? filename_dict["twist_angle"] = twist_angle : nothing
 		#if length(keys(params_dict)) == 0
 		#	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
 		#else
 			datafile_name = make_parameters_filename(filename_dict)
 		#end
-		model_paras = (if_continuous_saving=if_continuous_saving,nrgtol=nrgtol,if_densmat=if_densmat,centralflux_strength=centralflux_strength,if_pinning_pot=if_pinning,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=limit,if_chem=chemical,chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,limit=limit,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=herenoise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc)
+		model_paras = (twist_angle=twist_angle,if_continuous_saving=if_continuous_saving,nrgtol=nrgtol,if_densmat=if_densmat,centralflux_strength=centralflux_strength,if_pinning_pot=if_pinning,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=lr_scaling[2],if_chem=chemical,chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,onsite_strength=onsite_strength,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=herenoise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc)
 		
 		metadata_dict = merge(named_tuple_to_dict(model_paras),filename_dict)
 
 		#
 		println(datafile_name)
-		if_exists,found_data = check_data_exists(filename_dict,"ttn";location=loc)
+		if_exists,found_data = check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
 
 		if if_exists
 			println("Found Data")
@@ -1033,7 +1044,7 @@ if true
 			#if true
 			#densmat = nothing
 			starting = time()
-			net = build_HH_net(layer_count; syms=true)
+			net = build_HH_net(layer_count; syms=true, max_occ=max_occ)
 			ham = long_range_HH_ham(net,ts,alpha; model_paras...)
 			og_ttn, hamilt, dm_sp, rezobs, runtime, dens = find_ground_state(layer_count,num_particles; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
 			total_time = time() - starting
@@ -1081,8 +1092,6 @@ if true
 		fig = figure()
 		scatter(collect(1:mdim),-log.(specs))
 		=#
-		#end
-	#end
 
 end
 

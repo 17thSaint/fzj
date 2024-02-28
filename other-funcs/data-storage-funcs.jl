@@ -191,7 +191,7 @@ function find_data_file(params_dict,calc_type,location="/home/patrick/fzj/main-g
 			catch
 				try
 					#println("Error in first Attempt, $current_file")
-					current_file_metadata_dict = read_data_jld2(current_file,; output_bool=false)[2]
+					current_file_metadata_dict = read_data_jld2(current_file; kwargs...)[2]
 					current_file_metadata_dict[params] in params_dict[params] ? nothing : append!(remove_indices,i)
 				catch
 					#println("Parameter $params could not be found in file $current_file, skipping")
@@ -251,7 +251,6 @@ function check_data_exists(params_dict::Dict,data_type::String; kwargs...)
 	end
 end
 	
-
 function check_data_exists(filename::String,data_type="observer"; kwargs...)
     location = get(kwargs, :location, pwd())
     here = pwd()
