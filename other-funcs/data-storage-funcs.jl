@@ -354,6 +354,12 @@ end
 
 function read_data_jld2(file_name,location=pwd(); kwargs...)
 	output_bool = get(kwargs, :output_level, true)
+
+	if occursin("/",file_name)
+		location = join(split(file_name,"/")[1:end-1],"/")
+		file_name = split(file_name,"/")[end]
+	end
+
 	og_location = pwd()
 	try
 		cd(location)

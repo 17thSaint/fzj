@@ -417,7 +417,7 @@ function get_occupancy(wavefunc::MPS; kwargs...)
 end
 
 function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
-	cutoff = get(kwargs, :cutoff, 1E-8)
+	cutoff = get(kwargs, :cutoff, 1E-10)
 	running_again = get(kwargs, :running_again, false)
 	psi_ortho = get(kwargs, :psi_ortho, nothing)
 	opl = get(kwargs, :outputlevel, 1)
@@ -427,13 +427,13 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	if_parton = get(kwargs, :if_parton, true)
 	ham = get(kwargs, :ham, nothing)
 	mdim = get(kwargs, :mdim, 100)
-	#=if mdim >= 100 && !running_again
+	if mdim >= 100 && !running_again
 		if mdim >= 400
 			mdim = [Int(floor(mdim/4)),Int(floor(mdim/4)),Int(floor(mdim/4)),Int(floor(mdim/2)),Int(floor(mdim/2)),Int(floor(mdim/2)),Int(floor(mdim/2)),Int(floor(mdim/2)), mdim]
 		else
 			mdim = [Int(floor(mdim/4)),Int(floor(mdim/2)), mdim]
 		end
-	end=#
+	end
 	noise = get(kwargs, :noise, 0.0)
 	obs = get(kwargs, :observer, NoObserver())
 	if_save_data = get(kwargs, :if_save_data, false)
