@@ -835,7 +835,6 @@ function loop_sites(starting_site,which_quadrant,phys_length,virt_length; kwargs
 	end
 end
 
-
 function closed_loop(psi::TreeTensorNetwork, starting_site; kwargs...)
 	phys_length,virt_length = get_lattice_dims(psi)
 	which_direction = get(kwargs, :direction, 1)
@@ -881,7 +880,7 @@ fb_occ_mat = get_occupancy(fb_gs)
 
 
 #
-if true
+if false
 
 #nnst = 0.0
 #layers = 6

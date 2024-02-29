@@ -1197,15 +1197,21 @@ function get_2part_corr(ttn,particle_count; kwargs...)
 end
 
 function get_occupancy(ttn::TTNKit.TreeTensorNetwork; kwargs...)
-	#=
-	exp_occ = zeros(edge_length,edge_length)
-	for x in 1:edge_length
-		for y in 1:edge_length
-			exp_occ[x,y] = TTNKit.expect(ttn,"N",(x,y))
+	densmat = get(kwargs, :densmat, nothing)
+
+	if isnothing(densmat)
+		exp_occ = abs.(TTNKit.expect(ttn,"N"))
+	else
+		lat = TTNKit.physical_lattice(TTNKit.network(ttn))
+		phys_length,virt_length = get_lattice_dims(ttn)
+		exp_occ = zeros(phys_length,virt_length)
+		for j in 1:phys_length
+			for s in 1:virt_length
+				linear_index = TTNKit.linear_ind(lat,(j,s))
+				exp_occ[j,s] = abs(densmat[linear_index,linear_index])
+			end
 		end
 	end
-	=#
-	exp_occ = abs.(TTNKit.expect(ttn,"N"))
 	
 	if_save_data = get(kwargs, :if_save_data, false)
 	if_save_fig = get(kwargs, :if_save_fig, false)
@@ -1311,7 +1317,6 @@ function rewrite_inds(tensor,ref_tensor)
 	end
 	return tensor
 end
-
 
 function get_particles_needed(num_layers;kwargs...)
 	if num_layers % 2 != 0.0
