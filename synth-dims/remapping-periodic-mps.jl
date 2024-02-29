@@ -3,7 +3,7 @@ Pkg.activate(".")
 include("fqh_effective.jl")
 include("time_evolution.jl")
 include("../other-funcs/data-storage-funcs.jl")
-using Statistics,Observers,LsqFit
+using Statistics,Observers,LsqFit,SpecialFunctions
 
 function entropy_mps(offcenter_wavefunc::MPS,center_site::Int; kwargs...)
 	if_spectrum = get(kwargs, :if_spectrum, false)
@@ -137,47 +137,39 @@ function get_corrs(psi::MPS,if_remapping::Bool; kwargs...)
 end
 
 cutoff = 1E-8
-locL = 30
-dists = collect(0:locL-1)
 mu = 0.0
-ts = 0.1
-#us = 10.0
-#
-ustrens = range(1.0,stop=100.0,length=50)
-corrlens = []
-for us in ustrens
+ts = 1.0
+us = 0.1
+#locL = 10
+#ustrens = range(0.01,stop=10.0,length=10)
+Ls = collect(10:4:50)
+#intparts = zeros(length(Ls))
+#zeromomoccs = zeros(length(Ls))
+#for (idx,us) in enumerate(ustrens)
+for (idx,locL) in enumerate(Ls)
+    dists = collect(0:locL-1)
     psi_loc, gs_nrg_loc = get_1D_gs(locL,false,1E-4,100; onsite_strength = us,hopping_strength=ts,chemical_strength=mu,if_periodic_phys=false,cutoff=cutoff,maxocc=5)
-    #excited_psi, first_nrg = get_1D_gs(locL,false,1E-5,100; onsite_strength=us,hopping_strength=ts,chemical_strength=mu,if_periodic_phys=false,psi_ortho=psi_loc,cutoff=cutoff,maxocc=5)
-    #println("Energy Gap is ",first_nrg - gs_nrg_loc)
-    #plot(expect(psi_loc,"N"),label="$us")
     corrmat = correlation_matrix(psi_loc, "Adag", "A")
     siteocc = expect(psi_loc,"N")
     normalization_mat = sqrt.(siteocc * transpose(siteocc))
     corrmat ./= normalization_mat
-    #
     corrs = [mean(diag(corrmat,i)) for i in 0:locL-1]
     #fig = figure()
-    #plot(dists,corrs,"-p")
+    #plot(corrs)
     #yscale("log")
-    #xscale("log")
     decayfit(x,p) = (p[1].* exp.(-x ./ p[2]) ./ (x .^ 0.5)) .+ p[3]
-    #algfit(x,p) = (x ./ locL).^(-p[1]) .+ p[2]
     starting_point = 5
     decayfithere = curve_fit(decayfit,dists[starting_point:end],corrs[starting_point:end],[1.0,1.0,0.0])
     corrlength = decayfithere.param[2]
-    append!(corrlens,[corrlength])
-    scatter(ts / us,corrlength,c="b")
-    xlabel("t/U")
-    ylabel("Correlation Length")#=
-    algfithere = curve_fit(algfit,dists[starting_point:end],corrs[starting_point:end],[1.0,1.0])
-    plot(dists[2:end],decayfit(dists[2:end],decayfithere.param),label="Decay")
-    plot(dists[2:end],algfit(dists[2:end],algfithere.param),label="Algebraic")
-    xlabel("Distance")
-    ylabel("Correlations")
-    legend()
-    #
-    title("Int Stren = $us, Correlation length is $(decayfithere.param[2])")=#
+
+    integralpart = sqrt(corrlength) * gamma(1/2) #/ (locL^1.5)
+    sumpart = sum(corrmat) / locL^2
+    scatter(locL,integralpart,c="b")
+    #scatter(us,sumpart,c="r")
 end
+
+
+
 #=
 fig = figure()
 nrg_diffs = []

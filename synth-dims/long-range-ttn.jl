@@ -187,7 +187,6 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
 	if_hopping = get(kwargs, :if_hopping, true)
-	if_chem = get(kwargs, :if_chem, false)
 	if_nn_int = get(kwargs, :if_nn_int, false)
 	onsite_strength = get(kwargs, :onsite_strength, 0.0)
 	if_pinning_pot = get(kwargs, :if_pinning_pot, false)
@@ -273,33 +272,6 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 		end
 		append!(resulting_ham,[interaction])
 	end
-	#
-	if if_interaction
-		interaction = TTNKit.OpSum()
-		for i in 1:length(long_range_strengths)
-			if long_range_strengths[i] == 0
-				continue
-			else
-				local_strength = long_range_strengths[i]
-				if i == 1
-					for j in TTNKit.eachindex(lat)
-						interaction += (local_strength/2,"Adag * Adag * A * A",TTNKit.coordinate(lat,j))
-					end
-					append!(resulting_ham,[interaction])
-				else
-					for j in TTNKit.eachindex(lat)
-						interaction_sites = get_interaction_coords(TTNKit.coordinate(lat,j),i-1,lat)
-						
-						for k in interaction_sites
-							interaction += (local_strength/2,"Adag * A",TTNKit.coordinate(lat,j),"Adag * A",Tuple(k))
-							interaction -= (local_strength/2,"Adag * A",TTNKit.coordinate(lat,j))
-						end
-					end
-					append!(resulting_ham,[interaction])
-				end
-			end
-		end
-	end
 	
 	if if_nn_int
 		nn_int = TTNKit.OpSum()
@@ -310,7 +282,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 		append!(resulting_ham,[nn_int])
 	end
 	#
-	if if_chem && chem_strength != 0.0
+	if chem_strength != 0.0
 		chem = TTNKit.OpSum()
 		for i in TTNKit.eachindex(lat)
 			chem -= (chem_strength,"N",TTNKit.coordinate(lat,i))
@@ -880,7 +852,7 @@ fb_occ_mat = get_occupancy(fb_gs)
 
 
 #
-if false
+if true
 
 #nnst = 0.0
 #layers = 6
@@ -894,9 +866,13 @@ for (idx,file) in enumerate(all_files)
 	alphas[idx] = get_params_dict_from_filename(file)["alpha"]
 end=#
 
-	#params_dict = Dict([("layers",layers),("mdim",100),("if_save_data",false),("alpha",alpha),("twist_angle",twist_angle)])
+mus = range(0.1,stop=3.0,length=10)
+densities = zeros(length(mus))
+layers = 4
+for (idx,mu) in enumerate(mus)
+	params_dict = Dict([("layers",layers),("mdim",20),("if_save_data",false),("filling",0.5),("onsite_strength",1000.0)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
-	params_dict = make_args_dict(ARGS)
+	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
 	if typeof(open_cores) != String
 		BLAS.set_num_threads(open_cores)	
@@ -953,13 +929,12 @@ end=#
 	if_per_phys = true
 	if_per_virt = false
 	evolve = true
-	chemical = false
-	mu = 0.0
 	#max_occupation = 3
 	expan = TTNKit.DefaultExpander(1.0)#TTNKit.NoExpander()
 	herenoise = [0.0]
 	ts = 0.500
 	tot_sites = 2^layer_count
+	syms = false
 	#=
 	nu = 1.0
 	if isnothing(alpha)
@@ -1012,20 +987,20 @@ end=#
 	#for (idx,alpha) in enumerate(strens)
 	#for (idx,num_particles) in enumerate(parts)
 		#alpha = 0.0
-		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys)])
+		filename_dict = Dict([("layers",layer_count),("chem_strength",mu),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys)])
 		twist_angle != 0.0 ? filename_dict["twist_angle"] = twist_angle : nothing
 		#if length(keys(params_dict)) == 0
 		#	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
 		#else
 			datafile_name = make_parameters_filename(filename_dict)
 		#end
-		model_paras = (twist_angle=twist_angle,if_continuous_saving=if_continuous_saving,nrgtol=nrgtol,if_densmat=if_densmat,centralflux_strength=centralflux_strength,if_pinning_pot=if_pinning,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=lr_scaling[2],if_chem=chemical,chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,onsite_strength=onsite_strength,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=herenoise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc)
+		model_paras = (syms=syms,twist_angle=twist_angle,if_continuous_saving=if_continuous_saving,nrgtol=nrgtol,if_densmat=if_densmat,centralflux_strength=centralflux_strength,if_pinning_pot=if_pinning,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=lr_scaling[2],chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,onsite_strength=onsite_strength,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=herenoise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc)
 		
 		metadata_dict = merge(named_tuple_to_dict(model_paras),filename_dict)
 
 		#
 		println(datafile_name)
-		if_exists,found_data = check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
+		if_exists,found_data = false,nothing#check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
 
 		if if_exists
 			println("Found Data")
@@ -1043,14 +1018,21 @@ end=#
 			#if true
 			#densmat = nothing
 			starting = time()
-			net = build_HH_net(layer_count; syms=true, max_occ=max_occ)
+			net = build_HH_net(layer_count; syms=syms, max_occ=max_occ)
 			ham = long_range_HH_ham(net,ts,alpha; model_paras...)
+			#display(ham)
 			og_ttn, hamilt, dm_sp, rezobs, runtime, dens = find_ground_state(layer_count,num_particles; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
 			total_time = time() - starting
 			println("Running time = $total_time")
 			wavefunc = dm_sp.ttn
 			#append!(wavefuncs,[dm_sp.ttn])
 		end
+
+		occs = get_occupancy(wavefunc)
+		densities[idx] = sum(occs) / tot_sites
+		#scatter([mu],[densities[idx]],c="b")
+		#xlabel("Chemical Potential")
+		#ylabel("Density")
 
 		#=sforderparams[idx] = abs(2*sum(dens)) / (2^layer_count)
 
@@ -1091,7 +1073,7 @@ end=#
 		fig = figure()
 		scatter(collect(1:mdim),-log.(specs))
 		=#
-
+	end
 end
 
 #
