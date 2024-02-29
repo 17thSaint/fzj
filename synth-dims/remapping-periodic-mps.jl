@@ -5,13 +5,29 @@ include("time_evolution.jl")
 include("../other-funcs/data-storage-funcs.jl")
 using Statistics,Observers,LsqFit
 
-
+function entropy_mps(offcenter_wavefunc::MPS,center_site::Int; kwargs...)
+	if_spectrum = get(kwargs, :if_spectrum, false)
+	wavefunc = orthogonalize(offcenter_wavefunc,center_site)
+	u,s,v = svd(wavefunc[center_site], (linkind(wavefunc,center_site)))#, siteind(wavefunc,center_site)))
+	entropy = 0.0
+	for i in 1:dim(s,1)
+		p = s[i,i]^2
+		entropy -= p * log(p)
+	end
+	if if_spectrum
+		return entropy,diag(s)
+	else
+		return entropy
+	end
+end
 
 function hamiltonian_remapped(L,tp=1.0; kwargs...)
         if_periodic_phys = get(kwargs, :if_periodic_phys, true)
         tilt_strength = get(kwargs, :tilt_strength, 0.0)
         centralflux_strength = get(kwargs, :centralflux_strength, 0.0)
         if_remapping = get(kwargs, :if_remapping, true)
+        chemical_strength = get(kwargs, :chemical_strength, 0.0)
+        onsite_strength = get(kwargs, :onsite_strength, 1.0)
         
         remap = if_remapping ? remapping_nnn(L) : nothing
 
@@ -34,25 +50,26 @@ function hamiltonian_remapped(L,tp=1.0; kwargs...)
             end
 
             
-            coeff = -tp * exp(im*2*pi*centralflux_strength/L)
+            coeff = -tp
             ampo += (coeff, "Adag", starting_site, "A", next_site)
             ampo += (conj(coeff), "A", starting_site, "Adag", next_site)
         end
 
+        # onsite interaction
         for j in 1:L
             if if_remapping
                 phys_site = remap[j]
             else
                 phys_site = j
             end
-            ampo += (1000000.0, "Adag * A * Adag * A", phys_site)
-            ampo -= (1000000.0, "Adag * A", phys_site)
+            ampo += (onsite_strength, "N * N", phys_site)
+            ampo -= (onsite_strength, "N", phys_site)
         end
-        if_tilt = tilt_strength != 0.0
-        if if_tilt
+    
+        if chemical_strength != 0.0
             for j in 1:L
                 phys_site = if_remapping ? remap[j] : j
-                ampo += (-tilt_strength*j, "N", phys_site)
+                ampo += (chemical_strength, "N", phys_site)
             end
         end
         
@@ -61,17 +78,21 @@ end
 
 function get_1D_gs(L,if_remapping,nrg_tol,mdim; kwargs...)
     part_count = Int(floor(L/2))
+    maxocc = get(kwargs, :maxocc, 1)
+    psi_ortho = get(kwargs, :psi_ortho, nothing)
+    cutoff = get(kwargs, :cutoff, 1E-10)
+    hopping_strength = get(kwargs, :hopping_strength, 1.0)
     
     states = make_states(L,part_count,1)
-    sidx = siteinds("Boson", L; conserve_qns = true, dim=2)
+    sidx = isnothing(psi_ortho) ? siteinds("Boson", L; conserve_qns = true, dim=maxocc+1) : siteinds(psi_ortho)
     psi0 = randomMPS(sidx, states)
 
-    ham = hamiltonian_remapped(L; if_remapping=if_remapping)
+    ham = hamiltonian_remapped(L,hopping_strength; if_remapping=if_remapping,kwargs...)
     obs = NRGObserver(nrg_tol,ham)
-    dmrg_params = (outputlevel=1,psi_guess=psi0,if_densmat=false,nsweeps=50,if_parton=false,particle_type="Boson",conserve_qns=true,ham=ham,mdim=mdim,observer=obs)
-    psi = execute_mps(nothing,nothing,nothing,L,1,part_count; dmrg_params...)
+    dmrg_params = (cutoff=cutoff,psi_ortho=psi_ortho,outputlevel=1,psi_guess=psi0,if_densmat=false,nsweeps=100,if_parton=false,particle_type="Boson",conserve_qns=true,ham=ham,mdim=mdim,observer=obs)
+    psi, nrg = execute_mps(nothing,nothing,nothing,L,1,part_count; dmrg_params...,if_nrg=true)
     
-    return psi
+    return psi, nrg
 end
 
 function get_corrs(psi::MPS,if_remapping::Bool; kwargs...)
@@ -115,8 +136,80 @@ function get_corrs(psi::MPS,if_remapping::Bool; kwargs...)
     end
 end
 
+cutoff = 1E-8
+locL = 30
+dists = collect(0:locL-1)
+mu = 0.0
+ts = 0.1
+#us = 10.0
+#
+ustrens = range(1.0,stop=100.0,length=50)
+corrlens = []
+for us in ustrens
+    psi_loc, gs_nrg_loc = get_1D_gs(locL,false,1E-4,100; onsite_strength = us,hopping_strength=ts,chemical_strength=mu,if_periodic_phys=false,cutoff=cutoff,maxocc=5)
+    #excited_psi, first_nrg = get_1D_gs(locL,false,1E-5,100; onsite_strength=us,hopping_strength=ts,chemical_strength=mu,if_periodic_phys=false,psi_ortho=psi_loc,cutoff=cutoff,maxocc=5)
+    #println("Energy Gap is ",first_nrg - gs_nrg_loc)
+    #plot(expect(psi_loc,"N"),label="$us")
+    corrmat = correlation_matrix(psi_loc, "Adag", "A")
+    siteocc = expect(psi_loc,"N")
+    normalization_mat = sqrt.(siteocc * transpose(siteocc))
+    corrmat ./= normalization_mat
+    #
+    corrs = [mean(diag(corrmat,i)) for i in 0:locL-1]
+    #fig = figure()
+    #plot(dists,corrs,"-p")
+    #yscale("log")
+    #xscale("log")
+    decayfit(x,p) = (p[1].* exp.(-x ./ p[2]) ./ (x .^ 0.5)) .+ p[3]
+    #algfit(x,p) = (x ./ locL).^(-p[1]) .+ p[2]
+    starting_point = 5
+    decayfithere = curve_fit(decayfit,dists[starting_point:end],corrs[starting_point:end],[1.0,1.0,0.0])
+    corrlength = decayfithere.param[2]
+    append!(corrlens,[corrlength])
+    scatter(ts / us,corrlength,c="b")
+    xlabel("t/U")
+    ylabel("Correlation Length")#=
+    algfithere = curve_fit(algfit,dists[starting_point:end],corrs[starting_point:end],[1.0,1.0])
+    plot(dists[2:end],decayfit(dists[2:end],decayfithere.param),label="Decay")
+    plot(dists[2:end],algfit(dists[2:end],algfithere.param),label="Algebraic")
+    xlabel("Distance")
+    ylabel("Correlations")
+    legend()
+    #
+    title("Int Stren = $us, Correlation length is $(decayfithere.param[2])")=#
+end
+#=
+fig = figure()
+nrg_diffs = []
+Ls = collect(60:4:100)
+for L in Ls
+    psi, gs_nrg = get_1D_gs(L,false,1E-8,200; if_periodic_phys=false,cutoff=cutoff,hopping_strength=ts,chemical_strength=mu,maxocc=1)
+    #=excited_psi, first_nrg = get_1D_gs(L,false,1E-8,200; if_periodic_phys=false,psi_ortho=psi,cutoff=cutoff)
+    nrg_diff = first_nrg - gs_nrg
+    append!(nrg_diffs,[nrg_diff])
+    scatter(L,nrg_diff,c="b")
+    xlabel("1 / System Size")
+    ylabel("Energy Difference")=#
+    append!(nrg_diffs,[entropy_mps(psi,Int(ceil(L/2)))])
+    scatter(L,nrg_diffs[end],c="b")
+end
 
-    
+xs = Ls
+svnfunc(x,p) = p[1] .* log.((2/pi) .* x .* sin(pi/2)) .+ p[2]
+svnfit = curve_fit(svnfunc,xs,nrg_diffs,[1.0,1.0])
+plot(xs,svnfunc(xs,svnfit.param),label="Fit")
+title("Central Charge = $(svnfit.param[1]*6)")
+=#
+
+#=
+xs = collect(10:4:50)
+plot(xs,nrg_diffs,"-p")
+ratfit(x,p) = p[1] ./ x .+ p[2]
+fit = curve_fit(ratfit,xs,nrg_diffs,[1.0,1.0])
+plot(xs,ratfit(xs,fit.param),label="Fit")
+title("Limit is $(fit.param[2])")
+=#
+#=
 
 open_cores = "all"#get(params_dict, "open_cores", "all")
 if typeof(open_cores) != String
@@ -182,7 +275,7 @@ ylabel("(Adag_1 A_2 - Adag_1 A_L) / Adag_1 A_2")
 title("Percent Long Range Correlation Diff Linear vs NNN Remap")
 legend()
 
-
+=#
 
 
 

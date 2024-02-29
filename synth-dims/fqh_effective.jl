@@ -478,7 +478,7 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 			sidx = siteinds(particle_type, L; conserve_qns = conserve_qns)
 		end
 	elseif !isnothing(psi_ortho)
-		sidx = length(psi_ortho) > 1 ? siteinds(psi_ortho[1]) : siteinds(psi_ortho)
+		sidx = typeof(psi_ortho) == Vector{MPS} ? siteinds(psi_ortho[1]) : siteinds(psi_ortho)
 	else
 		sidx = siteinds(psi0)
 	end
