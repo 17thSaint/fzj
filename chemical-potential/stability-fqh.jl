@@ -14,22 +14,22 @@ include_other_files("review-practice-codes/ttn.jl")
 println("Added All files and packages")
 
 
-parameter_iteration = parse(Int,ENV["ENCAP_PROCID"])
-params_dict = make_args_dict(ARGS,parameter_iteration)
-#params_dict = Dict([("layers",4),("mdim",18),("if_save_data",false)])
+#parameter_iteration = parse(Int,ENV["ENCAP_PROCID"])
+#params_dict = make_args_dict(ARGS,parameter_iteration)
+params_dict = Dict([("layers",4),("mdim",18),("if_save_data",false)])
 display(params_dict)
 
 layers = get(params_dict, "layers", 4)#Done
 num_sites = 2^layers
 filling = 1/2
 mdim = get(params_dict, "mdim", 100)#Done
-nsweeps = get(params_dict, "nsweeps", 5)#Done
+nsweeps = get(params_dict, "nsweeps", 50)#Done
 if_save_data = get(params_dict, "if_save_data", false)#Done
 noise = get(params_dict, "noise", [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0.0])#Done
 expander = TTNKit.DefaultExpander(get(params_dict, "expander_coeff", 0.2))#Done
 u_strength = get(params_dict, "u_strength", 1.0)#Done
 syms = get(params_dict, "syms", false)#Done
-max_occ = get(params_dict, "maxocc", 1)
+max_occ = get(params_dict, "maxocc", 2)
 if_gpu = get(params_dict, "if_gpu", false)#Done
 seed_ttn = get(params_dict, "seed_ttn", nothing)#Done
 net = TTNKit.BinaryRectangularNetwork(layers, TTNKit.ITensorNode, "Boson";conserve_qns=syms,dim=max_occ+1)#Done
@@ -60,13 +60,16 @@ end
 if "if_save_data" in collect(keys(naming_dict))
 	delete!(naming_dict,"if_save_data")
 end
-model_paras = (if_periodic = if_periodic, if_chem = if_chem, chem_strength = chem_strength, u_strength = u_strength, max_dim = mdim, num_sweeps = nsweeps, noise = noise, if_save_data = if_save_data, sweep_type = "dmrg", syms = syms, phi = alpha, ttn_net = net, seed_ttn = seed_ttn, if_gpu = if_gpu, layers = layers, t_strength = t_strength, filling = filling, location = dataloc, particles = num_particles, open_cores = open_cores, part_type = particle_type, expander = expander)
+model_paras = (nrgtol=1E-6,if_periodic_synth=false,if_periodic_phys = false, if_chem = if_chem, chem_strength = chem_strength, u_strength = u_strength, mdim = mdim, num_sweeps = nsweeps, noise = noise, if_save_data = if_save_data, sweep_type = "dmrg", syms = syms, phi = alpha, ttn_net = net, seed_ttn = seed_ttn, if_gpu = if_gpu, layers = layers, t_strength = t_strength, filling = filling, location = dataloc, particles = num_particles, open_cores = open_cores, part_type = particle_type, expander = expander)
 metadata_dict = named_tuple_to_dict(model_paras)
 filename = "ttn-" * make_parameters_filename(naming_dict)
 display(dataloc * "/" * filename)
 
 ham_op = get_hofstadter_interacting_hamilt(net,t_strength,alpha; model_paras...)
-og_ttn, og_ham, dmsp = find_ground_state(layers,num_particles,t_strength; model_paras...,ham_op = ham_op,metadata=metadata_dict,name=filename)
+display(ham_op)
+og_ttn, og_ham, dmsp = find_ground_state(layers,num_particles; model_paras...,ham_op = ham_op,metadata=metadata_dict,name=filename)
+
+get_occupancy(dmsp.ttn; if_plot=false)
 
 #=
 ts_count = 1

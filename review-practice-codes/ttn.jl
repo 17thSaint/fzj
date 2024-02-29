@@ -681,7 +681,7 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	#get_position_dims(ttn)
 	if sweep_type == "dmrg"
 		#println("Before starting DMRG the bond dim is ",TTNKit.maxlinkdim(ttn))
-		get_occupancy(ttn; plot_title="Before DMRG")
+		#get_occupancy(ttn; plot_title="Before DMRG")
 		sp = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=1E-6)
 	elseif sweep_type == "simple"
 		proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
