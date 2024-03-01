@@ -928,6 +928,7 @@ function TTNKit.ITensors.measure!(o::NRGVarObserver; kwargs...)
     dmrg = kwargs[:sweep_handler]
 	println("Link dimension right now is ",TTNKit.maxlinkdim(dmrg.ttn)," while the maxdim is ",TTNKit.maxdim(dmrg))
     #o.nrg[1] = o.nrg[2]
+	#get_occupancy(dmrg.ttn; plot_title="Current Sweep = $(dmrg.current_sweep)")
     append!(o.nrg,[dmrg.current_energy])
 end
 

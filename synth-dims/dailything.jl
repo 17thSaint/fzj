@@ -324,7 +324,7 @@ if true
 	col = ["b","g","r","c","m","y","k","w"]
 	all_nrgs = [[],[]]
 	all_twists = [[],[]]
-	for layers in [4,5]
+	for layers in [5]
 		if layers % 2 == 0
 			phys_edge_length = Int(sqrt(2^layers))
 			virt_edge_length = phys_edge_length
@@ -336,7 +336,7 @@ if true
 
 
 		if true
-			params_dict = Dict([("layers",layers),("particles",num_parts),("alpha",0.0)])
+			params_dict = Dict([("layers",layers),("particles",num_parts)])
 			loc = get_folder_location("cluster-data/synth-dims")
 			all_files = find_data_file(params_dict,"ttn",loc)
 			display(all_files)
@@ -344,24 +344,30 @@ if true
 			#twists = []
 			#fillings = zeros(length(all_files))
 
-			for (idx,f) in enumerate(all_files)
+			for (idx,f) in enumerate(all_files[1:5])
 				name_data = get_params_dict_from_filename(f)
-				#filling = name_data["particles"] / (2^(name_data["layers"]) * name_data["alpha"])
+				filling = name_data["particles"] / (2^(name_data["layers"]) * name_data["alpha"])
 				#fillings[idx] = filling
-				twist = "twist_angle" in keys(name_data) ? name_data["twist_angle"] : 0.0
+				#twist = "twist_angle" in keys(name_data) ? name_data["twist_angle"] : 0.0
 				data,metadata = read_data_jld2(f,loc;outputlevel=0)
 				wavefunc = data["ttn"]
+				rho = data["densmat"]
+				fig = figure()
+				physical_distance_correlation(wavefunc; densmat=rho,if_plot=true)
+				title("Filling = $(round(filling,digits=4))")
+				get_occupancy(wavefunc; plot_title="Filling = $(round(filling,digits=4)), Bond Dim=$(maxlinkdim(wavefunc))",densmat=rho)
 
-				append!(all_nrgs[layers-3],[metadata["energies"][end]])
-				append!(all_twists[layers-3],[twist])
+				#append!(all_nrgs[layers-3],[metadata["energies"][end]])
+				#append!(all_twists[layers-3],[twist])
 
 			end
-			all_nrgs[layers-3] .-= all_nrgs[layers-3][1]
+			#all_nrgs[layers-3] .-= all_nrgs[layers-3][1]
 		end
 		phys_edge_length = layers % 2 == 0.0 ? Int(sqrt(2^layers)) : Int(sqrt(2^(layers+1))/2)
 		virt_edge_length = layers % 2 == 0.0 ? Int(sqrt(2^layers)) : Int(sqrt(2^(layers-1))/2)
-		all_nrgs[layers-3] .*= phys_edge_length / virt_edge_length
+		#all_nrgs[layers-3] .*= phys_edge_length / virt_edge_length
 	end
+	#=
 	all_hms = 2 .* [all_nrgs[i] ./ (all_twists[i] .^2) for i in 1:2]
 	helicity_moduli = [mean(all_hms[i][2:end]) for i in 1:2]
 	errors = [std(all_hms[i][2:end]) for i in 1:2]
@@ -369,7 +375,7 @@ if true
 	plot(all_twists[2],all_nrgs[2],"-p",label="Ns = $(2^5)")
 	legend()
 	xlabel("Twist Angle")
-	title("Helicity Modulus = $(round(helicity_moduli[1],digits=4)) ± $(round(errors[1],digits=4))")
+	title("Helicity Modulus = $(round(helicity_moduli[1],digits=4)) ± $(round(errors[1],digits=4))")=#
 end
 
 

@@ -556,9 +556,9 @@ function physical_distance_correlation(psi::TreeTensorNetwork; kwargs...)
 	all_corrs = [[] for i in 1:virt_length]
 	dists = [[] for i in 1:virt_length]
 	for s=1:virt_length
-		for j=1:1#phys_length
+		for j=1:phys_length
 			top = phys_length#mod1(j+Int(phys_length/2),phys_length)
-			println("Doing site ",(j,s))
+			#println("Doing site ",(j,s))
 			for jj=1:top#phys_length
 				if isnothing(densmat)
 					corr_val = TTNKit.correlation(psi,"Adag","A",(j,s),(jj,s))
@@ -587,13 +587,19 @@ function physical_distance_correlation(psi::TreeTensorNetwork; kwargs...)
 		corrs[i] = ([mean(all_corrs[i][j]) for j in 1:length(all_corrs[i])])
 	end
 
-	corr_lengths = correlation_length(dists[1],corrs; if_plot=false)
+	if if_periodic_phys
+		middle = Int(phys_length/2) + 1
+		corr_lengths = correlation_length(dists[1][2:middle],[corrs[i][2:middle] for i in 1:length(corrs)]; if_plot=if_plot)
+	else
+		middle = phys_length - 1
+		corr_lengths = correlation_length(dists[1][2:middle],[corrs[i][2:middle] for i in 1:length(corrs)]; if_plot=if_plot)
+	end
 
 	if if_plot
-		fig = figure()
+		#fig = figure()
 		title_string = get(kwargs, :plot_title, "")
 		for i in 1:virt_length
-			plot(dists[i],abs.(corrs[i]),"-p",label="$i")
+			plot(dists[i],abs.(corrs[i]),"p",label="$i")
 			yscale("log")
 		end
 		legend()
@@ -614,10 +620,10 @@ function correlation_length(dists,phys_correlations; kwargs...)
 	corr_lengths = [all_fits[i].param[2] for i in 1:length(all_fits)]
 
 	if if_plot
-		fig = figure()
+		#fig = figure()
 		for i in 1:length(phys_correlations)
-			scatter(dists,phys_correlations[i],label="Site $i")
-			plot(dists,exp_fit(dists,all_fits[i].param),"-",label="Fit $i")
+			#scatter(dists,phys_correlations[i],label="Site $i")
+			plot(dists,exp_fit(dists,all_fits[i].param),"-",label="$(round(corr_lengths[i],digits=4))")
 		end
 		xlabel("Distance")
 		ylabel("Correlation")
@@ -866,19 +872,18 @@ for (idx,file) in enumerate(all_files)
 	alphas[idx] = get_params_dict_from_filename(file)["alpha"]
 end=#
 
-mus = range(0.1,stop=3.0,length=10)
-densities = zeros(length(mus))
-layers = 4
-for (idx,mu) in enumerate(mus)
-	params_dict = Dict([("layers",layers),("mdim",20),("if_save_data",false),("filling",0.5),("onsite_strength",1000.0)])
+#layers = 6
+#nus = [0.5]#range(1.5,2.0,length=5)
+#for (idx,nu) in enumerate(nus)
+	#params_dict = Dict([("layers",layers),("mdim",200),("if_save_data",false),("filling",nu),("max_occ",1),("onsite_strength",0.0),("if_periodic_phys",true)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
-	#params_dict = make_args_dict(ARGS)
+	params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
 	if typeof(open_cores) != String
 		BLAS.set_num_threads(open_cores)	
 	end
 	#
-	nrgtol = get(params_dict, "nrgtol", 1E-5)
+	nrgtol = get(params_dict, "nrgtol", 1E-4)
 	if_NN = get(params_dict, "if_nn_int", false)
 	if_pinning = get(params_dict, "if_pinning", false)
 	if_gpu = get(params_dict, "if_gpu", false)
@@ -925,16 +930,17 @@ for (idx,mu) in enumerate(mus)
 	#
 	#nu = 1.0
 	sweep_type = "dmrg"
-	max_occ = get(params_dict, "max_occ", 2)
-	if_per_phys = true
-	if_per_virt = false
+	max_occ = get(params_dict, "max_occ", 1)
+	if_per_phys = get(params_dict, "if_periodic_phys", true)
+	if_per_virt = get(params_dict, "if_periodic_virt", false)
 	evolve = true
 	#max_occupation = 3
 	expan = TTNKit.DefaultExpander(1.0)#TTNKit.NoExpander()
 	herenoise = [0.0]
 	ts = 0.500
+	mu = get(params_dict, "chem_strength", 0.0)
 	tot_sites = 2^layer_count
-	syms = false
+	syms = get(params_dict, "syms", true)
 	#=
 	nu = 1.0
 	if isnothing(alpha)
@@ -954,7 +960,7 @@ for (idx,mu) in enumerate(mus)
 	save_plot = false
 	save_data = get(params_dict, "if_save_data", true)
 	if_cluster = any([occursin("local",pwd()),occursin("Local",pwd()),occursin("geraghty",pwd())])
-	if_continuous_saving = get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 6)
+	if_continuous_saving = false#get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 6)
 
 	loc = get(params_dict, "dataloc", get_folder_location("cluster-data/synth-dims"))
 	if_cliff = false
@@ -1028,8 +1034,15 @@ for (idx,mu) in enumerate(mus)
 			#append!(wavefuncs,[dm_sp.ttn])
 		end
 
-		occs = get_occupancy(wavefunc)
-		densities[idx] = sum(occs) / tot_sites
+		#=
+		fig = figure()
+		physical_distance_correlation(wavefunc; densmat=dens,if_plot=true,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt)
+		title("Filling = $(round(num_particles/(alpha*tot_sites),digits=4))")
+		get_occupancy(wavefunc; plot_title = "Filling = $(round(num_particles/(alpha*tot_sites),digits=4))",densmat=dens)
+		=#
+
+		#occs = get_occupancy(wavefunc)
+		#densities[idx] = sum(occs) / tot_sites
 		#scatter([mu],[densities[idx]],c="b")
 		#xlabel("Chemical Potential")
 		#ylabel("Density")
@@ -1073,7 +1086,7 @@ for (idx,mu) in enumerate(mus)
 		fig = figure()
 		scatter(collect(1:mdim),-log.(specs))
 		=#
-	end
+	#end
 end
 
 #
