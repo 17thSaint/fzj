@@ -324,7 +324,7 @@ if true
 	col = ["b","g","r","c","m","y","k","w"]
 	all_nrgs = [[],[]]
 	all_twists = [[],[]]
-	for layers in [5]
+	for layers in [6]
 		if layers % 2 == 0
 			phys_edge_length = Int(sqrt(2^layers))
 			virt_edge_length = phys_edge_length
@@ -344,7 +344,7 @@ if true
 			#twists = []
 			#fillings = zeros(length(all_files))
 
-			for (idx,f) in enumerate(all_files[1:5])
+			for (idx,f) in enumerate(all_files)
 				name_data = get_params_dict_from_filename(f)
 				filling = name_data["particles"] / (2^(name_data["layers"]) * name_data["alpha"])
 				#fillings[idx] = filling
