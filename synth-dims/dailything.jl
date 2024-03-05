@@ -319,8 +319,130 @@ ylabel("Physical Correlation Length")
 legend()
 =#
 
+function integral_part(correlation_length,cutoff_radius,counts=500; kwargs...)
+	xs = range(0.1,stop=cutoff_radius,length=counts)
+	ys = exp.(-xs ./ correlation_length) ./ (xs .^ 0.5)
+	return integrate(xs,ys)
+end
 
-if true
+ll = 6
+np = 4
+pbc = false
+pdict = Dict([("layers",ll),("particles",np),("if_periodic_phys",pbc)])
+whichfiles = find_data_file(pdict,"ttn",get_folder_location("cluster-data/synth-dims"))
+psi = nothing
+dens = nothing
+for (idx,f) in enumerate(whichfiles)
+	name_data = get_params_dict_from_filename(f)
+	filling = name_data["particles"] / (2^name_data["layers"] * name_data["alpha"])
+	if filling != 0.5
+		continue
+	else
+		println("Found Filling = ",filling)
+		data,metadata = read_data_jld2(f,get_folder_location("cluster-data/synth-dims"))
+		global psi = data["ttn"]
+		global dens = "densmat" in keys(data) ? data["densmat"] : density_matrix(psi)
+	end
+end
+lat = TTNKit.physical_lattice(TTNKit.network(psi))
+phys_length = 8
+virt_length = 8
+
+phys_corrs = zeros(phys_length,virt_length)
+for s in 1:virt_length
+	for j in 1:phys_length
+		site1 = TTNKit.linear_ind(lat,(1,s))
+		site2 = TTNKit.linear_ind(lat,(j,s))
+		corr_val = dens[site1,site2]
+		corr_normalization = sqrt(dens[site1,site1] * dens[site2,site2])
+		corr_val /= corr_normalization
+		corrs[j,s] = abs(corr_val)
+	end
+end
+fig = figure()
+for i in 2:Int(virt_length/2)
+	plot(0:phys_length-1,corrs[:,i],"-p",label="$i")
+end
+xlabel("Physical Distance")
+ylabel("Correlation")
+legend()
+title("Greens Func along Physical Dimension for Filling = 1/2")
+yscale("log")
+#=
+virt_corrs = zeros(phys_length,virt_length)
+for j in 1:phys_length
+	for s in 1:virt_length
+		site1 = TTNKit.linear_ind(lat,(j,1))
+		site2 = TTNKit.linear_ind(lat,(j,s))
+		corr_val = dens[site1,site2]
+		corr_normalization = sqrt(dens[site1,site1] * dens[site2,site2])
+		corr_val /= corr_normalization
+		virt_corrs[j,s] = abs(corr_val)
+	end
+end
+fig2 = figure()
+for i in 1:Int(phys_length/2)
+	plot(0:virt_length-1,virt_corrs[i,:],"-p",label="$i")
+end
+xlabel("Virtual Distance")
+ylabel("Correlation")
+legend()
+title("Greens Func along Virtual Dimension for Filling = 1/2")
+yscale("log")
+=#
+
+phys_currents = zeros(phys_length,virt_length)
+for j in 1:phys_length
+	next_phys = j + 1
+	if j == phys_length
+		if pbc
+			next_phys = 1
+		else
+			continue
+		end
+	end
+	for s in 1:virt_length
+		site2 = TTNKit.linear_ind(lat,(j,s))
+		site1 = TTNKit.linear_ind(lat,(next_phys,s))
+		current_val = imag(dens[site1,site2] - dens[site2,site1])
+		current_normalization = dens[site1,site1] + dens[site2,site2]
+		current_val /= current_normalization
+		phys_currents[j,s] = real(current_val)
+	end
+end
+fig3 = figure()
+for i in 1:Int(phys_length/2)
+	plot(1:virt_length,phys_currents[i,:],"-p",label="$i")
+end
+xlabel("Virtual Dimension")
+ylabel("Physical Current")
+legend()
+title("Current along Physical Dimension for Filling = 1/2")
+#=
+virt_currents = zeros(phys_length,virt_length)
+for s in 1:virt_length-1
+	next_virt = s + 1
+	for j in 1:phys_length
+		site2 = TTNKit.linear_ind(lat,(j,s))
+		site1 = TTNKit.linear_ind(lat,(j,next_virt))
+		current_val = imag(dens[site1,site2] - dens[site2,site1])
+		current_normalization = dens[site1,site1] + dens[site2,site2]
+		current_val /= current_normalization
+		virt_currents[j,s] = real(current_val)
+	end
+end
+fig4 = figure()
+for i in 1:Int(virt_length/2)
+	plot(1:phys_length,virt_currents[:,i],"-p",label="$i")
+end
+xlabel("Physical Dimension")
+ylabel("Virtual Current")
+legend()
+title("Current along Virtual Dimension for Filling = 1/2")
+=#
+
+	
+if false
 	col = ["b","g","r","c","m","y","k","w"]
 	all_nrgs = [[],[]]
 	all_twists = [[],[]]
@@ -334,7 +456,6 @@ if true
 		end
 		num_parts = layers % 2 == 0 ? Int(sqrt(2^(layers))/2) : Int(sqrt(2^(layers+1))/2)
 
-
 		if true
 			params_dict = Dict([("layers",layers),("particles",num_parts)])
 			loc = get_folder_location("cluster-data/synth-dims")
@@ -343,19 +464,55 @@ if true
 			#nrgs = []
 			#twists = []
 			#fillings = zeros(length(all_files))
-
+			intparts = []
+			fillings = []
+			zeromoms = []
 			for (idx,f) in enumerate(all_files)
 				name_data = get_params_dict_from_filename(f)
 				filling = name_data["particles"] / (2^(name_data["layers"]) * name_data["alpha"])
-				#fillings[idx] = filling
-				#twist = "twist_angle" in keys(name_data) ? name_data["twist_angle"] : 0.0
-				data,metadata = read_data_jld2(f,loc;outputlevel=0)
+				twist = "twist_angle" in keys(name_data) ? name_data["twist_angle"] : 0.0
+				if twist != 0.0
+					continue
+				end
+				#=
+				if isapprox(filling,0.5,atol=0.01)
+					col = "b"
+				elseif name_data["alpha"] == 0.0
+					col = "r"
+				elseif isapprox(filling,0.25,atol=0.01)
+					col = "g"
+				elseif isapprox(filling,0.3,atol=0.01)
+					col = "c"
+				else
+					continue
+				end
+				=#
+				data,metadata = read_data_jld2(f,loc;outputlevel=false)
 				wavefunc = data["ttn"]
 				rho = data["densmat"]
-				fig = figure()
-				physical_distance_correlation(wavefunc; densmat=rho,if_plot=true)
-				title("Filling = $(round(filling,digits=4))")
-				get_occupancy(wavefunc; plot_title="Filling = $(round(filling,digits=4)), Bond Dim=$(maxlinkdim(wavefunc))",densmat=rho)
+				#scatter(2^layers,abs(sum(rho)) / (name_data["particles"] * (2^layers)),c=col)
+				
+				#fig = figure()
+				#dists,corrs,corrlens = physical_distance_correlation(wavefunc; densmat=rho,if_plot=true)
+				#title("Filling = $(round(filling,digits=4))")
+				#get_occupancy(wavefunc; plot_title="Filling = $(round(filling,digits=4)), Bond Dim=$(maxlinkdim(wavefunc))",densmat=rho)
+				#=if any(corrlens .> 10.0)
+					continue
+				end=#
+
+				append!(fillings,[filling])
+				#allints_parts = [integral_part(corrlens[i],phys_edge_length/2) for i in 1:length(corrlens)]
+				zeromomoccs = abs(sum(rho)) / 2^(layers)
+				#append!(intparts,[2*sum(allints_parts)])
+				append!(zeromoms,[zeromomoccs])
+				#println("Integral = ",sum(allints_parts)," Zero Mom Occ = ",zeromomoccs)
+				if length(zeromoms) > 1
+					#plot(fillings[end-1:end],intparts[end-1:end],"-p",c="b")
+					plot(fillings[end-1:end],zeromoms[end-1:end],"-p",c="b")
+					xlabel("Filling")
+					#ylabel("ODLRO")
+				end
+				#
 
 				#append!(all_nrgs[layers-3],[metadata["energies"][end]])
 				#append!(all_twists[layers-3],[twist])

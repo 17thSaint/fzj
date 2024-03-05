@@ -872,12 +872,13 @@ for (idx,file) in enumerate(all_files)
 	alphas[idx] = get_params_dict_from_filename(file)["alpha"]
 end=#
 
+nu = 1.5
 #layers = 6
-#nus = [0.5]#range(1.5,2.0,length=5)
-#for (idx,nu) in enumerate(nus)
-	#params_dict = Dict([("layers",layers),("mdim",200),("if_save_data",false),("filling",nu),("max_occ",1),("onsite_strength",0.0),("if_periodic_phys",true)])
+alphas = range(4/(0.2*64),4/(0.8*64),length=20)
+for (idx,alpha) in enumerate(alphas)
+	params_dict = Dict([("layers",6),("mdim",300),("if_save_data",true),("alpha",alpha),("max_occ",1),("onsite_strength",0.0),("if_periodic_phys",true)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
-	params_dict = make_args_dict(ARGS)
+	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
 	if typeof(open_cores) != String
 		BLAS.set_num_threads(open_cores)	
@@ -993,7 +994,7 @@ end=#
 	#for (idx,alpha) in enumerate(strens)
 	#for (idx,num_particles) in enumerate(parts)
 		#alpha = 0.0
-		filename_dict = Dict([("layers",layer_count),("chem_strength",mu),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys)])
+		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys)])
 		twist_angle != 0.0 ? filename_dict["twist_angle"] = twist_angle : nothing
 		#if length(keys(params_dict)) == 0
 		#	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
@@ -1006,7 +1007,7 @@ end=#
 
 		#
 		println(datafile_name)
-		if_exists,found_data = false,nothing#check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
+		if_exists,found_data = check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
 
 		if if_exists
 			println("Found Data")
@@ -1034,6 +1035,11 @@ end=#
 			#append!(wavefuncs,[dm_sp.ttn])
 		end
 
+		occs = get_occupancy(wavefunc; densmat=dens,if_plot=false)
+		plot(collect(1:Int(sqrt(2^layer_count))),occs[4,:],label="$(round(num_particles/(alpha*tot_sites),digits=4))")
+		legend()
+		xlabel("Sites")
+		ylabel("Occupancy")
 		#=
 		fig = figure()
 		physical_distance_correlation(wavefunc; densmat=dens,if_plot=true,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt)
@@ -1086,7 +1092,7 @@ end=#
 		fig = figure()
 		scatter(collect(1:mdim),-log.(specs))
 		=#
-	#end
+	end
 end
 
 #
