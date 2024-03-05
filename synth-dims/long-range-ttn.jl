@@ -197,6 +197,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	twist_angle = get(kwargs, :twist_angle, 0.0)
 	
 	long_range_strengths = long_range_scaling(scaling_distance,virt_edge_length,onsite_strength; kwargs...)
+	display(long_range_strengths)
 	if_interaction = !all(long_range_strengths.==0)
 	
 	lat = TTNKit.physical_lattice(net)
@@ -272,7 +273,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 		end
 		append!(resulting_ham,[interaction])
 	end
-	
+	#=
 	if if_nn_int
 		nn_int = TTNKit.OpSum()
 		nns = TTNKit.nearest_neighbours(lat,collect(TTNKit.eachindex(lat));periodic=if_periodic)
@@ -281,7 +282,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 		end
 		append!(resulting_ham,[nn_int])
 	end
-	#
+	=#
 	if chem_strength != 0.0
 		chem = TTNKit.OpSum()
 		for i in TTNKit.eachindex(lat)
@@ -874,9 +875,10 @@ end=#
 
 nu = 1.5
 #layers = 6
-alphas = range(4/(0.2*64),4/(0.8*64),length=20)
-for (idx,alpha) in enumerate(alphas)
-	params_dict = Dict([("layers",6),("mdim",300),("if_save_data",true),("alpha",alpha),("max_occ",1),("onsite_strength",0.0),("if_periodic_phys",true)])
+#alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
+strens = [1000.0]#range(0.1,0.5,length=3)
+for (idx,stren) in enumerate(strens)
+	params_dict = Dict([("layers",6),("mdim",300),("if_save_data",true),("filling",0.5),("max_occ",1),("onsite_strength",stren),("lr",7),("if_periodic_phys",true)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
@@ -994,7 +996,7 @@ for (idx,alpha) in enumerate(alphas)
 	#for (idx,alpha) in enumerate(strens)
 	#for (idx,num_particles) in enumerate(parts)
 		#alpha = 0.0
-		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys)])
+		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys),("onsite_strength",onsite_strength)])
 		twist_angle != 0.0 ? filename_dict["twist_angle"] = twist_angle : nothing
 		#if length(keys(params_dict)) == 0
 		#	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"

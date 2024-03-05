@@ -325,10 +325,12 @@ function integral_part(correlation_length,cutoff_radius,counts=500; kwargs...)
 	return integrate(xs,ys)
 end
 
+if true
+
 ll = 6
 np = 4
-pbc = false
-pdict = Dict([("layers",ll),("particles",np),("if_periodic_phys",pbc)])
+pbc = true
+pdict = Dict([("layers",ll),("particles",np),("if_periodic_phys",pbc),("onsite_strength",1000.0)])
 whichfiles = find_data_file(pdict,"ttn",get_folder_location("cluster-data/synth-dims"))
 psi = nothing
 dens = nothing
@@ -356,19 +358,19 @@ for s in 1:virt_length
 		corr_val = dens[site1,site2]
 		corr_normalization = sqrt(dens[site1,site1] * dens[site2,site2])
 		corr_val /= corr_normalization
-		corrs[j,s] = abs(corr_val)
+		phys_corrs[j,s] = abs(corr_val)
 	end
 end
 fig = figure()
 for i in 2:Int(virt_length/2)
-	plot(0:phys_length-1,corrs[:,i],"-p",label="$i")
+	plot(0:phys_length-1,phys_corrs[:,i],"-p",label="$i")
 end
 xlabel("Physical Distance")
 ylabel("Correlation")
 legend()
 title("Greens Func along Physical Dimension for Filling = 1/2")
 yscale("log")
-#=
+#
 virt_corrs = zeros(phys_length,virt_length)
 for j in 1:phys_length
 	for s in 1:virt_length
@@ -389,7 +391,7 @@ ylabel("Correlation")
 legend()
 title("Greens Func along Virtual Dimension for Filling = 1/2")
 yscale("log")
-=#
+#
 
 phys_currents = zeros(phys_length,virt_length)
 for j in 1:phys_length
@@ -418,7 +420,7 @@ xlabel("Virtual Dimension")
 ylabel("Physical Current")
 legend()
 title("Current along Physical Dimension for Filling = 1/2")
-#=
+#
 virt_currents = zeros(phys_length,virt_length)
 for s in 1:virt_length-1
 	next_virt = s + 1
@@ -439,10 +441,12 @@ xlabel("Physical Dimension")
 ylabel("Virtual Current")
 legend()
 title("Current along Virtual Dimension for Filling = 1/2")
-=#
+#
 
-	
+end	
+
 if false
+	fig = figure()
 	col = ["b","g","r","c","m","y","k","w"]
 	all_nrgs = [[],[]]
 	all_twists = [[],[]]
