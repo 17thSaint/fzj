@@ -394,11 +394,12 @@ function get_xy_coeffs(x,y,edge_length,t_strength,phi,thetax=thetax_1,thetay=the
 end
 
 function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwargs...) 
-	#
+	hopping_anisotropy = get(kwargs, :hopping_anisotropy, 1.0)
+	t_strength_phys = t_strength * hopping_anisotropy
 	if get(kwargs, :no_magF, false)
 		phi = 0.0
 	end
-	if s1[1] == s2[1]
+	if s1[1] == s2[1] # Synthetic Dimension Hopping
 		thetay = get(kwargs, :thetay, thetay_2)
 		#=if ==(edge_length,s1[2])
 			println("Using ThetaY")
@@ -407,13 +408,13 @@ function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwarg
 		stren = -t_strength
 		phase_part = exp(im*2*pi*(phi*s1[1]))
 		return round(stren * phase_part,digits=8) #- ==(edge_length_y,s1[2])*thetay))
-	elseif s1[2] == s2[2]
+	elseif s1[2] == s2[2] # Physical Dimension Hopping
 		thetax = get(kwargs, :thetax, thetax_2)
 		#=if ==(edge_length,s1[1])
 			println("Using ThetaX")
 		end
 		=#
-		return -t_strength * 1 #* exp(-im*2*pi* ==(edge_length_x,s1[1]) *thetax)
+		return -t_strength_phys * 1 #* exp(-im*2*pi* ==(edge_length_x,s1[1]) *thetax)
 	else
 		return 0.0
 	end
