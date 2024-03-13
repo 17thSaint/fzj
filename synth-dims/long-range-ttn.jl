@@ -195,7 +195,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	chem_strength = get(kwargs, :chem_strength, 0.0)
 	centralflux_strength = get(kwargs, :centralflux_strength, 0.0)
 	twist_angle = get(kwargs, :twist_angle, 0.0)
-	hopping_anisotropy = get(kwargs, :hopping_anisotropy, 1.0) # t_phys / t_synth = anisotropy
+	#hopping_anisotropy = get(kwargs, :hopping_anisotropy, 1.0) t_phys / t_synth = anisotropy
 	
 	long_range_strengths = long_range_scaling(scaling_distance,virt_edge_length,onsite_strength; kwargs...)
 	display(long_range_strengths)
@@ -874,15 +874,15 @@ for (idx,file) in enumerate(all_files)
 	alphas[idx] = get_params_dict_from_filename(file)["alpha"]
 end=#
 
-nu = 1.5
+
 layers = 6
 lr = 0
-anises = [0.01,1.0,10.0]
+anises = [0.01,0.1,0.9,1.1,10.0,100.0]
 stren = 0.0
 #alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
 #strens = [0.0]#range(0.1,0.5,length=3)
 for (idx,anis) in enumerate(anises)
-	params_dict = Dict([("hopping_anisotropy",anis),("layers",layers),("mdim",200),("if_save_data",true),("filling",0.5),("max_occ",1),("onsite_strength",stren),("lr",lr),("if_periodic_phys",false)])
+	params_dict = Dict([("hopping_anisotropy",anis),("layers",layers),("mdim",100),("if_save_data",true),("filling",0.5),("max_occ",1),("onsite_strength",stren),("lr",lr),("if_periodic_phys",true)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
@@ -967,7 +967,7 @@ for (idx,anis) in enumerate(anises)
 	save_plot = false
 	save_data = get(params_dict, "if_save_data", true)
 	if_cluster = any([occursin("local",pwd()),occursin("Local",pwd()),occursin("geraghty",pwd())])
-	if_continuous_saving = false#get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 6)
+	if_continuous_saving = get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 7)
 
 	loc = get(params_dict, "dataloc", get_folder_location("cluster-data/synth-dims"))
 	if_cliff = false
@@ -1000,7 +1000,7 @@ for (idx,anis) in enumerate(anises)
 	#for (idx,alpha) in enumerate(strens)
 	#for (idx,num_particles) in enumerate(parts)
 		#alpha = 0.0
-		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_virt",if_per_virt),("if_periodic_phys",if_per_phys),("onsite_strength",onsite_strength),("hopping_anisotropy",anis)])
+		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_phys",if_per_phys),("onsite_strength",onsite_strength),("hopping_anisotropy",anis)])
 		twist_angle != 0.0 ? filename_dict["twist_angle"] = twist_angle : nothing
 		#if length(keys(params_dict)) == 0
 		#	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
@@ -1033,13 +1033,18 @@ for (idx,anis) in enumerate(anises)
 			starting = time()
 			net = build_HH_net(layer_count; syms=syms, max_occ=max_occ)
 			ham = long_range_HH_ham(net,ts,alpha; model_paras...)
-			display(ham)
+			#display(ham)
 			og_ttn, hamilt, dm_sp, rezobs, runtime, dens = find_ground_state(layer_count,num_particles; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
 			total_time = time() - starting
 			println("Running time = $total_time")
 			wavefunc = dm_sp.ttn
 			#append!(wavefuncs,[dm_sp.ttn])
 		end
+
+		scatter([anis],[sum(dens) / (tot_sites * num_particles)],c="b")
+		xlabel("Hopping Anisotropy")
+		ylabel("Zero Momentum Occupation")
+		xscale("log")
 
 		#occs = get_occupancy(wavefunc; densmat=dens,plot_title="Hopping Anisotropy = $anis")
 		#=plot(collect(1:Int(sqrt(2^layer_count))),occs[4,:],label="$(round(num_particles/(alpha*tot_sites),digits=4))")

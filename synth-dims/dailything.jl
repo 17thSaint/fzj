@@ -330,10 +330,23 @@ if true
 ll = 6
 np = 4
 pbc = true
-pdict = Dict([("layers",ll),("particles",np),("if_periodic_phys",pbc),("onsite_strength",1000.0)])
-whichfiles = find_data_file(pdict,"ttn",get_folder_location("cluster-data/synth-dims"))
+pdict = Dict([("layers",ll),("particles",np),("if_periodic_phys",pbc),("lr",0),("alpha",0.125)])#("onsite_strength",5.0)])
+whichfiles = find_data_file(pdict,"ttn",get_folder_location("cluster-data/synth-dims"); output_level=false)
 psi = nothing
 dens = nothing
+
+#=
+for f in whichfiles
+	data,metadata = read_data_jld2(f,get_folder_location("cluster-data/synth-dims"))
+	psi = data["ttn"]
+	dens = data["densmat"]
+
+	stren = metadata["onsite_strength"]
+	get_occupancy(psi; plot_title="Interaction Strength = $stren",densmat=dens)
+end
+=#
+
+#=
 for (idx,f) in enumerate(whichfiles)
 	name_data = get_params_dict_from_filename(f)
 	filling = name_data["particles"] / (2^name_data["layers"] * name_data["alpha"])
@@ -346,9 +359,35 @@ for (idx,f) in enumerate(whichfiles)
 		global dens = "densmat" in keys(data) ? data["densmat"] : density_matrix(psi)
 	end
 end
+=#
+
+
+
+for f in whichfiles
+	data,metadata = read_data_jld2(f,get_folder_location("cluster-data/synth-dims"))
+	psi = data["ttn"]
+	dens = data["densmat"]
+	anis = "hopping_anisotropy" in keys(metadata) ? metadata["hopping_anisotropy"] : 1.0
+
+	zeromomocc = TTNKit.maxlinkdim(psi)#abs(sum(dens)) / ((2^ll) * np)
+	scatter([anis],[zeromomocc],c="b")
+	xlabel("Anisotropy")
+	ylabel("Zero Momentum Occupancy")
+	xscale("log")#=
+	occs = get_occupancy(psi; if_plot=false,densmat=dens)
+	fig = figure()
+	plot(1:8,occs[4,:],label="Synth")
+	plot(1:8,occs[:,4],label="Phys")
+	legend()
+	title("Filling = 1/2, Anisotropy = $anis")
+	ylabel("Occupancy")=#
+
+
+#=
 lat = TTNKit.physical_lattice(TTNKit.network(psi))
-phys_length = 8
-virt_length = 8
+phys_length = ll % 2 == 0 ? Int(sqrt(2^ll)) : Int(sqrt(2^(ll+1))/2)
+virt_length = ll % 2 ? Int(sqrt(2^(ll-1))) : Int(sqrt(2^ll))
+
 
 phys_corrs = zeros(phys_length,virt_length)
 for s in 1:virt_length
@@ -362,13 +401,14 @@ for s in 1:virt_length
 	end
 end
 fig = figure()
-for i in 2:Int(virt_length/2)
+for i in 1:virt_length#2:Int(virt_length/2)
 	plot(0:phys_length-1,phys_corrs[:,i],"-p",label="$i")
 end
 xlabel("Physical Distance")
 ylabel("Correlation")
 legend()
-title("Greens Func along Physical Dimension for Filling = 1/2")
+#title("Greens Func LR = 7, Filling = 1/2")
+title("Greens Func LR = 7, Onsite = 10t, Anisotropy = $anis")
 yscale("log")
 #
 virt_corrs = zeros(phys_length,virt_length)
@@ -413,13 +453,14 @@ for j in 1:phys_length
 	end
 end
 fig3 = figure()
-for i in 1:Int(phys_length/2)
+for i in 1:phys_length
 	plot(1:virt_length,phys_currents[i,:],"-p",label="$i")
 end
 xlabel("Virtual Dimension")
 ylabel("Physical Current")
 legend()
-title("Current along Physical Dimension for Filling = 1/2")
+#title("Current LR = 7, Filling = 1/2")
+title("Current LR = 7, Onsite = 10t, Anisotropy = $anis")
 #
 virt_currents = zeros(phys_length,virt_length)
 for s in 1:virt_length-1
@@ -441,16 +482,17 @@ xlabel("Physical Dimension")
 ylabel("Virtual Current")
 legend()
 title("Current along Virtual Dimension for Filling = 1/2")
-#
+=#
 
 end	
+end
 
 if false
 	fig = figure()
 	col = ["b","g","r","c","m","y","k","w"]
 	all_nrgs = [[],[]]
 	all_twists = [[],[]]
-	for layers in [6]
+	for layers in [4,5,6,7,8]
 		if layers % 2 == 0
 			phys_edge_length = Int(sqrt(2^layers))
 			virt_edge_length = phys_edge_length
@@ -461,29 +503,37 @@ if false
 		num_parts = layers % 2 == 0 ? Int(sqrt(2^(layers))/2) : Int(sqrt(2^(layers+1))/2)
 
 		if true
-			params_dict = Dict([("layers",layers),("particles",num_parts)])
+			params_dict = Dict([("layers",layers),("particles",num_parts),("if_periodic_phys",true)])
 			loc = get_folder_location("cluster-data/synth-dims")
-			all_files = find_data_file(params_dict,"ttn",loc)
-			display(all_files)
+			all_files = find_data_file(params_dict,"ttn",loc; output_level=false)
+			#display(all_files)
 			#nrgs = []
 			#twists = []
 			#fillings = zeros(length(all_files))
 			intparts = []
 			fillings = []
 			zeromoms = []
+			halffillingvalue = nothing
+			sfvalue = nothing
 			for (idx,f) in enumerate(all_files)
 				name_data = get_params_dict_from_filename(f)
 				filling = name_data["particles"] / (2^(name_data["layers"]) * name_data["alpha"])
-				twist = "twist_angle" in keys(name_data) ? name_data["twist_angle"] : 0.0
-				if twist != 0.0
+				onsite_strength = "onsite_strength" in keys(name_data) ? name_data["onsite_strength"] : 0.0
+				hopping_anisotropy = "hopping_anisotropy" in keys(name_data) ? name_data["hopping_anisotropy"] : 1.0
+
+				if onsite_strength != 0.0
 					continue
 				end
+				if hopping_anisotropy != 1.0
+					continue
+				end
+
 				#=
 				if isapprox(filling,0.5,atol=0.01)
 					col = "b"
 				elseif name_data["alpha"] == 0.0
 					col = "r"
-				elseif isapprox(filling,0.25,atol=0.01)
+				elseif isapprox(filling,0.25,atol=0.001)
 					col = "g"
 				elseif isapprox(filling,0.3,atol=0.01)
 					col = "c"
@@ -491,10 +541,9 @@ if false
 					continue
 				end
 				=#
-				data,metadata = read_data_jld2(f,loc;outputlevel=false)
+				data,metadata = read_data_jld2(f,loc;output_level=false)
 				wavefunc = data["ttn"]
 				rho = data["densmat"]
-				#scatter(2^layers,abs(sum(rho)) / (name_data["particles"] * (2^layers)),c=col)
 				
 				#fig = figure()
 				#dists,corrs,corrlens = physical_distance_correlation(wavefunc; densmat=rho,if_plot=true)
@@ -506,22 +555,31 @@ if false
 
 				append!(fillings,[filling])
 				#allints_parts = [integral_part(corrlens[i],phys_edge_length/2) for i in 1:length(corrlens)]
-				zeromomoccs = abs(sum(rho)) / 2^(layers)
+				zeromomoccs = abs(sum(rho)) / (2^(layers) * num_parts)
 				#append!(intparts,[2*sum(allints_parts)])
 				append!(zeromoms,[zeromomoccs])
-				#println("Integral = ",sum(allints_parts)," Zero Mom Occ = ",zeromomoccs)
+				if isapprox(filling,0.5,atol=0.01)
+					halffillingvalue = zeromomoccs
+				elseif name_data["alpha"] == 0.0
+					sfvalue = zeromomoccs
+				end
+				#=println("Integral = ",sum(allints_parts)," Zero Mom Occ = ",zeromomoccs)
 				if length(zeromoms) > 1
 					#plot(fillings[end-1:end],intparts[end-1:end],"-p",c="b")
 					plot(fillings[end-1:end],zeromoms[end-1:end],"-p",c="b")
 					xlabel("Filling")
 					#ylabel("ODLRO")
-				end
-				#
+				end=#
+				
 
 				#append!(all_nrgs[layers-3],[metadata["energies"][end]])
 				#append!(all_twists[layers-3],[twist])
 
 			end
+			scatter(2^layers,sfvalue,c="r")
+			scatter(2^layers,halffillingvalue,c="b")
+			println("Half filling value = ",halffillingvalue)
+			length(zeromoms) > 0 ? scatter(2^layers,minimum(zeromoms),c="c") : nothing
 			#all_nrgs[layers-3] .-= all_nrgs[layers-3][1]
 		end
 		phys_edge_length = layers % 2 == 0.0 ? Int(sqrt(2^layers)) : Int(sqrt(2^(layers+1))/2)
@@ -539,6 +597,19 @@ if false
 	title("Helicity Modulus = $(round(helicity_moduli[1],digits=4)) ± $(round(errors[1],digits=4))")=#
 end
 
+
+if false
+halfvals = [0.17246013515736627,0.10920578094440274,0.0633053552666524,0.02970695637101318]
+layers = [4,5,6,7]
+expfit(x,p) = p[1] .* exp.(-p[2] .* x) .+ p[3]
+fit = curve_fit(expfit,2 .^ layers,halfvals,[0.5,0.5,0.1])
+plot(2 .^ layers,halfvals,"p")
+xs = 2 .^ range(4,stop=7,length=100)
+#plot(xs,expfit(xs,fit.param))
+title("Decay Coeff = $(round(fit.param[2],digits=4)), Thermo Limit = $(round(fit.param[3],digits=4))")
+yscale("log")
+xscale("log")
+end
 
 #=
 allberries = [zeros(edge_length-2,edge_length-2) for i in 1:length(all_files)]

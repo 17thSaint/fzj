@@ -395,7 +395,14 @@ end
 
 function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwargs...) 
 	hopping_anisotropy = get(kwargs, :hopping_anisotropy, 1.0)
-	t_strength_phys = t_strength * hopping_anisotropy
+	#t_strength_phys = t_strength * hopping_anisotropy
+	if hopping_anisotropy < 1.0
+		t_strength_synth = t_strength / hopping_anisotropy
+		t_strength_phys = t_strength
+	else
+		t_strength_phys = t_strength * hopping_anisotropy
+		t_strength_synth = t_strength
+	end
 	if get(kwargs, :no_magF, false)
 		phi = 0.0
 	end
@@ -405,7 +412,7 @@ function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwarg
 			println("Using ThetaY")
 		end
 		=#
-		stren = -t_strength
+		stren = -t_strength_synth
 		phase_part = exp(im*2*pi*(phi*s1[1]))
 		return round(stren * phase_part,digits=8) #- ==(edge_length_y,s1[2])*thetay))
 	elseif s1[2] == s2[2] # Physical Dimension Hopping
@@ -927,9 +934,7 @@ function TTNKit.ITensors.measure!(o::NRGVarObserver; kwargs...)
     nrgs = o.nrg
     var_tol = o.var_tol
     dmrg = kwargs[:sweep_handler]
-	println("Link dimension right now is ",TTNKit.maxlinkdim(dmrg.ttn)," while the maxdim is ",TTNKit.maxdim(dmrg))
-    #o.nrg[1] = o.nrg[2]
-	#get_occupancy(dmrg.ttn; plot_title="Current Sweep = $(dmrg.current_sweep)")
+	#println("Link dimension right now is ",TTNKit.maxlinkdim(dmrg.ttn)," while the maxdim is ",TTNKit.maxdim(dmrg))
     append!(o.nrg,[dmrg.current_energy])
 end
 
@@ -942,7 +947,7 @@ function TTNKit.ITensors.checkdone!(o::NRGVarObserver;kwargs...)
 		outputlevel > 0 ? println("Energy Converged. Stopping DMRG") : nothing
 		return true
 	else
-  		# Otherwise, keep going
+  		outputlevel > 0 ? println("Energy Change = $(round(abs(o.nrg[end] - o.nrg[end-1]),digits=2+abs(floor(Int,log10(o.var_tol)))))") : nothing
 		return false
 	end
 end
