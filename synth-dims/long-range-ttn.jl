@@ -876,13 +876,15 @@ end=#
 
 
 layers = 6
-lr = 0
-anises = [0.01,0.1,0.9,1.1,10.0,100.0]
-stren = 0.0
+lr = 7
+#anises = [0.01,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.6,0.8,0.9,1.1,1.3,1.5,1.7,1.9,2.0,2.5,3.0,3.5,4.0,6.0,8.0,9.0,10.0,15.0,20.0,25.0,30.0,40.0,50.0,70.0,90.0,100.0,1000.0,10000.0]
+anis = 0.7
+strens = range(0.01,2.0,length=10)
 #alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
 #strens = [0.0]#range(0.1,0.5,length=3)
-for (idx,anis) in enumerate(anises)
-	params_dict = Dict([("hopping_anisotropy",anis),("layers",layers),("mdim",100),("if_save_data",true),("filling",0.5),("max_occ",1),("onsite_strength",stren),("lr",lr),("if_periodic_phys",true)])
+#for (idx,anis) in enumerate(anises)
+for (idx,stren) in enumerate(strens)
+	params_dict = Dict([("hopping_anisotropy",anis),("layers",layers),("mdim",300),("if_save_data",true),("filling",0.5),("max_occ",1),("onsite_strength",stren),("lr",lr),("if_periodic_phys",true)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
@@ -1041,12 +1043,14 @@ for (idx,anis) in enumerate(anises)
 			#append!(wavefuncs,[dm_sp.ttn])
 		end
 
+		#=
 		scatter([anis],[sum(dens) / (tot_sites * num_particles)],c="b")
 		xlabel("Hopping Anisotropy")
 		ylabel("Zero Momentum Occupation")
 		xscale("log")
+		=#
 
-		#occs = get_occupancy(wavefunc; densmat=dens,plot_title="Hopping Anisotropy = $anis")
+		#occs = get_occupancy(wavefunc; densmat=dens,plot_title="Strength = $stren")
 		#=plot(collect(1:Int(sqrt(2^layer_count))),occs[4,:],label="$(round(num_particles/(alpha*tot_sites),digits=4))")
 		legend()
 		xlabel("Sites")

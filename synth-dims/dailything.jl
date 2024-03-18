@@ -329,7 +329,7 @@ if true
 
 ll = 6
 np = 4
-pbc = true
+pbc = false
 pdict = Dict([("layers",ll),("particles",np),("if_periodic_phys",pbc),("lr",0),("alpha",0.125)])#("onsite_strength",5.0)])
 whichfiles = find_data_file(pdict,"ttn",get_folder_location("cluster-data/synth-dims"); output_level=false)
 psi = nothing
@@ -362,19 +362,54 @@ end
 =#
 
 
-
+nrgs = []
+anises = []
 for f in whichfiles
 	data,metadata = read_data_jld2(f,get_folder_location("cluster-data/synth-dims"))
 	psi = data["ttn"]
 	dens = data["densmat"]
 	anis = "hopping_anisotropy" in keys(metadata) ? metadata["hopping_anisotropy"] : 1.0
+	
+	append!(anises,[anis])
+	append!(nrgs,[-metadata["energies"][end]])
+	scatter([anis],[-metadata["energies"][end]],c="b")
+	xlabel("Anisotropy")
+	ylabel("Energy")
+	#xscale("log")
 
-	zeromomocc = TTNKit.maxlinkdim(psi)#abs(sum(dens)) / ((2^ll) * np)
+
+	#=if anis > 1.0
+		lat = TTNKit.physical_lattice(TTNKit.network(psi))
+		new_dens = zeros(2^ll,2^ll) .* im
+		for j in 1:8
+			for s in 1:8
+				site1 = TTNKit.linear_ind(lat,(j,s))
+				redone_site1 = TTNKit.linear_ind(lat,(s,j))
+				for jj in 1:8
+					for ss in 1:8
+						site2 = TTNKit.linear_ind(lat,(jj,ss))
+						redone_site2 = TTNKit.linear_ind(lat,(ss,jj))
+						new_dens[redone_site1,redone_site2] = dens[site1,site2]
+					end
+				end
+			end
+		end
+		append!(alloccs,[new_dens])
+	else
+		append!(alloccs,[dens])
+	end
+	
+	fig = figure()
+	imshow(abs.(alloccs[end]))
+	title("Anisotropy = $anis")
+	colorbar()=#
+
+	#=zeromomocc = TTNKit.maxlinkdim(psi)#abs(sum(dens)) / ((2^ll) * np)
 	scatter([anis],[zeromomocc],c="b")
 	xlabel("Anisotropy")
 	ylabel("Zero Momentum Occupancy")
-	xscale("log")#=
-	occs = get_occupancy(psi; if_plot=false,densmat=dens)
+	xscale("log")#
+	occs = get_occupancy(psi; if_plot=true,plot_title="Hopping Anis = $anis",densmat=dens)
 	fig = figure()
 	plot(1:8,occs[4,:],label="Synth")
 	plot(1:8,occs[:,4],label="Phys")
