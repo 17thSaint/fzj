@@ -325,58 +325,241 @@ function integral_part(correlation_length,cutoff_radius,counts=500; kwargs...)
 	return integrate(xs,ys)
 end
 
+function cdw_structure_factor(rho::Matrix,qvec::Tuple,psi::TreeTensorNetwork; kwargs...)
+	if_periodic_phys = get(kwargs, :if_periodic_phys, true)
+	if_periodic_synth = get(kwargs, :if_periodic_synth, false)
+
+	lat = TTNKit.physical_lattice(TTNKit.network(psi))
+	phys_len,synth_len = size(lat)[1],size(lat)[2]
+
+	occs = get_occupancy(psi; if_plot=false,densmat=rho)
+
+	struc_fact = 0.0
+	for j in 1:phys_len
+		for s in 1:synth_len
+			p1 = (j,s)
+			p1_linear = TTNKit.linear_ind(lat,p1)
+			for jj in 1:phys_len
+				for ss in 1:synth_len
+					p2 = (jj,ss)
+					p2_linear = TTNKit.linear_ind(lat,p2)
+					dist = find_dist(p1, p2, (phys_len,synth_len), (if_periodic_phys,if_periodic_synth))[2]
+					struc_fact += occs[p1[1],p1[2]] * occs[p2[1],p2[2]] * exp(im * dot(qvec,dist))
+				end
+			end
+		end
+	end
+	return struc_fact / sum(occs)
+end
+
 if true
+	ll = 6
+	np = 4
+	pbc = true
+	anises = [1.0,0.8,0.7,0.6,0.5,0.3]
+	trans_strens = [zeros(length(anises)),zeros(length(anises))]
+	for (jj,anis) in enumerate(anises)
+		pdict = Dict([("layers",ll),("particles",np),("if_periodic_phys",pbc),("lr",7),("alpha",0.125),("hopping_anisotropy",anis)])
+		whichfiles = find_data_file(pdict,"ttn",get_folder_location("cluster-data/synth-dims"); output_level=false)
+		#
+		cdwsfs = [zeros(length(whichfiles)),zeros(length(whichfiles))]
+		lrs = zeros(length(whichfiles))
+		periods = [1,2]
+		theta = 0.0
+		for (idx,f) in enumerate(whichfiles)
+			data,metadata = read_data_jld2(f,get_folder_location("cluster-data/synth-dims"); output_level=false)
+			psi = data["ttn"]
+			dens = "densmat" in keys(data) ? data["densmat"] : nothing
+			cdwsfs[1][idx] = abs(cdw_structure_factor(dens,(periods[1]*cos(theta),periods[1]*sin(theta)),psi))
+			cdwsfs[2][idx] = abs(cdw_structure_factor(dens,(periods[2]*cos(theta),periods[2]*sin(theta)),psi))
+			lrs[idx] = 2*metadata["onsite_strength"]
+		end
+		
+		# transition is the first time the derivative is greater than 20% of the maximum derivative
+		cdw_derivs = abs.((cdwsfs[2][2:end] .- cdwsfs[2][1:end-1]) ./ cdwsfs[2][1])
+		trans_loc = findfirst(x -> cdw_derivs[x] > 0.2*(maximum(cdw_derivs)),1:length(cdw_derivs))
+		transition_strength = lrs[trans_loc]
+		trans_strens[2][jj] = transition_strength
+
+		# period 1 transition is when the value of cdwsf is within 1% of the maximum and after the period 2 transition
+		period1_onset = findfirst(x -> x > trans_loc && isapprox(cdwsfs[1][x],cdwsfs[1][1],atol=0.5*(cdwsfs[1][1] - minimum(cdwsfs[1]))),1:length(cdwsfs[1]))
+		trans_strens[1][jj] = lrs[period1_onset]
+
+		#=
+		fig,ax1 = subplots()
+		ax1.plot(lrs,cdwsfs_r1,"-p",c="b")
+		ax1.set_ylabel("Period $(periods[1])",c="b")
+		xlabel("Onsite Strength")
+		title("CDW Structure Factor")
+
+		ax2 = ax1.twinx()
+		ax2.plot(lrs,cdwsfs_r2,"-p",c="r")
+		ax2.set_ylabel("Period $(periods[2])",c="r")
+		=#
+	end
+	fig = figure()
+	plot(trans_strens[1],anises,"-p",label="Period 1 Onset")
+	plot(trans_strens[2],anises,"-p",label="Period 2 Onset")
+	legend()
+	xlabel("Transition Strength")
+	ylabel("Hopping Anisotropy")
+	yscale("log")
+end
+
+
+if false
 
 ll = 6
 np = 4
-pbc = false
-pdict = Dict([("layers",ll),("particles",np),("if_periodic_phys",pbc),("lr",0),("alpha",0.125)])#("onsite_strength",5.0)])
+pbc = true
+pdict = Dict([("layers",ll),("particles",np),("if_periodic_phys",pbc),("lr",7),("alpha",0.125)])
 whichfiles = find_data_file(pdict,"ttn",get_folder_location("cluster-data/synth-dims"); output_level=false)
-psi = nothing
-dens = nothing
 
-#=
-for f in whichfiles
-	data,metadata = read_data_jld2(f,get_folder_location("cluster-data/synth-dims"))
-	psi = data["ttn"]
-	dens = data["densmat"]
+#fig = figure("pyplot_subplot_column",figsize=(5,20))
 
-	stren = metadata["onsite_strength"]
-	get_occupancy(psi; plot_title="Interaction Strength = $stren",densmat=dens)
+strens = [range(0.01,2.0,length=10); range(0.01,2.0,length=10)[2:end] .+ 2]
+
+datapoints = 20
+anises = [1.0,0.8,0.7,0.6,0.5,0.3]
+howmany = length(anises)
+plotting_dict = Dict()
+for anis in anises
+	plotting_dict[anis] = 0
 end
-=#
 
-#=
 for (idx,f) in enumerate(whichfiles)
-	name_data = get_params_dict_from_filename(f)
-	filling = name_data["particles"] / (2^name_data["layers"] * name_data["alpha"])
-	if filling != 0.5
-		continue
-	else
-		println("Found Filling = ",filling)
-		data,metadata = read_data_jld2(f,get_folder_location("cluster-data/synth-dims"))
-		global psi = data["ttn"]
-		global dens = "densmat" in keys(data) ? data["densmat"] : density_matrix(psi)
-	end
-end
-=#
-
-
-nrgs = []
-anises = []
-for f in whichfiles
-	data,metadata = read_data_jld2(f,get_folder_location("cluster-data/synth-dims"))
+	data,metadata = read_data_jld2(f,get_folder_location("cluster-data/synth-dims"); output_level=false)
 	psi = data["ttn"]
-	dens = data["densmat"]
+	dens = "densmat" in keys(data) ? data["densmat"] : nothing
 	anis = "hopping_anisotropy" in keys(metadata) ? metadata["hopping_anisotropy"] : 1.0
+	uu = metadata["onsite_strength"]
+	if uu > 4.0 || anis > 1.0 || anis < 0.1
+		continue
+	end
 	
-	append!(anises,[anis])
+	#=append!(anises,[anis])
 	append!(nrgs,[-metadata["energies"][end]])
 	scatter([anis],[-metadata["energies"][end]],c="b")
 	xlabel("Anisotropy")
 	ylabel("Energy")
-	#xscale("log")
+	xscale("log")=#
 
+	#=cols = ["b","r","g"]
+
+	for ang in [0.0,0.25,0.5]
+		if ang == 0.0
+			col = "b"
+		elseif ang == 0.25
+			col = "r"
+		else
+			col = "g"
+		end
+		cdwsf = cdw_structure_factor(dens,(cos(ang*pi),sin(ang*pi)),psi)
+		if idx == 1
+			scatter([anis],[abs(cdwsf)],c=col,label="$(round(ang,digits=2))π")
+		else
+			scatter([anis],[abs(cdwsf)],c=col)
+		end
+	end
+	xscale("log")
+	legend()=#
+	#get_occupancy(psi; if_plot=true,plot_title="Hopping Anis = $anis, LR Strength = $uu",densmat=dens)
+
+	if !(uu in strens) || !(anis in anises)
+		continue
+	end
+
+	uu = round(2*uu,digits=3)
+
+	occs = get_occupancy(psi; plot_title="Hopping Anis = $anis, LR Strength = $uu",densmat=dens,if_plot=false)
+
+	plotting_dict[anis] += 1
+	shift = findfirst(x -> anises[x] == anis,1:howmany)
+	thisloc = Int(howmany*(plotting_dict[anis]-1) + shift)
+	#println("Plotting Anis = $anis, LR Stren = $uu t, this loc = ",thisloc)
+	subplot(datapoints,howmany,thisloc)
+	imshow(occs)
+	#=fig = figure()
+	xs = collect(Iterators.flatten([i .* ones(8) for i in 1:8]))
+	ys = collect(Iterators.flatten([[1,2,3,4,5,6,7,8] for i in 1:8]))
+	zs = collect(Iterators.flatten([occs[i,:] for i in 1:8]))
+	plot3D(xs,ys,zs,"-p")=#
+	#
+	if plotting_dict[anis] == 1
+		title("H Anis=$anis")
+		if anis == anises[end]
+			scatter([occs[1,1]],[occs[1,1]],label="LR=$uu t",c="b",s=1.0)
+			legend(loc=2,bbox_to_anchor=(1.05,1.0))
+		end
+	elseif anis == anises[end]
+		scatter([occs[1,1]],[occs[1,1]],label="LR=$uu t",c="b",s=1.0)
+		legend(loc=2,bbox_to_anchor=(1.05,1.0))
+	end
+	#
+	#colorbar()
+
+	#=if anis == 1.0
+		global plots1p0 += 1
+		thisloc = Int(howmany*(plots1p0-1) + 1)
+		println("1.0 this loc = ",thisloc)
+		subplot(10,howmany,thisloc)
+		imshow(occs)
+		if plots1p0 == 1
+			title("H Anis = $anis, LR Stren = $uu t")
+		else
+			title("LR Stren = $uu t")
+		end
+		#colorbar()
+	elseif anis == 0.8
+		global plots0p8 += 1
+		thisloc = Int(howmany*(plots0p8-1) + 2)
+		println("0.8 this loc = ",thisloc)
+		subplot(10,howmany,thisloc)
+		imshow(occs)
+		if plots0p8 == 1
+			title("H Anis = $anis, LR Stren = $uu t")
+		else
+			title("LR Stren = $uu t")
+		end
+		#colorbar()
+	elseif anis == 0.7
+		global plots0p7 += 1
+		thisloc = Int(howmany*(plots0p7-1)+3)
+		println("0.7 this loc = ",thisloc)
+		subplot(10,howmany,thisloc)
+		imshow(occs)
+		if plots0p7 == 1
+			title("H Anis = $anis, LR Stren = $uu t")
+		else
+			title("LR Stren = $uu t")
+		end
+		#colorbar()
+	elseif anis == 0.5
+		global plots0p5 += 1
+		thisloc = Int(howmany*(plots0p5-1) + 4)
+		println("0.5 this loc = ",thisloc)
+		subplot(10,howmany,thisloc)
+		imshow(occs)
+		if plots0p5 == 1
+			title("H Anis = $anis, LR Stren = $uu t")
+		else
+			title("LR Stren = $uu t")
+		end
+		#colorbar()
+	elseif anis == 0.1
+		global plots0p1 += 1
+		thisloc = Int(howmany*(plots0p1-1) + 5)
+		println("0.1 this loc = ",thisloc)
+		subplot(20,howmany,thisloc)
+		imshow(occs)
+		if plots0p1 == 1
+			title("H Anis = $anis, LR Stren = $uu t")
+		else
+			title("LR Stren = $uu t")
+		end
+		#colorbar()
+	end=#
+	
 
 	#=if anis > 1.0
 		lat = TTNKit.physical_lattice(TTNKit.network(psi))
@@ -421,7 +604,7 @@ for f in whichfiles
 #=
 lat = TTNKit.physical_lattice(TTNKit.network(psi))
 phys_length = ll % 2 == 0 ? Int(sqrt(2^ll)) : Int(sqrt(2^(ll+1))/2)
-virt_length = ll % 2 ? Int(sqrt(2^(ll-1))) : Int(sqrt(2^ll))
+virt_length = ll % 2 != 0 ? Int(sqrt(2^(ll-1))) : Int(sqrt(2^ll))
 
 
 phys_corrs = zeros(phys_length,virt_length)
@@ -436,7 +619,7 @@ for s in 1:virt_length
 	end
 end
 fig = figure()
-for i in 1:virt_length#2:Int(virt_length/2)
+for i in 1:Int(virt_length/2)#2:Int(virt_length/2)
 	plot(0:phys_length-1,phys_corrs[:,i],"-p",label="$i")
 end
 xlabel("Physical Distance")
@@ -519,7 +702,7 @@ legend()
 title("Current along Virtual Dimension for Filling = 1/2")
 =#
 
-end	
+end
 end
 
 if false

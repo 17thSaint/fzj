@@ -543,7 +543,7 @@ function find_dist(p1::Tuple{Int,Int}, p2::Tuple{Int,Int}, size::Tuple{Int,Int},
         dy = min(dy, size[2] - dy)
     end
 
-    return sqrt(dx^2 + dy^2)
+    return sqrt(dx^2 + dy^2),(dx,dy)
 end
 
 function physical_distance_correlation(psi::TreeTensorNetwork; kwargs...)
@@ -860,7 +860,7 @@ fb_occ_mat = get_occupancy(fb_gs)
 
 
 #
-if true
+if false
 
 #nnst = 0.0
 #layers = 6
