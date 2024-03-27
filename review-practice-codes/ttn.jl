@@ -670,16 +670,16 @@ end
 
 function do_sweep(ttn,ham,sweep_type; kwargs...)
 
-	opl = get(kwargs, :output_level, 0)
+	opl::Int = get(kwargs, :output_level, 0)
 	max_dim = get(kwargs, :mdim, 10)
-	num_sweeps = get(kwargs, :num_sweeps, 1)
+	num_sweeps::Int = get(kwargs, :num_sweeps, 1)
 	noise = get(kwargs, :noise, 0.0)
 	expander = get(kwargs, :expander, TTNKit.NoExpander())
 	etol = get(kwargs, :nrgtol, nothing)
-	if_continuous_saving = get(kwargs, :if_continuous_saving, false)
-	file_path = get(kwargs, :file_path, "")
+	if_continuous_saving::Bool = get(kwargs, :if_continuous_saving, false)
+	file_path::String = get(kwargs, :file_path, "")
 	if isnothing(etol)
-		observer = NoObserver()
+		observer::AbstractObserver = NoObserver()
 	elseif if_continuous_saving
 		observer = SavingNRGVarObserver(file_path,etol)
 	else
@@ -690,7 +690,7 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	if sweep_type == "dmrg"
 		#println("Before starting DMRG the bond dim is ",TTNKit.maxlinkdim(ttn))
 		#get_occupancy(ttn; plot_title="Before DMRG")
-		sp = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=1E-6)
+		sp::TTNKit.AbstractSweepHandler = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=1E-6)
 	elseif sweep_type == "simple"
 		proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
 		#println("Finished Making Hamiltonian")
@@ -765,31 +765,31 @@ function throwout_therm_time(times)
 	end
 end
 
-function find_ground_state(num_layers,particle_count; kwargs...)
-	num_sites = 2^num_layers
-	max_dim = get(kwargs, :mdim, 10)
-	sweep_iter = get(kwargs, :sweep_iter, 1)
-	if_sweep = get(kwargs, :if_sweep, true)
-	if_save_data = get(kwargs, :if_save_data, true)
-	if_continuous_saving = get(kwargs, :if_continuous_saving, false)
+function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
+	num_sites::Int = 2^num_layers
+	max_dim::Int = get(kwargs, :mdim, 10)
+	sweep_iter::Int = get(kwargs, :sweep_iter, 1)
+	if_sweep::Bool = get(kwargs, :if_sweep, true)
+	if_save_data::Bool = get(kwargs, :if_save_data, true)
+	if_continuous_saving::Bool = get(kwargs, :if_continuous_saving, false)
 	if_save_data ? nothing : if_continuous_saving = false
-	sweep_type = get(kwargs, :sweep_type, "simple")
-	max_occ = get(kwargs, :max_occ, Int(round(particle_count/(num_sites))+1) )
-	warming_limit = get(kwargs, :warming_limit, 100)
-	conserve_qns = get(kwargs, :syms, true)
+	sweep_type::String = get(kwargs, :sweep_type, "simple")
+	max_occ::Int = get(kwargs, :max_occ, Int(round(particle_count/(num_sites))+1) )
+	warming_limit::Int = get(kwargs, :warming_limit, 100)
+	conserve_qns::Bool = get(kwargs, :syms, true)
 	ham_operator = get(kwargs, :ham_op, nothing)
 	net = get(kwargs, :ttn_net, nothing)
 	ttn = get(kwargs, :seed_ttn, nothing)
-	if_gpu = get(kwargs, :if_gpu, false)
-	if_check = get(kwargs, :if_check, false)
-	particle_type = get(kwargs, :part_type, "Boson")
-	location = get(kwargs, :location, pwd())
-	filename = get(kwargs, :name, "ttn")
-	if_densmat = get(kwargs, :if_densmat, true)
+	if_gpu::Bool = get(kwargs, :if_gpu, false)
+	if_check::Bool = get(kwargs, :if_check, false)
+	particle_type::String = get(kwargs, :part_type, "Boson")
+	location::String = get(kwargs, :location, pwd())
+	filename::String = get(kwargs, :name, "ttn")
+	if_densmat::Bool = get(kwargs, :if_densmat, true)
 	
 	obs = NoObserver()
 	
-	metadata = get(kwargs, :metadata, Dict())
+	metadata::Dict = get(kwargs, :metadata, Dict())
 	metadata["layers"] = num_layers
 	metadata["particles"] = particle_count
 	metadata["max_occ"] = max_occ
@@ -806,7 +806,7 @@ function find_ground_state(num_layers,particle_count; kwargs...)
 	metadata["net"] = net
 	metadata["seed_ttn"] = ttn
 
-	gs_search_params = copy(metadata)
+	gs_search_params::Dict = copy(metadata)
 	delete!(gs_search_params,"ham")
 	delete!(gs_search_params,"net")
 	delete!(gs_search_params,"seed_ttn")
@@ -819,14 +819,14 @@ function find_ground_state(num_layers,particle_count; kwargs...)
 		net = TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, particle_type;conserve_qns=conserve_qns,dim=max_occ+1)
 		metadata["ttn_net"] = net
 	end
-	lat = TTNKit.physical_lattice(net)
+	lat::TTNKit.AbstractLattice = TTNKit.physical_lattice(net)
 
 	println("Finished Building Network")
 	
 	if isnothing(ttn)
 		if particle_type .== "Boson"
-			states = fill("0", num_sites)
-			old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
+			states::Vector{String} = fill("0", num_sites)
+			old_ttn::TTNKit.TreeTensorNetwork = TTNKit.ProductTreeTensorNetwork(net,states)
 			ttn = initialize_ttn(old_ttn,max_dim,particle_count; kwargs...)
 		else
 			states = fill_states(particle_count,num_sites,1)
@@ -839,7 +839,7 @@ function find_ground_state(num_layers,particle_count; kwargs...)
 
 	if if_continuous_saving
 		ttn_data_dict::Dict{String,Any} = if_gpu ? Dict([("ttn",back2cpu(ttn))]) : Dict([("ttn",ttn)])
-		actual_filename = write_data_jld2(filename,ttn_data_dict,location,metadata)
+		actual_filename::String = write_data_jld2(filename,ttn_data_dict,location,metadata)
 	else
 		actual_filename = filename
 	end
@@ -850,23 +850,23 @@ function find_ground_state(num_layers,particle_count; kwargs...)
 	end
 	println("Added States")
 	
-	ham = TTNKit.TPO(ham_operator,lat)
+	ham::TTNKit.AbstractTensorProductOperator = TTNKit.TPO(ham_operator,lat)
 	if if_gpu
 		println("Doing GPU Ham TPO")
 		ham = TTNKit.gpu(ham,ttn)
 	end
 	println("Built Hamiltonian")
-	sp = 0
-	times = []
+	sp = 0.0
+	times::Vector{Float64} = []
 	if if_sweep
 		for i in 1:sweep_iter
-			time_start = time()
-			new_ttn, new_ham, new_sp, new_obs = do_sweep(ttn,ham,sweep_type; kwargs...,file_path = location * "/" * actual_filename)
-			time_end = time()
+			time_start::Float64 = time()
+			new_ttn::TTNKit.TreeTensorNetwork, new_ham, new_sp::TTNKit.AbstractSweepHandler, new_obs::AbstractObserver = do_sweep(ttn,ham,sweep_type; kwargs...,file_path = location * "/" * actual_filename)
+			time_end::Float64 = time()
 			append!(times,[time_end - time_start])
 			#return sp.ttn, ham, sp
 			if if_check
-				if_frozen,why = any(particle_type .== ["Fermion","Boson"]) ? check_if_frozen(new_sp.ttn) : (false,"cuz")
+				if_frozen::Bool,why::String = any(particle_type .== ["Fermion","Boson"]) ? check_if_frozen(new_sp.ttn) : (false,"cuz")
 				if !if_frozen
 					#get_position_dims(sp.ttn)
 					#return new_sp.ttn, new_ham, new_sp
@@ -877,18 +877,18 @@ function find_ground_state(num_layers,particle_count; kwargs...)
 					elseif why == "variables"
 						println("Bad Variables on First Attempt, Starting Reset")	
 					end
-					warmed_results = warming(new_ttn,new_ham,new_sp,warming_limit;kwargs...)
+					ttn,ham,sp,obs = warming(new_ttn,new_ham,new_sp,warming_limit;kwargs...)
 					#return warmed_results
-					ttn,ham,sp,obs = warmed_results
+					#ttn,ham,sp,obs = warmed_results
 				end
 			else
 				ttn,ham,sp,obs = new_ttn,new_ham,new_sp,new_obs
 			end
 		end
 		
-		if_densmat ? densmat = density_matrix(sp.ttn) : nothing
+		if_densmat ? densmat::Matrix{ComplexF64} = density_matrix(sp.ttn) : nothing
 
-		end_time = time()
+		end_time::Float64 = time()
 		
 		if if_save_data
 			#try
@@ -903,7 +903,7 @@ function find_ground_state(num_layers,particle_count; kwargs...)
 			ttn_data_dict = if_gpu ? Dict([("ttn",back2cpu(sp.ttn))]) : Dict([("ttn",sp.ttn)])
 			if_densmat ? ttn_data_dict["densmat"] = densmat : nothing
 			if if_continuous_saving
-				new_metadata = Dict([("observer",metadata["observer"]),("runtime",metadata["runtime"]),("energies",metadata["energies"]),("maxlinkdim",metadata["maxlinkdim"])])
+				new_metadata::Dict{String,Any} = Dict([("observer",metadata["observer"]),("runtime",metadata["runtime"]),("energies",metadata["energies"]),("maxlinkdim",metadata["maxlinkdim"])])
 				modify_data_jld2(new_metadata,location * "/" * actual_filename,"metadata")
 				modify_data_jld2(ttn_data_dict,location * "/" * actual_filename,"all_data")
 			else

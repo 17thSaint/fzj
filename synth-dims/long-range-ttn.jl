@@ -971,7 +971,8 @@ end=#
 	save_plot = false
 	save_data = get(params_dict, "if_save_data", true)
 	if_cluster = any([occursin("local",pwd()),occursin("Local",pwd()),occursin("geraghty",pwd())])
-	if_continuous_saving = get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 7)
+	if_continuous_saving = true#get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 7)
+	save_data ? nothing : if_continuous_saving = false
 
 	loc = get(params_dict, "dataloc", get_folder_location("cluster-data/synth-dims"))
 	if_cliff = false
@@ -1045,7 +1046,7 @@ end=#
 			#append!(wavefuncs,[dm_sp.ttn])
 		end
 
-		Profile.print()
+		#Profile.print()
 
 		#=
 		scatter([anis],[sum(dens) / (tot_sites * num_particles)],c="b")
