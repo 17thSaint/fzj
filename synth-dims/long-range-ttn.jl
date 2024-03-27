@@ -884,9 +884,9 @@ end=#
 #strens = [0.0]#range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("hopping_anisotropy",0.5),("layers",6),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",5.0),("lr",7),("if_periodic_phys",true)])
+	#params_dict = Dict([("hopping_anisotropy",0.5),("layers",6),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",5.0),("lr",7),("if_periodic_phys",true)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
-	#params_dict = make_args_dict(ARGS)
+	params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
 	if typeof(open_cores) != String
 		BLAS.set_num_threads(open_cores)	
