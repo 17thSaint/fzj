@@ -27,7 +27,13 @@ script_name=$1
 param=$2
 START_VALUE=$3
 END_VALUE=$4
-STEP_SIZE=$(bc -l <<< "($END_VALUE - $START_VALUE) / ($SLURM_NTASKS_PER_NODE * $SLURM_JOB_NUM_NODES - 1)")
+
+if (( $(bc -l <<< "$START_VALUE == $END_VALUE") )); then
+    STEP_SIZE=0
+else
+    STEP_SIZE=$(bc -l <<< "($END_VALUE - $START_VALUE) / ($SLURM_NTASKS_PER_NODE * $SLURM_JOB_NUM_NODES - 1)")
+fi
+
 additional_params=("${@:5}")
 
 # Calculate the number of iterations
