@@ -2,8 +2,8 @@
 
 #SBATCH --account=netenesyquma
 #SBATCH --nodes=1
-#SBATCH --cpus-per-task=2
-#SBATCH --ntasks-per-node=10
+#SBATCH --cpus-per-task=5
+#SBATCH --ntasks-per-node=1
 #SBATCH --time=00:10:00
 #SBATCH --partition=batch
 
@@ -41,7 +41,7 @@ additional_params=("${@:5}")
 
 # Get the current date and time
 #alpha=$(date +"%Y-%m-%d_%H-%M")
-datafolder="/p/project/netenesyquma/geraghty1/data/data-$alpha"
+datafolder="/p/project/netenesyquma/geraghty1/data/data-memory-testing"
 
 # Create the folder
 #mkdir -p "$datafolder"

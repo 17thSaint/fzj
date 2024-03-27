@@ -885,7 +885,7 @@ end=#
 #strens = [0.0]#range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	#params_dict = Dict([("hopping_anisotropy",0.5),("layers",6),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",5.0),("lr",7),("if_periodic_phys",true)])
+	#params_dict = Dict([("hopping_anisotropy",0.5),("layers",4),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",5.0),("lr",3),("if_periodic_phys",true)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
@@ -1041,7 +1041,7 @@ end=#
 			@profile og_ttn, hamilt, dm_sp, rezobs, runtime, dens = find_ground_state(layer_count,num_particles; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
 			total_time = time() - starting
 			println("Running time = $total_time")
-			wavefunc = dm_sp.ttn
+			#wavefunc = dm_sp.ttn
 			#append!(wavefuncs,[dm_sp.ttn])
 		end
 
