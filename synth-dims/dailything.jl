@@ -325,7 +325,7 @@ function integral_part(correlation_length,cutoff_radius,counts=500; kwargs...)
 	return integrate(xs,ys)
 end
 
-function cdw_structure_factor(rho::Matrix,qvec::Tuple,psi::TreeTensorNetwork; kwargs...)
+function cdw_structure_factor(rho,qvec::Tuple,psi::TreeTensorNetwork; kwargs...)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, true)
 	if_periodic_synth = get(kwargs, :if_periodic_synth, false)
 
@@ -352,11 +352,11 @@ function cdw_structure_factor(rho::Matrix,qvec::Tuple,psi::TreeTensorNetwork; kw
 	return struc_fact / sum(occs)
 end
 
-if true
+if false
 	ll = 6
 	np = 4
 	pbc = true
-	anises = [1.0,0.8,0.7,0.6,0.5,0.3]
+	anises = [1.0,0.8,0.7,0.6,0.5,0.4,0.35,0.3]
 	trans_strens = [zeros(length(anises)),zeros(length(anises))]
 	for (jj,anis) in enumerate(anises)
 		pdict = Dict([("layers",ll),("particles",np),("if_periodic_phys",pbc),("lr",7),("alpha",0.125),("hopping_anisotropy",anis)])
@@ -420,7 +420,7 @@ whichfiles = find_data_file(pdict,"ttn",get_folder_location("cluster-data/synth-
 strens = [range(0.01,2.0,length=10); range(0.01,2.0,length=10)[2:end] .+ 2]
 
 datapoints = 20
-anises = [1.0,0.8,0.7,0.6,0.5,0.3]
+anises = [1.0,0.8,0.7,0.6,0.5,0.4,0.35,0.3]
 howmany = length(anises)
 plotting_dict = Dict()
 for anis in anises
@@ -465,7 +465,11 @@ for (idx,f) in enumerate(whichfiles)
 	legend()=#
 	#get_occupancy(psi; if_plot=true,plot_title="Hopping Anis = $anis, LR Strength = $uu",densmat=dens)
 
-	if !(uu in strens) || !(anis in anises)
+	if !(anis in anises)
+		continue
+	end
+
+	if anis == 1.0 && !(uu in strens)
 		continue
 	end
 
@@ -473,6 +477,7 @@ for (idx,f) in enumerate(whichfiles)
 
 	occs = get_occupancy(psi; plot_title="Hopping Anis = $anis, LR Strength = $uu",densmat=dens,if_plot=false)
 
+	
 	plotting_dict[anis] += 1
 	shift = findfirst(x -> anises[x] == anis,1:howmany)
 	thisloc = Int(howmany*(plotting_dict[anis]-1) + shift)
@@ -496,69 +501,6 @@ for (idx,f) in enumerate(whichfiles)
 		legend(loc=2,bbox_to_anchor=(1.05,1.0))
 	end
 	#
-	#colorbar()
-
-	#=if anis == 1.0
-		global plots1p0 += 1
-		thisloc = Int(howmany*(plots1p0-1) + 1)
-		println("1.0 this loc = ",thisloc)
-		subplot(10,howmany,thisloc)
-		imshow(occs)
-		if plots1p0 == 1
-			title("H Anis = $anis, LR Stren = $uu t")
-		else
-			title("LR Stren = $uu t")
-		end
-		#colorbar()
-	elseif anis == 0.8
-		global plots0p8 += 1
-		thisloc = Int(howmany*(plots0p8-1) + 2)
-		println("0.8 this loc = ",thisloc)
-		subplot(10,howmany,thisloc)
-		imshow(occs)
-		if plots0p8 == 1
-			title("H Anis = $anis, LR Stren = $uu t")
-		else
-			title("LR Stren = $uu t")
-		end
-		#colorbar()
-	elseif anis == 0.7
-		global plots0p7 += 1
-		thisloc = Int(howmany*(plots0p7-1)+3)
-		println("0.7 this loc = ",thisloc)
-		subplot(10,howmany,thisloc)
-		imshow(occs)
-		if plots0p7 == 1
-			title("H Anis = $anis, LR Stren = $uu t")
-		else
-			title("LR Stren = $uu t")
-		end
-		#colorbar()
-	elseif anis == 0.5
-		global plots0p5 += 1
-		thisloc = Int(howmany*(plots0p5-1) + 4)
-		println("0.5 this loc = ",thisloc)
-		subplot(10,howmany,thisloc)
-		imshow(occs)
-		if plots0p5 == 1
-			title("H Anis = $anis, LR Stren = $uu t")
-		else
-			title("LR Stren = $uu t")
-		end
-		#colorbar()
-	elseif anis == 0.1
-		global plots0p1 += 1
-		thisloc = Int(howmany*(plots0p1-1) + 5)
-		println("0.1 this loc = ",thisloc)
-		subplot(20,howmany,thisloc)
-		imshow(occs)
-		if plots0p1 == 1
-			title("H Anis = $anis, LR Stren = $uu t")
-		else
-			title("LR Stren = $uu t")
-		end
-		#colorbar()
-	end=#
 	
 
 	#=if anis > 1.0

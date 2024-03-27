@@ -860,7 +860,7 @@ fb_occ_mat = get_occupancy(fb_gs)
 
 
 #
-if false
+if true
 
 #nnst = 0.0
 #layers = 6
@@ -875,16 +875,16 @@ for (idx,file) in enumerate(all_files)
 end=#
 
 
-layers = 6
-lr = 7
+#layers = 6
+#lr = 7
 #anises = [0.01,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.6,0.8,0.9,1.1,1.3,1.5,1.7,1.9,2.0,2.5,3.0,3.5,4.0,6.0,8.0,9.0,10.0,15.0,20.0,25.0,30.0,40.0,50.0,70.0,90.0,100.0,1000.0,10000.0]
-anis = 0.7
-strens = range(0.01,2.0,length=10)
+#anis = 0.7
+#strens = range(0.01,2.0,length=10)
 #alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
 #strens = [0.0]#range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
-for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("hopping_anisotropy",anis),("layers",layers),("mdim",300),("if_save_data",true),("filling",0.5),("max_occ",1),("onsite_strength",stren),("lr",lr),("if_periodic_phys",true)])
+#for (idx,stren) in enumerate(strens)
+	params_dict = Dict([("hopping_anisotropy",0.5),("layers",6),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",5.0),("lr",7),("if_periodic_phys",true)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
@@ -900,9 +900,10 @@ for (idx,stren) in enumerate(strens)
 	if_densmat = get(params_dict, :if_densmat, true)
 	change = get(params_dict, "change", 0.0001)
 	onsite_strength = get(params_dict, "onsite_strength", 0.0)
+	anis = get(params_dict, "hopping_anisotropy", 1.0)
 	layer_count = Int(get(params_dict, "layers", 4))
 	mag_off = get(params_dict, "mag_off", true)
-	mdim = get(params_dict, "mdim", get_mdim(layer_count,(false,1)))
+	mdim = get(params_dict, "mdim", 300)
 	longrange_dist = get(params_dict, "lr", 0)
 	centralflux_strength = get(params_dict, "centralflux_strength", 0.0)
 	twist_angle = get(params_dict, "twist_angle", 0.0)
@@ -1015,15 +1016,15 @@ for (idx,stren) in enumerate(strens)
 
 		#
 		println(datafile_name)
-		if_exists,found_data = check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
+		if_exists,found_data = false,nothing#check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
 
 		if if_exists
 			println("Found Data")
 			wavefunc = found_data[1]["ttn"]
 			try
-				dens = found_data[1]["densmat"]
+				global dens = found_data[1]["densmat"]
 			catch
-				dens = nothing
+				global dens = nothing
 			end
 			ham = found_data[2]["ham"]
 			#append!(wavefuncs,[wavefunc])
@@ -1036,12 +1037,14 @@ for (idx,stren) in enumerate(strens)
 			net = build_HH_net(layer_count; syms=syms, max_occ=max_occ)
 			ham = long_range_HH_ham(net,ts,alpha; model_paras...)
 			#display(ham)
-			og_ttn, hamilt, dm_sp, rezobs, runtime, dens = find_ground_state(layer_count,num_particles; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
+			@profile og_ttn, hamilt, dm_sp, rezobs, runtime, dens = find_ground_state(layer_count,num_particles; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
 			total_time = time() - starting
 			println("Running time = $total_time")
 			wavefunc = dm_sp.ttn
 			#append!(wavefuncs,[dm_sp.ttn])
 		end
+
+		Profile.print()
 
 		#=
 		scatter([anis],[sum(dens) / (tot_sites * num_particles)],c="b")
@@ -1107,7 +1110,7 @@ for (idx,stren) in enumerate(strens)
 		fig = figure()
 		scatter(collect(1:mdim),-log.(specs))
 		=#
-	end
+	#end
 end
 
 #
