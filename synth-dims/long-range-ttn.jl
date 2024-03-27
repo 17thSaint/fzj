@@ -1,6 +1,7 @@
 using Pkg
 Pkg.activate(".")
 include("../review-practice-codes/ttn.jl")
+using Profile
 
 function spin_matrix_element(m1,m2,spin,direction::String)
 	if direction == "X"
