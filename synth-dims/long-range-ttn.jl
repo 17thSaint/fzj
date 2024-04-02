@@ -1,7 +1,7 @@
 using Pkg
 Pkg.activate(".")
 include("../review-practice-codes/ttn.jl")
-using Profile
+using Profile,MKL
 
 function spin_matrix_element(m1,m2,spin,direction::String)
 	if direction == "X"
@@ -861,7 +861,7 @@ fb_occ_mat = get_occupancy(fb_gs)
 
 
 #
-if false
+if true
 
 #nnst = 0.0
 #layers = 6
@@ -891,6 +891,7 @@ end=#
 	open_cores = get(params_dict, "open_cores", "all")
 	if typeof(open_cores) != String
 		BLAS.set_num_threads(open_cores)	
+		display(BLAS.get_config())
 	end
 	#
 	nrgtol = get(params_dict, "nrgtol", 1E-4)
@@ -1046,7 +1047,7 @@ end=#
 			#append!(wavefuncs,[dm_sp.ttn])
 		end
 
-		#Profile.print()
+		Profile.print()
 
 		#=
 		scatter([anis],[sum(dens) / (tot_sites * num_particles)],c="b")
