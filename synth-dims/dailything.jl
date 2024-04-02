@@ -407,12 +407,12 @@ if false
 end
 
 
-if false
+if true
 
-ll = 6
-np = 4
+ll = 4
+np = 2
 pbc = true
-pdict = Dict([("layers",ll),("particles",np),("if_periodic_phys",pbc),("lr",7),("alpha",0.125)])
+pdict = Dict([("layers",ll),("particles",np),("if_periodic_phys",pbc),("lr",3)])
 whichfiles = find_data_file(pdict,"ttn",get_folder_location("cluster-data/synth-dims"); output_level=false)
 
 #fig = figure("pyplot_subplot_column",figsize=(5,20))
@@ -420,7 +420,7 @@ whichfiles = find_data_file(pdict,"ttn",get_folder_location("cluster-data/synth-
 strens = [range(0.01,2.0,length=10); range(0.01,2.0,length=10)[2:end] .+ 2]
 
 datapoints = 20
-anises = [1.0,0.8,0.7,0.6,0.5,0.4,0.35,0.3]
+anises = [0.8,0.7,0.6,0.5]#[1.0,0.8,0.7,0.6,0.5,0.4,0.35,0.3]
 howmany = length(anises)
 plotting_dict = Dict()
 for anis in anises
@@ -436,6 +436,8 @@ for (idx,f) in enumerate(whichfiles)
 	if uu > 4.0 || anis > 1.0 || anis < 0.1
 		continue
 	end
+	
+	#
 	
 	#=append!(anises,[anis])
 	append!(nrgs,[-metadata["energies"][end]])

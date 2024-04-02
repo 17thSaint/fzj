@@ -786,7 +786,8 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 	location::String = get(kwargs, :location, pwd())
 	filename::String = get(kwargs, :name, "ttn")
 	if_densmat::Bool = get(kwargs, :if_densmat, true)
-	
+	if_redo::Bool = get(kwargs, :if_redo, false)
+
 	obs = NoObserver()
 	
 	metadata::Dict = get(kwargs, :metadata, Dict())
@@ -824,21 +825,30 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 	println("Finished Building Network")
 	
 	if isnothing(ttn)
-		if particle_type .== "Boson"
-			states::Vector{String} = fill("0", num_sites)
-			old_ttn::TTNKit.TreeTensorNetwork = TTNKit.ProductTreeTensorNetwork(net,states)
-			ttn = initialize_ttn(old_ttn,max_dim,particle_count; kwargs...)
+		if if_redo
+			data,metadata = read_data_jld2(filename,location)
+			ttn = data["ttn"]
+			println("Starting from Previous End")
+			net = TTNKit.network(ttn)
+			lat = TTNKit.physical_lattice(net)
 		else
-			states = fill_states(particle_count,num_sites,1)
-			old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
-			ttn = TTNKit.increase_dim_tree_tensor_network_zeros(old_ttn, maxdim = max_dim)
-			ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
+			if particle_type .== "Boson"
+				states::Vector{String} = fill("0", num_sites)
+				old_ttn::TTNKit.TreeTensorNetwork = TTNKit.ProductTreeTensorNetwork(net,states)
+				ttn = initialize_ttn(old_ttn,max_dim,particle_count; kwargs...)
+			else
+				states = fill_states(particle_count,num_sites,1)
+				old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
+				ttn = TTNKit.increase_dim_tree_tensor_network_zeros(old_ttn, maxdim = max_dim)
+				ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
+			end
 		end
 		metadata["seed_ttn"] = ttn
 	end
 
 	if if_continuous_saving
-		ttn_data_dict::Dict{String,Any} = if_gpu ? Dict([("ttn",back2cpu(ttn))]) : Dict([("ttn",ttn)])
+		if_densmat ? densmat::Matrix{ComplexF64} = density_matrix(ttn) : nothing
+		ttn_data_dict::Dict{String,Any} = if_gpu ? Dict([("ttn",back2cpu(ttn)),("densmat",densmat)]) : Dict([("ttn",ttn),("densmat",densmat)])
 		actual_filename::String = write_data_jld2(filename,ttn_data_dict,location,metadata)
 	else
 		actual_filename = filename
@@ -886,7 +896,7 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 			end
 		end
 		
-		if_densmat ? densmat::Matrix{ComplexF64} = density_matrix(sp.ttn) : nothing
+		if_densmat ? densmat = density_matrix(sp.ttn) : nothing
 
 		end_time::Float64 = time()
 		
@@ -967,7 +977,10 @@ function TTNKit.ITensors.measure!(o::SavingNRGVarObserver; kwargs...)
     #o.nrg[1] = o.nrg[2]
     append!(o.nrg,[dmrg.current_energy])
 
-	modify_data_jld2("ttn",dmrg.ttn,o.file_path,"all_data")
+	#modify_data_jld2("ttn",dmrg.ttn,o.file_path,"all_data")
+	alldata_update::Dict{String,Any} = Dict([("ttn",dmrg.ttn),("densmat",density_matrix(dmrg.ttn))])
+	modify_data_jld2(alldata_update,o.file_path,"all_data")
+	
 	metadata_update = Dict([("observer",o),("maxlinkdim",TTNKit.maxlinkdim(dmrg.ttn))])
 	modify_data_jld2(metadata_update,o.file_path,"metadata")
 end
@@ -1228,6 +1241,35 @@ function get_occupancy(ttn::TTNKit.TreeTensorNetwork; kwargs...)
 	if_save_data ? save_occupancy(exp_occ; kwargs...) : nothing
 	if_plot	|| if_save_fig ? plot_occupancy(exp_occ; kwargs...) : nothing
 		
+	return exp_occ
+end
+
+function get_occupancy(densmat::Matrix; kwargs...)
+	if isinteger(sqrt(size(densmat)[1]))
+		phys_length = Int(sqrt(size(densmat)[1]))
+		virt_length = Int(phys_length)
+	else
+		phys_length = Int(sqrt(2*size(densmat)[1]))
+		virt_length = Int(phys_length/2)
+	end
+
+	lat = TTNKit.SimpleLattice((phys_length,virt_length),TTNKit.ITensorNode,"Boson")
+
+	exp_occ = zeros(phys_length,virt_length)
+	for j in 1:phys_length
+		for s in 1:virt_length
+			linear_index = TTNKit.linear_ind(lat,(j,s))
+			exp_occ[j,s] = abs(densmat[linear_index,linear_index])
+		end
+	end
+
+	if_save_data = get(kwargs, :if_save_data, false)
+	if_save_fig = get(kwargs, :if_save_fig, false)
+	if_plot = get(kwargs, :if_plot, true)
+
+	if_save_data ? save_occupancy(exp_occ; kwargs...) : nothing
+	if_plot	|| if_save_fig ? plot_occupancy(exp_occ; kwargs...) : nothing
+
 	return exp_occ
 end
 
