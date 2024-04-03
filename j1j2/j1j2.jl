@@ -1,9 +1,18 @@
 include("../review-practice-codes/ttn.jl")
-using Statistics
+using Statistics,MKL
+#using Pyplot
 
-function find_next_nearest_neighbors(lat,if_periodic=false)
+function find_next_nearest_neighbors(layers,if_periodic=false)
 	nn_neighbors = []
-	xlen,ylen = size(lat)
+
+	if layers % 2 == 0
+		lat_size = (Int(sqrt(2^layers)),Int(sqrt(2^layers)))
+	else
+		lat_size = (Int(sqrt(2^(layers-1))),Int(sqrt(2^(layers+1))))
+	end
+	lat = TTNKit.SimpleLattice(lat_size,TTNKit.ITensorNode,"Qubit")
+
+	xlen,ylen = lat_size
 	shift = if_periodic ? 0 : xlen
 	for s in collect(1:Int(xlen*ylen - shift))
 		if (s-1) % xlen == 0
@@ -24,10 +33,16 @@ function find_next_nearest_neighbors(lat,if_periodic=false)
 	return nn_neighbors
 end
 
-function get_j1j2_hamilt(net,j2,j1=1; kwargs...)
-	if_periodic = get(kwargs, :if_periodic, true)
+function get_j1j2_hamilt(layers,j2,j1=1; kwargs...)
+	if_periodic = get(kwargs, :if_periodic, false)
+	if_mag_orientation = get(kwargs, :if_mag_orientation, false)
 	
-	lat = TTNKit.physical_lattice(net)
+	if layers % 2 == 0
+		lat_size = (Int(sqrt(2^layers)),Int(sqrt(2^layers)))
+	else
+		lat_size = (Int(sqrt(2^(layers-1))),Int(sqrt(2^(layers+1))))
+	end
+	lat = TTNKit.SimpleLattice(lat_size,TTNKit.ITensorNode,"Qubit")
 	resulting_ham = []
 	
 	if j1 != 0.0
@@ -45,7 +60,7 @@ function get_j1j2_hamilt(net,j2,j1=1; kwargs...)
 	
 	if j2 != 0.0
 		j2_term = TTNKit.OpSum()
-		for (s1,s2) in find_next_nearest_neighbors(lat,if_periodic)
+		for (s1,s2) in find_next_nearest_neighbors(layers,if_periodic)
 			s1_coord = TTNKit.coordinate(lat,s1)
 			s2_coord = TTNKit.coordinate(lat,s2)
 			
@@ -55,7 +70,13 @@ function get_j1j2_hamilt(net,j2,j1=1; kwargs...)
 		end
 		append!(resulting_ham,[j2_term])
 	end
-	
+
+	if if_mag_orientation
+		mag_term = TTNKit.OpSum()
+		mag_term -= (1000.0,"Sz",(1,1))
+		append!(resulting_ham,[mag_term])
+	end
+
 	if length(resulting_ham) > 1
 		return sum(resulting_ham)
 	else
@@ -63,7 +84,7 @@ function get_j1j2_hamilt(net,j2,j1=1; kwargs...)
 	end
 end
 
-function get_spin_texture(ttn; kwargs...)
+function get_spin_texture(ttn::TTNKit.TreeTensorNetwork; kwargs...)
 	if_sign = get(kwargs, :if_sign, false)
 	
 	exp_occ = real.(TTNKit.expect(ttn,"Sz"))
@@ -76,7 +97,6 @@ function get_spin_texture(ttn; kwargs...)
 	return exp_occ
 end
 
-using PyPlot
 function plot_spin_texture(exp_occ; kwargs...)
 	data_dict = get(kwargs, :data_dict, nothing)
 	if !isnothing(data_dict)
@@ -214,57 +234,101 @@ function spinspin_structure_factor(wavefunc::TTNKit.TreeTensorNetwork; kwargs...
 end
 
 
-#
-layers = 6
+ll = 4
+j_two = 0.0
+bonddim = 300
+params_dict = Dict([("layers",ll),("j2",j_two),("mdim",bonddim),("if_save_data",true),("if_mag_orientation",true)])
+#params_dict = make_args_dict(ARGS)
+open_cores = get(params_dict, "open_cores", "all")
+if typeof(open_cores) != String
+	BLAS.set_num_threads(open_cores)	
+	display(BLAS.get_config())
+end
+
+layers = get(params_dict, "layers", 4)
 num_parts = Int((2^layers)/2)
-syms = true
-max_occ = 1
-mdim = 20
-nsweeps = 10
-if_periodic = true
-dataloc = "../cluster-data/j1j2/"
+syms = get(params_dict,"syms",true)
+if_periodic = get(params_dict,"if_periodic",false)
+j2 = get(params_dict,"j2",0.0)
+if_mag_orientation = get(params_dict,"if_mag_orientation",false)
 
-net = TTNKit.BinaryRectangularNetwork(layers, TTNKit.ITensorNode, "Qubit")
-j2 = 0.0
+mdim = get(params_dict,"mdim",100)
+num_sweeps = get(params_dict,"num_sweeps",100)
+
+dataloc = get_folder_location("cluster-data/j1j2")
+if_save_data = get(params_dict,"if_save_data",true)
+if_cluster = any([occursin("local",pwd()),occursin("Local",pwd()),occursin("geraghty",pwd())])
+if_continuous_saving = get(params_dict,"if_continuous_saving",if_cluster)
+if_save_data ? nothing : if_continuous_saving = false
+if_densmat = get(params_dict,"if_densmat",false)
+if_gpu = get(params_dict,"if_gpu",false)
+nrgtol = get(params_dict,"nrgtol",1e-4)
+
+noise = get(params_dict,"noise",0.0)
+expander_val = get(params_dict,"expander_val",1.0)
+expander = TTNKit.DefaultExpander(expander_val)
+
+
+filename_dict = Dict([("layers",layers),("j2",j2),("mdim",mdim)])
+datafile_name = make_parameters_filename(filename_dict)
+
+model_paras = (mdim=mdim,
+				j2=j2,
+				nrgtol=nrgtol,
+				if_periodic=if_periodic,
+				if_mag_orientation=if_mag_orientation,
+				if_densmat=if_densmat,
+				location=dataloc,
+				if_save_data=if_save_data,
+				if_continuous_saving=if_continuous_saving,
+				name = "ttn-"*datafile_name,
+				if_gpu=if_gpu,
+				noise=noise,
+				num_sweeps=num_sweeps,
+				sweep_type="dmrg",
+				syms=syms,
+				part_type = "Qubit",
+				particles=num_parts)
+
+metadata_dict = merge(named_tuple_to_dict(model_paras),filename_dict)
+
+starting = time()
+net = TTNKit.BinaryRectangularNetwork(layers, TTNKit.ITensorNode, "Qubit", conserve_qns=syms)
+hamj1j2 = get_j1j2_hamilt(layers,j2; model_paras...)
+
+og_ttn, hamilt, dm_sp, rezobs, runtime = find_ground_state(layers,num_parts; ttn_net=net,ham_op=hamj1j2,model_paras...,metadata=merge(metadata_dict,Dict([("ham",hamj1j2),("net",net)])))
+total_time = time() - starting
+println("Total running time: $total_time")
+
+wavefunc = dm_sp.ttn
+
+#text = get_spin_texture(wavefunc; if_sign = false,plot_title = "J2 = $j2")
+
+final_energy = if_mag_orientation ? (rezobs.nrg[end] + 1000*TTNKit.expect(wavefunc,"Sz",(1,1))) / 2^layers : rezobs.nrg[end] / 2^layers
+
+println("Energy per site = ",round(final_energy,digits=5))
+
 #=
-j2_count = 10
-j2s = [(i-1)*2/(j2_count-1) for i in 1:j2_count]
-s2_vert = [0.0 for i in 1:j2_count]
-s2_neel = [0.0 for i in 1:j2_count]
-s2_horiz = [0.0 for i in 1:j2_count]
-for i in  1:j2_count
-j2 = j2s[i]
-=#
-hamj1j2 = get_j1j2_hamilt(net,j2; if_periodic = if_periodic)
+lat = TTNKit.physical_lattice(net)
 
-model_paras = (max_dim = mdim, if_save_data = false, num_sweeps = nsweeps, sweep_type = "dmrg", syms = syms, ttn_net = net, ham_op = hamj1j2, part_type = "Qubit")
+sx = allsitescorrelation(wavefunc,"Sx")
+sy = allsitescorrelation(wavefunc,"Sy")
+sz = allsitescorrelation(wavefunc,"Sz")
 
-#og_ttn, og_ham, dmsp = find_ground_state(layers,num_parts,nothing; model_paras...)
-#text = get_spin_texture(dmsp.ttn; if_sign = true,plot_title = "J2 = $j2")
-
-#distance_correlation(dmsp.ttn,"Sz"; if_periodic = ifp)
-fig = figure()
-for i in 1:2^layers
-	distance_correlation(dmsp.ttn,"Sz"; starting_site = i, label_string = "$i")
+sx_part = 0.0*im
+sy_part = 0.0*im
+sz_part = 0.0*im
+for t in 1:length(hamj1j2)
+	s1 = TTNKit.site(hamj1j2[t][1])
+	s2 = TTNKit.site(hamj1j2[t][2])
+	ls1 = TTNKit.linear_ind(lat,s1)
+	ls2 = TTNKit.linear_ind(lat,s2)
+	global sx_part += sx[ls1,ls2]
+	global sy_part += sy[ls1,ls2]
+	global sz_part += sz[ls1,ls2]
 end
-#distance_correlation(dmsp.ttn,"Sy"; if_periodic = ifp)
-
-#=
-s2_vert[i] = spinspin_structure_factor(dmsp.ttn; pitch_vector = (0,pi))
-s2_horiz[i] = spinspin_structure_factor(dmsp.ttn; pitch_vector = (pi,0))
-s2_neel[i] = spinspin_structure_factor(dmsp.ttn; pitch_vector = (pi,pi))
-println("V = ",s2_vert[i],", H = ",s2_horiz[i],", N = ",s2_neel[i])
-end
-fig = figure()
-plot(j2s,s2_vert,"-p",label="Vert")
-plot(j2s,s2_horiz,"-p",label="Horiz")
-plot(j2s,s2_neel,"-p",label="Neel")
-legend()
-xlabel("J2")
-ylabel("S^2")
+println("Sx = ",sx_part," Sy = ",sy_part," Sz = ",sz_part)
 =#
-
-
 
 
 

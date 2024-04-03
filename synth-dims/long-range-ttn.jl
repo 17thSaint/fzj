@@ -1013,7 +1013,40 @@ end=#
 		#else
 			datafile_name = make_parameters_filename(filename_dict)
 		#end
-		model_paras = (hopping_anisotropy=anis,syms=syms,twist_angle=twist_angle,if_continuous_saving=if_continuous_saving,nrgtol=nrgtol,if_densmat=if_densmat,centralflux_strength=centralflux_strength,if_pinning_pot=if_pinning,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt,if_nn_int=if_NN,nn_int_strength=lr_scaling[2],chem_strength=mu,no_magF=mag_off,scaling=sc_type,scaling_dist=longrange_dist,onsite_strength=onsite_strength,cliff=if_cliff,if_change=if_change,change=change,if_gpu=if_gpu,noise=herenoise,if_save_data=save_data,if_save_fig=save_plot,if_sweep=evolve,sweep_type=sweep_type,expander=expan,max_occ=max_occ,mdim=mdim,num_sweeps=nswps,phi=alpha,output_level=0,name="ttn-"*datafile_name,location=loc)
+		model_paras = (hopping_anisotropy=anis,
+						syms=syms,
+						twist_angle=twist_angle,
+						if_continuous_saving=if_continuous_saving,
+						nrgtol=nrgtol,
+						if_densmat=if_densmat,
+						centralflux_strength=centralflux_strength,
+						if_pinning_pot=if_pinning,
+						if_periodic_phys=if_per_phys,
+						if_periodic_virt=if_per_virt,
+						if_nn_int=if_NN,
+						nn_int_strength=lr_scaling[2],
+						chem_strength=mu,
+						no_magF=mag_off,
+						scaling=sc_type,
+						scaling_dist=longrange_dist,
+						onsite_strength=onsite_strength,
+						cliff=if_cliff,
+						if_change=if_change,
+						change=change,
+						if_gpu=if_gpu,
+						noise=herenoise,
+						if_save_data=save_data,
+						if_save_fig=save_plot,
+						if_sweep=evolve,
+						sweep_type=sweep_type,
+						expander=expan,
+						max_occ=max_occ,
+						mdim=mdim,
+						num_sweeps=nswps,
+						phi=alpha,
+						output_level=0,
+						name="ttn-"*datafile_name,
+						location=loc)
 		
 		metadata_dict = merge(named_tuple_to_dict(model_paras),filename_dict)
 

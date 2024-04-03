@@ -690,7 +690,7 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	if sweep_type == "dmrg"
 		#println("Before starting DMRG the bond dim is ",TTNKit.maxlinkdim(ttn))
 		#get_occupancy(ttn; plot_title="Before DMRG")
-		sp::TTNKit.AbstractSweepHandler = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=1E-6)
+		sp::TTNKit.AbstractSweepHandler = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=1E-10)
 	elseif sweep_type == "simple"
 		proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
 		#println("Finished Making Hamiltonian")
@@ -944,7 +944,7 @@ function TTNKit.ITensors.measure!(o::NRGVarObserver; kwargs...)
     nrgs = o.nrg
     var_tol = o.var_tol
     dmrg = kwargs[:sweep_handler]
-	#println("Link dimension right now is ",TTNKit.maxlinkdim(dmrg.ttn)," while the maxdim is ",TTNKit.maxdim(dmrg))
+	println("Link dimension right now is ",TTNKit.maxlinkdim(dmrg.ttn)," while the maxdim is ",TTNKit.maxdim(dmrg))
     append!(o.nrg,[dmrg.current_energy])
 end
 
@@ -978,7 +978,7 @@ function TTNKit.ITensors.measure!(o::SavingNRGVarObserver; kwargs...)
     append!(o.nrg,[dmrg.current_energy])
 
 	#modify_data_jld2("ttn",dmrg.ttn,o.file_path,"all_data")
-	alldata_update::Dict{String,Any} = Dict([("ttn",dmrg.ttn),("densmat",density_matrix(dmrg.ttn))])
+	alldata_update::Dict{String,Any} = Dict([("ttn",dmrg.ttn)])#,("densmat",density_matrix(dmrg.ttn))])
 	modify_data_jld2(alldata_update,o.file_path,"all_data")
 	
 	metadata_update = Dict([("observer",o),("maxlinkdim",TTNKit.maxlinkdim(dmrg.ttn))])
