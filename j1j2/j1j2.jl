@@ -1,3 +1,5 @@
+using Pkg
+Pkg.activate(".")
 include("../review-practice-codes/ttn.jl")
 using Statistics,MKL
 #using Pyplot
@@ -236,8 +238,9 @@ end
 
 ll = 4
 j_two = 0.0
-bonddim = 300
-params_dict = Dict([("layers",ll),("j2",j_two),("mdim",bonddim),("if_save_data",true),("if_mag_orientation",true)])
+bonddims = [20]
+for bonddim in bonddims
+params_dict = Dict([("layers",ll),("j2",j_two),("mdim",bonddim),("if_save_data",true),("if_mag_orientation",true),("if_periodic",true)])
 #params_dict = make_args_dict(ARGS)
 open_cores = get(params_dict, "open_cores", "all")
 if typeof(open_cores) != String
@@ -264,12 +267,14 @@ if_densmat = get(params_dict,"if_densmat",false)
 if_gpu = get(params_dict,"if_gpu",false)
 nrgtol = get(params_dict,"nrgtol",1e-4)
 
+if_redo = get(params_dict,"if_redo",false)
+
 noise = get(params_dict,"noise",0.0)
 expander_val = get(params_dict,"expander_val",1.0)
 expander = TTNKit.DefaultExpander(expander_val)
 
 
-filename_dict = Dict([("layers",layers),("j2",j2),("mdim",mdim)])
+filename_dict = Dict([("layers",layers),("j2",j2),("mdim",mdim),("if_mag_orientation",if_mag_orientation),("if_periodic",if_periodic)])
 datafile_name = make_parameters_filename(filename_dict)
 
 model_paras = (mdim=mdim,
@@ -292,21 +297,45 @@ model_paras = (mdim=mdim,
 
 metadata_dict = merge(named_tuple_to_dict(model_paras),filename_dict)
 
-starting = time()
-net = TTNKit.BinaryRectangularNetwork(layers, TTNKit.ITensorNode, "Qubit", conserve_qns=syms)
-hamj1j2 = get_j1j2_hamilt(layers,j2; model_paras...)
+if_exists,found_data = check_data_exists(filename_dict,"ttn"; location=dataloc,output_level=false)
 
-og_ttn, hamilt, dm_sp, rezobs, runtime = find_ground_state(layers,num_parts; ttn_net=net,ham_op=hamj1j2,model_paras...,metadata=merge(metadata_dict,Dict([("ham",hamj1j2),("net",net)])))
-total_time = time() - starting
-println("Total running time: $total_time")
+if if_exists
+	println("Found Data")
+	data,metadata = found_data
+	wavefunc = data["ttn"]
+	rezobs = metadata["observer"]
+	
+	if if_redo 
+		starting = time()
+		net = TTNKit.BinaryRectangularNetwork(layers, TTNKit.ITensorNode, "Qubit", conserve_qns=syms)
+		hamj1j2 = get_j1j2_hamilt(layers,j2; model_paras...)
 
-wavefunc = dm_sp.ttn
+		og_ttn, hamilt, dm_sp, rezobs, runtime = find_ground_state(layers,num_parts; ttn_net=net,ham_op=hamj1j2,model_paras...,if_redo=true,metadata=merge(metadata_dict,Dict([("ham",hamj1j2),("net",net)])))
+		total_time = time() - starting
+		wavefunc = dm_sp.ttn
+		println("Total running time: $total_time")
+	end
 
-#text = get_spin_texture(wavefunc; if_sign = false,plot_title = "J2 = $j2")
+else		
+	starting = time()
+	net = TTNKit.BinaryRectangularNetwork(layers, TTNKit.ITensorNode, "Qubit", conserve_qns=syms)
+	hamj1j2 = get_j1j2_hamilt(layers,j2; model_paras...)
 
-final_energy = if_mag_orientation ? (rezobs.nrg[end] + 1000*TTNKit.expect(wavefunc,"Sz",(1,1))) / 2^layers : rezobs.nrg[end] / 2^layers
+	og_ttn, hamilt, dm_sp, rezobs, runtime = find_ground_state(layers,num_parts; ttn_net=net,ham_op=hamj1j2,model_paras...,metadata=merge(metadata_dict,Dict([("ham",hamj1j2),("net",net)])))
+	total_time = time() - starting
+	println("Total running time: $total_time")
 
-println("Energy per site = ",round(final_energy,digits=5))
+	wavefunc = dm_sp.ttn
+end
+
+text = get_spin_texture(wavefunc; if_sign = false,plot_title = "J2 = $j2")
+
+#final_energy = if_mag_orientation ? (rezobs.nrg[end] + 1000*TTNKit.expect(wavefunc,"Sz",(1,1))) / 2^layers : rezobs.nrg[end] / 2^layers
+
+#println("Energy per site = ",round(final_energy,digits=5))
+#scatter(1/TTNKit.maxlinkdim(wavefunc),final_energy,c="b")
+#xscale("log")
+end
 
 #=
 lat = TTNKit.physical_lattice(net)

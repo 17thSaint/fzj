@@ -847,8 +847,12 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 	end
 
 	if if_continuous_saving
-		if_densmat ? densmat::Matrix{ComplexF64} = density_matrix(ttn) : nothing
-		ttn_data_dict::Dict{String,Any} = if_gpu ? Dict([("ttn",back2cpu(ttn)),("densmat",densmat)]) : Dict([("ttn",ttn),("densmat",densmat)])
+		if if_densmat
+			densmat::Matrix{ComplexF64} = density_matrix(ttn)
+			ttn_data_dict::Dict{String,Any} = if_gpu ? Dict([("ttn",back2cpu(ttn)),("densmat",densmat)]) : Dict([("ttn",ttn),("densmat",densmat)])
+		else
+			ttn_data_dict = if_gpu ? Dict([("ttn",back2cpu(ttn))]) : Dict([("ttn",ttn)])
+		end
 		actual_filename::String = write_data_jld2(filename,ttn_data_dict,location,metadata)
 	else
 		actual_filename = filename
@@ -912,7 +916,7 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 			metadata["maxlinkdim"] = TTNKit.maxlinkdim(sp.ttn)
 			ttn_data_dict = if_gpu ? Dict([("ttn",back2cpu(sp.ttn))]) : Dict([("ttn",sp.ttn)])
 			if_densmat ? ttn_data_dict["densmat"] = densmat : nothing
-			if if_continuous_saving
+			if if_continuous_saving || if_redo
 				new_metadata::Dict{String,Any} = Dict([("observer",metadata["observer"]),("runtime",metadata["runtime"]),("energies",metadata["energies"]),("maxlinkdim",metadata["maxlinkdim"])])
 				modify_data_jld2(new_metadata,location * "/" * actual_filename,"metadata")
 				modify_data_jld2(ttn_data_dict,location * "/" * actual_filename,"all_data")
