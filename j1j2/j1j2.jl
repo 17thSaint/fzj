@@ -234,16 +234,16 @@ end
 
 if true
 
-#ll = 4
-#j_two = 10.0
+ll = 4
+j_two = 0.5
 #bonddims = [100,150]
-#bonddim = 300
+bonddim = 300
 #all_wavefuncs = []
 #for bonddim in bonddims
 #for (idx,mag_or) in enumerate([true,true,false])
 #mag_dir = idx == 1 ? 1.0 : -1.0
-#params_dict = Dict([("layers",ll),("j2",j_two),("mdim",bonddim),("if_save_data",true),("if_mag_orientation",mag_or),("mag_direction",mag_dir),("if_periodic",false)])
-params_dict = make_args_dict(ARGS)
+params_dict = Dict([("layers",ll),("j2",j_two),("mdim",bonddim),("if_save_data",false),("if_mag_orientation",false),("if_periodic",false)])
+#params_dict = make_args_dict(ARGS)
 open_cores = get(params_dict, "open_cores", "all")
 if typeof(open_cores) != String
 	BLAS.set_num_threads(open_cores)	
@@ -286,6 +286,7 @@ model_paras = (mdim=mdim,
 				j2=j2,
 				nrgtol=nrgtol,
 				cutoff=cutoff,
+				expander=expander,
 				if_periodic=if_periodic,
 				if_mag_orientation=if_mag_orientation,
 				mag_direction=mag_direction,
@@ -335,16 +336,16 @@ else
 	wavefunc = dm_sp.ttn
 end
 
-#=append!(all_wavefuncs,[wavefunc])
+#append!(all_wavefuncs,[wavefunc])
 
-if j2 > 1.0
+#=if j2 > 1.0
 	shift = idx == 1 ? 1000*TTNKit.expect(wavefunc,"Sz",(2,1)) : 1000*TTNKit.expect(wavefunc,"Sz",(1,2))
 	final_energy = (rezobs.nrg[end] + shift + 1000*TTNKit.expect(wavefunc,"Sz",(1,1))) / 2^layers
-else
+else=#
 	final_energy = if_mag_orientation ? (rezobs.nrg[end] + 1000*mag_direction*TTNKit.expect(wavefunc,"Sz",(1,1))) / 2^layers : rezobs.nrg[end] / 2^layers
-end
+#end
 
-text = get_spin_texture(wavefunc; if_sign = false,plot_title = "J2 = $j2, NRG = $(round(real(final_energy),digits=5))")=#
+text = get_spin_texture(wavefunc; if_sign = false,plot_title = "J2 = $j2, NRG = $(round(real(final_energy),digits=5))")#
 
 #append!(all_wavefuncs,[wavefunc])
 
