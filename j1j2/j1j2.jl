@@ -2,7 +2,7 @@ using Pkg
 Pkg.activate(".")
 include("../review-practice-codes/ttn.jl")
 using Statistics,MKL
-#using Pyplot
+using PyPlot
 
 function find_next_nearest_neighbors(layers,if_periodic=false)
 	nn_neighbors = []
@@ -36,13 +36,14 @@ function find_next_nearest_neighbors(layers,if_periodic=false)
 end
 
 function get_j1j2_hamilt(layers,j2,j1=1; kwargs...)
-	if_periodic = get(kwargs, :if_periodic, false)
-	if_mag_orientation = get(kwargs, :if_mag_orientation, false)
+	if_periodic::Bool = get(kwargs, :if_periodic, false)
+	if_mag_orientation::Bool = get(kwargs, :if_mag_orientation, false)
+	mag_direction::Float64 = get(kwargs, :mag_direction, 1.0)
 	
 	if layers % 2 == 0
 		lat_size = (Int(sqrt(2^layers)),Int(sqrt(2^layers)))
 	else
-		lat_size = (Int(sqrt(2^(layers-1))),Int(sqrt(2^(layers+1))))
+		lat_size = (Int(sqrt(2^(layers+1))),Int(sqrt(2^(layers-1))))
 	end
 	lat = TTNKit.SimpleLattice(lat_size,TTNKit.ITensorNode,"Qubit")
 	resulting_ham = []
@@ -75,7 +76,7 @@ function get_j1j2_hamilt(layers,j2,j1=1; kwargs...)
 
 	if if_mag_orientation
 		mag_term = TTNKit.OpSum()
-		mag_term -= (1000.0,"Sz",(1,1))
+		mag_term -= (mag_direction*1000.0,"Sz",(1,1))
 		append!(resulting_ham,[mag_term])
 	end
 
@@ -235,13 +236,15 @@ function spinspin_structure_factor(wavefunc::TTNKit.TreeTensorNetwork; kwargs...
 	return real(sum(exp_mat .* corr_mat) / (num_sites*(num_sites+2)))#, exp_mat
 end
 
+if true
 
-ll = 4
-j_two = 0.0
-bonddims = [20]
-for bonddim in bonddims
-params_dict = Dict([("layers",ll),("j2",j_two),("mdim",bonddim),("if_save_data",true),("if_mag_orientation",true),("if_periodic",true)])
-#params_dict = make_args_dict(ARGS)
+#ll = 6
+#j_two = 0.0
+#bonddims = [100,150]
+#for bonddim in bonddims
+#mag_dir = idx == 1 ? 1.0 : -1.0
+#params_dict = Dict([("layers",ll),("j2",j_two),("mdim",bonddim),("if_save_data",false),("if_mag_orientation",false),("if_periodic",false)])
+params_dict = make_args_dict(ARGS)
 open_cores = get(params_dict, "open_cores", "all")
 if typeof(open_cores) != String
 	BLAS.set_num_threads(open_cores)	
@@ -254,11 +257,12 @@ syms = get(params_dict,"syms",true)
 if_periodic = get(params_dict,"if_periodic",false)
 j2 = get(params_dict,"j2",0.0)
 if_mag_orientation = get(params_dict,"if_mag_orientation",false)
+mag_direction = get(params_dict,"mag_direction",1.0)
 
 mdim = get(params_dict,"mdim",100)
 num_sweeps = get(params_dict,"num_sweeps",100)
 
-dataloc = get_folder_location("cluster-data/j1j2")
+dataloc = get(params_dict, "dataloc", get_folder_location("cluster-data/j1j2"))
 if_save_data = get(params_dict,"if_save_data",true)
 if_cluster = any([occursin("local",pwd()),occursin("Local",pwd()),occursin("geraghty",pwd())])
 if_continuous_saving = get(params_dict,"if_continuous_saving",if_cluster)
@@ -266,6 +270,7 @@ if_save_data ? nothing : if_continuous_saving = false
 if_densmat = get(params_dict,"if_densmat",false)
 if_gpu = get(params_dict,"if_gpu",false)
 nrgtol = get(params_dict,"nrgtol",1e-4)
+cutoff = get(params_dict,"cutoff",1e-10)
 
 if_redo = get(params_dict,"if_redo",false)
 
@@ -280,8 +285,10 @@ datafile_name = make_parameters_filename(filename_dict)
 model_paras = (mdim=mdim,
 				j2=j2,
 				nrgtol=nrgtol,
+				cutoff=cutoff,
 				if_periodic=if_periodic,
 				if_mag_orientation=if_mag_orientation,
+				mag_direction=mag_direction,
 				if_densmat=if_densmat,
 				location=dataloc,
 				if_save_data=if_save_data,
@@ -320,6 +327,7 @@ else
 	starting = time()
 	net = TTNKit.BinaryRectangularNetwork(layers, TTNKit.ITensorNode, "Qubit", conserve_qns=syms)
 	hamj1j2 = get_j1j2_hamilt(layers,j2; model_paras...)
+	display(hamj1j2)
 
 	og_ttn, hamilt, dm_sp, rezobs, runtime = find_ground_state(layers,num_parts; ttn_net=net,ham_op=hamj1j2,model_paras...,metadata=merge(metadata_dict,Dict([("ham",hamj1j2),("net",net)])))
 	total_time = time() - starting
@@ -328,40 +336,54 @@ else
 	wavefunc = dm_sp.ttn
 end
 
-text = get_spin_texture(wavefunc; if_sign = false,plot_title = "J2 = $j2")
+#final_energy = if_mag_orientation ? (rezobs.nrg[end] + 1000*mag_direction*TTNKit.expect(wavefunc,"Sz",(1,1))) / 2^layers : rezobs.nrg[end] / 2^layers
 
-#final_energy = if_mag_orientation ? (rezobs.nrg[end] + 1000*TTNKit.expect(wavefunc,"Sz",(1,1))) / 2^layers : rezobs.nrg[end] / 2^layers
+#text = get_spin_texture(wavefunc; if_sign = false,plot_title = "J2 = $j2, NRG = $(round(real(final_energy),digits=5))")
+
+#append!(all_wavefuncs,[wavefunc])
 
 #println("Energy per site = ",round(final_energy,digits=5))
 #scatter(1/TTNKit.maxlinkdim(wavefunc),final_energy,c="b")
 #xscale("log")
+#end
+
 end
 
-#=
-lat = TTNKit.physical_lattice(net)
+#=w1_overlap = TTNKit.inner(all_wavefuncs[1],all_wavefuncs[3])
+w2_overlap = TTNKit.inner(all_wavefuncs[2],all_wavefuncs[3])
+println("Overlap with Up Corner = ",w1_overlap," Overlap with Down Corner = ",w2_overlap)#
 
-sx = allsitescorrelation(wavefunc,"Sx")
-sy = allsitescorrelation(wavefunc,"Sy")
-sz = allsitescorrelation(wavefunc,"Sz")
+which_wavefunc = 3
+s1 = 1
+s2 = 2
+net = TTNKit.network(all_wavefuncs[which_wavefunc])
+ttnc1 = TTNKit.copy(all_wavefuncs[which_wavefunc])
+ttnc2 = TTNKit.copy(all_wavefuncs[which_wavefunc])
 
-sx_part = 0.0*im
-sy_part = 0.0*im
-sz_part = 0.0*im
-for t in 1:length(hamj1j2)
-	s1 = TTNKit.site(hamj1j2[t][1])
-	s2 = TTNKit.site(hamj1j2[t][2])
-	ls1 = TTNKit.linear_ind(lat,s1)
-	ls2 = TTNKit.linear_ind(lat,s2)
-	global sx_part += sx[ls1,ls2]
-	global sy_part += sy[ls1,ls2]
-	global sz_part += sz[ls1,ls2]
-end
-println("Sx = ",sx_part," Sy = ",sy_part," Sz = ",sz_part)
+idx_1 = TTNKit.siteinds(net)[s1]
+O1 = TTNKit.convert_cu(TTNKit.op("Sz",idx_1),all_wavefuncs[which_wavefunc][(1,1)])
+ch_pos1 = (0,s1)
+parent_pos1 = TTNKit.parent_node(net,ch_pos1)
+TTNKit.move_ortho!(ttnc1,parent_pos1)
+T1 = ttnc1[parent_pos1]
+first_application = TTNKit.noprime(O1*T1)
+ttnc1[parent_pos1] = first_application
+
+idx_2 = TTNKit.siteinds(net)[s2]
+O2 = TTNKit.convert_cu(TTNKit.op("Sz",idx_2),all_wavefuncs[which_wavefunc][(1,1)])
+ch_pos2 = (0,s2)
+parent_pos2 = TTNKit.parent_node(net,ch_pos2)
+TTNKit.move_ortho!(ttnc1,parent_pos2)
+T2 = ttnc1[parent_pos2]
+second_application = TTNKit.noprime(O2*first_application)
+
+TTNKit.move_ortho!(ttnc2,parent_pos2)
+
+T = ttnc2[parent_pos2]
+res = dot(T, second_application)
+
+println("Result = ",res)
 =#
-
-
-
-
 
 
 

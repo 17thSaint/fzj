@@ -861,7 +861,7 @@ fb_occ_mat = get_occupancy(fb_gs)
 
 
 #
-if true
+if false
 
 #nnst = 0.0
 #layers = 6
@@ -895,6 +895,7 @@ end=#
 	end
 	#
 	nrgtol = get(params_dict, "nrgtol", 1E-4)
+	cutoff = get(params_dict, "cutoff", 1E-6)
 	if_NN = get(params_dict, "if_nn_int", false)
 	if_pinning = get(params_dict, "if_pinning", false)
 	if_gpu = get(params_dict, "if_gpu", false)
@@ -1015,6 +1016,7 @@ end=#
 		#end
 		model_paras = (hopping_anisotropy=anis,
 						syms=syms,
+						cutoff=cutoff,
 						twist_angle=twist_angle,
 						if_continuous_saving=if_continuous_saving,
 						nrgtol=nrgtol,

@@ -671,6 +671,7 @@ end
 function do_sweep(ttn,ham,sweep_type; kwargs...)
 
 	opl::Int = get(kwargs, :output_level, 0)
+	cutoff::Float64 = get(kwargs, :cutoff, 10^-8)
 	max_dim = get(kwargs, :mdim, 10)
 	num_sweeps::Int = get(kwargs, :num_sweeps, 1)
 	noise = get(kwargs, :noise, 0.0)
@@ -690,7 +691,7 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	if sweep_type == "dmrg"
 		#println("Before starting DMRG the bond dim is ",TTNKit.maxlinkdim(ttn))
 		#get_occupancy(ttn; plot_title="Before DMRG")
-		sp::TTNKit.AbstractSweepHandler = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=1E-10)
+		sp::TTNKit.AbstractSweepHandler = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff)
 	elseif sweep_type == "simple"
 		proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
 		#println("Finished Making Hamiltonian")

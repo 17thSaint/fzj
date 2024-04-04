@@ -352,11 +352,11 @@ function cdw_structure_factor(rho,qvec::Tuple,psi::TreeTensorNetwork; kwargs...)
 	return struc_fact / sum(occs)
 end
 
-if false
+if true
 	ll = 6
 	np = 4
 	pbc = true
-	anises = [1.0,0.8,0.7,0.6,0.5,0.4,0.35,0.3]
+	anises = [1.0,0.8,0.7,0.6,0.5,0.4,0.35]
 	trans_strens = [zeros(length(anises)),zeros(length(anises))]
 	for (jj,anis) in enumerate(anises)
 		pdict = Dict([("layers",ll),("particles",np),("if_periodic_phys",pbc),("lr",7),("alpha",0.125),("hopping_anisotropy",anis)])
@@ -385,20 +385,22 @@ if false
 		period1_onset = findfirst(x -> x > trans_loc && isapprox(cdwsfs[1][x],cdwsfs[1][1],atol=0.5*(cdwsfs[1][1] - minimum(cdwsfs[1]))),1:length(cdwsfs[1]))
 		trans_strens[1][jj] = lrs[period1_onset]
 
-		#=
-		fig,ax1 = subplots()
-		ax1.plot(lrs,cdwsfs_r1,"-p",c="b")
+		#
+		fig2,ax1 = subplots()
+		ax1.plot(lrs,cdwsfs[1],c="b")
 		ax1.set_ylabel("Period $(periods[1])",c="b")
+		ax1.scatter(lrs[period1_onset],cdwsfs[1][period1_onset],c="g")
 		xlabel("Onsite Strength")
 		title("CDW Structure Factor")
 
 		ax2 = ax1.twinx()
-		ax2.plot(lrs,cdwsfs_r2,"-p",c="r")
+		ax2.plot(lrs,cdwsfs[2],c="r")
 		ax2.set_ylabel("Period $(periods[2])",c="r")
-		=#
+		ax2.scatter(lrs[trans_loc],cdwsfs[2][trans_loc],c="g")
+		#
 	end
 	fig = figure()
-	plot(trans_strens[1],anises,"-p",label="Period 1 Onset")
+	#plot(trans_strens[1],anises,"-p",label="Period 1 Onset")
 	plot(trans_strens[2],anises,"-p",label="Period 2 Onset")
 	legend()
 	xlabel("Transition Strength")
@@ -407,7 +409,7 @@ if false
 end
 
 
-if true
+if false
 
 ll = 4
 np = 2
