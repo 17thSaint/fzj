@@ -83,7 +83,11 @@ function make_parameters_filename(param_dict)
 		if key in ["change", "if_change", "open_cores"]
 			continue
 		else
-			value = string(param_dict[key])
+			if typeof(param_dict[key]) == Float64 && param_dict[key] < 0
+				value = "n" * string(abs(param_dict[key]))
+			else
+				value = string(param_dict[key])
+			end
 			param_filename *= "$key-$value-"
 		end
 	end
@@ -105,6 +109,7 @@ function get_params_dict_from_filename(filename)
 	else
 		split_filename = split(filename,"-")
 	end
+
 	for i in 1:Int(length(split_filename)/2)
 		key = split_filename[2*i-1]
 		value = split_filename[2*i]

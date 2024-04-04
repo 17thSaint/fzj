@@ -10,29 +10,23 @@ function find_next_nearest_neighbors(layers,if_periodic=false)
 	if layers % 2 == 0
 		lat_size = (Int(sqrt(2^layers)),Int(sqrt(2^layers)))
 	else
-		lat_size = (Int(sqrt(2^(layers-1))),Int(sqrt(2^(layers+1))))
+		lat_size = (Int(sqrt(2^(layers+1))),Int(sqrt(2^(layers-1))))
 	end
-	lat = TTNKit.SimpleLattice(lat_size,TTNKit.ITensorNode,"Qubit")
-
-	xlen,ylen = lat_size
-	shift = if_periodic ? 0 : xlen
-	for s in collect(1:Int(xlen*ylen - shift))
-		if (s-1) % xlen == 0
-			append!(nn_neighbors,[(s,mod(s+xlen+1,Int(xlen*ylen)))])
-			if if_periodic
-				append!(nn_neighbors,[(s,mod(s+2*xlen-1,Int(xlen*ylen)))])
+	
+	edges_x = [lat_size[1],1]
+	for (idx,direction) in enumerate([1,-1])
+		for x in 1:lat_size[1]
+			next_site_x = mod1(x+direction,lat_size[1])
+			x == edges_x[idx] && !if_periodic ? continue : nothing
+			for y in 1:lat_size[2]
+				next_site_y = mod1(y+1,lat_size[2])
+				next_site_y == 1 && !if_periodic ? continue : nothing
+				append!(nn_neighbors,[[(x,y),(next_site_x,next_site_y)]])
 			end
-		elseif s % xlen == 0
-			append!(nn_neighbors,[(s,mod(s+xlen-1,Int(xlen*ylen)))])
-			if if_periodic
-				append!(nn_neighbors,[(s,mod(s+1,Int(xlen*ylen)))])
-			end
-		else
-			append!(nn_neighbors,[(s,mod(s+xlen+1,Int(xlen*ylen)))])
-			append!(nn_neighbors,[(s,mod(s+xlen-1,Int(xlen*ylen)))])
 		end
 	end
-	return nn_neighbors
+
+	return unique(nn_neighbors)
 end
 
 function get_j1j2_hamilt(layers,j2,j1=1; kwargs...)
@@ -64,19 +58,21 @@ function get_j1j2_hamilt(layers,j2,j1=1; kwargs...)
 	if j2 != 0.0
 		j2_term = TTNKit.OpSum()
 		for (s1,s2) in find_next_nearest_neighbors(layers,if_periodic)
-			s1_coord = TTNKit.coordinate(lat,s1)
-			s2_coord = TTNKit.coordinate(lat,s2)
-			
-			j2_term += (j2,"Sx",s1_coord,"Sx",s2_coord)
-			j2_term += (j2,"Sy",s1_coord,"Sy",s2_coord)
-			j2_term += (j2,"Sz",s1_coord,"Sz",s2_coord)
+			j2_term += (j2,"Sx",s1,"Sx",s2)
+			j2_term += (j2,"Sy",s1,"Sy",s2)
+			j2_term += (j2,"Sz",s1,"Sz",s2)
 		end
 		append!(resulting_ham,[j2_term])
 	end
 
 	if if_mag_orientation
 		mag_term = TTNKit.OpSum()
-		mag_term -= (mag_direction*1000.0,"Sz",(1,1))
+		if j2 > 1.0
+			mag_term -= (1000.0,"Sz",(1,1))
+			mag_term -= mag_direction == 1 ? (1000.0,"Sz",(2,1)) : (1000.0,"Sz",(1,2))
+		else
+			mag_term -= (1000.0*mag_direction,"Sz",(1,1))
+		end
 		append!(resulting_ham,[mag_term])
 	end
 
@@ -238,12 +234,15 @@ end
 
 if true
 
-#ll = 6
-#j_two = 0.0
+#ll = 4
+#j_two = 10.0
 #bonddims = [100,150]
+#bonddim = 300
+#all_wavefuncs = []
 #for bonddim in bonddims
+#for (idx,mag_or) in enumerate([true,true,false])
 #mag_dir = idx == 1 ? 1.0 : -1.0
-#params_dict = Dict([("layers",ll),("j2",j_two),("mdim",bonddim),("if_save_data",false),("if_mag_orientation",false),("if_periodic",false)])
+#params_dict = Dict([("layers",ll),("j2",j_two),("mdim",bonddim),("if_save_data",true),("if_mag_orientation",mag_or),("mag_direction",mag_dir),("if_periodic",false)])
 params_dict = make_args_dict(ARGS)
 open_cores = get(params_dict, "open_cores", "all")
 if typeof(open_cores) != String
@@ -280,6 +279,7 @@ expander = TTNKit.DefaultExpander(expander_val)
 
 
 filename_dict = Dict([("layers",layers),("j2",j2),("mdim",mdim),("if_mag_orientation",if_mag_orientation),("if_periodic",if_periodic)])
+if_mag_orientation ? merge!(filename_dict,Dict([("mag_direction",mag_direction)])) : nothing
 datafile_name = make_parameters_filename(filename_dict)
 
 model_paras = (mdim=mdim,
@@ -327,7 +327,6 @@ else
 	starting = time()
 	net = TTNKit.BinaryRectangularNetwork(layers, TTNKit.ITensorNode, "Qubit", conserve_qns=syms)
 	hamj1j2 = get_j1j2_hamilt(layers,j2; model_paras...)
-	display(hamj1j2)
 
 	og_ttn, hamilt, dm_sp, rezobs, runtime = find_ground_state(layers,num_parts; ttn_net=net,ham_op=hamj1j2,model_paras...,metadata=merge(metadata_dict,Dict([("ham",hamj1j2),("net",net)])))
 	total_time = time() - starting
@@ -336,9 +335,16 @@ else
 	wavefunc = dm_sp.ttn
 end
 
-#final_energy = if_mag_orientation ? (rezobs.nrg[end] + 1000*mag_direction*TTNKit.expect(wavefunc,"Sz",(1,1))) / 2^layers : rezobs.nrg[end] / 2^layers
+#=append!(all_wavefuncs,[wavefunc])
 
-#text = get_spin_texture(wavefunc; if_sign = false,plot_title = "J2 = $j2, NRG = $(round(real(final_energy),digits=5))")
+if j2 > 1.0
+	shift = idx == 1 ? 1000*TTNKit.expect(wavefunc,"Sz",(2,1)) : 1000*TTNKit.expect(wavefunc,"Sz",(1,2))
+	final_energy = (rezobs.nrg[end] + shift + 1000*TTNKit.expect(wavefunc,"Sz",(1,1))) / 2^layers
+else
+	final_energy = if_mag_orientation ? (rezobs.nrg[end] + 1000*mag_direction*TTNKit.expect(wavefunc,"Sz",(1,1))) / 2^layers : rezobs.nrg[end] / 2^layers
+end
+
+text = get_spin_texture(wavefunc; if_sign = false,plot_title = "J2 = $j2, NRG = $(round(real(final_energy),digits=5))")=#
 
 #append!(all_wavefuncs,[wavefunc])
 
