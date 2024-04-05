@@ -325,33 +325,6 @@ function integral_part(correlation_length,cutoff_radius,counts=500; kwargs...)
 	return integrate(xs,ys)
 end
 
-function cdw_structure_factor(rho,qvec::Tuple,psi::TreeTensorNetwork; kwargs...)
-	if_periodic_phys = get(kwargs, :if_periodic_phys, true)
-	if_periodic_synth = get(kwargs, :if_periodic_synth, false)
-
-	lat = TTNKit.physical_lattice(TTNKit.network(psi))
-	phys_len,synth_len = size(lat)[1],size(lat)[2]
-
-	occs = get_occupancy(psi; if_plot=false,densmat=rho)
-
-	struc_fact = 0.0
-	for j in 1:phys_len
-		for s in 1:synth_len
-			p1 = (j,s)
-			p1_linear = TTNKit.linear_ind(lat,p1)
-			for jj in 1:phys_len
-				for ss in 1:synth_len
-					p2 = (jj,ss)
-					p2_linear = TTNKit.linear_ind(lat,p2)
-					dist = find_dist(p1, p2, (phys_len,synth_len), (if_periodic_phys,if_periodic_synth))[2]
-					struc_fact += occs[p1[1],p1[2]] * occs[p2[1],p2[2]] * exp(im * dot(qvec,dist))
-				end
-			end
-		end
-	end
-	return struc_fact / sum(occs)
-end
-
 if true
 	ll = 6
 	np = 4

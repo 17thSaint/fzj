@@ -844,6 +844,32 @@ function closed_loop(psi::TreeTensorNetwork, starting_site; kwargs...)
 	return angle(prod(calced_values)),calced_values,sites_to_loop
 end
 
+function cdw_structure_factor(rho,qvec::Tuple,psi::TreeTensorNetwork; kwargs...)
+	if_periodic_phys = get(kwargs, :if_periodic_phys, true)
+	if_periodic_synth = get(kwargs, :if_periodic_synth, false)
+
+	lat = TTNKit.physical_lattice(TTNKit.network(psi))
+	phys_len,synth_len = size(lat)[1],size(lat)[2]
+
+	occs = get_occupancy(psi; if_plot=false,densmat=rho)
+
+	struc_fact = 0.0
+	for j in 1:phys_len
+		for s in 1:synth_len
+			p1 = (j,s)
+			p1_linear = TTNKit.linear_ind(lat,p1)
+			for jj in 1:phys_len
+				for ss in 1:synth_len
+					p2 = (jj,ss)
+					p2_linear = TTNKit.linear_ind(lat,p2)
+					dist = find_dist(p1, p2, (phys_len,synth_len), (if_periodic_phys,if_periodic_synth))[2]
+					struc_fact += occs[p1[1],p1[2]] * occs[p2[1],p2[2]] * exp(im * dot(qvec,dist))
+				end
+			end
+		end
+	end
+	return struc_fact / sum(occs)
+end
 
 
 
@@ -861,7 +887,7 @@ fb_occ_mat = get_occupancy(fb_gs)
 
 
 #
-if false
+if true
 
 #nnst = 0.0
 #layers = 6
@@ -882,12 +908,12 @@ end=#
 #anis = 0.7
 #strens = range(0.01,2.0,length=10)
 #alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
-#strens = [0.0]#range(0.1,0.5,length=3)
+#strens = range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	#params_dict = Dict([("hopping_anisotropy",0.5),("layers",4),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",5.0),("lr",3),("if_periodic_phys",true)])
+	params_dict = Dict([("hopping_anisotropy",100.0),("layers",6),("mdim",50),("if_save_data",false),("alpha",0.0),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
-	params_dict = make_args_dict(ARGS)
+	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", "all")
 	if typeof(open_cores) != String
 		BLAS.set_num_threads(open_cores)	
@@ -935,10 +961,9 @@ end=#
 		alpha = num_particles/(filling*(2^layer_count))
 		mag_off = false
 	else
-		mag_off = false
+		mag_off = alpha == 0.0
 	end
 	#
-	mag_off = false
 
 	#
 	#nu = 1.0
@@ -973,13 +998,14 @@ end=#
 	save_plot = false
 	save_data = get(params_dict, "if_save_data", true)
 	if_cluster = any([occursin("local",pwd()),occursin("Local",pwd()),occursin("geraghty",pwd())])
-	if_continuous_saving = true#get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 7)
+	if_continuous_saving = get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 7)
 	save_data ? nothing : if_continuous_saving = false
 
 	loc = get(params_dict, "dataloc", get_folder_location("cluster-data/synth-dims"))
 	if_cliff = false
 	sc_type = "flat"
 	dists = [i for i in 1:2*edge_sites]
+	longrange_dist == "all" ? longrange_dist = edge_sites-1 : nothing
 	lr_scaling = long_range_scaling(longrange_dist,edge_sites,onsite_strength; cliff=if_cliff,scaling=sc_type,if_plot=false)
 
 	
@@ -1054,15 +1080,15 @@ end=#
 
 		#
 		println(datafile_name)
-		if_exists,found_data = false,nothing#check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
+		if_exists,found_data = check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
 
 		if if_exists
 			println("Found Data")
 			wavefunc = found_data[1]["ttn"]
 			try
-				global dens = found_data[1]["densmat"]
+				dens = found_data[1]["densmat"]
 			catch
-				global dens = nothing
+				dens = nothing
 			end
 			ham = found_data[2]["ham"]
 			#append!(wavefuncs,[wavefunc])
@@ -1075,14 +1101,14 @@ end=#
 			net = build_HH_net(layer_count; syms=syms, max_occ=max_occ)
 			ham = long_range_HH_ham(net,ts,alpha; model_paras...)
 			#display(ham)
-			@profile og_ttn, hamilt, dm_sp, rezobs, runtime, dens = find_ground_state(layer_count,num_particles; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
+			og_ttn, hamilt, dm_sp, rezobs, runtime, dens = find_ground_state(layer_count,num_particles; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
 			total_time = time() - starting
 			println("Running time = $total_time")
-			#wavefunc = dm_sp.ttn
+			wavefunc = dm_sp.ttn
 			#append!(wavefuncs,[dm_sp.ttn])
 		end
 
-		Profile.print()
+		#Profile.print()
 
 		#=
 		scatter([anis],[sum(dens) / (tot_sites * num_particles)],c="b")
@@ -1091,7 +1117,7 @@ end=#
 		xscale("log")
 		=#
 
-		#occs = get_occupancy(wavefunc; densmat=dens,plot_title="Strength = $stren")
+		occs = get_occupancy(wavefunc; densmat=dens,plot_title="Strength = $(params_dict["hopping_anisotropy"])")
 		#=plot(collect(1:Int(sqrt(2^layer_count))),occs[4,:],label="$(round(num_particles/(alpha*tot_sites),digits=4))")
 		legend()
 		xlabel("Sites")

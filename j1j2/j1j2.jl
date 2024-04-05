@@ -235,14 +235,14 @@ end
 if true
 
 ll = 4
-j_two = 0.5
+j_two = 0.0
 #bonddims = [100,150]
-bonddim = 300
+bonddim = 80
 #all_wavefuncs = []
 #for bonddim in bonddims
 #for (idx,mag_or) in enumerate([true,true,false])
 #mag_dir = idx == 1 ? 1.0 : -1.0
-params_dict = Dict([("layers",ll),("j2",j_two),("mdim",bonddim),("if_save_data",false),("if_mag_orientation",false),("if_periodic",false)])
+params_dict = Dict([("layers",ll),("j2",j_two),("mdim",bonddim),("if_save_data",false),("if_mag_orientation",true),("if_periodic",false)])
 #params_dict = make_args_dict(ARGS)
 open_cores = get(params_dict, "open_cores", "all")
 if typeof(open_cores) != String
@@ -279,7 +279,7 @@ expander = TTNKit.DefaultExpander(expander_val)
 
 
 filename_dict = Dict([("layers",layers),("j2",j2),("mdim",mdim),("if_mag_orientation",if_mag_orientation),("if_periodic",if_periodic)])
-if_mag_orientation ? merge!(filename_dict,Dict([("mag_direction",mag_direction)])) : nothing
+#if_mag_orientation ? merge!(filename_dict,Dict([("mag_direction",mag_direction)])) : nothing
 datafile_name = make_parameters_filename(filename_dict)
 
 model_paras = (mdim=mdim,
@@ -305,7 +305,7 @@ model_paras = (mdim=mdim,
 
 metadata_dict = merge(named_tuple_to_dict(model_paras),filename_dict)
 
-if_exists,found_data = check_data_exists(filename_dict,"ttn"; location=dataloc,output_level=false)
+if_exists,found_data = false,nothing#check_data_exists(filename_dict,"ttn"; location=dataloc,output_level=false)
 
 if if_exists
 	println("Found Data")
@@ -342,10 +342,10 @@ end
 	shift = idx == 1 ? 1000*TTNKit.expect(wavefunc,"Sz",(2,1)) : 1000*TTNKit.expect(wavefunc,"Sz",(1,2))
 	final_energy = (rezobs.nrg[end] + shift + 1000*TTNKit.expect(wavefunc,"Sz",(1,1))) / 2^layers
 else=#
-	final_energy = if_mag_orientation ? (rezobs.nrg[end] + 1000*mag_direction*TTNKit.expect(wavefunc,"Sz",(1,1))) / 2^layers : rezobs.nrg[end] / 2^layers
+	#final_energy = if_mag_orientation ? (rezobs.nrg[end] + 1000*mag_direction*TTNKit.expect(wavefunc,"Sz",(1,1))) / 2^layers : rezobs.nrg[end] / 2^layers
 #end
 
-text = get_spin_texture(wavefunc; if_sign = false,plot_title = "J2 = $j2, NRG = $(round(real(final_energy),digits=5))")#
+#text = get_spin_texture(wavefunc; if_sign = false,plot_title = "J2 = $j2, ")#NRG = $(round(real(final_energy),digits=5))")#
 
 #append!(all_wavefuncs,[wavefunc])
 
@@ -356,11 +356,37 @@ text = get_spin_texture(wavefunc; if_sign = false,plot_title = "J2 = $j2, NRG = 
 
 end
 
-#=w1_overlap = TTNKit.inner(all_wavefuncs[1],all_wavefuncs[3])
-w2_overlap = TTNKit.inner(all_wavefuncs[2],all_wavefuncs[3])
-println("Overlap with Up Corner = ",w1_overlap," Overlap with Down Corner = ",w2_overlap)#
+function get_commutator_hamilt(wavefunc::TTNKit.TreeTensorNetwork,ham_op,which_op::String,squared_val,nrg0,s1::Int64)
+	#sz_expval = TTNKit.expect(wavefunc,which_op,s1)
 
-which_wavefunc = 3
+	net = TTNKit.network(wavefunc)
+	ttnc1 = TTNKit.copy(wavefunc)
+	ttnc2 = TTNKit.copy(wavefunc)
+
+	idx_1 = TTNKit.siteinds(net)[s1]
+	O1 = TTNKit.convert_cu(TTNKit.op(which_op,idx_1),wavefunc[(1,1)])
+	ch_pos1 = (0,s1)
+	parent_pos1 = TTNKit.parent_node(net,ch_pos1)
+	TTNKit.move_ortho!(ttnc1,parent_pos1)
+	T1 = ttnc1[parent_pos1]
+	first_application = TTNKit.noprime(O1*T1)
+	ttnc1[parent_pos1] = first_application
+
+	TTNKit.move_ortho!(ttnc1,(1,1))
+	sz_nrg = calculate_energy(ttnc1,ham_op)
+	println("Operated Energy = ",sz_nrg)
+
+	commutator = (sz_nrg - squared_val*nrg0)# / sz_expval
+	return commutator
+end
+
+ham_here = get_j1j2_hamilt(layers,j2; model_paras...)#if_exists ? metadata["ham"] : hamj1j2
+comval = get_commutator_hamilt(wavefunc,ham_here,"Sz",1.0,rezobs.nrg[end],1)
+println("Commutator = ",comval)
+#
+
+
+#=which_wavefunc = 1
 s1 = 1
 s2 = 2
 net = TTNKit.network(all_wavefuncs[which_wavefunc])

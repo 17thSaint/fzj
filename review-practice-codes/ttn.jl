@@ -1769,6 +1769,24 @@ function integrated_density(occs_diff::Matrix; kwargs...)
 	return edges,int_dens
 end
 
+function calculate_energy(wavefunc::TTNKit.TreeTensorNetwork,ham_op)
+	TTNKit.move_ortho!(wavefunc,(1,1))
+	net = TTNKit.network(wavefunc)
+	lat = TTNKit.physical_lattice(net)
+	ham_tpo = TTNKit.TPO(ham_op,lat)
+	ham_ptpo = TTNKit.ProjectedTensorProductOperator(wavefunc,ham_tpo)
+	func = (action, T) -> eigsolve(action, T, 1,
+								:SR;
+								ishermitian=true,
+								tol=1e-14,
+								krylovdim=5,
+								maxiter=3)
+	sh = TTNKit.SimpleSweepHandler(wavefunc,ham_ptpo,func,1,[TTNKit.maxlinkdim(wavefunc)],[0.0],TTNKit.NoExpander())
+	sh = TTNKit.update!(sh,(1,1))
+	nrg = sh.current_energy
+	return nrg
+end
+
 #=
 
 #final_time = 0.1
