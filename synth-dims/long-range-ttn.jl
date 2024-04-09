@@ -887,7 +887,7 @@ fb_occ_mat = get_occupancy(fb_gs)
 
 
 #
-if true
+if false
 
 #nnst = 0.0
 #layers = 6
@@ -911,15 +911,15 @@ end=#
 #strens = range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("hopping_anisotropy",100.0),("layers",6),("mdim",50),("if_save_data",false),("alpha",0.0),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true)])
+	params_dict = Dict([("hopping_anisotropy",0.6),("particles",6),("layers",6),("mdim",150),("if_save_data",true),("filling",0.5),("onsite_strength",0.231111111),("lr","all"),("if_periodic_phys",true)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
-	open_cores = get(params_dict, "open_cores", "all")
+	open_cores = get(params_dict, "open_cores", 5)
 	if typeof(open_cores) != String
 		BLAS.set_num_threads(open_cores)	
 		display(BLAS.get_config())
 	end
-	#
+	#true
 	nrgtol = get(params_dict, "nrgtol", 1E-4)
 	cutoff = get(params_dict, "cutoff", 1E-6)
 	if_NN = get(params_dict, "if_nn_int", false)
@@ -1117,7 +1117,7 @@ end=#
 		xscale("log")
 		=#
 
-		occs = get_occupancy(wavefunc; densmat=dens,plot_title="Strength = $(params_dict["hopping_anisotropy"])")
+		occs = get_occupancy(wavefunc; densmat=dens,plot_title="Anis = $(params_dict["hopping_anisotropy"])")
 		#=plot(collect(1:Int(sqrt(2^layer_count))),occs[4,:],label="$(round(num_particles/(alpha*tot_sites),digits=4))")
 		legend()
 		xlabel("Sites")

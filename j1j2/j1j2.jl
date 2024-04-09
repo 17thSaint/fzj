@@ -232,7 +232,31 @@ function spinspin_structure_factor(wavefunc::TTNKit.TreeTensorNetwork; kwargs...
 	return real(sum(exp_mat .* corr_mat) / (num_sites*(num_sites+2)))#, exp_mat
 end
 
-if true
+function get_commutator_hamilt(wavefunc::TTNKit.TreeTensorNetwork,ham_op,which_op::String,squared_val,nrg0,s1::Int64)
+	#sz_expval = TTNKit.expect(wavefunc,which_op,s1)
+
+	net = TTNKit.network(wavefunc)
+	ttnc1 = TTNKit.copy(wavefunc)
+	ttnc2 = TTNKit.copy(wavefunc)
+
+	idx_1 = TTNKit.siteinds(net)[s1]
+	O1 = TTNKit.convert_cu(TTNKit.op(which_op,idx_1),wavefunc[(1,1)])
+	ch_pos1 = (0,s1)
+	parent_pos1 = TTNKit.parent_node(net,ch_pos1)
+	TTNKit.move_ortho!(ttnc1,parent_pos1)
+	T1 = ttnc1[parent_pos1]
+	first_application = TTNKit.noprime(O1*T1)
+	ttnc1[parent_pos1] = first_application
+
+	TTNKit.move_ortho!(ttnc1,(1,1))
+	sz_nrg = calculate_energy(ttnc1,ham_op)
+	println("Operated Energy = ",sz_nrg)
+
+	commutator = (sz_nrg - squared_val*nrg0)# / sz_expval
+	return commutator
+end
+
+if false
 
 ll = 4
 j_two = 0.0
@@ -356,33 +380,9 @@ else=#
 
 end
 
-function get_commutator_hamilt(wavefunc::TTNKit.TreeTensorNetwork,ham_op,which_op::String,squared_val,nrg0,s1::Int64)
-	#sz_expval = TTNKit.expect(wavefunc,which_op,s1)
-
-	net = TTNKit.network(wavefunc)
-	ttnc1 = TTNKit.copy(wavefunc)
-	ttnc2 = TTNKit.copy(wavefunc)
-
-	idx_1 = TTNKit.siteinds(net)[s1]
-	O1 = TTNKit.convert_cu(TTNKit.op(which_op,idx_1),wavefunc[(1,1)])
-	ch_pos1 = (0,s1)
-	parent_pos1 = TTNKit.parent_node(net,ch_pos1)
-	TTNKit.move_ortho!(ttnc1,parent_pos1)
-	T1 = ttnc1[parent_pos1]
-	first_application = TTNKit.noprime(O1*T1)
-	ttnc1[parent_pos1] = first_application
-
-	TTNKit.move_ortho!(ttnc1,(1,1))
-	sz_nrg = calculate_energy(ttnc1,ham_op)
-	println("Operated Energy = ",sz_nrg)
-
-	commutator = (sz_nrg - squared_val*nrg0)# / sz_expval
-	return commutator
-end
-
-ham_here = get_j1j2_hamilt(layers,j2; model_paras...)#if_exists ? metadata["ham"] : hamj1j2
-comval = get_commutator_hamilt(wavefunc,ham_here,"Sz",1.0,rezobs.nrg[end],1)
-println("Commutator = ",comval)
+#ham_here = get_j1j2_hamilt(layers,j2; model_paras...)#if_exists ? metadata["ham"] : hamj1j2
+#comval = get_commutator_hamilt(wavefunc,ham_here,"Sz",1.0,rezobs.nrg[end],1)
+#println("Commutator = ",comval)
 #
 
 

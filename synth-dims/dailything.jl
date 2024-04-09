@@ -328,11 +328,12 @@ end
 if true
 	ll = 6
 	np = 4
+	magfield = 2*np / (2^ll)
 	pbc = true
 	anises = [1.0,0.8,0.7,0.6,0.5,0.4,0.35]
 	trans_strens = [zeros(length(anises)),zeros(length(anises))]
 	for (jj,anis) in enumerate(anises)
-		pdict = Dict([("layers",ll),("particles",np),("if_periodic_phys",pbc),("lr",7),("alpha",0.125),("hopping_anisotropy",anis)])
+		pdict = Dict([("layers",ll),("particles",np),("if_periodic_phys",pbc),("lr",7),("alpha",magfield),("hopping_anisotropy",anis)])
 		whichfiles = find_data_file(pdict,"ttn",get_folder_location("cluster-data/synth-dims"); output_level=false)
 		#
 		cdwsfs = [zeros(length(whichfiles)),zeros(length(whichfiles))]
