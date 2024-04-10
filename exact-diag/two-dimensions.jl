@@ -364,7 +364,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
                 continue
             end
 
-            coeff = -ty
+            coeff = -ty #* exp(im*alpha*starting_site[1]*2*pi)
             dir == -1 ? coeff = conj(coeff) : nothing
             push!(output_weights,coeff)
 
@@ -430,11 +430,11 @@ end
 
 
 
-density = 1/4
-Lx,Ly = 4,5
-N = Int(floor(density*Lx*Ly))
+#density = 1/4
+Lx,Ly = 5,5
+N = 3#Int(floor(density*Lx*Ly))
 println("Using ",N," particles with density ",round(N/(Lx*Ly),digits=3))
-if_periodic_x,if_periodic_y = true,false
+if_periodic_x,if_periodic_y = true,true
 start_time = time()
 full_basis,basis_dict = generate_basis(Lx,Ly,N; output_level=1)
 println("Made basis in ",time()-start_time)
@@ -466,16 +466,16 @@ println("Sparsity = ",nnz(H)/size(H)[1]^2)
 nev = 20
 rez = eigsolve(H,nev)
 println("Elapsed time: ",time()-start_time)
+gs = rez[2][findfirst(x->x==minimum(rez[1]),rez[1])]
 
-nrgs_krylov = -1 .* filter(x->x<0.0,rez[1])
+nrgs_krylov = filter(x->x<0.0,rez[1])
 scatter(1:length(nrgs_krylov),nrgs_krylov,c="b",label="Krylov")
 xlabel("Eigenvalue Index")
 ylabel("Energy")
-yscale("log")
 legend()
-#=for i in 1:nev
-    occs = get_occupancy(rez[2][i],lattice_params; plot_title="NRG = $(round(rez[1][1],digits=4))")
-end=#
+
+occs = get_occupancy(gs,lattice_params; plot_title="NRG = $(round(minimum(rez[1]),digits=4))")
+
 
 
 
