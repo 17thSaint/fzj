@@ -2,49 +2,8 @@ using Pkg
 Pkg.activate(".")
 using LinearAlgebra,KrylovKit,Combinatorics,SparseArrays
 
-# finds the linear index assuming jump snake mapping with site 1 at bottom left corner
-function linear_index(site::Tuple{Int64,Int64},Lx::Int64,Ly::Int64)
-    return (site[2]-1)*Ly + site[1]
-end
-
-# finds the site assuming jump snake mapping with site 1 at bottom left corner
-function coordinate(site::Int64,Lx::Int64,Ly::Int64)
-    y = div(site-1,Ly) + 1
-    x = site - (y-1)*Ly
-    return (x,y)
-end
-
-# builds up the full basis of N hard-core particles in a Lx by Ly lattice (no symmetries yet)
-function generate_basis(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
-
-    totalSites = Lx * Ly
-    n_states = binomial(totalSites,N)
-    #println("Numbers of basis states: ",n_states)
-
-    #bit_strings = Array{String,2}(undef,totalSites,n_states)
-    bit_states    = Array{Int,2}(undef,   totalSites,n_states)
-
-    #basis_dict  = Dict{String,Int}()
-
-    subsets = combinations([1:1:totalSites;],N)
-
-    jj = 1
-    for subs in subsets
-        #bit_strings[:,jj]  = fill("0",totalSites)
-        bit_states[:,jj] = fill(0,  totalSites)
-        for en in subs
-            #bit_strings[en,jj]  = "1"
-            bit_states[en,jj] =  1
-        end
-        #basis_dict[join(bit_strings[:,jj])] = jj
-        jj = jj + 1
-    end
-
-    return bit_states
-end
-
-generate_basis(L::Int64,N::Int64) = generate_basis(L,L,N)
-
+######## hopping is wrong because has amplitude even if no particle at starting location #########
+#=
 function right_x_hopping_matrix(site::Tuple{Int64,Int64},Lx::Int64,Ly::Int64)
     
     # the matrix is mostly close to identity
@@ -172,14 +131,13 @@ function full_tensor_matrix(ham_comp,which_particle::Int64,N::Int64)
     return H_part
 end
 
-function naive_build_ham(lattice_params::Dict,hamilt_params::Dict)
+function naive_build_ham(lattice_params::Dict,hamilt_params::Dict; kwargs...)
     Lx = lattice_params["Lx"]
     Ly = lattice_params["Ly"]
     N = lattice_params["N"]
     if_periodic_x = lattice_params["if_periodic_x"]
     if_periodic_y = lattice_params["if_periodic_y"]
     totalSites = Lx * Ly
-    basis = generate_basis(Lx,Ly,N)
 
     alpha = get(hamilt_params,"alpha",0.0)
     tx = get(hamilt_params,"tx",1.0)
@@ -205,9 +163,7 @@ function naive_build_ham(lattice_params::Dict,hamilt_params::Dict)
                         continue
                     end
 
-                    for i in 1:N
-                        H += ham_component
-                    end
+                    H += ham_component
                 end
             end
 
@@ -225,9 +181,6 @@ function naive_build_ham(lattice_params::Dict,hamilt_params::Dict)
                         continue
                     end
 
-                    #=for i in 1:N
-                        H += full_tensor_matrix(ham_component,i,N)
-                    end=#
                     H += ham_component
                 end
             end
@@ -239,9 +192,7 @@ function naive_build_ham(lattice_params::Dict,hamilt_params::Dict)
                     coeff = U[abs(s-ss) + 1]
                     if abs(coeff) > 1e-4
                         ham_component = coeff * sparse(number_operator_matrix(site2,Lx,Ly))
-                        #=for i in 1:N
-                            H += full_tensor_matrix(ham_component,i,N)
-                        end=#
+
                         H += ham_component
                     end
                 end
@@ -250,16 +201,76 @@ function naive_build_ham(lattice_params::Dict,hamilt_params::Dict)
         end
     end
 
-    return H# + conj(transpose(H))
+    return H
+end
+=#
+
+
+# finds the linear index assuming jump snake mapping with site 1 at bottom left corner
+function linear_index(site::Tuple{Int64,Int64},Lx::Int64,Ly::Int64)
+    return (site[2] - 1)*Lx + site[1]
 end
 
-function get_occupancy(x::Vector{ComplexF64},Lx::Int64,Ly::Int64; kwargs...)
+# finds the site assuming jump snake mapping with site 1 at bottom left corner
+function coordinate(site::Int64,Lx::Int64,Ly::Int64)
+    x = mod1(site,Lx)
+    y = Int((site - x) / Lx + 1)
+    return (x,y)
+end
+
+# builds up the full basis of N hard-core particles in a Lx by Ly lattice (no symmetries yet)
+function generate_basis(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
+
+    output_level = get(kwargs,:output_level,1)
     totalSites = Lx * Ly
+    n_states = binomial(totalSites,N)
+    output_level > 0 ? println("Numbers of basis states: ",n_states) : nothing
+
+    #bit_strings = Array{String,2}(undef,totalSites,n_states)
+    bit_states    = Array{Int,2}(undef,   totalSites,n_states)
+
+    basis_dict  = Dict{String,Int}()
+
+    subsets = combinations([1:1:totalSites;],N)
+
+    jj = 1
+    for subs in subsets
+        #bit_strings[:,jj]  = fill("0",totalSites)
+        bit_states[:,jj] = fill(0,  totalSites)
+        for en in subs
+            #bit_strings[en,jj]  = "1"
+            bit_states[en,jj] =  1
+        end
+        basis_dict[prod(string.(bit_states[:,jj]))] = jj
+        jj = jj + 1
+        if output_level > 0 && isapprox(jj/length(subsets)*100 % 10,0.0,atol=1e-4)
+            println(round(jj/length(subsets)*100,digits=2),"% done.")
+        end
+    end
+
+    return bit_states,basis_dict
+end
+
+generate_basis(L::Int64,N::Int64) = generate_basis(L,L,N)
+
+function get_occupancy(x::Vector{ComplexF64},lattice_params::Dict{String,Any}; kwargs...)
+    basis_dict = lattice_params["basis_dict"]
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+    N = lattice_params["N"]
+
     occupancy = zeros(Float64,Ly,Lx)
+    wavefunc = zeros(ComplexF64,Lx*Ly)
+    for (key,val) in basis_dict
+        wavefunc += x[val] .* [parse(Int64,b) for b in key]
+    end
+    normalize!(wavefunc)
+    wavefunc .*= sqrt(N)
+
     for j in 1:Lx
         for s in 1:Ly
-            op_mat = sparse(number_operator_matrix((j,s),Lx,Ly))
-            occupancy[s,j] = conj(transpose(x)) * op_mat * x
+            site = (j,s)
+            occupancy[s,j] = abs2(wavefunc[linear_index(site,Lx,Ly)])
         end
     end
 
@@ -282,28 +293,189 @@ function plot_occupancy(exp_occ; kwargs...)
     return nothing
 end
 
-Lx,Ly = 4,4
-N = 3
+function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
+    
+    output_states = Array{Int64,1}(undef,0)
+    output_weights = Array{ComplexF64,1}(undef,0)
+    # get the basis state
+    basis_state = lattice_params["full_basis"][:,which_basis]
+    basis_dict = lattice_params["basis_dict"]
+    
+    if_periodic_x = lattice_params["if_periodic_x"]
+    if_periodic_y = lattice_params["if_periodic_y"]
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+
+    tx = hamilt_params["tx"]
+    ty = hamilt_params["ty"]
+    alpha = hamilt_params["alpha"]
+    U = hamilt_params["U"]
+    interaction_cutoff = hamilt_params["interaction_cutoff"]
+
+    particle_locations_linear = findall(x->x==1,basis_state)
+    particle_locations_coordinate = coordinate.(particle_locations_linear,Lx,Ly)
+
+    # get the hopping weights
+    for (idx,starting_site) in enumerate(particle_locations_coordinate)
+        
+        # x-direction hopping (physical)
+        for dir in [1,-1]
+
+            # skip term if at boundary and no periodic boundary
+            if starting_site[1] == Lx && !if_periodic_x && dir == 1
+                continue
+            elseif starting_site[1] == 1 && !if_periodic_x && dir == -1
+                continue
+            end
+
+            next_site = (mod1(starting_site[1]+dir,Lx),starting_site[2])
+
+            # enforce hard-core constraint
+            if next_site in particle_locations_coordinate
+                continue
+            end
+
+            coeff = -tx * exp(im*alpha*starting_site[2]*2*pi)
+            dir == -1 ? coeff = conj(coeff) : nothing
+            push!(output_weights,coeff)
+
+            
+            output_basis_state = zeros(Int64,length(basis_state)) + basis_state
+            output_basis_state[linear_index(starting_site,Lx,Ly)] = 0
+            output_basis_state[linear_index(next_site,Lx,Ly)] = 1
+            output_basis_state_index = basis_dict[prod(string.(output_basis_state))]
+            push!(output_states,output_basis_state_index)
+        end
+
+        # y-direction hopping (synthetic)
+        for dir in [1,-1]
+
+            # skip term if at boundary and no periodic boundary
+            if starting_site[2] == Ly && !if_periodic_y && dir == 1
+                continue
+            elseif starting_site[2] == 1 && !if_periodic_y && dir == -1
+                continue
+            end
+
+            next_site = (starting_site[1],mod1(starting_site[2]+dir,Ly))
+
+            # enforce hard-core constraint
+            if next_site in particle_locations_coordinate
+                continue
+            end
+
+            coeff = -ty
+            dir == -1 ? coeff = conj(coeff) : nothing
+            push!(output_weights,coeff)
+
+            output_basis_state = zeros(Int64,length(basis_state)) + basis_state
+            output_basis_state[linear_index(starting_site,Lx,Ly)] = 0
+            output_basis_state[linear_index(next_site,Lx,Ly)] = 1
+            output_basis_state_index = basis_dict[prod(string.(output_basis_state))]
+            push!(output_states,output_basis_state_index)
+        end
+
+    end
+    #
+
+    # interaction
+    lr_dist = sum(U .> interaction_cutoff) - 1
+    if length(particle_locations_linear) > 1 && lr_dist > 0
+        #println("Doing Interactions")
+        for phys_loc in 1:Lx
+
+            # find interacting particles at given physical site
+            interacting_particles = findall(x->x[1]==phys_loc,particle_locations_coordinate)
+            
+            if length(interacting_particles) > 1 # need more than 1 particle to interact
+                for i in 1:length(interacting_particles) # loop over all pairs of interacting particles
+                    for j in i+1:length(interacting_particles)
+                        dist = abs(particle_locations_coordinate[interacting_particles[i]][2] - particle_locations_coordinate[interacting_particles[j]][2])
+                        if_periodic_y ? dist = min(dist,Ly-dist) : nothing
+                        if dist <= lr_dist && U[dist+1] > interaction_cutoff
+                            push!(output_weights,U[dist+1])
+                            push!(output_states,which_basis)
+                        end
+                    end
+                end
+            end
+
+        end
+    end
+
+        
+    return output_states,output_weights
+end
+
+function buildHam(lattice_params::Dict,hamilt_params::Dict; kwargs...)
+    output_level = get(kwargs,:output_level,1)
+    full_basis = lattice_params["full_basis"]
+
+    ham = spzeros(ComplexF64,size(full_basis)[2],size(full_basis)[2])
+
+    for j in 1:size(full_basis)[2]
+        output_states,output_weights = applyHam(j,lattice_params,hamilt_params)
+        for (idx,state) in enumerate(output_states)
+            ham[j,state] += output_weights[idx]
+        end
+        if output_level > 0 && isapprox(j/size(full_basis)[2]*100 % 10,0.0,atol=1e-4)
+            println(round(j/size(full_basis)[2]*100,digits=2),"% done.")
+        end
+    end
+
+    return ham
+end
+
+
+
+
+
+density = 1/4
+Lx,Ly = 4,5
+N = Int(floor(density*Lx*Ly))
+println("Using ",N," particles with density ",round(N/(Lx*Ly),digits=3))
 if_periodic_x,if_periodic_y = true,false
-lattice_params = Dict("Lx"=>Lx,
+start_time = time()
+full_basis,basis_dict = generate_basis(Lx,Ly,N; output_level=1)
+println("Made basis in ",time()-start_time)
+
+lattice_params::Dict{String,Any} = Dict("Lx"=>Lx,
                       "Ly"=>Ly,
                       "N"=>N,
                       "if_periodic_x"=>if_periodic_x,
-                      "if_periodic_y"=>if_periodic_y)
+                      "if_periodic_y"=>if_periodic_y,
+                      "full_basis"=>full_basis,
+                      "basis_dict"=>basis_dict)
 
-filling = 1.0
-alpha = 0.0#N / (filling * Lx * Ly)
+stren = 0.0
+lr_dist = "all"
+lr_dist == "all" ? lr_dist = Ly : nothing
+us = [i < lr_dist+1 ? stren : 0.0 for i in 1:Ly]
+filling = 0.5
+alpha = N / (filling * Lx * Ly)
 hamilt_params = Dict("alpha"=>alpha,
                      "tx"=>1.0,
                      "ty"=>1.0,
-                     "U"=>zeros(Ly))
+                     "U"=>us,
+                     "interaction_cutoff"=>1e-5)
 
-H = naive_build_ham(lattice_params,hamilt_params)
 
-nev = 1
+H = buildHam(lattice_params,hamilt_params)
+println("Sparsity = ",nnz(H)/size(H)[1]^2)
+
+nev = 20
 rez = eigsolve(H,nev)
+println("Elapsed time: ",time()-start_time)
 
-occs = get_occupancy(rez[2][1],Lx,Ly; plot_title="NRG = $(round(rez[1][1],digits=4))")
+nrgs_krylov = -1 .* filter(x->x<0.0,rez[1])
+scatter(1:length(nrgs_krylov),nrgs_krylov,c="b",label="Krylov")
+xlabel("Eigenvalue Index")
+ylabel("Energy")
+yscale("log")
+legend()
+#=for i in 1:nev
+    occs = get_occupancy(rez[2][i],lattice_params; plot_title="NRG = $(round(rez[1][1],digits=4))")
+end=#
 
 
 
