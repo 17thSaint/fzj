@@ -426,13 +426,110 @@ function buildHam(lattice_params::Dict,hamilt_params::Dict; kwargs...)
     return ham
 end
 
+function get_old_basis_version(basis::Array)
+    previous_iteration = sparse(basis[end] == 0 ? [1 0] : [0 1])
+    for i in 1:length(basis)-1
+        if basis[length(basis)-i] == 0
+            previous_iteration = kron(previous_iteration,sparse([1 0]))
+        else
+            previous_iteration = kron(previous_iteration,sparse([0 1]))
+        end
+    end
+    return previous_iteration
+end
 
+function get_old_basis_version(operator::Matrix,which_site::Int64,total_sites::Int64)
+    previous_iteration = sparse(which_site == total_sites ? operator : Matrix(I,2,2))
+    for i in 1:total_sites-1
+        if total_sites - i == which_site
+            previous_iteration = kron(previous_iteration,sparse(operator))
+        else
+            previous_iteration = kron(previous_iteration,sparse(Matrix(I,2,2)))
+        end
+    end
+    return previous_iteration
+end
+
+function get_old_basis_version(operator1::Matrix,operator2::Matrix,site1::Int64,site2::Int64,total_sites::Int64)
+    
+    if site1 == site2
+        return get_old_basis_version(operator1*operator2,site1,total_sites)
+    end
+    
+    previous_iteration = sparse(Matrix(I,2,2))
+    if site1 == total_sites
+        previous_iteration = sparse(operator1)
+    elseif site2 == total_sites
+        previous_iteration = sparse(operator2)
+    end
+    for i in 1:total_sites-1
+        if total_sites-i == site1
+            previous_iteration = kron(previous_iteration,sparse(operator1))
+        elseif total_sites-i == site2
+            previous_iteration = kron(previous_iteration,sparse(operator2))
+        else
+            previous_iteration = kron(previous_iteration,sparse(Matrix(I,2,2)))
+        end
+    end
+    return previous_iteration
+end
+
+get_old_basis_version(operator1::Matrix,operator2::Matrix,site1::Tuple{Int64,Int64},site2::Tuple{Int64,Int64},Lx::Int64,Ly::Int64) = get_old_basis_version(operator1,operator2,linear_index(site1,Lx,Ly),linear_index(site2,Lx,Ly),Lx*Ly)
+get_old_basis_version(operator::Matrix,which_site::Tuple{Int64,Int64},Lx::Int64,Ly::Int64) = get_old_basis_version(operator,linear_index(which_site,Lx,Ly),Lx*Ly)
+
+function change_of_basis_matrix(lattice_params::Dict{String,Any})
+    full_basis = lattice_params["full_basis"]
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+    N = lattice_params["N"]
+
+    total_sites = Lx * Ly
+    change_of_basis = spzeros(ComplexF64,2^(Lx*Ly),size(full_basis)[2])
+
+    for j in 1:size(full_basis)[2]
+        change_of_basis[:,j] = transpose(get_old_basis_version(full_basis[:,j]))
+    end
+
+    return change_of_basis,sparse(pinv(Matrix(change_of_basis)))
+end
+
+function hopping_matrix(site1::Tuple{Int64,Int64},site2::Tuple{Int64,Int64},lattice_params::Dict{String,Any})
+    full_basis = lattice_params["full_basis"]
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+    change_of_basis = lattice_params["change_of_basis"]
+    change_of_basis_inv = lattice_params["change_of_basis_inv"]
+
+    creation = [0 1; 0 0]
+    annihilation = [0 0; 1 0]
+
+    hopping_old_basis = get_old_basis_version(creation,annihilation,site1,site2,Lx,Ly)
+
+    new_basis_hopping = change_of_basis_inv * hopping_old_basis * change_of_basis
+    return new_basis_hopping
+end
+
+function density_matrix(x::Vector{ComplexF64},lattice_params::Dict{String,Any})
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+
+    rho = Array{ComplexF64,2}(undef,Lx*Ly,Lx*Ly)
+
+    for i in 1:Lx*Ly
+        for j in 1:i
+            rho[i,j] = conj(transpose(x)) * hopping_matrix(coordinate(i,Lx,Ly),coordinate(j,Lx,Ly),lattice_params) * x
+            rho[j,i] = conj(rho[i,j])
+        end
+    end
+
+    return rho
+end
 
 
 
 #density = 1/4
-Lx,Ly = 5,5
-N = 3#Int(floor(density*Lx*Ly))
+Lx,Ly = 4,4
+N = 2#Int(floor(density*Lx*Ly))
 println("Using ",N," particles with density ",round(N/(Lx*Ly),digits=3))
 if_periodic_x,if_periodic_y = true,true
 start_time = time()
@@ -447,34 +544,55 @@ lattice_params::Dict{String,Any} = Dict("Lx"=>Lx,
                       "full_basis"=>full_basis,
                       "basis_dict"=>basis_dict)
 
+if_cob = true
+if if_cob
+    change_of_basis,change_of_basis_inv = change_of_basis_matrix(lattice_params)
+    println("Found Change of Basis Matrices in ",time()-start_time)
+    lattice_params["change_of_basis"] = change_of_basis
+    lattice_params["change_of_basis_inv"] = change_of_basis_inv
+end
+
 stren = 0.0
 lr_dist = "all"
 lr_dist == "all" ? lr_dist = Ly : nothing
-us = [i < lr_dist+1 ? stren : 0.0 for i in 1:Ly]
-filling = 0.5
-alpha = N / (filling * Lx * Ly)
+us = [i < lr_dist+1 ? stren : 0.0 for i in 1:Ly]    
+filling = 1.0
+x_shift,y_shift = !if_periodic_x, !if_periodic_y
+alpha = N / (filling * (Lx - x_shift) * (Ly - y_shift))
 hamilt_params = Dict("alpha"=>alpha,
                      "tx"=>1.0,
                      "ty"=>1.0,
                      "U"=>us,
                      "interaction_cutoff"=>1e-5)
 
-
+#
 H = buildHam(lattice_params,hamilt_params)
 println("Sparsity = ",nnz(H)/size(H)[1]^2)
 
 nev = 20
 rez = eigsolve(H,nev)
 println("Elapsed time: ",time()-start_time)
-gs = rez[2][findfirst(x->x==minimum(rez[1]),rez[1])]
+gs = rez[2][findfirst(x->x==minimum(rez[1]),rez[1])]#
 
-nrgs_krylov = filter(x->x<0.0,rez[1])
+rho = density_matrix(gs,lattice_params)
+imshow(abs.(rho))
+colorbar()
+
+#=nrgs_krylov = filter(x->x<0.0,rez[1])
+fig = figure()
 scatter(1:length(nrgs_krylov),nrgs_krylov,c="b",label="Krylov")
 xlabel("Eigenvalue Index")
 ylabel("Energy")
 legend()
 
-occs = get_occupancy(gs,lattice_params; plot_title="NRG = $(round(minimum(rez[1]),digits=4))")
+occs = get_occupancy(gs,lattice_params; plot_title="NRG = $(round(minimum(rez[1]),digits=4))")#
+
+fig2 = figure()
+scatter(1:10,rr[end-9:end],c="b")
+xlabel("Eigenvalue Index")
+ylabel("Eigenvalue")
+title("Density Matrix Eigenvalues")
+yscale("log")=#
 
 
 

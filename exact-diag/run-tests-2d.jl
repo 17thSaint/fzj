@@ -3,7 +3,7 @@ include("two-dimensions.jl")
 
 if_all = true
 
-if false || if_all
+#=if false || if_all
     @testset "linear index" begin
         Lx,Ly = 4,4
         @test linear_index((1,1),Lx,Ly) == 1
@@ -96,6 +96,66 @@ if false || if_all
         two_particle_config_vector[linear_index(site,Lx,Ly)] = 1/sqrt(2)
         two_particle_config_vector[linear_index((3,3),Lx,Ly)] = 1/sqrt(2)
         @test isapprox(transpose(two_particle_config_vector) * m * two_particle_config_vector,0.5,atol=1e-3)
+    end
+end=#
+
+if true || if_all
+    @testset "operator change of basis" begin
+        Lx,Ly = 2,2
+        N = 2
+        if_periodic_x,if_periodic_y = true,true
+        full_basis,basis_dict = generate_basis(Lx,Ly,N; output_level=0)
+        
+        lattice_params::Dict{String,Any} = Dict("Lx"=>Lx,
+                              "Ly"=>Ly,
+                              "N"=>N,
+                              "if_periodic_x"=>if_periodic_x,
+                              "if_periodic_y"=>if_periodic_y,
+                              "full_basis"=>full_basis,
+                              "basis_dict"=>basis_dict)
+
+        change_of_basis,change_of_basis_inv = change_of_basis_matrix(lattice_params)
+
+        lattice_params["change_of_basis"] = change_of_basis
+        lattice_params["change_of_basis_inv"] = change_of_basis_inv
+        
+        alpha = 0.0
+        hamilt_params = Dict("alpha"=>alpha,
+                             "tx"=>1.0,
+                             "ty"=>1.0,
+                             "U"=>zeros(Ly),
+                             "interaction_cutoff"=>1e-5)
+        
+        H = buildHam(lattice_params,hamilt_params; output_level=0)
+        
+        nev = 3
+        rez = eigsolve(H,nev)
+        gs = rez[2][findfirst(x->x==minimum(rez[1]),rez[1])]
+        
+        new_basis_hopping = hopping_matrix((1,1),(2,1),lattice_params)
+        new_basis_expval = abs(conj(transpose(gs)) * new_basis_hopping * gs)
+        
+        old_basis_hopping = get_old_basis_version([0 1; 0 0],[0 0; 1 0],(1,1),(2,1),Lx,Ly)
+        old_basis_gs = change_of_basis * gs
+        old_basis_expval = abs(conj(transpose(old_basis_gs)) * old_basis_hopping * old_basis_gs)
+
+        @test isapprox(new_basis_expval,old_basis_expval,atol=1e-3)
+
+        
+        
+        efficient_occupancy = get_occupancy(gs,lattice_params; if_plot=false)[1,1]
+
+        old_basis_occupancy = get_old_basis_version([0 0;0 1],(1,1),Lx,Ly)
+        old_basis_occ_expval = abs(conj(transpose(old_basis_gs)) * old_basis_occupancy * old_basis_gs)
+        #println("Old Basis Occupancy: ",old_basis_occ_expval)
+        @test isapprox(efficient_occupancy,old_basis_occ_expval,atol=1e-5)
+
+        new_basis_occupancy = change_of_basis_inv * old_basis_occupancy * change_of_basis
+        new_basis_occ_expval = abs(conj(transpose(gs)) * new_basis_occupancy * gs)
+        #println("New Basis Occupancy: ",new_basis_occ_expval)
+        @test isapprox(efficient_occupancy,new_basis_occ_expval,atol=1e-5)
+    
+        
     end
 end
 
