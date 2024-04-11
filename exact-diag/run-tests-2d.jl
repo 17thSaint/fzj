@@ -1,7 +1,7 @@
 using Test
 include("two-dimensions.jl")
 
-if_all = false
+if_all = true
 
 #=if false || if_all
     @testset "linear index" begin
@@ -160,7 +160,7 @@ if false || if_all
 end
 
 if false || if_all
-    @testset "hopping on self as number operator" begin
+    @testset "hopping probability function" begin
         Lx,Ly = 4,4
         N = 2
         if_periodic_x,if_periodic_y = false,false
@@ -172,6 +172,9 @@ if false || if_all
                               "if_periodic_y"=>if_periodic_y,
                               "full_basis"=>full_basis,
                               "basis_dict"=>basis_dict)
+        change_of_basis,change_of_basis_inv = change_of_basis_matrix(lattice_params)
+        lattice_params["change_of_basis"] = change_of_basis
+        lattice_params["change_of_basis_inv"] = change_of_basis_inv
 
         alpha = 0.0
         hamilt_params = Dict("alpha"=>alpha,
@@ -185,6 +188,7 @@ if false || if_all
         rez = eigsolve(H,nev)
         gs = rez[2][findfirst(x->x==minimum(rez[1]),rez[1])]
 
+        # test that occupancy matrix matches the hopping probability on itself for every site
         direct_occupancy = get_occupancy(gs,lattice_params; if_plot=false, plot_title="Direct Occupancy")
         handmade_occs = zeros(Float64,Ly,Lx)
         for j in 1:Lx
@@ -196,6 +200,11 @@ if false || if_all
         percent_diff = abs.((direct_occupancy .- handmade_occs) ./ direct_occupancy)
         # less than 3% difference
         @test all(percent_diff .< 0.03)
+
+        # test hopping probability makes same density matrix
+        rho = density_matrix_naive(gs,lattice_params)
+        rho_efficient = density_matrix(gs,lattice_params)
+        @test isapprox(rho,rho_efficient,atol=1e-5)
     end
 end
 

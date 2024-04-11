@@ -620,6 +620,22 @@ function hopping_probability(x::Vector{ComplexF64},site1::Tuple{Int64,Int64},sit
     return hopping_prob
 end
 
+function density_matrix(x::Vector{ComplexF64},lattice_params::Dict{String,Any}; kwargs...)
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+
+    rho = Array{ComplexF64,2}(undef,Lx*Ly,Lx*Ly)
+
+    for i in 1:Lx*Ly
+        for j in 1:i
+            rho[i,j] = hopping_probability(x,coordinate(i,Lx,Ly),coordinate(j,Lx,Ly),lattice_params; kwargs...)
+            rho[j,i] = conj(rho[i,j])
+        end
+    end
+
+    return rho
+end
+
 
 
 
@@ -675,9 +691,20 @@ gs = rez[2][findfirst(x->x==minimum(rez[1]),rez[1])]#
 
 if if_cob
     rho = density_matrix_naive(gs,lattice_params)
-    corrs = physical_correlation(rho,Lx,Ly; if_plot=true)
+    #corrs = physical_correlation(rho,Lx,Ly; if_plot=true)
 end
-occs = get_occupancy(gs,lattice_params; if_plot=true,plot_title="OG")
+#occs = get_occupancy(gs,lattice_params; if_plot=true,plot_title="OG")
+rho_eff = density_matrix(gs,lattice_params)
+
+fig = figure()
+imshow(abs.(rho_eff))
+colorbar()
+title("Density Matrix Efficient")
+
+fig2 = figure()
+imshow(abs.(rho))
+colorbar()
+title("Density Matrix Naive")
 
 else
 
