@@ -1,7 +1,7 @@
 using Test
 include("two-dimensions.jl")
 
-if_all = true
+if_all = false
 
 #=if false || if_all
     @testset "linear index" begin
@@ -99,13 +99,12 @@ if false || if_all
     end
 end=#
 
-if true || if_all
+if false || if_all
     @testset "operator change of basis" begin
-        Lx,Ly = 2,2
+        Lx,Ly = 4,4
         N = 2
-        if_periodic_x,if_periodic_y = true,true
+        if_periodic_x,if_periodic_y = false,false
         full_basis,basis_dict = generate_basis(Lx,Ly,N; output_level=0)
-        
         lattice_params::Dict{String,Any} = Dict("Lx"=>Lx,
                               "Ly"=>Ly,
                               "N"=>N,
@@ -115,10 +114,8 @@ if true || if_all
                               "basis_dict"=>basis_dict)
 
         change_of_basis,change_of_basis_inv = change_of_basis_matrix(lattice_params)
-
         lattice_params["change_of_basis"] = change_of_basis
         lattice_params["change_of_basis_inv"] = change_of_basis_inv
-        
         alpha = 0.0
         hamilt_params = Dict("alpha"=>alpha,
                              "tx"=>1.0,
@@ -127,35 +124,78 @@ if true || if_all
                              "interaction_cutoff"=>1e-5)
         
         H = buildHam(lattice_params,hamilt_params; output_level=0)
-        
         nev = 3
         rez = eigsolve(H,nev)
         gs = rez[2][findfirst(x->x==minimum(rez[1]),rez[1])]
         
-        new_basis_hopping = hopping_matrix((1,1),(2,1),lattice_params)
-        new_basis_expval = abs(conj(transpose(gs)) * new_basis_hopping * gs)
-        
-        old_basis_hopping = get_old_basis_version([0 1; 0 0],[0 0; 1 0],(1,1),(2,1),Lx,Ly)
+        # test if the hopping amplitude is the same between old and new basis
+        s1 = (1,1)
+        other_site = (3,2)
         old_basis_gs = change_of_basis * gs
-        old_basis_expval = abs(conj(transpose(old_basis_gs)) * old_basis_hopping * old_basis_gs)
+        for s2 in [other_site,s1]
+            new_basis_hopping = hopping_matrix_naive(s1,s2,lattice_params)
+            new_basis_expval = abs(conj(transpose(gs)) * new_basis_hopping * gs)
+            
+            old_basis_hopping = get_old_basis_version([0 0; 1 0],[0 1; 0 0],s1,s2,Lx,Ly)
+            old_basis_expval = abs(conj(transpose(old_basis_gs)) * old_basis_hopping * old_basis_gs)
 
-        @test isapprox(new_basis_expval,old_basis_expval,atol=1e-3)
+            @test isapprox(new_basis_expval,old_basis_expval,atol=1e-5)
+        end
 
-        
-        
-        efficient_occupancy = get_occupancy(gs,lattice_params; if_plot=false)[1,1]
-
-        old_basis_occupancy = get_old_basis_version([0 0;0 1],(1,1),Lx,Ly)
+        # test if the occupancy is the same between old and new basis
+        old_basis_occupancy = get_old_basis_version([0 0;0 1],other_site,Lx,Ly)
         old_basis_occ_expval = abs(conj(transpose(old_basis_gs)) * old_basis_occupancy * old_basis_gs)
-        #println("Old Basis Occupancy: ",old_basis_occ_expval)
-        @test isapprox(efficient_occupancy,old_basis_occ_expval,atol=1e-5)
-
         new_basis_occupancy = change_of_basis_inv * old_basis_occupancy * change_of_basis
         new_basis_occ_expval = abs(conj(transpose(gs)) * new_basis_occupancy * gs)
-        #println("New Basis Occupancy: ",new_basis_occ_expval)
-        @test isapprox(efficient_occupancy,new_basis_occ_expval,atol=1e-5)
+        @test isapprox(new_basis_occ_expval,old_basis_occ_expval,atol=1e-5)
+
+
+        # test if efficient occupancy matches the full basis method
+        rho = density_matrix_naive(gs,lattice_params)
+        occs_densmat = get_occupancy(rho,lattice_params; if_plot=false, plot_title="Density Matrix Occupancy")
+        efficient_occs = get_occupancy(gs,lattice_params; if_plot=false, plot_title="Efficient Occupancy")
+        @test all((efficient_occs .- occs_densmat) ./ occs_densmat .< 1e-1)
     
+    end
+end
+
+if false || if_all
+    @testset "hopping on self as number operator" begin
+        Lx,Ly = 4,4
+        N = 2
+        if_periodic_x,if_periodic_y = false,false
+        full_basis,basis_dict = generate_basis(Lx,Ly,N; output_level=0)
+        lattice_params::Dict{String,Any} = Dict("Lx"=>Lx,
+                              "Ly"=>Ly,
+                              "N"=>N,
+                              "if_periodic_x"=>if_periodic_x,
+                              "if_periodic_y"=>if_periodic_y,
+                              "full_basis"=>full_basis,
+                              "basis_dict"=>basis_dict)
+
+        alpha = 0.0
+        hamilt_params = Dict("alpha"=>alpha,
+                             "tx"=>1.0,
+                             "ty"=>1.0,
+                             "U"=>zeros(Ly),
+                             "interaction_cutoff"=>1e-5)
         
+        H = buildHam(lattice_params,hamilt_params; output_level=0)
+        nev = 3
+        rez = eigsolve(H,nev)
+        gs = rez[2][findfirst(x->x==minimum(rez[1]),rez[1])]
+
+        direct_occupancy = get_occupancy(gs,lattice_params; if_plot=false, plot_title="Direct Occupancy")
+        handmade_occs = zeros(Float64,Ly,Lx)
+        for j in 1:Lx
+            for s in 1:Ly
+                site = (j,s)
+                handmade_occs[s,j] = hopping_probability(gs,site,site,lattice_params)
+            end
+        end
+        percent_diff = abs.((direct_occupancy .- handmade_occs) ./ direct_occupancy)
+        # less than 3% difference
+        @test all(percent_diff .< 0.03)
     end
 end
 

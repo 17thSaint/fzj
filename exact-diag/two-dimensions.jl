@@ -280,6 +280,25 @@ function get_occupancy(x::Vector{ComplexF64},lattice_params::Dict{String,Any}; k
     return occupancy
 end
 
+function get_occupancy(rho::Array{ComplexF64,2},lattice_params::Dict{String,Any}; kwargs...)
+    if_plot = get(kwargs,:if_plot,true)
+
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+
+    occs = zeros(Float64,Ly,Lx)
+    all_occs = diag(rho)
+
+    for (idx,val) in enumerate(all_occs)
+        site = coordinate(idx,Lx,Ly)
+        occs[site[2],site[1]] = real(val)
+    end
+
+    if_plot ? plot_occupancy(occs; kwargs...) : nothing
+
+    return occs
+end
+
 function plot_occupancy(exp_occ; kwargs...)
 	fig = figure()
 	imshow(exp_occ)
@@ -493,15 +512,15 @@ function change_of_basis_matrix(lattice_params::Dict{String,Any})
     return change_of_basis,sparse(pinv(Matrix(change_of_basis)))
 end
 
-function hopping_matrix(site1::Tuple{Int64,Int64},site2::Tuple{Int64,Int64},lattice_params::Dict{String,Any})
+function hopping_matrix_naive(site1::Tuple{Int64,Int64},site2::Tuple{Int64,Int64},lattice_params::Dict{String,Any})
     full_basis = lattice_params["full_basis"]
     Lx = lattice_params["Lx"]
     Ly = lattice_params["Ly"]
     change_of_basis = lattice_params["change_of_basis"]
     change_of_basis_inv = lattice_params["change_of_basis_inv"]
 
-    creation = [0 1; 0 0]
-    annihilation = [0 0; 1 0]
+    creation = [0 0; 1 0]
+    annihilation = [0 1; 0 0]
 
     hopping_old_basis = get_old_basis_version(creation,annihilation,site1,site2,Lx,Ly)
 
@@ -509,7 +528,7 @@ function hopping_matrix(site1::Tuple{Int64,Int64},site2::Tuple{Int64,Int64},latt
     return new_basis_hopping
 end
 
-function density_matrix(x::Vector{ComplexF64},lattice_params::Dict{String,Any})
+function density_matrix_naive(x::Vector{ComplexF64},lattice_params::Dict{String,Any})
     Lx = lattice_params["Lx"]
     Ly = lattice_params["Ly"]
 
@@ -517,7 +536,7 @@ function density_matrix(x::Vector{ComplexF64},lattice_params::Dict{String,Any})
 
     for i in 1:Lx*Ly
         for j in 1:i
-            rho[i,j] = conj(transpose(x)) * hopping_matrix(coordinate(i,Lx,Ly),coordinate(j,Lx,Ly),lattice_params) * x
+            rho[i,j] = conj(transpose(x)) * hopping_matrix_naive(coordinate(i,Lx,Ly),coordinate(j,Lx,Ly),lattice_params) * x
             rho[j,i] = conj(rho[i,j])
         end
     end
@@ -525,13 +544,93 @@ function density_matrix(x::Vector{ComplexF64},lattice_params::Dict{String,Any})
     return rho
 end
 
+function physical_correlation(densmat::Array{ComplexF64,2},Lx::Int64,Ly::Int64; kwargs...)
+    if_plot = get(kwargs,:if_plot,true)
+    plot_title = get(kwargs,:plot_title,"")
 
+    phys_corrs = Array{Float64,2}(undef,Lx-1,Ly)
+    for j in 2:Lx
+        for s in 1:Ly
+            phys_corr = densmat[linear_index((j,s),Lx,Ly),linear_index((1,s),Lx,Ly)]
+            phys_corr /= sqrt(densmat[linear_index((j,s),Lx,Ly),linear_index((j,s),Lx,Ly)] * densmat[linear_index((1,s),Lx,Ly),linear_index((1,s),Lx,Ly)])
+            phys_corrs[j-1,s] = abs(phys_corr)
+        end
+    end
+
+    if_plot ? plot_physical_correlation(phys_corrs) : nothing
+
+    return phys_corrs
+end
+
+function plot_physical_correlation(phys_corrs::Array{Float64,2}; kwargs...)
+    fig = figure()
+    for i in 1:size(phys_corrs)[2]
+        plot(1:size(phys_corrs)[1],phys_corrs[:,i],"-p",label="$i")
+    end
+    xlabel("Physical Distance")
+    ylabel("Correlation")
+    title("Physical Correlation")
+    legend()
+    yscale("log")
+    return nothing
+end
+
+function buildHopping(lattice_params::Dict,site1::Int64,site2::Int64; kwargs...)
+    output_level = get(kwargs,:output_level,1)
+    full_basis = lattice_params["full_basis"]
+
+    hop = spzeros(ComplexF64,size(full_basis)[2],size(full_basis)[2])
+
+    if site1 == site2
+        for j in 1:size(full_basis)[2]
+            this_basis_state = full_basis[:,j]
+            if this_basis_state[site1] == 1
+                output_state = basis_dict[prod(string.(this_basis_state))]
+                hop[j,output_state] = 1.0+0.0*im
+            end
+        end
+    else
+        for j in 1:size(full_basis)[2]
+            this_basis_state = full_basis[:,j]
+            if this_basis_state[site1] == 1 && this_basis_state[site2] == 0 # check if particle at starting location and check hard-core constraint
+                
+                output_state = this_basis_state .+ 0
+                output_state[site1] = 0
+                output_state[site2] = 1
+
+                output_state = basis_dict[prod(string.(output_state))]
+                hop[j,output_state] = 1.0+0.0*im
+            end
+        end
+    end
+
+    return hop
+end
+
+function hopping_probability(x::Vector{ComplexF64},site1::Tuple{Int64,Int64},site2::Tuple{Int64,Int64},lattice_params::Dict{String,Any}; kwargs...)
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+
+    s1_linear = linear_index(site1,Lx,Ly)
+    s2_linear = linear_index(site2,Lx,Ly)
+
+    hopping_operator = buildHopping(lattice_params,s1_linear,s2_linear; kwargs...)
+    hopping_prob = abs(conj(transpose(x)) * hopping_operator * x)
+
+    return hopping_prob
+end
+
+
+
+
+
+if false
 
 #density = 1/4
 Lx,Ly = 4,4
 N = 2#Int(floor(density*Lx*Ly))
 println("Using ",N," particles with density ",round(N/(Lx*Ly),digits=3))
-if_periodic_x,if_periodic_y = true,true
+if_periodic_x,if_periodic_y = true,false
 start_time = time()
 full_basis,basis_dict = generate_basis(Lx,Ly,N; output_level=1)
 println("Made basis in ",time()-start_time)
@@ -544,7 +643,7 @@ lattice_params::Dict{String,Any} = Dict("Lx"=>Lx,
                       "full_basis"=>full_basis,
                       "basis_dict"=>basis_dict)
 
-if_cob = true
+if_cob = false
 if if_cob
     change_of_basis,change_of_basis_inv = change_of_basis_matrix(lattice_params)
     println("Found Change of Basis Matrices in ",time()-start_time)
@@ -556,9 +655,9 @@ stren = 0.0
 lr_dist = "all"
 lr_dist == "all" ? lr_dist = Ly : nothing
 us = [i < lr_dist+1 ? stren : 0.0 for i in 1:Ly]    
-filling = 1.0
+filling = 0.5
 x_shift,y_shift = !if_periodic_x, !if_periodic_y
-alpha = N / (filling * (Lx - x_shift) * (Ly - y_shift))
+alpha = 0.0#N / (filling * (Lx - x_shift) * (Ly - y_shift))
 hamilt_params = Dict("alpha"=>alpha,
                      "tx"=>1.0,
                      "ty"=>1.0,
@@ -574,9 +673,16 @@ rez = eigsolve(H,nev)
 println("Elapsed time: ",time()-start_time)
 gs = rez[2][findfirst(x->x==minimum(rez[1]),rez[1])]#
 
-rho = density_matrix(gs,lattice_params)
-imshow(abs.(rho))
-colorbar()
+if if_cob
+    rho = density_matrix_naive(gs,lattice_params)
+    corrs = physical_correlation(rho,Lx,Ly; if_plot=true)
+end
+occs = get_occupancy(gs,lattice_params; if_plot=true,plot_title="OG")
+
+else
+
+
+end
 
 #=nrgs_krylov = filter(x->x<0.0,rez[1])
 fig = figure()
@@ -584,8 +690,6 @@ scatter(1:length(nrgs_krylov),nrgs_krylov,c="b",label="Krylov")
 xlabel("Eigenvalue Index")
 ylabel("Energy")
 legend()
-
-occs = get_occupancy(gs,lattice_params; plot_title="NRG = $(round(minimum(rez[1]),digits=4))")#
 
 fig2 = figure()
 scatter(1:10,rr[end-9:end],c="b")
