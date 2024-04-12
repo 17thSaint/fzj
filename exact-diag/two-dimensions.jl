@@ -546,7 +546,6 @@ end
 
 function physical_correlation(densmat::Array{ComplexF64,2},Lx::Int64,Ly::Int64; kwargs...)
     if_plot = get(kwargs,:if_plot,true)
-    plot_title = get(kwargs,:plot_title,"")
 
     phys_corrs = Array{Float64,2}(undef,Lx-1,Ly)
     for j in 2:Lx
@@ -562,14 +561,46 @@ function physical_correlation(densmat::Array{ComplexF64,2},Lx::Int64,Ly::Int64; 
     return phys_corrs
 end
 
+function synthetic_correlation(densmat::Array{ComplexF64,2},Lx::Int64,Ly::Int64; kwargs...)
+    if_plot = get(kwargs,:if_plot,true)
+
+    syn_corrs = Array{Float64,2}(undef,Lx,Ly-1)
+    for j in 1:Lx
+        for s in 2:Ly
+            syn_corr = densmat[linear_index((j,s),Lx,Ly),linear_index((j,1),Lx,Ly)]
+            syn_corr /= sqrt(densmat[linear_index((j,s),Lx,Ly),linear_index((j,s),Lx,Ly)] * densmat[linear_index((j,1),Lx,Ly),linear_index((j,1),Lx,Ly)])
+            syn_corrs[j,s-1] = abs(syn_corr)
+        end
+    end
+
+    if_plot ? plot_synthetic_correlation(syn_corrs) : nothing
+
+    return syn_corrs
+end
+
+function plot_synthetic_correlation(syn_corrs::Array{Float64,2}; kwargs...)
+    plot_title = get(kwargs,:plot_title,"")
+    fig = figure()
+    for i in 1:size(syn_corrs)[1]
+        plot(1:size(syn_corrs)[2],syn_corrs[i,:],"-p",label="$i")
+    end
+    xlabel("Synthetic Site")
+    ylabel("Correlation")
+    title("Synthetic Correlation "*plot_title)
+    legend()
+    yscale("log")
+    return nothing
+end
+
 function plot_physical_correlation(phys_corrs::Array{Float64,2}; kwargs...)
+    plot_title = get(kwargs,:plot_title,"")
     fig = figure()
     for i in 1:size(phys_corrs)[2]
         plot(1:size(phys_corrs)[1],phys_corrs[:,i],"-p",label="$i")
     end
     xlabel("Physical Distance")
     ylabel("Correlation")
-    title("Physical Correlation")
+    title("Physical Correlation "*plot_title)
     legend()
     yscale("log")
     return nothing
@@ -615,42 +646,141 @@ function hopping_probability(x::Vector{ComplexF64},site1::Tuple{Int64,Int64},sit
     s2_linear = linear_index(site2,Lx,Ly)
 
     hopping_operator = buildHopping(lattice_params,s1_linear,s2_linear; kwargs...)
-    hopping_prob = abs(conj(transpose(x)) * hopping_operator * x)
+    hopping_prob = conj(transpose(x)) * hopping_operator * x
 
     return hopping_prob
 end
 
 function density_matrix(x::Vector{ComplexF64},lattice_params::Dict{String,Any}; kwargs...)
+    output_level = get(kwargs,:output_level,1)
     Lx = lattice_params["Lx"]
     Ly = lattice_params["Ly"]
 
     rho = Array{ComplexF64,2}(undef,Lx*Ly,Lx*Ly)
 
+    start_time = time()
     for i in 1:Lx*Ly
         for j in 1:i
             rho[i,j] = hopping_probability(x,coordinate(i,Lx,Ly),coordinate(j,Lx,Ly),lattice_params; kwargs...)
             rho[j,i] = conj(rho[i,j])
         end
+        output_level > 0 ? println(round(i/(Lx*Ly)*100,digits=2),"% done.") : nothing
     end
+
+    output_level > 0 ? println("Density Matrix: Elapsed time: ",time()-start_time) : nothing
 
     return rho
 end
 
+function physical_current(densmat::Array{ComplexF64,2},lattice_params::Dict{String,Any}; kwargs...)
+    if_plot = get(kwargs,:if_plot,true)
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+    if_periodic_x = lattice_params["if_periodic_x"]
+
+    xlen = if_periodic_x ? Lx : Lx-1
+
+    currents = Array{Float64,2}(undef,xlen,Ly)
+    for s in 1:Ly
+        for j in 1:xlen
+            site1 = linear_index((j,s),Lx,Ly)
+            site2 = linear_index((mod1(j+1,Lx),s),Lx,Ly)
+            current_val = imag(densmat[site1,site2] - densmat[site2,site1])
+            current_normalization = densmat[site1,site1] + densmat[site2,site2]
+            current_val /= current_normalization
+            currents[j,s] = real(current_val)
+        end
+    end
+
+    if_plot ? plot_physical_current(currents; kwargs...) : nothing
+
+    return currents
+end
+
+function synthetic_current(densmat::Array{ComplexF64,2},lattice_params::Dict{String,Any}; kwargs...)
+    if_plot = get(kwargs,:if_plot,true)
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+    if_periodic_y = lattice_params["if_periodic_y"]
+
+    ylen = if_periodic_y ? Ly : Ly-1
+
+    currents = Array{Float64,2}(undef,Lx,ylen)
+    for j in 1:Lx
+        for s in 1:ylen
+            site1 = linear_index((j,s),Lx,Ly)
+            site2 = linear_index((j,mod1(s+1,Ly)),Lx,Ly)
+            current_val = imag(densmat[site1,site2] - densmat[site2,site1])
+            current_normalization = densmat[site1,site1] + densmat[site2,site2]
+            current_val /= current_normalization
+            currents[j,s] = real(current_val)
+        end
+    end
+
+    if_plot ? plot_synthetic_current(currents; kwargs...) : nothing
+
+    return currents
+end
+
+function plot_synthetic_current(currents::Array{Float64,2}; kwargs...)
+    plot_title = get(kwargs,:plot_title,"")
+    fig = figure()
+    for i in 1:size(currents)[1]
+        plot(1:size(currents)[2],currents[i,:],"-p",label="$i")
+    end
+    xlabel("Synthetic Site")
+    ylabel("Current")
+    title("Synthetic Current "*plot_title)
+    legend()
+    return nothing
+end
+
+function plot_physical_current(currents::Array{Float64,2}; kwargs...)
+    plot_title = get(kwargs,:plot_title,"")
+    fig = figure()
+    for i in 1:size(currents)[2]
+        plot(1:size(currents)[1],currents[:,i],"-p",label="$i")
+    end
+    xlabel("Physical Site")
+    ylabel("Current")
+    title("Physical Current "*plot_title)
+    legend()
+    return nothing
+end
+
+function check_fluxes(alpha::Float64,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_y::Bool)
+    if alpha == 0.0
+        return nothing
+    end
+    x_shift,y_shift = !if_periodic_x, !if_periodic_y
+    num_fluxes = round(alpha*(Lx - x_shift) * (Ly - y_shift),digits=5)
+    println("Number of Fluxes = ",num_fluxes," for Lx = ",Lx," and Ly = ",Ly)
+    if !isinteger(num_fluxes)
+        error("Number of fluxes is not an integer")
+    end
+
+    if if_periodic_x && !isinteger(num_fluxes/Lx)
+        error("Number of fluxes is not an integer multiple of Lx")
+    end
+
+    if if_periodic_y && !isinteger(num_fluxes/Ly)
+        error("Number of fluxes is not an integer multiple of Ly")
+    end
+
+    return nothing
+end
 
 
-
-
-if false
+if true
 
 #density = 1/4
-Lx,Ly = 4,4
-N = 2#Int(floor(density*Lx*Ly))
+Lx,Ly = 8,8
+N = 4#Int(floor(density*Lx*Ly))
 println("Using ",N," particles with density ",round(N/(Lx*Ly),digits=3))
-if_periodic_x,if_periodic_y = true,false
+if_periodic_x,if_periodic_y = true,true
 start_time = time()
 full_basis,basis_dict = generate_basis(Lx,Ly,N; output_level=1)
 println("Made basis in ",time()-start_time)
-
 lattice_params::Dict{String,Any} = Dict("Lx"=>Lx,
                       "Ly"=>Ly,
                       "N"=>N,
@@ -659,21 +789,14 @@ lattice_params::Dict{String,Any} = Dict("Lx"=>Lx,
                       "full_basis"=>full_basis,
                       "basis_dict"=>basis_dict)
 
-if_cob = false
-if if_cob
-    change_of_basis,change_of_basis_inv = change_of_basis_matrix(lattice_params)
-    println("Found Change of Basis Matrices in ",time()-start_time)
-    lattice_params["change_of_basis"] = change_of_basis
-    lattice_params["change_of_basis_inv"] = change_of_basis_inv
-end
-
 stren = 0.0
 lr_dist = "all"
 lr_dist == "all" ? lr_dist = Ly : nothing
 us = [i < lr_dist+1 ? stren : 0.0 for i in 1:Ly]    
 filling = 0.5
 x_shift,y_shift = !if_periodic_x, !if_periodic_y
-alpha = 0.0#N / (filling * (Lx - x_shift) * (Ly - y_shift))
+alpha = N / (filling * (Lx - x_shift) * (Ly - y_shift))
+check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y)
 hamilt_params = Dict("alpha"=>alpha,
                      "tx"=>1.0,
                      "ty"=>1.0,
@@ -686,27 +809,16 @@ println("Sparsity = ",nnz(H)/size(H)[1]^2)
 
 nev = 20
 rez = eigsolve(H,nev)
-println("Elapsed time: ",time()-start_time)
+println("Ground State: Elapsed time: ",time()-start_time)
 gs = rez[2][findfirst(x->x==minimum(rez[1]),rez[1])]#
 
-if if_cob
-    rho = density_matrix_naive(gs,lattice_params)
-    #corrs = physical_correlation(rho,Lx,Ly; if_plot=true)
-end
-#occs = get_occupancy(gs,lattice_params; if_plot=true,plot_title="OG")
-rho_eff = density_matrix(gs,lattice_params)
 
-fig = figure()
-imshow(abs.(rho_eff))
-colorbar()
-title("Density Matrix Efficient")
-
-fig2 = figure()
-imshow(abs.(rho))
-colorbar()
-title("Density Matrix Naive")
-
-else
+rho = density_matrix(gs,lattice_params)
+occs = get_occupancy(rho,lattice_params; if_plot=true)
+corrs = physical_correlation(rho,Lx,Ly; if_plot=true)
+currents = physical_current(rho,lattice_params; if_plot=true)
+corrs_syn = synthetic_correlation(rho,Lx,Ly; if_plot=true)
+currents_syn = synthetic_current(rho,lattice_params; if_plot=true)
 
 
 end
