@@ -1,7 +1,7 @@
 using Test
 include("two-dimensions.jl")
 
-if_all = false
+if_all = true
 
 #=if false || if_all
     @testset "linear index" begin
@@ -100,11 +100,11 @@ if false || if_all
 end=#
 
 if false || if_all
-    @testset "operator change of basis" begin
+    @testset "operator change of basis old with naive" begin
         Lx,Ly = 4,4
         N = 2
         if_periodic_x,if_periodic_y = false,false
-        full_basis,basis_dict = generate_basis(Lx,Ly,N; output_level=0)
+        full_basis,basis_dict = generate_basis_naive(Lx,Ly,N; output_level=0)
         lattice_params::Dict{String,Any} = Dict("Lx"=>Lx,
                               "Ly"=>Ly,
                               "N"=>N,
@@ -123,7 +123,7 @@ if false || if_all
                              "U"=>zeros(Ly),
                              "interaction_cutoff"=>1e-5)
         
-        H = buildHam(lattice_params,hamilt_params; output_level=0)
+        H = buildHam_naive(lattice_params,hamilt_params; output_level=0)
         nev = 3
         rez = eigsolve(H,nev)
         gs = rez[2][findfirst(x->x==minimum(rez[1]),rez[1])]
@@ -153,18 +153,18 @@ if false || if_all
         # test if efficient occupancy matches the full basis method
         rho = density_matrix_naive(gs,lattice_params)
         occs_densmat = get_occupancy(rho,lattice_params; if_plot=false, plot_title="Density Matrix Occupancy")
-        efficient_occs = get_occupancy(gs,lattice_params; if_plot=false, plot_title="Efficient Occupancy")
+        efficient_occs = get_occupancy_naive(gs,lattice_params; if_plot=false, plot_title="Efficient Occupancy")
         @test all((efficient_occs .- occs_densmat) ./ occs_densmat .< 1e-1)
     
     end
 end
 
 if false || if_all
-    @testset "hopping probability function" begin
+    @testset "hopping probability function old way" begin
         Lx,Ly = 4,4
         N = 2
         if_periodic_x,if_periodic_y = false,false
-        full_basis,basis_dict = generate_basis(Lx,Ly,N; output_level=0)
+        full_basis,basis_dict = generate_basis_naive(Lx,Ly,N; output_level=0)
         lattice_params::Dict{String,Any} = Dict("Lx"=>Lx,
                               "Ly"=>Ly,
                               "N"=>N,
@@ -175,6 +175,89 @@ if false || if_all
         change_of_basis,change_of_basis_inv = change_of_basis_matrix(lattice_params)
         lattice_params["change_of_basis"] = change_of_basis
         lattice_params["change_of_basis_inv"] = change_of_basis_inv
+
+        alpha = 0.0
+        hamilt_params = Dict("alpha"=>alpha,
+                             "tx"=>1.0,
+                             "ty"=>1.0,
+                             "U"=>zeros(Ly),
+                             "interaction_cutoff"=>1e-5)
+        
+        H = buildHam_naive(lattice_params,hamilt_params; output_level=0)
+        nev = 3
+        rez = eigsolve(H,nev)
+        gs = rez[2][findfirst(x->x==minimum(rez[1]),rez[1])]
+
+        # test that occupancy matrix matches the hopping probability on itself for every site
+        direct_occupancy = get_occupancy_naive(gs,lattice_params; if_plot=false, plot_title="Direct Occupancy")
+        handmade_occs = zeros(Float64,Ly,Lx)
+        for j in 1:Lx
+            for s in 1:Ly
+                site = (j,s)
+                handmade_occs[s,j] = hopping_probability_old(gs,site,site,lattice_params)
+            end
+        end
+        percent_diff = abs.((direct_occupancy .- handmade_occs) ./ direct_occupancy)
+        # less than 3% difference
+        @test all(percent_diff .< 0.03)
+
+        # test hopping probability makes same density matrix
+        rho = density_matrix_naive(gs,lattice_params)
+        rho_efficient = density_matrix_old(gs,lattice_params; output_level=0)
+        @test isapprox(rho,rho_efficient,atol=1e-5)
+    end
+end
+
+
+if false || if_all
+    @testset "New faster Index numbering" begin
+        @test find_basis_index([4,3,2]) == 4
+        @test find_basis_index([3,2,1]) == 1
+        @test find_basis_index([4,2,1]) == 2
+        @test find_basis_index([4,3,1]) == 3
+
+        @test find_basis_index([2,1]) == 1
+        @test find_basis_index([3,1]) == 2
+        @test find_basis_index([3,2]) == 3
+        @test find_basis_index([4,1]) == 4
+
+        @test find_basis_index([4,3,2,1]) == 1
+    end
+end
+
+if false || if_all
+    @testset "Generating new basis" begin
+        n2_basis = n_particle_basis(2,2,2; output_level=0)
+        @test n2_basis == [2 3 3 4 4 4; 1 1 2 1 2 3]
+        for i in 1:size(n2_basis,2)
+            @test find_basis_index(n2_basis[:,i]) == i
+        end
+
+        n3_basis = n_particle_basis(3,2,2; output_level=0)
+        @test n3_basis == [3 4 4 4; 2 2 3 3; 1 1 1 2]
+        for i in 1:size(n3_basis,2)
+            @test find_basis_index(n3_basis[:,i]) == i
+        end
+
+        n4_basis = n_particle_basis(4,2,2; output_level=0)
+        @test n4_basis == [4; 3; 2; 1;;]
+
+    end
+end
+
+if false || if_all
+    @testset "hopping probability function" begin
+        Lx,Ly = 4,4
+        N = 2
+        if_periodic_x,if_periodic_y = false,false
+        full_basis = n_particle_basis(N,Lx,Ly; output_level=0)
+        lattice_params::Dict{String,Any} = Dict("Lx"=>Lx,
+                              "Ly"=>Ly,
+                              "N"=>N,
+                              "if_periodic_x"=>if_periodic_x,
+                              "if_periodic_y"=>if_periodic_y,
+                              "full_basis"=>full_basis)
+    
 
         alpha = 0.0
         hamilt_params = Dict("alpha"=>alpha,
@@ -194,34 +277,13 @@ if false || if_all
         for j in 1:Lx
             for s in 1:Ly
                 site = (j,s)
-                handmade_occs[s,j] = hopping_probability(gs,site,site,lattice_params)
+                handmade_occs[s,j] = hopping_probability(gs,site,site,lattice_params; output_level=0)
             end
         end
         percent_diff = abs.((direct_occupancy .- handmade_occs) ./ direct_occupancy)
-        # less than 3% difference
-        @test all(percent_diff .< 0.03)
-
-        # test hopping probability makes same density matrix
-        rho = density_matrix_naive(gs,lattice_params)
-        rho_efficient = density_matrix(gs,lattice_params; output_level=0)
-        @test isapprox(rho,rho_efficient,atol=1e-5)
-    end
-end
-
-
-if false || if_all
-    @testset "New faster Index numbering" begin
-        @test find_basis_index([4,3,2]) == 4
-        @test find_basis_index([3,2,1]) == 1
-        @test find_basis_index([4,2,1]) == 2
-        @test find_basis_index([4,3,1]) == 3
-
-        @test find_basis_index([2,1]) == 1
-        @test find_basis_index([3,1]) == 2
-        @test find_basis_index([3,2]) == 3
-        @test find_basis_index([4,1]) == 4
-
-        @test find_basis_index([4,3,2,1]) == 1
+        # less than 0.1% difference
+        @test all(percent_diff .< 0.001)
+        
     end
 end
 
