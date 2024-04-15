@@ -1,7 +1,7 @@
 using Test
 include("two-dimensions.jl")
 
-if_all = true
+if_all = false
 
 #=if false || if_all
     @testset "linear index" begin
@@ -203,11 +203,27 @@ if false || if_all
 
         # test hopping probability makes same density matrix
         rho = density_matrix_naive(gs,lattice_params)
-        rho_efficient = density_matrix(gs,lattice_params)
+        rho_efficient = density_matrix(gs,lattice_params; output_level=0)
         @test isapprox(rho,rho_efficient,atol=1e-5)
     end
 end
 
+
+if false || if_all
+    @testset "New faster Index numbering" begin
+        @test find_basis_index([4,3,2]) == 4
+        @test find_basis_index([3,2,1]) == 1
+        @test find_basis_index([4,2,1]) == 2
+        @test find_basis_index([4,3,1]) == 3
+
+        @test find_basis_index([2,1]) == 1
+        @test find_basis_index([3,1]) == 2
+        @test find_basis_index([3,2]) == 3
+        @test find_basis_index([4,1]) == 4
+
+        @test find_basis_index([4,3,2,1]) == 1
+    end
+end
 
 
 

@@ -218,6 +218,44 @@ function coordinate(site::Int64,Lx::Int64,Ly::Int64)
     return (x,y)
 end
 
+function single_particle_basis(start_point::Int64,end_point::Int64)
+    return [[i] for i in start_point:end_point]
+end
+
+function find_basis_index(basis::Vector{Int64})
+    p = basis[1]
+    lower_limit = 1 + binomial(p-1,length(basis))
+    for i in 1:length(basis)-1
+        q = basis[i+1]
+        lower_limit += binomial(q-1,length(basis)-i)
+    end
+    
+    return lower_limit
+end
+
+#=Lx,Ly = 2,2
+
+sp_basis = single_particle_basis(1,Lx*Ly)
+display(sp_basis)
+
+two_particle_basis = Array{Vector{Int64},1}(undef,0)
+for i in 1:length(sp_basis)
+    p = sp_basis[i][1]
+    for q in 1:p-1
+        push!(two_particle_basis,[p,q])
+    end
+end
+display(two_particle_basis)
+
+three_particle_basis = Array{Vector{Int64},1}(undef,0)
+for i in 1:length(two_particle_basis)
+    q = two_particle_basis[i][end]
+    for r in 1:q-1
+        push!(three_particle_basis,[two_particle_basis[i];[r]])
+    end
+end
+display(three_particle_basis)=#
+
 # builds up the full basis of N hard-core particles in a Lx by Ly lattice (no symmetries yet)
 function generate_basis(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
 
@@ -609,6 +647,7 @@ end
 function buildHopping(lattice_params::Dict,site1::Int64,site2::Int64; kwargs...)
     output_level = get(kwargs,:output_level,1)
     full_basis = lattice_params["full_basis"]
+    basis_dict = lattice_params["basis_dict"]
 
     hop = spzeros(ComplexF64,size(full_basis)[2],size(full_basis)[2])
 
@@ -771,7 +810,7 @@ function check_fluxes(alpha::Float64,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_
 end
 
 
-if true
+if false
 
 #density = 1/4
 Lx,Ly = 8,8
