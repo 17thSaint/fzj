@@ -2,6 +2,20 @@ using Pkg
 Pkg.activate(".")
 using LinearAlgebra,KrylovKit,Combinatorics,SparseArrays
 
+function include_other_files(all_files)
+	center = find_center()
+	get_to_fzj = split(pwd(),center)[1]
+	if typeof(all_files) == String
+		all_files = [all_files]
+	end
+	for file in all_files
+		occursin("main-git",pwd()) ? include(get_to_fzj * center * "/main-git/" * file) : include(get_to_fzj * center * "/" * file)
+		println("Included $file")
+	end
+end
+
+include_other_files(["other-funcs/data-storage-funcs.jl"])
+
 ######## hopping is wrong because has amplitude even if no particle at starting location #########
 #=
 function right_x_hopping_matrix(site::Tuple{Int64,Int64},Lx::Int64,Ly::Int64)
@@ -607,8 +621,28 @@ function two_particle_basis(Lx::Int64,Ly::Int64)
     return two_particle_basis
 end
 
+function save_basis(full_basis::Array{Int64,2},N::Int64,Lx::Int64,Ly::Int64,dataloc::String)
+    data_dict = Dict([("full_basis",full_basis)])
+    metadata_dict = Dict([("Lx",Lx),("Ly",Ly),("N",N)])
+    filename = "basis-N-"*string(N)*"-Lx-"*string(Lx)*"-Ly-"*string(Ly)*".jld2"
+    full_loc = join([dataloc,filename],"/")
+    write_data_jld2(full_loc,data_dict,metadata_dict)
+end
+
 function n_particle_basis(N::Int64,Lx::Int64,Ly::Int64; kwargs...)
     output_level = get(kwargs,:output_level,1)
+    if_save_data = get(kwargs,:if_save_data,false)
+    dataloc = get(kwargs,:dataloc,get_folder_location("cluster-data/exact-diag"))
+    if_find_existing = get(kwargs,:if_find_existing,true)
+
+    if if_find_existing
+        metadata_dict = Dict([("Lx",Lx),("Ly",Ly),("N",N)])
+        if_exists,data = check_data_exists(metadata_dict,"basis"; location=dataloc,output_level=output_level)
+        if if_exists
+            output_level > 0 ? println("Found existing file with basis data") : nothing
+            return data[1]["full_basis"]
+        end
+    end
 
     n2_basis = two_particle_basis(Lx,Ly)
     for i in 3:N
@@ -628,6 +662,8 @@ function n_particle_basis(N::Int64,Lx::Int64,Ly::Int64; kwargs...)
     for i in 1:length(n2_basis)
         full_basis[:,i] = zeros(Int64,N) + n2_basis[i]
     end
+
+    if_save_data ? save_basis(full_basis,N,Lx,Ly,dataloc) : nothing
 
     return full_basis
 end
@@ -1043,15 +1079,15 @@ function plot_occupancy(exp_occ; kwargs...)
 end
 
 
-if false
+if true
 
 #density = 1/4
-Lx,Ly = 7,7
+Lx,Ly = 4,4
 N = 3#Int(floor(density*Lx*Ly))
 println("Using ",N," particles with density ",round(N/(Lx*Ly),digits=3))
-if_periodic_x,if_periodic_y = true,true
+if_periodic_x,if_periodic_y = false,false
 start_time = time()
-full_basis = n_particle_basis(N,Lx,Ly)
+full_basis = n_particle_basis(N,Lx,Ly; if_save_data=true,output_level=false)
 println("Made basis in ",time()-start_time)
 lattice_params::Dict{String,Any} = Dict("Lx"=>Lx,
                       "Ly"=>Ly,
@@ -1066,7 +1102,7 @@ lr_dist == "all" ? lr_dist = Ly : nothing
 us = [i < lr_dist+1 ? stren : 0.0 for i in 1:Ly]    
 filling = 0.5
 x_shift,y_shift = !if_periodic_x, !if_periodic_y
-alpha = 0.0#N / (filling * (Lx - x_shift) * (Ly - y_shift))
+alpha = N / (filling * (Lx - x_shift) * (Ly - y_shift))
 check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y)
 hamilt_params = Dict("alpha"=>alpha,
                      "tx"=>1.0,
@@ -1086,8 +1122,8 @@ gs = rez[2][findfirst(x->x==minimum(rez[1]),rez[1])]#
 
 rho = density_matrix(gs,lattice_params)
 occs = get_occupancy(rho,lattice_params; if_plot=true)
-corrs = physical_correlation(rho,Lx,Ly; if_plot=true)
-currents = physical_current(rho,lattice_params; if_plot=true)
+#corrs = physical_correlation(rho,Lx,Ly; if_plot=true)
+#currents = physical_current(rho,lattice_params; if_plot=true)
 corrs_syn = synthetic_correlation(rho,Lx,Ly; if_plot=true)
 currents_syn = synthetic_current(rho,lattice_params; if_plot=true)
 
