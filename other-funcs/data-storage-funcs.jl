@@ -7,6 +7,19 @@ function get_folder_location(folder_name)
 	return full_location
 end
 
+function find_center()
+	all_folders = split(pwd(),"/")
+	if "fzj" in all_folders
+		return "fzj"
+	elseif "local" in all_folders
+		return all_folders[findfirst(x -> all_folders[x] == "local",1:length(all_folders))+1]
+	elseif "Local" in all_folders
+		return all_folders[findfirst(x -> all_folders[x] == "Local",1:length(all_folders))+1]
+	else
+		println("Not sure where the center is: $(pwd())")
+	end
+end
+
 function back2cpu(ttn::TTNKit.TreeTensorNetwork)
 	datagpu = deepcopy(ttn.data)
 	datac = map(datagpu) do layerdata
@@ -104,7 +117,7 @@ function get_params_dict_from_filename(filename)
 	end
 	if split(filename,"-")[1] in ["virt","phys","Y","X"]
 		split_filename = split(filename,"-")[4:end]
-	elseif split(filename,"-")[1] in ["mps","ttn","rfa","laugh"]
+	elseif split(filename,"-")[1] in ["mps","ttn","rfa","laugh","basis"]
 		split_filename = split(filename,"-")[2:end]
 	else
 		split_filename = split(filename,"-")
@@ -256,7 +269,7 @@ function check_data_exists(params_dict::Dict,data_type::String; kwargs...)
 	end
 end
 	
-function check_data_exists(filename::String,data_type="observer"; kwargs...)
+function check_data_exists(filename::AbstractString,data_type="observer"; kwargs...)
     location = get(kwargs, :location, pwd())
     here = pwd()
     cd(location)
@@ -323,7 +336,7 @@ function check_dict(data)
 	end
 end
 
-function write_data_jld2(file_name,data,location=pwd(),metadata=nothing; kwargs...)
+function write_data_jld2(file_name::AbstractString,data::Dict,location=pwd(),metadata=nothing; kwargs...)
 	og_location = pwd()
 	try
 		cd(location)
@@ -356,8 +369,15 @@ function write_data_jld2(file_name,data,location=pwd(),metadata=nothing; kwargs.
 	return file_name
 end
 
+function write_data_jld2(location::AbstractString,data::Dict,metadata::Dict; kwargs...)
+	split_location = split(location,"/")
+	file_name = split_location[end]
+	location = join(split_location[1:end-1],"/")
+	write_data_jld2(file_name,data,location,metadata; kwargs...)
+end
+
 function read_data_jld2(file_name,location=pwd(); kwargs...)
-	output_bool = get(kwargs, :output_level, true)
+	output_bool = get(kwargs, :output_level, 1)
 
 	if occursin("/",file_name)
 		location = join(split(file_name,"/")[1:end-1],"/")
@@ -399,7 +419,7 @@ function read_data_jld2(file_name,location=pwd(); kwargs...)
 	
 	close(binary_file)
 	cd(og_location)
-	if output_bool
+	if output_bool > 0
 		println("Data Extracted, File Closed: $file_name")
 	end
 	

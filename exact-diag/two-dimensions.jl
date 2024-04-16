@@ -2,6 +2,19 @@ using Pkg
 Pkg.activate(".")
 using LinearAlgebra,KrylovKit,Combinatorics,SparseArrays
 
+function find_center()
+	all_folders = split(pwd(),"/")
+	if "fzj" in all_folders
+		return "fzj"
+	elseif "local" in all_folders
+		return all_folders[findfirst(x -> all_folders[x] == "local",1:length(all_folders))+1]
+	elseif "Local" in all_folders
+		return all_folders[findfirst(x -> all_folders[x] == "Local",1:length(all_folders))+1]
+	else
+		println("Not sure where the center is: $(pwd())")
+	end
+end
+
 function include_other_files(all_files)
 	center = find_center()
 	get_to_fzj = split(pwd(),center)[1]
@@ -864,6 +877,76 @@ function density_matrix(x::Vector{ComplexF64},lattice_params::Dict{String,Any}; 
     return rho
 end
 
+function density_matrix_fast(x::Vector{ComplexF64},lattice_params::Dict{String,Any}; kwargs...)
+    output_level = get(kwargs,:output_level,1)
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+    if_periodic_x = lattice_params["if_periodic_x"]
+    if_periodic_y = lattice_params["if_periodic_y"]
+    if_periodic = (if_periodic_x,if_periodic_y)
+    edges = (Lx,Ly)
+    N = lattice_params["N"]
+    full_basis = lattice_params["full_basis"]
+    dimHilb = size(full_basis)[2]
+    println("Hilbert Space Dimension: ",dimHilb)
+
+    rho = Array{ComplexF64,2}(undef,Lx*Ly,Lx*Ly)
+    all_hopping_operators = spzeros(Int64,dimHilb*Lx*Ly,dimHilb*Lx*Ly)
+
+    start_time = time()
+    for i in 1:dimHilb
+        for n in 1:N
+            coordinate_position = coordinate(full_basis[n,i],Lx,Ly)
+            for dir in [1,-1]
+                for axis in [1,2]
+
+                    position_change = [0,0]
+                    position_change[axis] += dir
+
+                    # find next position if hopping x-direction, and check periodicity
+                    next_site_hopping = coordinate_position .+ position_change
+                    if next_site_hopping[axis] > edges[axis] || next_site_hopping[axis] < 1
+                        if if_periodic[axis]
+                            next_site_hopping[axis] = mod1(next_site_hopping[axis],edges[axis])
+                        else
+                            continue
+                        end
+                    end
+                    next_site_hopping_linear = linear_index(Tuple(next_site_hopping),Lx,Ly)
+                    println("Hopping from ",coordinate_position," to ",next_site_hopping)
+                    #= enforce hard-core constraint, then find next basis state
+                    if !(next_site_hopping_linear in full_basis[:,i])
+                        next_basis = full_basis[:,i] .+ 0
+                        next_basis[n] = next_site_hopping_linear
+                        sort!(next_basis,rev=true)
+                        next_basis_index = find_basis_index(next_basis)
+                        local_indices = (full_basis[n,i],next_basis_index)
+                        shift = ((n-1)*dimHilb,(next_site_hopping_linear-1)*dimHilb)
+                        index_result = local_indices .+ shift
+                        #println(local_indices," ",shift," ",index_result)
+                        all_hopping_operators[index_result[1],index_result[2]] += 1
+                    end=#
+                end
+            
+            end
+        end
+    end
+
+    for i in 1:Lx*Ly
+        for j in 1:Lx*Ly
+            rho[i,j] = conj(transpose(x)) * all_hopping_operators[(i-1)*dimHilb+1:i*dimHilb,(j-1)*dimHilb+1:j*dimHilb] * x
+        end
+        output_level > 0 ? println(round(i/(Lx*Ly)*100,digits=2),"% done.") : nothing
+    end
+
+
+
+    output_level > 0 ? println("Density Matrix: Elapsed time: ",time()-start_time) : nothing
+
+    return rho
+
+end
+
 function physical_correlation(densmat::Array{ComplexF64,2},Lx::Int64,Ly::Int64; kwargs...)
     if_plot = get(kwargs,:if_plot,true)
 
@@ -1082,8 +1165,8 @@ end
 if true
 
 #density = 1/4
-Lx,Ly = 4,4
-N = 3#Int(floor(density*Lx*Ly))
+Lx,Ly = 2,2
+N = 2#Int(floor(density*Lx*Ly))
 println("Using ",N," particles with density ",round(N/(Lx*Ly),digits=3))
 if_periodic_x,if_periodic_y = false,false
 start_time = time()
@@ -1110,22 +1193,33 @@ hamilt_params = Dict("alpha"=>alpha,
                      "U"=>us,
                      "interaction_cutoff"=>1e-5)
 
-#
+#=
 H = buildHam(lattice_params,hamilt_params)
 println("Sparsity = ",nnz(H)/size(H)[1]^2)
 
 nev = 20
 rez = eigsolve(H,nev)
 println("Ground State: Elapsed time: ",time()-start_time)
-gs = rez[2][findfirst(x->x==minimum(rez[1]),rez[1])]#
+gs = rez[2][findfirst(x->x==minimum(rez[1]),rez[1])]=#
 
 
 rho = density_matrix(gs,lattice_params)
-occs = get_occupancy(rho,lattice_params; if_plot=true)
+rho_fast = density_matrix_fast(gs,lattice_params)
+
+fig1 = figure()
+imshow(abs.(rho))
+colorbar()
+title("Density Matrix Original")
+
+fig2 = figure()
+imshow(abs.(rho_fast))
+colorbar()
+title("Density Matrix Fast")
+#occs = get_occupancy(rho,lattice_params; if_plot=true)
 #corrs = physical_correlation(rho,Lx,Ly; if_plot=true)
 #currents = physical_current(rho,lattice_params; if_plot=true)
-corrs_syn = synthetic_correlation(rho,Lx,Ly; if_plot=true)
-currents_syn = synthetic_current(rho,lattice_params; if_plot=true)
+#corrs_syn = synthetic_correlation(rho,Lx,Ly; if_plot=true)
+#currents_syn = synthetic_current(rho,lattice_params; if_plot=true)
 
 
 end
