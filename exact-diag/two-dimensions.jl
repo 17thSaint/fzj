@@ -823,8 +823,7 @@ function buildHopping(lattice_params::Dict,site1::Int64,site2::Int64; kwargs...)
         for j in 1:size(full_basis)[2]
             this_basis_state = full_basis[:,j]
             if site1 in this_basis_state
-                output_state = find_basis_index(this_basis_state)
-                hop[j,output_state] = 1.0+0.0*im
+                hop[j,j] = 1.0+0.0*im
             end
         end
     else
@@ -853,10 +852,10 @@ function hopping_probability(x::Vector{ComplexF64},site1::Tuple{Int64,Int64},sit
     hopping_operator = buildHopping(lattice_params,s1_linear,s2_linear; kwargs...)
     hopping_prob = conj(transpose(x)) * hopping_operator * x
 
-    return hopping_prob,hopping_operator
+    return hopping_prob
 end
 
-function density_matrix(x::Vector{ComplexF64},lattice_params::Dict{String,Any}; kwargs...)
+function density_matrix_slow(x::Vector{ComplexF64},lattice_params::Dict{String,Any}; kwargs...)
     output_level = get(kwargs,:output_level,1)
     Lx = lattice_params["Lx"]
     Ly = lattice_params["Ly"]
@@ -877,7 +876,7 @@ function density_matrix(x::Vector{ComplexF64},lattice_params::Dict{String,Any}; 
     return rho
 end
 
-function density_matrix_fast(x::Vector{ComplexF64},lattice_params::Dict{String,Any}; kwargs...)
+function density_matrix(x::Vector{ComplexF64},lattice_params::Dict{String,Any}; kwargs...)
     output_level = get(kwargs,:output_level,1)
     Lx = lattice_params["Lx"]
     Ly = lattice_params["Ly"]
@@ -888,7 +887,7 @@ function density_matrix_fast(x::Vector{ComplexF64},lattice_params::Dict{String,A
     N = lattice_params["N"]
     full_basis = lattice_params["full_basis"]
     dimHilb = size(full_basis)[2]
-    println("Hilbert Space Dimension: ",dimHilb)
+    output_level > 0 ? println("Hilbert Space Dimension: ",dimHilb) : nothing
 
     rho = Array{ComplexF64,2}(undef,Lx*Ly,Lx*Ly)
     all_hopping_operators = spzeros(Int64,dimHilb*Lx*Ly,dimHilb*Lx*Ly)
@@ -897,58 +896,38 @@ function density_matrix_fast(x::Vector{ComplexF64},lattice_params::Dict{String,A
     for i in 1:dimHilb
         this_basis = full_basis[:,i]
         for n in 1:N
-            coordinate_position = coordinate(this_basis[n],Lx,Ly)
-            for dir in [1,-1]
-                for axis in [1,2]
+            for j in 1:Lx*Ly
 
-                    position_change = [0,0]
-                    position_change[axis] += dir
-
-                    # find next position if hopping x-direction, and check periodicity
-                    next_site_hopping = coordinate_position .+ position_change
-                    if next_site_hopping[axis] > edges[axis] || next_site_hopping[axis] < 1
-                        if if_periodic[axis]
-                            next_site_hopping[axis] = mod1(next_site_hopping[axis],edges[axis])
-                        else
-                            continue
-                        end
-                    end
-                    next_site_hopping = Tuple(next_site_hopping)
-                    next_site_hopping_linear = linear_index(next_site_hopping,Lx,Ly)
-                    println("Moving from Site: ",this_basis[n]," to Site: ",next_site_hopping_linear)
-
-                    # enforce hard-core constraint, then find next basis state
-                    if !(next_site_hopping_linear in this_basis)
-                        next_basis = this_basis .+ 0
-                        next_basis[n] = next_site_hopping_linear
-                        sort!(next_basis,rev=true)
-                        next_basis_index = find_basis_index(next_basis)
-
-                        local_indices = (i,next_basis_index)
-                        shift = ((this_basis[n]-1)*dimHilb,(next_site_hopping_linear-1)*dimHilb)
-                        index_result = local_indices .+ shift
-                        all_hopping_operators[index_result[1],index_result[2]] += 1
-                    else
-                        println("Hard-core constraint violated")
-                    end
+                # enforce hard-core constraint but keep diagonal elements
+                if j in this_basis && this_basis[n] != j
+                    continue
                 end
-            
+
+                # find basis of next configuration
+                next_basis = this_basis .+ 0
+                next_basis[n] = j
+                sort!(next_basis,rev=true)
+                next_basis_index = find_basis_index(next_basis)
+
+                # add element to hopping operator
+                local_indices = (i,next_basis_index)
+                shift = ((this_basis[n]-1)*dimHilb,(j-1)*dimHilb)
+                index_result = local_indices .+ shift
+                all_hopping_operators[index_result[1],index_result[2]] += 1
             end
         end
     end
 
-    # diagonal components
-
-    #=for i in 1:Lx*Ly
+    for i in 1:Lx*Ly
         for j in 1:Lx*Ly
             rho[i,j] = conj(transpose(x)) * all_hopping_operators[(i-1)*dimHilb+1:i*dimHilb,(j-1)*dimHilb+1:j*dimHilb] * x
         end
         output_level > 0 ? println(round(i/(Lx*Ly)*100,digits=2),"% done.") : nothing
-    end=#
+    end
 
     output_level > 0 ? println("Density Matrix: Elapsed time: ",time()-start_time) : nothing
 
-    return all_hopping_operators
+    return rho
 
 end
 
@@ -1167,7 +1146,7 @@ function plot_occupancy(exp_occ; kwargs...)
 end
 
 
-if true
+if false
 
 #density = 1/4
 Lx,Ly = 2,2
@@ -1208,10 +1187,8 @@ println("Ground State: Elapsed time: ",time()-start_time)
 gs = rez[2][findfirst(x->x==minimum(rez[1]),rez[1])]#
 
 
-thisprob,hop_op = hopping_probability(gs,(2,1),(1,2),lattice_params)
-display(hop_op)
-#=rho = density_matrix(gs,lattice_params)
-rho_fast = density_matrix_fast(gs,lattice_params)
+rho = density_matrix_slow(gs,lattice_params)
+rho_fast = density_matrix(gs,lattice_params)
 
 fig1 = figure()
 imshow(abs.(rho))
@@ -1221,7 +1198,12 @@ title("Density Matrix")
 fig2 = figure()
 imshow(abs.(rho_fast))
 colorbar()
-title("Density Matrix Fast")=#
+title("Density Matrix Fast")
+
+fig3 = figure()
+imshow(abs.(rho-rho_fast))
+colorbar()
+title("Density Matrix Difference")
 
 #occs = get_occupancy(rho,lattice_params; if_plot=true)
 #corrs = physical_correlation(rho,Lx,Ly; if_plot=true)
