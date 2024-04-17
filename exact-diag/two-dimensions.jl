@@ -593,6 +593,62 @@ function density_matrix_old(x::Vector{ComplexF64},lattice_params::Dict{String,An
     return rho
 end
 
+function density_matrix_slow(x::Vector{ComplexF64},lattice_params::Dict{String,Any}; kwargs...)
+    output_level = get(kwargs,:output_level,1)
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+    if_periodic_x = lattice_params["if_periodic_x"]
+    if_periodic_y = lattice_params["if_periodic_y"]
+    if_periodic = (if_periodic_x,if_periodic_y)
+    edges = (Lx,Ly)
+    N = lattice_params["N"]
+    full_basis = lattice_params["full_basis"]
+    dimHilb = size(full_basis)[2]
+    output_level > 0 ? println("Hilbert Space Dimension: ",dimHilb) : nothing
+
+    rho = Array{ComplexF64,2}(undef,Lx*Ly,Lx*Ly)
+    all_hopping_operators = spzeros(Int64,dimHilb*Lx*Ly,dimHilb*Lx*Ly)
+
+    start_time = time()
+    for i in 1:dimHilb
+        this_basis = full_basis[:,i]
+        for n in 1:N
+            for j in 1:Lx*Ly
+
+                # enforce hard-core constraint but keep diagonal elements
+                if j in this_basis && this_basis[n] != j
+                    continue
+                end
+
+                # find basis of next configuration
+                next_basis = this_basis .+ 0
+                next_basis[n] = j
+                sort!(next_basis,rev=true)
+                next_basis_index = find_basis_index(next_basis)
+
+                # add element to hopping operator
+                local_indices = (i,next_basis_index)
+                shift = ((this_basis[n]-1)*dimHilb,(j-1)*dimHilb)
+                index_result = local_indices .+ shift
+                all_hopping_operators[index_result[1],index_result[2]] = 1
+            end
+        end
+    end
+
+    for i in 1:Lx*Ly
+        for j in 1:i
+            rho[i,j] = conj(transpose(x)) * all_hopping_operators[(i-1)*dimHilb+1:i*dimHilb,(j-1)*dimHilb+1:j*dimHilb] * x
+            rho[j,i] = conj(rho[i,j])
+        end
+        output_level > 0 ? println(round(i/(Lx*Ly)*100,digits=2),"% done.") : nothing
+    end
+
+    output_level > 0 ? println("Density Matrix: Elapsed time: ",time()-start_time) : nothing
+
+    return rho
+
+end
+
 ######## This is the better working way to do things ########
 
 # finds the linear index assuming jump snake mapping with site 1 at bottom left corner
@@ -644,7 +700,7 @@ end
 
 function n_particle_basis(N::Int64,Lx::Int64,Ly::Int64; kwargs...)
     output_level = get(kwargs,:output_level,1)
-    if_save_data = get(kwargs,:if_save_data,false)
+    if_save_data = get(kwargs,:if_save_data,true)
     dataloc = get(kwargs,:dataloc,get_folder_location("cluster-data/exact-diag"))
     if_find_existing = get(kwargs,:if_find_existing,true)
 
@@ -817,14 +873,11 @@ function buildHopping(lattice_params::Dict,site1::Int64,site2::Int64; kwargs...)
     output_level = get(kwargs,:output_level,1)
     full_basis = lattice_params["full_basis"]
 
-    hop = spzeros(ComplexF64,size(full_basis)[2],size(full_basis)[2])
+    hop = spzeros(Int64,size(full_basis)[2],size(full_basis)[2])
 
     if site1 == site2
         for j in 1:size(full_basis)[2]
-            this_basis_state = full_basis[:,j]
-            if site1 in this_basis_state
-                hop[j,j] = 1.0+0.0*im
-            end
+            site1 in full_basis[:,j] ? hop[j,j] = 1.0+0.0*im : nothing
         end
     else
         for j in 1:size(full_basis)[2]
@@ -833,8 +886,7 @@ function buildHopping(lattice_params::Dict,site1::Int64,site2::Int64; kwargs...)
                 output_state = zeros(Int64,length(this_basis_state)) + this_basis_state
                 output_state[findfirst(x->this_basis_state[x]==site1,1:length(this_basis_state))] = site2
                 sort!(output_state,rev=true)
-                output_state_index = find_basis_index(output_state)
-                hop[j,output_state_index] = 1.0+0.0*im
+                hop[j,find_basis_index(output_state)] = 1
             end
         end
     end
@@ -855,7 +907,7 @@ function hopping_probability(x::Vector{ComplexF64},site1::Tuple{Int64,Int64},sit
     return hopping_prob
 end
 
-function density_matrix_slow(x::Vector{ComplexF64},lattice_params::Dict{String,Any}; kwargs...)
+function density_matrix(x::Vector{ComplexF64},lattice_params::Dict{String,Any}; kwargs...)
     output_level = get(kwargs,:output_level,1)
     Lx = lattice_params["Lx"]
     Ly = lattice_params["Ly"]
@@ -876,59 +928,54 @@ function density_matrix_slow(x::Vector{ComplexF64},lattice_params::Dict{String,A
     return rho
 end
 
-function density_matrix(x::Vector{ComplexF64},lattice_params::Dict{String,Any}; kwargs...)
+function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwargs...)
     output_level = get(kwargs,:output_level,1)
-    Lx = lattice_params["Lx"]
-    Ly = lattice_params["Ly"]
-    if_periodic_x = lattice_params["if_periodic_x"]
-    if_periodic_y = lattice_params["if_periodic_y"]
-    if_periodic = (if_periodic_x,if_periodic_y)
-    edges = (Lx,Ly)
-    N = lattice_params["N"]
-    full_basis = lattice_params["full_basis"]
-    dimHilb = size(full_basis)[2]
-    output_level > 0 ? println("Hilbert Space Dimension: ",dimHilb) : nothing
+    if_densmat = get(kwargs,:if_densmat,true)
+    if_save_data = get(kwargs,:if_save_data,false)
 
-    rho = Array{ComplexF64,2}(undef,Lx*Ly,Lx*Ly)
-    all_hopping_operators = spzeros(Int64,dimHilb*Lx*Ly,dimHilb*Lx*Ly)
+    metadata_dict = merge(merge(lattice_params,hamilt_params),named_tuple_to_dict(kwargs))
 
-    start_time = time()
-    for i in 1:dimHilb
-        this_basis = full_basis[:,i]
-        for n in 1:N
-            for j in 1:Lx*Ly
+    output_level > 0 ? display(metadata_dict) : nothing
+    
+    H = buildHam(lattice_params,hamilt_params; output_level)
+    output_level > 0 ? println("Sparsity = ",nnz(H)/size(H)[1]^2) : nothing
 
-                # enforce hard-core constraint but keep diagonal elements
-                if j in this_basis && this_basis[n] != j
-                    continue
-                end
+    rez = eigsolve(H,nev+3)
+    output_level > 0 ? println("Ground State: Elapsed time: ",time()-start_time) : nothing
 
-                # find basis of next configuration
-                next_basis = this_basis .+ 0
-                next_basis[n] = j
-                sort!(next_basis,rev=true)
-                next_basis_index = find_basis_index(next_basis)
+    sorted_indices = sortperm(rez[1])
+    states = rez[2][sorted_indices][1:nev]
+    nrgs = rez[1][sorted_indices][1:nev]
 
-                # add element to hopping operator
-                local_indices = (i,next_basis_index)
-                shift = ((this_basis[n]-1)*dimHilb,(j-1)*dimHilb)
-                index_result = local_indices .+ shift
-                all_hopping_operators[index_result[1],index_result[2]] += 1
-            end
+    rhos = []
+    if if_densmat
+        for state in states
+            append!(rhos,[density_matrix(state,lattice_params)])
         end
     end
 
-    for i in 1:Lx*Ly
-        for j in 1:Lx*Ly
-            rho[i,j] = conj(transpose(x)) * all_hopping_operators[(i-1)*dimHilb+1:i*dimHilb,(j-1)*dimHilb+1:j*dimHilb] * x
-        end
-        output_level > 0 ? println(round(i/(Lx*Ly)*100,digits=2),"% done.") : nothing
+    if nev == 1
+        states = states[1]
+        rhos = rhos[1]
+        nrgs = nrgs[1]
     end
 
-    output_level > 0 ? println("Density Matrix: Elapsed time: ",time()-start_time) : nothing
+    if_save_data ? save_eigenstates(states,rhos,nrgs,metadata_dict) : nothing
 
-    return rho
+    return states,nrgs,rhos
+end
 
+find_ground_state(lattice_params::Dict,hamilt_params::Dict; kwargs...) = find_eigenstates(1,lattice_params,hamilt_params; kwargs...)
+
+function save_eigenstates(states,densmats,nrgs,metadata::Dict)
+    dataloc = get(metadata,"dataloc",get_folder_location("cluster-data/exact-diag"))
+    data_dict = Dict([("state",states),("nrg",nrgs),("densmat",densmats)])
+    filename_dict = Dict([("Lx",metadata["Lx"]),("Ly",metadata["Ly"]),("N",metadata["N"]),("alpha",metadata["alpha"]),("hopping_anisotropy",metadata["tx"]/metadata["ty"]),("interaction_strength",metadata["U"][1]),("if_periodic_x",metadata["if_periodic_x"]),("if_periodic_y",metadata["if_periodic_y"])])
+    filename = join(["ed",make_parameters_filename(filename_dict)],"-")
+    metadata["filename"] = filename
+    full_loc = join([dataloc,filename],"/")
+    println("Filename: ",full_loc)
+    write_data_jld2(full_loc,data_dict,metadata)
 end
 
 function physical_correlation(densmat::Array{ComplexF64,2},Lx::Int64,Ly::Int64; kwargs...)
@@ -971,7 +1018,7 @@ function plot_synthetic_correlation(syn_corrs::Array{Float64,2}; kwargs...)
     for i in 1:size(syn_corrs)[1]
         plot(1:size(syn_corrs)[2],syn_corrs[i,:],"-p",label="$i")
     end
-    xlabel("Synthetic Site")
+    xlabel("Synthetic Distance")
     ylabel("Correlation")
     title("Synthetic Correlation "*plot_title)
     legend()
@@ -1046,10 +1093,10 @@ end
 function plot_synthetic_current(currents::Array{Float64,2}; kwargs...)
     plot_title = get(kwargs,:plot_title,"")
     fig = figure()
-    for i in 1:size(currents)[1]
-        plot(1:size(currents)[2],currents[i,:],"-p",label="$i")
+    for i in 1:size(currents)[2]
+        plot(1:size(currents)[1],currents[:,i],"-p",label="$i")
     end
-    xlabel("Synthetic Site")
+    xlabel("Physical Site")
     ylabel("Current")
     title("Synthetic Current "*plot_title)
     legend()
@@ -1059,10 +1106,10 @@ end
 function plot_physical_current(currents::Array{Float64,2}; kwargs...)
     plot_title = get(kwargs,:plot_title,"")
     fig = figure()
-    for i in 1:size(currents)[2]
-        plot(1:size(currents)[1],currents[:,i],"-p",label="$i")
+    for i in 1:size(currents)[1]
+        plot(1:size(currents)[2],currents[i,:],"-p",label="$i")
     end
-    xlabel("Physical Site")
+    xlabel("Synthetic Site")
     ylabel("Current")
     title("Physical Current "*plot_title)
     legend()
@@ -1145,71 +1192,104 @@ function plot_occupancy(exp_occ; kwargs...)
     return nothing
 end
 
-
-if false
-
-#density = 1/4
-Lx,Ly = 2,2
-N = 2#Int(floor(density*Lx*Ly))
-println("Using ",N," particles with density ",round(N/(Lx*Ly),digits=3))
-if_periodic_x,if_periodic_y = false,false
-start_time = time()
-full_basis = n_particle_basis(N,Lx,Ly; if_save_data=true,output_level=false)
-println("Made basis in ",time()-start_time)
-lattice_params::Dict{String,Any} = Dict("Lx"=>Lx,
-                      "Ly"=>Ly,
-                      "N"=>N,
-                      "if_periodic_x"=>if_periodic_x,
-                      "if_periodic_y"=>if_periodic_y,
-                      "full_basis"=>full_basis)
-
-stren = 0.0
-lr_dist = "all"
-lr_dist == "all" ? lr_dist = Ly : nothing
-us = [i < lr_dist+1 ? stren : 0.0 for i in 1:Ly]    
-filling = 0.5
-x_shift,y_shift = !if_periodic_x, !if_periodic_y
-alpha = 0.0#N / (filling * (Lx - x_shift) * (Ly - y_shift))
-check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y)
-hamilt_params = Dict("alpha"=>alpha,
-                     "tx"=>1.0,
-                     "ty"=>1.0,
-                     "U"=>us,
-                     "interaction_cutoff"=>1e-5)
-
-#
-H = buildHam(lattice_params,hamilt_params)
-println("Sparsity = ",nnz(H)/size(H)[1]^2)
-
-nev = 20
-rez = eigsolve(H,nev)
-println("Ground State: Elapsed time: ",time()-start_time)
-gs = rez[2][findfirst(x->x==minimum(rez[1]),rez[1])]#
+function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
+    return Dict([("Lx",lattice_params["Lx"]),("Ly",lattice_params["Ly"]),("N",lattice_params["N"]),("alpha",hamilt_params["alpha"]),("hopping_anisotropy",hamilt_params["tx"]/hamilt_params["ty"]),("interaction_strength",hamilt_params["U"][1]),("if_periodic_x",lattice_params["if_periodic_x"]),("if_periodic_y",lattice_params["if_periodic_y"])])
+end
 
 
-rho = density_matrix_slow(gs,lattice_params)
-rho_fast = density_matrix(gs,lattice_params)
+if true
 
-fig1 = figure()
-imshow(abs.(rho))
-colorbar()
-title("Density Matrix")
+    params_dict = Dict([("Lx",4),("N",2),("if_periodic_x",false),("if_periodic_y",false),("filling",0.5),("nev",3),("if_save_data",true)])
 
-fig2 = figure()
-imshow(abs.(rho_fast))
-colorbar()
-title("Density Matrix Fast")
+    # set number of open cores
+    open_cores = get(params_dict, "open_cores", 5)
+	if typeof(open_cores) != String
+		BLAS.set_num_threads(open_cores)	
+		display(BLAS.get_config())
+	end
 
-fig3 = figure()
-imshow(abs.(rho-rho_fast))
-colorbar()
-title("Density Matrix Difference")
+    # set running operation parameters
+    nev = get(params_dict,"nev",1)
+    if_save_data = get(params_dict, "if_save_data", true)
+    dataloc = get(params_dict, "dataloc", get_folder_location("cluster-data/exact-diag"))
+    opl = get(params_dict, "output_level", 1)
+    running_args = (nev=nev,
+                    if_densmat=true,
+                    if_save_data=if_save_data,
+                    output_level=opl)
 
-#occs = get_occupancy(rho,lattice_params; if_plot=true)
-#corrs = physical_correlation(rho,Lx,Ly; if_plot=true)
-#currents = physical_current(rho,lattice_params; if_plot=true)
-#corrs_syn = synthetic_correlation(rho,Lx,Ly; if_plot=true)
-#currents_syn = synthetic_current(rho,lattice_params; if_plot=true)
+    # set lattice parameters
+    Lx = get(params_dict, "Lx", 4)
+    Ly = get(params_dict, "Ly", Lx)
+    N = get(params_dict, "N", 2)
+    if_periodic_x = get(params_dict, "if_periodic_x", false)
+    if_periodic_y = get(params_dict, "if_periodic_y", false)
+
+    opl > 0 ? println("Using ",N," particles with density ",round(N/(Lx*Ly),digits=3)) : nothing
+
+    # build lattice parameters dictionary
+    lattice_params::Dict{String,Any} = Dict("Lx"=>Lx,
+                        "Ly"=>Ly,
+                        "N"=>N,
+                        "if_periodic_x"=>if_periodic_x,
+                        "if_periodic_y"=>if_periodic_y,
+                        "full_basis"=>full_basis)
+
+    # build long range interaction parameters
+    stren = get(params_dict,"interaction_strength", 0.0)
+    lr_dist = get(params_dict,"lr", "all")
+    lr_dist == "all" ? lr_dist = Ly : nothing
+    us = [i < lr_dist+1 ? stren : 0.0 for i in 1:Ly]    
+
+    # build magnetic field parameters and check fluxes for periodicity
+    alpha = get(params_dict,"alpha",nothing)
+    if isnothing(alpha)
+        filling = get(params_dict,"filling",0.5)
+        x_shift,y_shift = !if_periodic_x, !if_periodic_y
+        alpha = N / (filling * (Lx - x_shift) * (Ly - y_shift))
+    end
+    check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y)
+
+    # build hamiltonian parameters dictionary
+    hamilt_params = Dict("alpha"=>alpha,
+                        "tx"=>1.0,
+                        "ty"=>1.0,
+                        "U"=>us,
+                        "interaction_cutoff"=>1e-5)
+
+    # build filename dictionary
+    filename_dict = make_filename_dict(lattice_params,hamilt_params)
+    if_exists,found_data = check_data_exists(filename_dict,"ed"; location=dataloc,output_level=false)
+
+    # need to do something different for nev larger and fill in missing higher eigenstates
+    if if_exists
+        println("Found existing data: ",found_data[2]["filename"])
+        states = found_data[1]["state"]
+        nrgs = found_data[1]["nrg"]
+        rhos = found_data[1]["densmat"]
+    else
+
+        # make basis only if data doesn't exist
+        start_time = time()
+        full_basis = n_particle_basis(N,Lx,Ly; output_level=opl)
+        opl > 0 ? println("Made basis in ",time()-start_time) : nothing
+        lattice_params["full_basis"] = full_basis 
+
+        # run exact diagonalization for find eigenstates
+        if nev == 1
+            states,nrgs,rhos = find_ground_state(lattice_params,hamilt_params; running_args...)
+        else
+            states,nrgs,rhos = find_eigenstates(nev,lattice_params,hamilt_params; running_args...)
+        end
+    end
+
+    for i in 1:nev
+        occs = get_occupancy(rhos[i],lattice_params; if_plot=true,plot_title="State "*string(i))
+    end
+    #=corrs = physical_correlation(rho,Lx,Ly; if_plot=true)
+    currents = physical_current(rho,lattice_params; if_plot=true)
+    corrs_syn = synthetic_correlation(rho,Lx,Ly; if_plot=true)
+    currents_syn = synthetic_current(rho,lattice_params; if_plot=true)=#
 
 
 end

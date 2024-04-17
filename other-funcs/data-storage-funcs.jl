@@ -117,7 +117,7 @@ function get_params_dict_from_filename(filename)
 	end
 	if split(filename,"-")[1] in ["virt","phys","Y","X"]
 		split_filename = split(filename,"-")[4:end]
-	elseif split(filename,"-")[1] in ["mps","ttn","rfa","laugh","basis"]
+	elseif split(filename,"-")[1] in ["mps","ttn","rfa","laugh","basis","ed"]
 		split_filename = split(filename,"-")[2:end]
 	else
 		split_filename = split(filename,"-")
