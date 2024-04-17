@@ -853,7 +853,7 @@ function hopping_probability(x::Vector{ComplexF64},site1::Tuple{Int64,Int64},sit
     hopping_operator = buildHopping(lattice_params,s1_linear,s2_linear; kwargs...)
     hopping_prob = conj(transpose(x)) * hopping_operator * x
 
-    return hopping_prob
+    return hopping_prob,hopping_operator
 end
 
 function density_matrix(x::Vector{ComplexF64},lattice_params::Dict{String,Any}; kwargs...)
@@ -895,8 +895,9 @@ function density_matrix_fast(x::Vector{ComplexF64},lattice_params::Dict{String,A
 
     start_time = time()
     for i in 1:dimHilb
+        this_basis = full_basis[:,i]
         for n in 1:N
-            coordinate_position = coordinate(full_basis[n,i],Lx,Ly)
+            coordinate_position = coordinate(this_basis[n],Lx,Ly)
             for dir in [1,-1]
                 for axis in [1,2]
 
@@ -912,38 +913,42 @@ function density_matrix_fast(x::Vector{ComplexF64},lattice_params::Dict{String,A
                             continue
                         end
                     end
-                    next_site_hopping_linear = linear_index(Tuple(next_site_hopping),Lx,Ly)
-                    println("Hopping from ",coordinate_position," to ",next_site_hopping)
-                    #= enforce hard-core constraint, then find next basis state
-                    if !(next_site_hopping_linear in full_basis[:,i])
-                        next_basis = full_basis[:,i] .+ 0
+                    next_site_hopping = Tuple(next_site_hopping)
+                    next_site_hopping_linear = linear_index(next_site_hopping,Lx,Ly)
+                    println("Moving from Site: ",this_basis[n]," to Site: ",next_site_hopping_linear)
+
+                    # enforce hard-core constraint, then find next basis state
+                    if !(next_site_hopping_linear in this_basis)
+                        next_basis = this_basis .+ 0
                         next_basis[n] = next_site_hopping_linear
                         sort!(next_basis,rev=true)
                         next_basis_index = find_basis_index(next_basis)
-                        local_indices = (full_basis[n,i],next_basis_index)
-                        shift = ((n-1)*dimHilb,(next_site_hopping_linear-1)*dimHilb)
+
+                        local_indices = (i,next_basis_index)
+                        shift = ((this_basis[n]-1)*dimHilb,(next_site_hopping_linear-1)*dimHilb)
                         index_result = local_indices .+ shift
-                        #println(local_indices," ",shift," ",index_result)
                         all_hopping_operators[index_result[1],index_result[2]] += 1
-                    end=#
+                    else
+                        println("Hard-core constraint violated")
+                    end
                 end
             
             end
         end
     end
 
-    for i in 1:Lx*Ly
+    # diagonal components
+
+    #=for i in 1:Lx*Ly
         for j in 1:Lx*Ly
             rho[i,j] = conj(transpose(x)) * all_hopping_operators[(i-1)*dimHilb+1:i*dimHilb,(j-1)*dimHilb+1:j*dimHilb] * x
         end
         output_level > 0 ? println(round(i/(Lx*Ly)*100,digits=2),"% done.") : nothing
-    end
-
-
+    end=#
 
     output_level > 0 ? println("Density Matrix: Elapsed time: ",time()-start_time) : nothing
 
-    return rho
+    return all_hopping_operators
 
 end
 
@@ -1185,7 +1190,7 @@ lr_dist == "all" ? lr_dist = Ly : nothing
 us = [i < lr_dist+1 ? stren : 0.0 for i in 1:Ly]    
 filling = 0.5
 x_shift,y_shift = !if_periodic_x, !if_periodic_y
-alpha = N / (filling * (Lx - x_shift) * (Ly - y_shift))
+alpha = 0.0#N / (filling * (Lx - x_shift) * (Ly - y_shift))
 check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y)
 hamilt_params = Dict("alpha"=>alpha,
                      "tx"=>1.0,
@@ -1193,28 +1198,31 @@ hamilt_params = Dict("alpha"=>alpha,
                      "U"=>us,
                      "interaction_cutoff"=>1e-5)
 
-#=
+#
 H = buildHam(lattice_params,hamilt_params)
 println("Sparsity = ",nnz(H)/size(H)[1]^2)
 
 nev = 20
 rez = eigsolve(H,nev)
 println("Ground State: Elapsed time: ",time()-start_time)
-gs = rez[2][findfirst(x->x==minimum(rez[1]),rez[1])]=#
+gs = rez[2][findfirst(x->x==minimum(rez[1]),rez[1])]#
 
 
-rho = density_matrix(gs,lattice_params)
+thisprob,hop_op = hopping_probability(gs,(2,1),(1,2),lattice_params)
+display(hop_op)
+#=rho = density_matrix(gs,lattice_params)
 rho_fast = density_matrix_fast(gs,lattice_params)
 
 fig1 = figure()
 imshow(abs.(rho))
 colorbar()
-title("Density Matrix Original")
+title("Density Matrix")
 
 fig2 = figure()
 imshow(abs.(rho_fast))
 colorbar()
-title("Density Matrix Fast")
+title("Density Matrix Fast")=#
+
 #occs = get_occupancy(rho,lattice_params; if_plot=true)
 #corrs = physical_correlation(rho,Lx,Ly; if_plot=true)
 #currents = physical_current(rho,lattice_params; if_plot=true)

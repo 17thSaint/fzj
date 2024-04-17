@@ -287,6 +287,36 @@ if false || if_all
     end
 end
 
+if true || if_all
+    @testset "faster density matrix calculation" begin
+        Lx,Ly = 4,4
+        N = 2
+        if_periodic_x,if_periodic_y = false,false
+        full_basis = n_particle_basis(N,Lx,Ly; output_level=0)
+        lattice_params::Dict{String,Any} = Dict("Lx"=>Lx,
+                              "Ly"=>Ly,
+                              "N"=>N,
+                              "if_periodic_x"=>if_periodic_x,
+                              "if_periodic_y"=>if_periodic_y,
+                              "full_basis"=>full_basis)
+    
+
+        alpha = 0.0
+        hamilt_params = Dict("alpha"=>alpha,
+                             "tx"=>1.0,
+                             "ty"=>1.0,
+                             "U"=>zeros(Ly),
+                             "interaction_cutoff"=>1e-5)
+        
+        H = buildHam(lattice_params,hamilt_params; output_level=0)
+        nev = 3
+        rez = eigsolve(H,nev)
+        gs = rez[2][findfirst(x->x==minimum(rez[1]),rez[1])]
+
+        
+    end
+end
+
 
 
 
