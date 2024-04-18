@@ -938,6 +938,7 @@ function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwa
     output_level > 0 ? display(metadata_dict) : nothing
     
     H = buildHam(lattice_params,hamilt_params; output_level)
+    metadata_dict["H"] = H
     output_level > 0 ? println("Sparsity = ",nnz(H)/size(H)[1]^2) : nothing
 
     rez = eigsolve(H,nev+3)
@@ -961,6 +962,41 @@ function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwa
     end
 
     if_save_data ? save_eigenstates(states,rhos,nrgs,metadata_dict) : nothing
+
+    return states,nrgs,rhos
+end
+
+function rerun_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict,metadata::Dict,data_dict::Dict; kwargs...)
+    output_level = get(kwargs,:output_level,1)
+    if_densmat = get(kwargs,:if_densmat,true)
+    if_save_data = get(kwargs,:if_save_data,false)
+
+    output_level > 0 ? display(metadata) : nothing
+    
+    H = metadata["H"]
+    output_level > 0 ? println("Sparsity = ",nnz(H)/size(H)[1]^2) : nothing
+
+    previous_nev = metadata["nev"]
+    rez = eigsolve(H,nev+3)
+    output_level > 0 ? println("Ground State: Elapsed time: ",time()-start_time) : nothing
+
+    sorted_indices = sortperm(rez[1])
+    states = rez[2][sorted_indices][1:nev]
+    nrgs = rez[1][sorted_indices][1:nev]
+
+    rhos = []
+    if if_densmat
+        for (idx,state) in enumerate(states)
+            idx <= previous_nev ? append!(rhos,[data_dict["densmat"][idx]]) : append!(rhos,[density_matrix(state,lattice_params)])
+        end
+    end
+
+    if if_save_data
+        full_loc = join([metadata["dataloc"],metadata["filename"]],"/")
+        modify_data_jld2("nev",nev,full_loc,"metadata")
+        new_data_dict = Dict([("state",states),("nrg",nrgs),("densmat",rhos)])
+        modify_data_jld2(new_data_dict,full_loc,"all_data")
+    end
 
     return states,nrgs,rhos
 end
@@ -1197,9 +1233,44 @@ function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
 end
 
 
-if true
+all_params = [(3,3,3),(4,3,3),(3,4,3),(4,4,3),(5,3,3),(3,4,4),(4,4,4)]
+hildims = []
+build_times = []
+read_times = []
+for (N,Lx,Ly) in all_params
+    append!(hildims,[binomial(Lx*Ly,N)])
+    
+    read_time = 0.0
+    for i in 1:6
+        start_time = time()
+        n_particle_basis(N,Lx,Ly; output_level=0,if_find_existing=true)
+        i > 1 ? read_time += (time() - start_time)/5 : nothing
+    end
+    append!(read_times,[read_time])
 
-    params_dict = Dict([("Lx",4),("N",2),("if_periodic_x",false),("if_periodic_y",false),("filling",0.5),("nev",3),("if_save_data",true)])
+    build_time = 0.0
+    for i in 1:6
+        start_time = time()
+        n_particle_basis(N,Lx,Ly; output_level=0,if_find_existing=false,if_save_data=false)
+        i > 1 ? build_time += (time() - start_time)/5 : nothing
+    end
+    append!(build_times,[build_time])
+
+end
+
+scatter(hildims,build_times,label="Build Time")
+scatter(hildims,read_times,label="Read Time")
+xlabel("Hilbert Space Dimension")
+ylabel("Time (s)")
+yscale("log")
+legend()
+
+
+
+
+if false
+
+    params_dict = Dict([("Lx",4),("N",2),("if_periodic_x",false),("if_periodic_y",false),("filling",0.5),("nev",2),("if_save_data",true)])
 
     # set number of open cores
     open_cores = get(params_dict, "open_cores", 5)
@@ -1216,6 +1287,7 @@ if true
     running_args = (nev=nev,
                     if_densmat=true,
                     if_save_data=if_save_data,
+                    dataloc=dataloc,
                     output_level=opl)
 
     # set lattice parameters
@@ -1232,8 +1304,7 @@ if true
                         "Ly"=>Ly,
                         "N"=>N,
                         "if_periodic_x"=>if_periodic_x,
-                        "if_periodic_y"=>if_periodic_y,
-                        "full_basis"=>full_basis)
+                        "if_periodic_y"=>if_periodic_y)
 
     # build long range interaction parameters
     stren = get(params_dict,"interaction_strength", 0.0)
@@ -1261,12 +1332,25 @@ if true
     filename_dict = make_filename_dict(lattice_params,hamilt_params)
     if_exists,found_data = check_data_exists(filename_dict,"ed"; location=dataloc,output_level=false)
 
-    # need to do something different for nev larger and fill in missing higher eigenstates
+    # check if data exists and rerun if need more eigenstates
     if if_exists
         println("Found existing data: ",found_data[2]["filename"])
-        states = found_data[1]["state"]
-        nrgs = found_data[1]["nrg"]
-        rhos = found_data[1]["densmat"]
+        if nev > found_data[2]["nev"]
+            opl > 0 ? println("Asking for more eigenstates than in file, rerunning") : nothing
+            full_basis = n_particle_basis(N,Lx,Ly; output_level=opl)
+            opl > 0 ? println("Made basis in ",time()-start_time) : nothing
+            lattice_params["full_basis"] = full_basis 
+            states,nrgs,rhos = rerun_eigenstates(nev,lattice_params,hamilt_params,found_data[2],found_data[1]; running_args...)
+        elseif nev < found_data[2]["nev"]
+            opl > 0 ? println("Asking for fewer eigenstates than in file, using existing data") : nothing
+            states = found_data[1]["state"][1:nev]
+            nrgs = found_data[1]["nrg"][1:nev]
+            rhos = found_data[1]["densmat"][1:nev]
+        else
+            states = found_data[1]["state"]
+            nrgs = found_data[1]["nrg"]
+            rhos = found_data[1]["densmat"]
+        end
     else
 
         # make basis only if data doesn't exist
@@ -1284,7 +1368,7 @@ if true
     end
 
     for i in 1:nev
-        occs = get_occupancy(rhos[i],lattice_params; if_plot=true,plot_title="State "*string(i))
+        occs = get_occupancy(rhos,lattice_params; if_plot=true,plot_title="State "*string(i))
     end
     #=corrs = physical_correlation(rho,Lx,Ly; if_plot=true)
     currents = physical_current(rho,lattice_params; if_plot=true)
