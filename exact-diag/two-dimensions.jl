@@ -1254,11 +1254,17 @@ if true
     nev = get(params_dict,"nev",1)
     if_save_data = get(params_dict, "if_save_data", true)
     dataloc = get(params_dict, "dataloc", get_folder_location("cluster-data/exact-diag"))
+    if "geraghty1" in dataloc
+        basis_dataloc = "/p/project/netenesyquma/geraghty1/data/data-ed/basis-files"
+    else
+        basis_dataloc = dataloc
+    end
     opl = get(params_dict, "output_level", 1)
     running_args = (nev=nev,
                     if_densmat=true,
                     if_save_data=if_save_data,
                     dataloc=dataloc,
+                    basis_dataloc=basis_dataloc,
                     output_level=opl)
 
     # set lattice parameters
@@ -1320,7 +1326,7 @@ if true
         if nev > found_data[2]["nev"]
             opl > 0 ? println("Asking for more eigenstates than in file, rerunning") : nothing
             start_time = time()
-            full_basis = n_particle_basis(N,Lx,Ly; output_level=opl)
+            full_basis = n_particle_basis(N,Lx,Ly; output_level=opl,dataloc=basis_dataloc)
             opl > 0 ? println("Made basis in ",time()-start_time) : nothing
             lattice_params["full_basis"] = full_basis 
             states,nrgs,rhos = rerun_eigenstates(nev,lattice_params,hamilt_params,found_data[2],found_data[1]; running_args...)
@@ -1338,7 +1344,7 @@ if true
 
         # make basis only if data doesn't exist
         start_time = time()
-        full_basis = n_particle_basis(N,Lx,Ly; output_level=opl)
+        full_basis = n_particle_basis(N,Lx,Ly; output_level=opl,dataloc=basis_dataloc)
         opl > 0 ? println("Made basis in ",time()-start_time) : nothing
         lattice_params["full_basis"] = full_basis 
 
@@ -1350,10 +1356,10 @@ if true
         end
     end
 
-    #=for i in 1:nev
+    for i in 1:nev
         occs = get_occupancy(rhos[i],lattice_params; if_plot=true,plot_title="State "*string(i))
     end
-    #corrs = physical_correlation(rho,Lx,Ly; if_plot=true)
+    #=corrs = physical_correlation(rho,Lx,Ly; if_plot=true)
     currents = physical_current(rho,lattice_params; if_plot=true)
     corrs_syn = synthetic_correlation(rho,Lx,Ly; if_plot=true)
     currents_syn = synthetic_current(rho,lattice_params; if_plot=true)=#
