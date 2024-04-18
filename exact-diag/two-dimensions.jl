@@ -939,11 +939,13 @@ function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwa
     delete!(metadata_displaying,"full_basis")
     output_level > 0 ? display(metadata_displaying) : nothing
     
+    start_time = time()
     H = buildHam(lattice_params,hamilt_params; output_level)
     metadata_dict["H"] = H
     output_level > 0 ? println("Sparsity = ",nnz(H)/size(H)[1]^2) : nothing
 
-    rez = eigsolve(H,nev+3)
+    x0 = rand(Float64,size(lattice_params["full_basis"])[2])
+    rez = eigsolve(H,x0,nev,:SR,Lanczos())
     output_level > 0 ? println("Ground State: Elapsed time: ",time()-start_time) : nothing
 
     sorted_indices = sortperm(rez[1])
@@ -1157,7 +1159,7 @@ function plot_physical_current(currents::Array{Float64,2}; kwargs...)
     return nothing
 end
 
-function check_fluxes(alpha::Float64,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_y::Bool)
+function check_fluxes(alpha,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_y::Bool)
     if alpha == 0.0
         return nothing
     end
@@ -1237,11 +1239,20 @@ function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     return Dict([("Lx",lattice_params["Lx"]),("Ly",lattice_params["Ly"]),("N",lattice_params["N"]),("alpha",hamilt_params["alpha"]),("hopping_anisotropy",hamilt_params["tx"]/hamilt_params["ty"]),("interaction_strength",hamilt_params["U"][1]),("if_periodic_x",lattice_params["if_periodic_x"]),("if_periodic_y",lattice_params["if_periodic_y"])])
 end
 
+function get_lattice_params_from_metadata(metadata::Dict)
+    return Dict([("Lx",metadata["Lx"]),("Ly",metadata["Ly"]),("N",metadata["N"]),("if_periodic_x",metadata["if_periodic_x"]),("if_periodic_y",metadata["if_periodic_y"]),("full_basis",metadata["full_basis"])])
+end
+
+#which_files = find_data_file(Dict([("Lx",6),("N",3)]),"ed",get_folder_location("cluster-data/exact-diag"))
+
+
+
 
 if true
-
-    #params_dict = Dict([("Lx",4),("N",2),("if_periodic_x",false),("if_periodic_y",false),("filling",0.5),("nev",3),("if_save_data",true)])
-    params_dict = make_args_dict(ARGS)
+for intstrens in range(0.5,20.0,length=50)
+    #for change in [0,0.0001]
+    params_dict = Dict([("Lx",6),("N",3),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",intstrens),("interaction_strength",0.0),("filling",0.5),("nev",7),("if_save_data",false)])
+    #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
     open_cores = get(params_dict, "open_cores", 5)
@@ -1261,7 +1272,7 @@ if true
     end
     opl = get(params_dict, "output_level", 1)
     running_args = (nev=nev,
-                    if_densmat=true,
+                    if_densmat=false,
                     if_save_data=if_save_data,
                     dataloc=dataloc,
                     basis_dataloc=basis_dataloc,
@@ -1306,7 +1317,7 @@ if true
         x_shift,y_shift = !if_periodic_x, !if_periodic_y
         alpha = N / (filling * (Lx - x_shift) * (Ly - y_shift))
     end
-    check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y)
+    #check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y)
 
     # build hamiltonian parameters dictionary
     hamilt_params = Dict("alpha"=>alpha,
@@ -1356,18 +1367,61 @@ if true
         end
     end
 
-    for i in 1:nev
-        occs = get_occupancy(rhos[i],lattice_params; if_plot=true,plot_title="State "*string(i))
-    end
-    #=corrs = physical_correlation(rho,Lx,Ly; if_plot=true)
-    currents = physical_current(rho,lattice_params; if_plot=true)
-    corrs_syn = synthetic_correlation(rho,Lx,Ly; if_plot=true)
-    currents_syn = synthetic_current(rho,lattice_params; if_plot=true)=#
+    #for i in 1:nev
+    #    occs = get_occupancy(rhos[i],lattice_params; if_plot=true,plot_title="$i E=$(round(nrgs[i],digits=5))")
+    #end
+    scatter(intstrens .* ones(nev),nrgs .- nrgs[1],c="b")
+    xlabel("Interaction Strength")
+    ylabel("Energy")
+    #ylim(-9.5,-8.5)
+    #=corrs = physical_correlation(rhos,Lx,Ly; if_plot=true)
+    currents = physical_current(rhos,lattice_params; if_plot=true)
+    corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
+    currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
+#end
 
 
 end
+end
 
 
+#=anises = [1.0,0.8,0.7,0.6,0.5,0.4,0.3]
+howmany = length(anises)
+which_files = find_data_file(Dict([("Lx",6),("N",3)]),"ed",get_folder_location("cluster-data/exact-diag"))
+plotting_dict = Dict()
+for anis in anises
+	plotting_dict[anis] = 0
+end
+datapoints = 10
+
+for f in which_files
+    data = read_data_jld2(f,get_folder_location("cluster-data/exact-diag"))
+    anis = data[2]["hopping_anisotropy"]
+    uu = data[2]["U"][1]
+    
+    currents = synthetic_current(data[1]["densmat"],get_lattice_params_from_metadata(data[2]); if_plot=false)
+
+	plotting_dict[anis] += 1
+	shift = findfirst(x -> anises[x] == anis,1:howmany)
+	thisloc = Int(howmany*(plotting_dict[anis]-1) + shift)
+	println("Plotting Anis = $anis, LR Stren = $uu t, this loc = ",thisloc)
+	subplot(datapoints,howmany,thisloc)
+	for i in 1:size(currents)[2]
+        plot(1:size(currents)[1],currents[:,i],"-p")
+    end
+    ylim(-1.0,1.0)
+
+	if plotting_dict[anis] == 1
+		title("H Anis=$anis")
+		if anis == anises[end]
+			scatter([currents[1,1]],[currents[1,1]],label="LR=$uu t",c="b",s=1.0)
+			legend(loc=2,bbox_to_anchor=(1.05,1.0))
+		end
+	elseif anis == anises[end]
+		scatter([currents[1,1]],[currents[1,1]],label="LR=$uu t",c="b",s=1.0)
+		legend(loc=2,bbox_to_anchor=(1.05,1.0))
+	end
+end=#
 
 
 
