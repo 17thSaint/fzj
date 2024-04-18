@@ -291,7 +291,7 @@ if false || if_all
     end
 end
 
-if true || if_all
+if false || if_all
     @testset "faster density matrix calculation OBC" begin
         Lx,Ly = 4,4
         N = 2
@@ -354,6 +354,43 @@ if false || if_all
         rho_fast = density_matrix(gs,lattice_params; output_level=0)
 
         @test isapprox(rho_slow,rho_fast,atol=1e-5)
+    end
+end
+
+if false || if_all
+    @testset "interaction hamiltonian" begin
+        Lx,Ly = 4,4
+        N = 2
+        if_periodic_x,if_periodic_y = false,false
+        full_basis = n_particle_basis(N,Lx,Ly; output_level=0)
+        lattice_params::Dict{String,Any} = Dict("Lx"=>Lx,
+                              "Ly"=>Ly,
+                              "N"=>N,
+                              "if_periodic_x"=>if_periodic_x,
+                              "if_periodic_y"=>if_periodic_y,
+                              "full_basis"=>full_basis)
+    
+        int_strens = [5.0*exp(-i/5) for i in 1:Ly]
+        alpha = 0.0
+        hamilt_params = Dict("alpha"=>alpha,
+                             "tx"=>0.0,
+                             "ty"=>0.0,
+                             "U"=>int_strens,
+                             "interaction_cutoff"=>1e-5)
+        
+        H = buildHam(lattice_params,hamilt_params; output_level=0)
+        @test isdiag(H)
+
+        for (idx,val) in enumerate(diag(H))
+            if val != 0.0
+                basis_state = full_basis[:,idx]
+                coord1 = coordinate(basis_state[1],Lx,Ly)
+                coord2 = coordinate(basis_state[2],Lx,Ly)
+                @test coord1[1] == coord2[1]
+                @test isapprox(val,int_strens[Int(abs(coord1[2] - coord2[2]))+1],atol=1e-5)
+            end
+        end
+
     end
 end
 
