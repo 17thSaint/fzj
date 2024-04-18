@@ -63,6 +63,10 @@ function make_args_dict(args,parameter_iteration=0)
 	for i in 1:2:length(args)
 		key = args[i]
 		value = args[i+1]
+		if key == "dataloc"
+			parameters_dict["dataloc"] = value
+			continue
+		end
 		get_integer = tryparse(Int,value) 
 		if isnothing(get_integer)
 			get_float = tryparse(Float64,value)
