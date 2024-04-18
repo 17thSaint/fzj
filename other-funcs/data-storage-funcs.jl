@@ -1,4 +1,4 @@
-using JLD2,TTNKit
+using JLD2
 
 function get_folder_location(folder_name)
 	central_loc=find_center()
@@ -18,17 +18,6 @@ function find_center()
 	else
 		println("Not sure where the center is: $(pwd())")
 	end
-end
-
-function back2cpu(ttn::TTNKit.TreeTensorNetwork)
-	datagpu = deepcopy(ttn.data)
-	datac = map(datagpu) do layerdata
-		map(T -> TTNKit.cpu(T), layerdata)
-	end
-	ortho_centerc = deepcopy(ttn.ortho_center)
-	netc = deepcopy(ttn.net)
-	ortho_directionc = deepcopy(ttn.ortho_direction)
-	return TreeTensorNetwork(datac, ortho_directionc, ortho_centerc, netc)
 end
 
 function named_tuple_to_dict(namedtuple)

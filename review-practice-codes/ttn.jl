@@ -60,6 +60,17 @@ end
 =#
 
 
+function back2cpu(ttn::TTNKit.TreeTensorNetwork)
+	datagpu = deepcopy(ttn.data)
+	datac = map(datagpu) do layerdata
+		map(T -> TTNKit.cpu(T), layerdata)
+	end
+	ortho_centerc = deepcopy(ttn.ortho_center)
+	netc = deepcopy(ttn.net)
+	ortho_directionc = deepcopy(ttn.ortho_direction)
+	return TreeTensorNetwork(datac, ortho_directionc, ortho_centerc, netc)
+end
+
 function get_site_count(ttn)
 	layers = Int(TTNKit.number_of_layers(ttn))
 	return 2^layers

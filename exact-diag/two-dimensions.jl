@@ -935,7 +935,9 @@ function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwa
 
     metadata_dict = merge(merge(lattice_params,hamilt_params),named_tuple_to_dict(kwargs))
 
-    output_level > 0 ? display(metadata_dict) : nothing
+    metadata_displaying::Dict = copy(metadata_dict)
+    delete!(metadata_displaying,"full_basis")
+    output_level > 0 ? display(metadata_displaying) : nothing
     
     H = buildHam(lattice_params,hamilt_params; output_level)
     metadata_dict["H"] = H
@@ -971,7 +973,10 @@ function rerun_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict,met
     if_densmat = get(kwargs,:if_densmat,true)
     if_save_data = get(kwargs,:if_save_data,false)
 
-    output_level > 0 ? display(metadata) : nothing
+    metadata_displaying::Dict = copy(metadata)
+    delete!(metadata_displaying,"full_basis")
+    delete!(metadata_displaying,"H")
+    output_level > 0 ? display(metadata_displaying) : nothing
     
     H = metadata["H"]
     output_level > 0 ? println("Sparsity = ",nnz(H)/size(H)[1]^2) : nothing
@@ -1006,7 +1011,7 @@ find_ground_state(lattice_params::Dict,hamilt_params::Dict; kwargs...) = find_ei
 function save_eigenstates(states,densmats,nrgs,metadata::Dict)
     dataloc = get(metadata,"dataloc",get_folder_location("cluster-data/exact-diag"))
     data_dict = Dict([("state",states),("nrg",nrgs),("densmat",densmats)])
-    filename_dict = Dict([("Lx",metadata["Lx"]),("Ly",metadata["Ly"]),("N",metadata["N"]),("alpha",metadata["alpha"]),("hopping_anisotropy",metadata["tx"]/metadata["ty"]),("interaction_strength",metadata["U"][1]),("if_periodic_x",metadata["if_periodic_x"]),("if_periodic_y",metadata["if_periodic_y"])])
+    filename_dict = Dict([("Lx",metadata["Lx"]),("Ly",metadata["Ly"]),("N",metadata["N"]),("alpha",metadata["alpha"]),("hopping_anisotropy",metadata["hopping_anisotropy"]),("interaction_strength",metadata["U"][1]),("if_periodic_x",metadata["if_periodic_x"]),("if_periodic_y",metadata["if_periodic_y"])])
     filename = join(["ed",make_parameters_filename(filename_dict)],"-")
     metadata["filename"] = filename
     full_loc = join([dataloc,filename],"/")
@@ -1233,44 +1238,10 @@ function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
 end
 
 
-all_params = [(3,3,3),(4,3,3),(3,4,3),(4,4,3),(5,3,3),(3,4,4),(4,4,4)]
-hildims = []
-build_times = []
-read_times = []
-for (N,Lx,Ly) in all_params
-    append!(hildims,[binomial(Lx*Ly,N)])
-    
-    read_time = 0.0
-    for i in 1:6
-        start_time = time()
-        n_particle_basis(N,Lx,Ly; output_level=0,if_find_existing=true)
-        i > 1 ? read_time += (time() - start_time)/5 : nothing
-    end
-    append!(read_times,[read_time])
+if true
 
-    build_time = 0.0
-    for i in 1:6
-        start_time = time()
-        n_particle_basis(N,Lx,Ly; output_level=0,if_find_existing=false,if_save_data=false)
-        i > 1 ? build_time += (time() - start_time)/5 : nothing
-    end
-    append!(build_times,[build_time])
-
-end
-
-scatter(hildims,build_times,label="Build Time")
-scatter(hildims,read_times,label="Read Time")
-xlabel("Hilbert Space Dimension")
-ylabel("Time (s)")
-yscale("log")
-legend()
-
-
-
-
-if false
-
-    params_dict = Dict([("Lx",4),("N",2),("if_periodic_x",false),("if_periodic_y",false),("filling",0.5),("nev",2),("if_save_data",true)])
+    #params_dict = Dict([("Lx",4),("N",2),("if_periodic_x",false),("if_periodic_y",false),("filling",0.5),("nev",3),("if_save_data",true)])
+    params_dict = make_args_dict(ARGS)
 
     # set number of open cores
     open_cores = get(params_dict, "open_cores", 5)
@@ -1310,7 +1281,17 @@ if false
     stren = get(params_dict,"interaction_strength", 0.0)
     lr_dist = get(params_dict,"lr", "all")
     lr_dist == "all" ? lr_dist = Ly : nothing
-    us = [i < lr_dist+1 ? stren : 0.0 for i in 1:Ly]    
+    us = [i < lr_dist+1 ? stren : 0.0 for i in 1:Ly]
+
+    # get hopping anisotropy values
+    hopping_anisotropy = get(params_dict,"hopping_anisotropy",1.0)
+    if hopping_anisotropy < 1.0
+		ty = 1.0 / hopping_anisotropy
+		tx = 1.0
+	else
+		tx = 1.0 * hopping_anisotropy
+		ty = 1.0
+	end
 
     # build magnetic field parameters and check fluxes for periodicity
     alpha = get(params_dict,"alpha",nothing)
@@ -1323,8 +1304,9 @@ if false
 
     # build hamiltonian parameters dictionary
     hamilt_params = Dict("alpha"=>alpha,
-                        "tx"=>1.0,
-                        "ty"=>1.0,
+                        "tx"=>tx,
+                        "ty"=>ty,
+                        "hopping_anisotropy"=>hopping_anisotropy,
                         "U"=>us,
                         "interaction_cutoff"=>1e-5)
 
@@ -1337,6 +1319,7 @@ if false
         println("Found existing data: ",found_data[2]["filename"])
         if nev > found_data[2]["nev"]
             opl > 0 ? println("Asking for more eigenstates than in file, rerunning") : nothing
+            start_time = time()
             full_basis = n_particle_basis(N,Lx,Ly; output_level=opl)
             opl > 0 ? println("Made basis in ",time()-start_time) : nothing
             lattice_params["full_basis"] = full_basis 
@@ -1367,10 +1350,10 @@ if false
         end
     end
 
-    for i in 1:nev
-        occs = get_occupancy(rhos,lattice_params; if_plot=true,plot_title="State "*string(i))
+    #=for i in 1:nev
+        occs = get_occupancy(rhos[i],lattice_params; if_plot=true,plot_title="State "*string(i))
     end
-    #=corrs = physical_correlation(rho,Lx,Ly; if_plot=true)
+    #corrs = physical_correlation(rho,Lx,Ly; if_plot=true)
     currents = physical_current(rho,lattice_params; if_plot=true)
     corrs_syn = synthetic_correlation(rho,Lx,Ly; if_plot=true)
     currents_syn = synthetic_current(rho,lattice_params; if_plot=true)=#
@@ -1378,19 +1361,6 @@ if false
 
 end
 
-#=nrgs_krylov = filter(x->x<0.0,rez[1])
-fig = figure()
-scatter(1:length(nrgs_krylov),nrgs_krylov,c="b",label="Krylov")
-xlabel("Eigenvalue Index")
-ylabel("Energy")
-legend()
-
-fig2 = figure()
-scatter(1:10,rr[end-9:end],c="b")
-xlabel("Eigenvalue Index")
-ylabel("Eigenvalue")
-title("Density Matrix Eigenvalues")
-yscale("log")=#
 
 
 
