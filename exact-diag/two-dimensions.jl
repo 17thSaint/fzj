@@ -1254,7 +1254,7 @@ if true
     nev = get(params_dict,"nev",1)
     if_save_data = get(params_dict, "if_save_data", true)
     dataloc = get(params_dict, "dataloc", get_folder_location("cluster-data/exact-diag"))
-    if "geraghty1" in dataloc
+    if occursin("geraghty1",dataloc)
         basis_dataloc = "/p/project/netenesyquma/geraghty1/data/data-ed/basis-files"
     else
         basis_dataloc = dataloc
