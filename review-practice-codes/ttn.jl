@@ -15,7 +15,7 @@ function find_center()
 	end
 end
 
-function include_other_files(all_files)
+function include_other_files(all_files,output_level=0)
 	center = find_center()
 	get_to_fzj = split(pwd(),center)[1]
 	if typeof(all_files) == String
@@ -23,7 +23,7 @@ function include_other_files(all_files)
 	end
 	for file in all_files
 		occursin("main-git",pwd()) ? include(get_to_fzj * center * "/main-git/" * file) : include(get_to_fzj * center * "/" * file)
-		println("Included $file")
+		output_level > 0 ? println("Included $file") : nothing
 	end
 end
 

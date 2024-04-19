@@ -905,13 +905,13 @@ end=#
 #layers = 6
 #lr = 7
 #anises = [0.01,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.6,0.8,0.9,1.1,1.3,1.5,1.7,1.9,2.0,2.5,3.0,3.5,4.0,6.0,8.0,9.0,10.0,15.0,20.0,25.0,30.0,40.0,50.0,70.0,90.0,100.0,1000.0,10000.0]
-#anis = 0.7
+#anises = range(1.0,20.0,length=20)
 #strens = range(0.01,2.0,length=10)
 #alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
 #strens = range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("hopping_anisotropy",0.6),("particles",6),("layers",6),("mdim",150),("if_save_data",true),("filling",0.5),("onsite_strength",0.231111111),("lr","all"),("if_periodic_phys",true)])
+	params_dict = Dict([("hopping_anisotropy",1.0),("nrgtol",1e-8),("particles",4),("layers",4),("mdim",150),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",false),("if_periodic_virt",false)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)
@@ -921,7 +921,7 @@ end=#
 	end
 	#true
 	nrgtol = get(params_dict, "nrgtol", 1E-4)
-	cutoff = get(params_dict, "cutoff", 1E-6)
+	cutoff = get(params_dict, "cutoff", 0.0)
 	if_NN = get(params_dict, "if_nn_int", false)
 	if_pinning = get(params_dict, "if_pinning", false)
 	if_gpu = get(params_dict, "if_gpu", false)
@@ -950,15 +950,19 @@ end=#
 	#
 	if layer_count % 2 == 0
 		edge_sites = Int(sqrt(2^layer_count))
+		phys_edge_length,synth_edge_length = edge_sites,edge_sites
 		num_particles = get(params_dict, "particles", Int(edge_sites/2))
 	else
 		edge_sites = Int(sqrt(2^(layer_count+1)))
+		phys_edge_length,synth_edge_length = edge_sites,Int(edge_sites/2)
 		num_particles = get(params_dict, "particles", Int(sqrt(2^(layer_count+1))/2))
 	end
-	#
+	if_per_phys = get(params_dict, "if_periodic_phys", true)
+	if_per_virt = get(params_dict, "if_periodic_virt", false)
 	if isnothing(alpha)
 		filling = get(params_dict, "filling", 1.0)
-		alpha = num_particles/(filling*(2^layer_count))
+		phys_shift,synth_shift = !if_per_phys,!if_per_virt
+		alpha = num_particles/(filling*(phys_edge_length - phys_shift)*(synth_edge_length - synth_shift))
 		mag_off = false
 	else
 		mag_off = alpha == 0.0
@@ -969,13 +973,12 @@ end=#
 	#nu = 1.0
 	sweep_type = "dmrg"
 	max_occ = get(params_dict, "max_occ", 1)
-	if_per_phys = get(params_dict, "if_periodic_phys", true)
-	if_per_virt = get(params_dict, "if_periodic_virt", false)
+	
 	evolve = true
 	#max_occupation = 3
-	expan = TTNKit.DefaultExpander(0.5)#TTNKit.NoExpander()
+	expan = TTNKit.DefaultExpander(1.0)#TTNKit.NoExpander()
 	herenoise = [0.0]
-	ts = 0.500
+	ts = 1.0
 	mu = get(params_dict, "chem_strength", 0.0)
 	tot_sites = 2^layer_count
 	syms = get(params_dict, "syms", true)
@@ -1001,7 +1004,14 @@ end=#
 	if_continuous_saving = get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 7)
 	save_data ? nothing : if_continuous_saving = false
 
-	loc = get(params_dict, "dataloc", get_folder_location("cluster-data/synth-dims"))
+	if if_per_phys && if_per_virt
+		dataloc = get_folder_location("cluster-data/synth-dims/torus")
+	elseif if_per_phys || if_per_virt
+		dataloc = get_folder_location("cluster-data/synth-dims")
+	elseif !if_per_phys && !if_per_virt
+		dataloc = get_folder_location("cluster-data/synth-dims/obc")
+	end
+	loc = get(params_dict, "dataloc", dataloc)
 	if_cliff = false
 	sc_type = "flat"
 	dists = [i for i in 1:2*edge_sites]
@@ -1080,7 +1090,7 @@ end=#
 
 		#
 		println(datafile_name)
-		if_exists,found_data = check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
+		if_exists,found_data = false,nothing#check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
 
 		if if_exists
 			println("Found Data")
@@ -1090,6 +1100,7 @@ end=#
 			catch
 				dens = nothing
 			end
+			rezobs = found_data[2]["observer"]
 			ham = found_data[2]["ham"]
 			#append!(wavefuncs,[wavefunc])
 		else
@@ -1108,6 +1119,13 @@ end=#
 			#append!(wavefuncs,[dm_sp.ttn])
 		end
 
+		imshow(real.(dens))
+		colorbar()
+
+		#scatter(anis,rezobs.nrg[end],c="b")
+		#xlabel("Hopping Anisotropy")
+		#ylabel("Energy")
+
 		#Profile.print()
 
 		#=
@@ -1117,7 +1135,7 @@ end=#
 		xscale("log")
 		=#
 
-		occs = get_occupancy(wavefunc; densmat=dens,plot_title="Anis = $(params_dict["hopping_anisotropy"])")
+		#occs = get_occupancy(wavefunc; densmat=dens,plot_title="Torus")
 		#=plot(collect(1:Int(sqrt(2^layer_count))),occs[4,:],label="$(round(num_particles/(alpha*tot_sites),digits=4))")
 		legend()
 		xlabel("Sites")

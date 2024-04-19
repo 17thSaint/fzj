@@ -15,7 +15,7 @@ function find_center()
 	end
 end
 
-function include_other_files(all_files)
+function include_other_files(all_files,output_level=0)
 	center = find_center()
 	get_to_fzj = split(pwd(),center)[1]
 	if typeof(all_files) == String
@@ -23,7 +23,7 @@ function include_other_files(all_files)
 	end
 	for file in all_files
 		occursin("main-git",pwd()) ? include(get_to_fzj * center * "/main-git/" * file) : include(get_to_fzj * center * "/" * file)
-		println("Included $file")
+		output_level > 0 ? println("Included $file") : nothing
 	end
 end
 
@@ -478,6 +478,33 @@ end
 get_old_basis_version(operator1::Matrix,operator2::Matrix,site1::Tuple{Int64,Int64},site2::Tuple{Int64,Int64},Lx::Int64,Ly::Int64) = get_old_basis_version(operator1,operator2,linear_index(site1,Lx,Ly),linear_index(site2,Lx,Ly),Lx*Ly)
 get_old_basis_version(operator::Matrix,which_site::Tuple{Int64,Int64},Lx::Int64,Ly::Int64) = get_old_basis_version(operator,linear_index(which_site,Lx,Ly),Lx*Ly)
 
+function convert_new_basis_to_old(basis::Array,lattice_params::Dict)
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+    N = length(basis)
+
+    old_basis_version = zeros(Int64,Lx*Ly)
+    for i in 1:N
+        old_basis_version[basis[i]] = 1
+    end
+
+    return old_basis_version
+end
+
+function convert_full_basis_new_to_old(lattice_params::Dict)
+    full_basis = lattice_params["new_basis"]
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+    N = lattice_params["N"]
+
+    old_basis = Array{Int64,2}(undef,Lx*Ly,binomial(Lx*Ly,N))
+    for i in 1:size(full_basis)[2]
+        old_basis[:,i] = convert_new_basis_to_old(full_basis[:,i],lattice_params)
+    end
+
+    return old_basis
+end
+
 function change_of_basis_matrix(lattice_params::Dict{String,Any})
     full_basis = lattice_params["full_basis"]
     Lx = lattice_params["Lx"]
@@ -491,7 +518,7 @@ function change_of_basis_matrix(lattice_params::Dict{String,Any})
         change_of_basis[:,j] = transpose(get_old_basis_version(full_basis[:,j]))
     end
 
-    return change_of_basis,sparse(pinv(Matrix(change_of_basis)))
+    return change_of_basis#,sparse(pinv(Matrix(change_of_basis)))
 end
 
 function hopping_matrix_naive(site1::Tuple{Int64,Int64},site2::Tuple{Int64,Int64},lattice_params::Dict{String,Any})
@@ -959,12 +986,6 @@ function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwa
         end
     end
 
-    if nev == 1
-        states = states[1]
-        rhos = rhos[1]
-        nrgs = nrgs[1]
-    end
-
     if_save_data ? save_eigenstates(states,rhos,nrgs,metadata_dict) : nothing
 
     return states,nrgs,rhos
@@ -1033,7 +1054,7 @@ function physical_correlation(densmat::Array{ComplexF64,2},Lx::Int64,Ly::Int64; 
         end
     end
 
-    if_plot ? plot_physical_correlation(phys_corrs) : nothing
+    if_plot ? plot_physical_correlation(phys_corrs; kwargs...) : nothing
 
     return phys_corrs
 end
@@ -1050,7 +1071,7 @@ function synthetic_correlation(densmat::Array{ComplexF64,2},Lx::Int64,Ly::Int64;
         end
     end
 
-    if_plot ? plot_synthetic_correlation(syn_corrs) : nothing
+    if_plot ? plot_synthetic_correlation(syn_corrs; kwargs...) : nothing
 
     return syn_corrs
 end
@@ -1243,15 +1264,22 @@ function get_lattice_params_from_metadata(metadata::Dict)
     return Dict([("Lx",metadata["Lx"]),("Ly",metadata["Ly"]),("N",metadata["N"]),("if_periodic_x",metadata["if_periodic_x"]),("if_periodic_y",metadata["if_periodic_y"]),("full_basis",metadata["full_basis"])])
 end
 
+function hh_gap_exact(hopping_anisotropy::Float64,alpha::Float64)
+    a2 = 1/(4*(sin(pi*alpha)^2))
+    a1 = (1+2*(1/hopping_anisotropy^2)*(a2^2))^-0.5
+    return 4*alpha*(1/hopping_anisotropy^2)*(a1^4)*(a2^2)
+end
+
 #which_files = find_data_file(Dict([("Lx",6),("N",3)]),"ed",get_folder_location("cluster-data/exact-diag"))
 
-
-
-
-if true
-for intstrens in range(0.5,20.0,length=50)
+if false
+#anises = range(1.0,20.0,length=60)
+#intstrens = range(-10.0,10.0,length=50)
+coeffs = []
+#for (idx,anis) in enumerate(anises)
+#for intstren in intstrens
     #for change in [0,0.0001]
-    params_dict = Dict([("Lx",6),("N",3),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",intstrens),("interaction_strength",0.0),("filling",0.5),("nev",7),("if_save_data",false)])
+    params_dict = Dict([("Lx",4),("N",4),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("alpha",0.0),("nev",4),("if_save_data",false)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
@@ -1272,7 +1300,7 @@ for intstrens in range(0.5,20.0,length=50)
     end
     opl = get(params_dict, "output_level", 1)
     running_args = (nev=nev,
-                    if_densmat=false,
+                    if_densmat=true,
                     if_save_data=if_save_data,
                     dataloc=dataloc,
                     basis_dataloc=basis_dataloc,
@@ -1298,7 +1326,7 @@ for intstrens in range(0.5,20.0,length=50)
     stren = get(params_dict,"interaction_strength", 0.0)
     lr_dist = get(params_dict,"lr", "all")
     lr_dist == "all" ? lr_dist = Ly : nothing
-    us = [i < lr_dist+1 ? stren : 0.0 for i in 1:Ly]
+    us = [i < lr_dist+2 ? stren : 0.0 for i in 1:Ly]
 
     # get hopping anisotropy values
     hopping_anisotropy = get(params_dict,"hopping_anisotropy",1.0)
@@ -1317,7 +1345,7 @@ for intstrens in range(0.5,20.0,length=50)
         x_shift,y_shift = !if_periodic_x, !if_periodic_y
         alpha = N / (filling * (Lx - x_shift) * (Ly - y_shift))
     end
-    #check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y)
+    check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y)
 
     # build hamiltonian parameters dictionary
     hamilt_params = Dict("alpha"=>alpha,
@@ -1367,12 +1395,22 @@ for intstrens in range(0.5,20.0,length=50)
         end
     end
 
-    #for i in 1:nev
-    #    occs = get_occupancy(rhos[i],lattice_params; if_plot=true,plot_title="$i E=$(round(nrgs[i],digits=5))")
-    #end
-    scatter(intstrens .* ones(nev),nrgs .- nrgs[1],c="b")
-    xlabel("Interaction Strength")
-    ylabel("Energy")
+    for i in 1:nev
+        occs = get_occupancy(rhos[i],lattice_params; if_plot=true,plot_title="$i E=$(round(nrgs[i],digits=5))")
+    end
+    #coeff = (maximum(nrgs) .- nrgs[1]) / hh_gap_exact(anis,alpha)
+    #append!(coeffs,[coeff])
+    
+    #scatter(intstren,nrgs[1],c="b")
+    #scatter(intstren,nrgs[2],c="r")
+    #scatter(intstren,nrgs[3],c="g")
+    #scatter(intstren,nrgs[4],c="k")
+    #scatter(intstren,nrgs[2] .- nrgs[1],c="b")
+    #scatter(intstren,nrgs[3] .- nrgs[2],c="r")
+    #scatter(anis,hh_gap_exact(anis,alpha),c="g")
+    #xlabel("Hopping Anisotropy")
+    #xlabel("Interaction Strength")
+    #ylabel("Energy")
     #ylim(-9.5,-8.5)
     #=corrs = physical_correlation(rhos,Lx,Ly; if_plot=true)
     currents = physical_current(rhos,lattice_params; if_plot=true)
@@ -1381,7 +1419,7 @@ for intstrens in range(0.5,20.0,length=50)
 #end
 
 
-end
+#end
 end
 
 
