@@ -905,13 +905,13 @@ end=#
 #layers = 6
 #lr = 7
 #anises = [0.01,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.6,0.8,0.9,1.1,1.3,1.5,1.7,1.9,2.0,2.5,3.0,3.5,4.0,6.0,8.0,9.0,10.0,15.0,20.0,25.0,30.0,40.0,50.0,70.0,90.0,100.0,1000.0,10000.0]
-#anises = range(1.0,20.0,length=20)
+anises = range(1.0,5.0,length=5)
 #strens = range(0.01,2.0,length=10)
 #alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
 #strens = range(0.1,0.5,length=3)
-#for (idx,anis) in enumerate(anises)
+for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("hopping_anisotropy",1.0),("nrgtol",1e-8),("particles",4),("layers",4),("mdim",150),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",false),("if_periodic_virt",false)])
+	params_dict = Dict([("hopping_anisotropy",1/anis),("nrgtol",1e-8),("particles",4),("layers",4),("mdim",150),("if_save_data",true),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",false),("if_periodic_virt",false)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)
@@ -1119,10 +1119,10 @@ end=#
 			#append!(wavefuncs,[dm_sp.ttn])
 		end
 
-		imshow(real.(dens))
-		colorbar()
+		#imshow(real.(dens))
+		#colorbar()
 
-		#scatter(anis,rezobs.nrg[end],c="b")
+		scatter(anis,rezobs.nrg[end],c="b")
 		#xlabel("Hopping Anisotropy")
 		#ylabel("Energy")
 
@@ -1192,7 +1192,7 @@ end=#
 		fig = figure()
 		scatter(collect(1:mdim),-log.(specs))
 		=#
-	#end
+	end
 end
 
 #

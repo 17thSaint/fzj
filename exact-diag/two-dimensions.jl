@@ -849,7 +849,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
     #
 
     # interaction
-    lr_dist = sum(U .> interaction_cutoff) - 1
+    lr_dist = sum(abs.(U) .> interaction_cutoff) - 1
     if length(particle_locations_linear) > 1 && lr_dist > 0
         #println("Doing Interactions")
         for phys_loc in 1:Lx
@@ -969,7 +969,7 @@ function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwa
     start_time = time()
     H = buildHam(lattice_params,hamilt_params; output_level)
     metadata_dict["H"] = H
-    output_level > 0 ? println("Sparsity = ",nnz(H)/size(H)[1]^2) : nothing
+    output_level > 0 ? println("Sparsity = ",SparseArrays.nnz(H)/size(H)[1]^2) : nothing
 
     x0 = rand(Float64,size(lattice_params["full_basis"])[2])
     rez = eigsolve(H,x0,nev,:SR,Lanczos())
@@ -1273,13 +1273,13 @@ end
 #which_files = find_data_file(Dict([("Lx",6),("N",3)]),"ed",get_folder_location("cluster-data/exact-diag"))
 
 if false
-#anises = range(1.0,20.0,length=60)
+anises = range(1.0,5.0,length=5)
 #intstrens = range(-10.0,10.0,length=50)
 coeffs = []
 #for (idx,anis) in enumerate(anises)
 #for intstren in intstrens
     #for change in [0,0.0001]
-    params_dict = Dict([("Lx",4),("N",4),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("alpha",0.0),("nev",4),("if_save_data",false)])
+    params_dict = Dict([("output_level",0),("Lx",4),("N",4),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",4),("if_save_data",true)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
@@ -1395,9 +1395,9 @@ coeffs = []
         end
     end
 
-    for i in 1:nev
-        occs = get_occupancy(rhos[i],lattice_params; if_plot=true,plot_title="$i E=$(round(nrgs[i],digits=5))")
-    end
+    #for i in 1:1#nev
+    #    occs = get_occupancy(rhos[i],lattice_params; if_plot=true,plot_title="$i E=$(round(nrgs[i],digits=5))")
+    #end
     #coeff = (maximum(nrgs) .- nrgs[1]) / hh_gap_exact(anis,alpha)
     #append!(coeffs,[coeff])
     
@@ -1407,6 +1407,7 @@ coeffs = []
     #scatter(intstren,nrgs[4],c="k")
     #scatter(intstren,nrgs[2] .- nrgs[1],c="b")
     #scatter(intstren,nrgs[3] .- nrgs[2],c="r")
+    #scatter(anis,nrgs[1],c="b")
     #scatter(anis,hh_gap_exact(anis,alpha),c="g")
     #xlabel("Hopping Anisotropy")
     #xlabel("Interaction Strength")

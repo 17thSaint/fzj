@@ -40,8 +40,8 @@ if false || if_all
         Lx,Ly = 4,4
         N = 4
 
-        ttn_files = find_data_file(Dict([("layers",Int(log(2,Lx*Ly))),("particles",N),("if_periodic_phys",true),("if_periodic_virt",true)]),"ttn",ttn_dataloc; output_level=0)
-        ed_files = find_data_file(Dict([("Lx",Lx),("Ly",Ly),("N",N),("if_periodic_x",true),("if_periodic_y",true)]),"ed",ed_dataloc; output_level=0)
+        ttn_files = find_data_file(Dict([("layers",Int(log(2,Lx*Ly))),("particles",N),("if_periodic_phys",true),("if_periodic_virt",true),("hopping_anisotropy",1.0),("onsite_strength",0.0)]),"ttn",ttn_dataloc; output_level=0)
+        ed_files = find_data_file(Dict([("Lx",Lx),("Ly",Ly),("N",N),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0)]),"ed",ed_dataloc; output_level=0)
 
         ttn_data = Dict()
         for f in ttn_files
@@ -125,7 +125,7 @@ if false || if_all
     end
 end
 
-if true || if_all
+if false || if_all
 	@testset "OBC 4x4 N=4" begin
 		ttn_dataloc = get_folder_location("cluster-data/synth-dims/obc")
 		ed_dataloc = get_folder_location("cluster-data/exact-diag")
@@ -133,8 +133,8 @@ if true || if_all
 		Lx,Ly = 4,4
 		N = 4
 
-		ttn_files = find_data_file(Dict([("layers",Int(log(2,Lx*Ly))),("particles",N),("if_periodic_phys",false),("if_periodic_virt",false)]),"ttn",ttn_dataloc; output_level=0)
-		ed_files = find_data_file(Dict([("Lx",Lx),("Ly",Ly),("N",N),("if_periodic_x",false),("if_periodic_y",false)]),"ed",ed_dataloc; output_level=0)
+		ttn_files = find_data_file(Dict([("layers",Int(log(2,Lx*Ly))),("particles",N),("if_periodic_phys",false),("if_periodic_virt",false),("hopping_anisotropy",1.0),("onsite_strength",0.0)]),"ttn",ttn_dataloc; output_level=0)
+		ed_files = find_data_file(Dict([("Lx",Lx),("Ly",Ly),("N",N),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",0.0)]),"ed",ed_dataloc; output_level=0)
 
 		ttn_data = Dict()
 		for f in ttn_files
@@ -218,6 +218,61 @@ if true || if_all
 	end
 end
 
+if false || if_all
+	@testset "hopping anisotropy comparison TTN OBC" begin
+		ttn_dataloc = get_folder_location("cluster-data/synth-dims/obc")
+		ed_dataloc = get_folder_location("cluster-data/exact-diag")
+
+		Lx,Ly = 4,4
+		N = 4
+
+		ttn_files = find_data_file(Dict([("layers",Int(log(2,Lx*Ly))),("particles",N),("if_periodic_phys",false),("if_periodic_virt",false),("onsite_strength",0.0)]),"ttn",ttn_dataloc; output_level=0)
+		ed_files = find_data_file(Dict([("Lx",Lx),("Ly",Ly),("N",N),("if_periodic_x",false),("if_periodic_y",false),("interaction_strength",0.0)]),"ed",ed_dataloc; output_level=0)
+
+		ttn_data = Dict()
+		for f in ttn_files
+			data,metadata = read_data_jld2(f,ttn_dataloc; output_level=0)
+			ttn_data[string(metadata["hopping_anisotropy"])] = (data["densmat"],metadata["observer"].nrg)
+		end
+
+		ed_data = Dict()
+		for f in ed_files
+			data,metadata = read_data_jld2(f,ed_dataloc; output_level=0)
+			ed_data[string(metadata["hopping_anisotropy"])] = (data["densmat"][1],data["nrg"][1])
+		end
+
+		# test that the energies match-up
+		ed_nrgs = []
+		ttn_nrgs = []
+		for (key,val) in ed_data
+			push!(ed_nrgs,val[2])
+			push!(ttn_nrgs,ttn_data[key][2][end])
+		end
+		if if_plot
+			fig = figure()
+			xs = parse.(Float64,keys(ed_data))
+			scatter(xs,ttn_nrgs,label="TTN")
+			scatter(xs,ed_nrgs,label="ED")
+			legend()
+			xlabel("Hopping Anisotropy")
+			ylabel("Energy")
+			title("Energy comparison")
+		end
+		@test isapprox(ed_nrgs,ttn_nrgs,atol=1e-6)
+
+		# test that the density matrices match-up
+		for (key,val) in ed_data
+			densmat_diff = abs.(ttn_data[key][1]) .- abs.(val[1])
+			if if_plot
+				fig = figure()
+				imshow(abs.(densmat_diff))
+				colorbar()
+				title("TTN - ED: $key")#
+			end
+			@test maximum(abs.(densmat_diff)) < 1e-8
+		end
+	end
+end
 
 
 
