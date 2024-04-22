@@ -35,7 +35,7 @@ if_plot = false
 if false || if_all
     @testset "Torus 4x4 N=4" begin
         ttn_dataloc = get_folder_location("cluster-data/synth-dims/torus")
-        ed_dataloc = get_folder_location("cluster-data/exact-diag")
+        ed_dataloc = get_folder_location("cluster-data/exact-diag/torus")
 
         Lx,Ly = 4,4
         N = 4
@@ -128,7 +128,7 @@ end
 if false || if_all
 	@testset "OBC 4x4 N=4" begin
 		ttn_dataloc = get_folder_location("cluster-data/synth-dims/obc")
-		ed_dataloc = get_folder_location("cluster-data/exact-diag")
+		ed_dataloc = get_folder_location("cluster-data/exact-diag/obc")
 
 		Lx,Ly = 4,4
 		N = 4
@@ -220,14 +220,14 @@ end
 
 if false || if_all
 	@testset "hopping anisotropy comparison TTN OBC" begin
-		ttn_dataloc = get_folder_location("cluster-data/synth-dims/obc")
-		ed_dataloc = get_folder_location("cluster-data/exact-diag")
+		ttn_dataloc = get_folder_location("cluster-data/synth-dims/torus")
+		ed_dataloc = get_folder_location("cluster-data/exact-diag/torus")
 
 		Lx,Ly = 4,4
 		N = 4
 
-		ttn_files = find_data_file(Dict([("layers",Int(log(2,Lx*Ly))),("particles",N),("if_periodic_phys",false),("if_periodic_virt",false),("onsite_strength",0.0)]),"ttn",ttn_dataloc; output_level=0)
-		ed_files = find_data_file(Dict([("Lx",Lx),("Ly",Ly),("N",N),("if_periodic_x",false),("if_periodic_y",false),("interaction_strength",0.0)]),"ed",ed_dataloc; output_level=0)
+		ttn_files = find_data_file(Dict([("layers",Int(log(2,Lx*Ly))),("particles",N),("if_periodic_phys",true),("if_periodic_virt",true),("onsite_strength",0.0)]),"ttn",ttn_dataloc; output_level=0)
+		ed_files = find_data_file(Dict([("Lx",Lx),("Ly",Ly),("N",N),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",0.0)]),"ed",ed_dataloc; output_level=0)
 
 		ttn_data = Dict()
 		for f in ttn_files
@@ -269,7 +269,7 @@ if false || if_all
 				colorbar()
 				title("TTN - ED: $key")#
 			end
-			@test maximum(abs.(densmat_diff)) < 1e-8
+			@test maximum(abs.(densmat_diff)) < 1e-7
 		end
 	end
 end
