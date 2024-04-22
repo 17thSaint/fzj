@@ -805,7 +805,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
                 continue
             end
 
-            coeff = -tx * exp(im*alpha*starting_site[2]*2*pi)
+            coeff = -tx #* exp(im*alpha*starting_site[2]*2*pi)
             dir == -1 ? coeff = conj(coeff) : nothing
             push!(output_weights,coeff)
 
@@ -834,7 +834,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
                 continue
             end
 
-            coeff = -ty #* exp(im*alpha*starting_site[1]*2*pi)
+            coeff = -ty * exp(im*alpha*starting_site[1]*2*pi)
             dir == -1 ? coeff = conj(coeff) : nothing
             push!(output_weights,coeff)
 
@@ -856,13 +856,13 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
 
             # find interacting particles at given physical site
             interacting_particles = findall(x->x[1]==phys_loc,particle_locations_coordinate)
-            
+
             if length(interacting_particles) > 1 # need more than 1 particle to interact
                 for i in 1:length(interacting_particles) # loop over all pairs of interacting particles
                     for j in i+1:length(interacting_particles)
                         dist = abs(particle_locations_coordinate[interacting_particles[i]][2] - particle_locations_coordinate[interacting_particles[j]][2])
                         if_periodic_y ? dist = min(dist,Ly-dist) : nothing
-                        if dist <= lr_dist && U[dist+1] > interaction_cutoff
+                        if dist <= lr_dist && abs(U[dist+1]) > interaction_cutoff
                             push!(output_weights,U[dist+1])
                             push!(output_states,which_basis)
                         end
@@ -1004,6 +1004,7 @@ function rerun_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict,met
     H = metadata["H"]
     output_level > 0 ? println("Sparsity = ",nnz(H)/size(H)[1]^2) : nothing
 
+    start_time = time()
     previous_nev = metadata["nev"]
     rez = eigsolve(H,nev+3)
     output_level > 0 ? println("Ground State: Elapsed time: ",time()-start_time) : nothing
@@ -1245,13 +1246,13 @@ end
 
 function plot_occupancy(exp_occ; kwargs...)
 	fig = figure()
-	imshow(exp_occ)
+	imshow(transpose(exp_occ))
 	colorbar()
 	plot_title = get(kwargs, :plot_title, "")
 	title_string = "Occupancy, " * plot_title
 	title(title_string)
-	ylabel("Synthetic")
-	xlabel("Physical")
+	xlabel("Synthetic")
+	ylabel("Physical")
 
     return nothing
 end
@@ -1272,14 +1273,15 @@ end
 
 #which_files = find_data_file(Dict([("Lx",6),("N",3)]),"ed",get_folder_location("cluster-data/exact-diag"))
 
-if false
-anises = range(1.0,5.0,length=5)
-#intstrens = range(-10.0,10.0,length=50)
-coeffs = []
+if true
+anises = range(0.5,1.0,length=3)
+for (idx2,anis) in enumerate(anises)
+intstrens = range(0.0,5.0,length=30)
+all_nrgs = []
 #for (idx,anis) in enumerate(anises)
-#for intstren in intstrens
+for (idx,intstren) in enumerate(intstrens)
     #for change in [0,0.0001]
-    params_dict = Dict([("output_level",0),("Lx",4),("N",4),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",4),("if_save_data",true)])
+    params_dict = Dict([("Lx",6),("N",3),("if_periodic_x",true),("if_periodic_y",false),("hopping_anisotropy",anis),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",2),("if_save_data",false)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
@@ -1289,10 +1291,25 @@ coeffs = []
 		display(BLAS.get_config())
 	end
 
+    # set lattice parameters
+    Lx = get(params_dict, "Lx", 4)
+    Ly = get(params_dict, "Ly", Lx)
+    N = get(params_dict, "N", 2)
+    if_periodic_x = get(params_dict, "if_periodic_x", false)
+    if_periodic_y = get(params_dict, "if_periodic_y", false)
+
+
     # set running operation parameters
     nev = get(params_dict,"nev",1)
     if_save_data = get(params_dict, "if_save_data", true)
-    dataloc = get(params_dict, "dataloc", get_folder_location("cluster-data/exact-diag"))
+    if if_periodic_x && if_periodic_y
+		dataloc = get_folder_location("cluster-data/exact-diag/torus")
+	elseif if_periodic_x || if_periodic_y
+		dataloc = get_folder_location("cluster-data/exact-diag")
+	elseif !if_periodic_x && !if_periodic_y
+		dataloc = get_folder_location("cluster-data/exact-diag/obc")
+	end
+    dataloc = get(params_dict, "dataloc", dataloc)
     if occursin("geraghty1",dataloc)
         basis_dataloc = "/p/project/netenesyquma/geraghty1/data/data-ed/basis-files"
     else
@@ -1300,18 +1317,12 @@ coeffs = []
     end
     opl = get(params_dict, "output_level", 1)
     running_args = (nev=nev,
-                    if_densmat=true,
+                    if_densmat=false,
                     if_save_data=if_save_data,
                     dataloc=dataloc,
                     basis_dataloc=basis_dataloc,
                     output_level=opl)
 
-    # set lattice parameters
-    Lx = get(params_dict, "Lx", 4)
-    Ly = get(params_dict, "Ly", Lx)
-    N = get(params_dict, "N", 2)
-    if_periodic_x = get(params_dict, "if_periodic_x", false)
-    if_periodic_y = get(params_dict, "if_periodic_y", false)
 
     opl > 0 ? println("Using ",N," particles with density ",round(N/(Lx*Ly),digits=3)) : nothing
 
@@ -1337,7 +1348,7 @@ coeffs = []
 		tx = 1.0 * hopping_anisotropy
 		ty = 1.0
 	end
-
+    
     # build magnetic field parameters and check fluxes for periodicity
     alpha = get(params_dict,"alpha",nothing)
     if isnothing(alpha)
@@ -1394,20 +1405,31 @@ coeffs = []
             states,nrgs,rhos = find_eigenstates(nev,lattice_params,hamilt_params; running_args...)
         end
     end
+    #
 
     #for i in 1:1#nev
     #    occs = get_occupancy(rhos[i],lattice_params; if_plot=true,plot_title="$i E=$(round(nrgs[i],digits=5))")
     #end
     #coeff = (maximum(nrgs) .- nrgs[1]) / hh_gap_exact(anis,alpha)
     #append!(coeffs,[coeff])
-    
-    #scatter(intstren,nrgs[1],c="b")
+    cols = ["b","r","g","k","m","c"]
+
+    scatter(intstren,nrgs[2] - nrgs[1],c=cols[idx2])
+    #yscale("log")
     #scatter(intstren,nrgs[2],c="r")
     #scatter(intstren,nrgs[3],c="g")
     #scatter(intstren,nrgs[4],c="k")
+    #scatter(intstren,nrgs[5],c="m")
+    xlabel("Interaction Strength")
+    ylabel("Energy")
     #scatter(intstren,nrgs[2] .- nrgs[1],c="b")
     #scatter(intstren,nrgs[3] .- nrgs[2],c="r")
-    #scatter(anis,nrgs[1],c="b")
+    #if idx == 1
+    #    plot(anises,ones(length(anises)) .* 4*(sin(pi*alpha)^2),c="g",label="TT-Gap")
+    #end
+    #scatter(anis,nrgs[2] - nrgs[1],c="b")
+    #scatter(anis,nrgs[3] - nrgs[2],c="r")
+    #scatter(anis,nrgs[3],c="g")
     #scatter(anis,hh_gap_exact(anis,alpha),c="g")
     #xlabel("Hopping Anisotropy")
     #xlabel("Interaction Strength")
@@ -1417,10 +1439,10 @@ coeffs = []
     currents = physical_current(rhos,lattice_params; if_plot=true)
     corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
     currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
-#end
+end
 
 
-#end
+end
 end
 
 

@@ -99,7 +99,7 @@ function long_range_scaling(x_final,virt_edge_length,initial_strength; kwargs...
 	if if_hard_cutoff
 		strengths[x_final + 2:end] .= 0.0
 	elseif if_rounding
-		final_index = findfirst(x -> x .<= trunc,strengths)
+		final_index = findfirst(x -> abs(x) .<= trunc,strengths)
 		if !isnothing(final_index)
 			strengths[final_index:end] .= 0.0
 		end
@@ -199,6 +199,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	#hopping_anisotropy = get(kwargs, :hopping_anisotropy, 1.0) t_phys / t_synth = anisotropy
 	
 	long_range_strengths = long_range_scaling(scaling_distance,virt_edge_length,onsite_strength; kwargs...)
+	long_range_strengths[1] = 0.0
 	display(long_range_strengths)
 	if_interaction = !all(long_range_strengths.==0)
 	
@@ -887,7 +888,7 @@ fb_occ_mat = get_occupancy(fb_gs)
 
 
 #
-if false
+if true
 
 #nnst = 0.0
 #layers = 6
@@ -905,13 +906,13 @@ end=#
 #layers = 6
 #lr = 7
 #anises = [0.01,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.6,0.8,0.9,1.1,1.3,1.5,1.7,1.9,2.0,2.5,3.0,3.5,4.0,6.0,8.0,9.0,10.0,15.0,20.0,25.0,30.0,40.0,50.0,70.0,90.0,100.0,1000.0,10000.0]
-anises = range(1.0,5.0,length=5)
-#strens = range(0.01,2.0,length=10)
+#anises = range(1.0,5.0,length=5)
+strens = [0.0,1.0,10.0]#range(0.0,5.0,length=10)
 #alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
 #strens = range(0.1,0.5,length=3)
-for (idx,anis) in enumerate(anises)
-#for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("hopping_anisotropy",1/anis),("nrgtol",1e-8),("particles",4),("layers",4),("mdim",150),("if_save_data",true),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",false),("if_periodic_virt",false)])
+#for (idx,anis) in enumerate(anises)
+for (idx,stren) in enumerate(strens)
+	params_dict = Dict([("hopping_anisotropy",1.0),("nrgtol",1e-8),("particles",4),("layers",4),("mdim",150),("if_save_data",false),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_virt",false)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)
@@ -1122,8 +1123,8 @@ for (idx,anis) in enumerate(anises)
 		#imshow(real.(dens))
 		#colorbar()
 
-		scatter(anis,rezobs.nrg[end],c="b")
-		#xlabel("Hopping Anisotropy")
+		#scatter(stren,rezobs.nrg[end],c="b")
+		#xlabel("Interaction Strength")
 		#ylabel("Energy")
 
 		#Profile.print()
@@ -1147,7 +1148,7 @@ for (idx,anis) in enumerate(anises)
 		get_occupancy(wavefunc; plot_title = "Filling = $(round(num_particles/(alpha*tot_sites),digits=4))",densmat=dens)
 		=#
 
-		#occs = get_occupancy(wavefunc)
+		occs = get_occupancy(wavefunc; plot_title="$stren")
 		#densities[idx] = sum(occs) / tot_sites
 		#scatter([mu],[densities[idx]],c="b")
 		#xlabel("Chemical Potential")
