@@ -1274,14 +1274,14 @@ end
 #which_files = find_data_file(Dict([("Lx",6),("N",3)]),"ed",get_folder_location("cluster-data/exact-diag"))
 
 if true
-anises = range(0.5,1.0,length=3)
-for (idx2,anis) in enumerate(anises)
-intstrens = range(0.0,5.0,length=30)
+#anises = range(0.5,1.0,length=3)
+#for (idx2,anis) in enumerate(anises)
+intstrens = range(0.0,5.0,length=50)
 all_nrgs = []
 #for (idx,anis) in enumerate(anises)
 for (idx,intstren) in enumerate(intstrens)
     #for change in [0,0.0001]
-    params_dict = Dict([("Lx",6),("N",3),("if_periodic_x",true),("if_periodic_y",false),("hopping_anisotropy",anis),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",2),("if_save_data",false)])
+    params_dict = Dict([("Lx",4),("Ly",5),("N",5),("if_periodic_x",false),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",5),("if_save_data",false)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
@@ -1414,12 +1414,12 @@ for (idx,intstren) in enumerate(intstrens)
     #append!(coeffs,[coeff])
     cols = ["b","r","g","k","m","c"]
 
-    scatter(intstren,nrgs[2] - nrgs[1],c=cols[idx2])
+    scatter(intstren,nrgs[1],c="b")
     #yscale("log")
-    #scatter(intstren,nrgs[2],c="r")
-    #scatter(intstren,nrgs[3],c="g")
-    #scatter(intstren,nrgs[4],c="k")
-    #scatter(intstren,nrgs[5],c="m")
+    scatter(intstren,nrgs[2],c="r")
+    scatter(intstren,nrgs[3],c="g")
+    scatter(intstren,nrgs[4],c="k")
+    scatter(intstren,nrgs[5],c="m")
     xlabel("Interaction Strength")
     ylabel("Energy")
     #scatter(intstren,nrgs[2] .- nrgs[1],c="b")
@@ -1439,7 +1439,7 @@ for (idx,intstren) in enumerate(intstrens)
     currents = physical_current(rhos,lattice_params; if_plot=true)
     corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
     currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
-end
+#end
 
 
 end
