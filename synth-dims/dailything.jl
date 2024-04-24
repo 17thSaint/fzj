@@ -123,6 +123,7 @@ function find_current_transition(all_files,loc; kwargs...) # adding HC part of c
 	return fillings[min_loc+1],fillings,currents
 end
 
+
 #=
 loc = get_folder_location("cluster-data/synth-dims","fzj")
 for L in [6,7,8]#10,16
@@ -154,8 +155,9 @@ end
 # 6,5,3 = 50
 # 8,6,4 = 78
 
-loc = get_folder_location("cluster-data/synth-dims")
+
 #=exc_loc = get_folder_location("cluster-data/synth-dims/higher-states","fzj")
+loc = get_folder_location("cluster-data/synth-dims")
 
 L = 6
 nflavors = 5
@@ -325,7 +327,7 @@ function integral_part(correlation_length,cutoff_radius,counts=500; kwargs...)
 	return integrate(xs,ys)
 end
 
-if true
+if false
 	ll = 6
 	np = 4
 	magfield = 2*np / (2^ll)
