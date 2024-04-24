@@ -805,7 +805,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
                 continue
             end
 
-            coeff = -tx #* exp(im*alpha*starting_site[2]*2*pi)
+            coeff = -tx * exp(im*alpha*starting_site[2]*2*pi)
             dir == -1 ? coeff = conj(coeff) : nothing
             push!(output_weights,coeff)
 
@@ -834,7 +834,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
                 continue
             end
 
-            coeff = -ty * exp(im*alpha*starting_site[1]*2*pi)
+            coeff = -ty #* exp(im*alpha*starting_site[1]*2*pi)
             dir == -1 ? coeff = conj(coeff) : nothing
             push!(output_weights,coeff)
 
@@ -1268,27 +1268,33 @@ end
 function hh_gap_exact(hopping_anisotropy::Float64,alpha::Float64)
     a2 = 1/(4*(sin(pi*alpha)^2))
     a1 = (1+2*(1/hopping_anisotropy^2)*(a2^2))^-0.5
-    return 4*alpha*(1/hopping_anisotropy^2)*(a1^4)*(a2^2)
+    val = 4*alpha*(1/hopping_anisotropy^2)*(a1^4)*(a2^2)
+    if val > 0.5
+        return 1/(1+2*(1/hopping_anisotropy^2)*(a2^2))
+    else
+        return val
+    end
+end
+
+function hh_gap_fit(x,p)
+    return p[1] .* hh_gap_exact.(x,0.25) .+ p[2]
 end
 
 #which_files = find_data_file(Dict([("Lx",6),("N",3)]),"ed",get_folder_location("cluster-data/exact-diag"))
 
 if true
-#anises = range(0.5,1.0,length=3)
+anises = range(0.1,10.0,length=50)
+gapvals = zeros(Float64,length(anises))
+lx = 4
+n = 4
+#alphas = range(0.0,0.5,length=20)
 #for (idx2,anis) in enumerate(anises)
 #intstrens = range(1.15,1.3,length=30)
-ac = 3 / (0.5 * 5*6)
-as = 3 / (0.2 * 5*6)#ac - 0.05
-af = 3 / (0.6 * 5*6)#ac + 0.1
-alphs = [range(as,af,length=20) .+ 0.01; range(as,af,length=20) .- 0.01]
-all_bulkdens = []
-all_states = []
-#all_bulkdens2 = []
-for (idx,alph) in enumerate(alphs)
-#for (idx,anis) in enumerate(anises)
+#for (idx,alpha) in enumerate(alphas)
+for (idx,anis) in enumerate(anises)
 #for (idx,intstren) in enumerate(intstrens)
     #for change in [0,0.0001]
-    params_dict = Dict([("Lx",4),("N",4),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("alpha",alph),("nev",3),("if_save_data",false)])
+    params_dict = Dict([("Lx",lx),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",anis),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",3),("if_save_data",false)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
@@ -1413,10 +1419,9 @@ for (idx,alph) in enumerate(alphs)
         end
     end
 
-    append!(all_states,[states])
     
 
-    #occs1 = get_occupancy(rhos[1],lattice_params; if_plot=false)
+    #occs1 = get_occupancy(rhos[1],lattice_params; if_plot=true,plot_title="tx=$tx ty=$ty")
     #append!(all_bulkdens,[sum(occs1[3:4,3:4])])
 
     #for i in 1:1#nev
@@ -1426,27 +1431,31 @@ for (idx,alph) in enumerate(alphs)
     #append!(coeffs,[coeff])
     cols = ["b","r","g","k","m","c"]
 
-    xx = N / (alph * (Lx - x_shift) * (Ly - y_shift))
+    #xx = N / (alph * (Lx - x_shift) * (Ly - y_shift))
+
+    gapvals[idx] = maximum(nrgs) - minimum(nrgs)
     
-    #=if idx == 1
-        #scatter(xx,nrgs[2] - nrgs[1],c="b",label="E1 - E0")
-        #scatter(intstren,nrgs[3] - nrgs[2],c="r",label="E2 - E1")
-        scatter(xx,nrgs[1],c="b",label="E0")
-        scatter(xx,nrgs[2],c="r",label="E1")
-        #scatter(intstren,nrgs[3],c="g",label="E2")
+    if idx == 1
+        #scatter(anis,nrgs[3] - nrgs[1],c="b",label="E2 - E0")
+        #scatter(anis,nrgs[3] - nrgs[2],c="r",label="E2 - E1")
+        scatter(anis,nrgs[1],c="b",label="E0")
+        scatter(anis,nrgs[2],c="r",label="E1")
+        scatter(anis,nrgs[3],c="g",label="E2")
         #scatter(intstren,nrgs[4],c="k",label="E3")
     else
-        #scatter(xx,nrgs[2] - nrgs[1],c="b")
-        #scatter(intstren,nrgs[3] - nrgs[2],c="r")
-        scatter(xx,nrgs[1],c="b")
-        scatter(xx,nrgs[2],c="r")
-        #scatter(intstren,nrgs[3],c="g")
+        #scatter(anis,nrgs[3] - nrgs[1],c="b")
+        #plot(anises[idx-1:idx],[hh_gap_exact(anises[idx-1],alpha),hh_gap_exact(anises[idx],alpha)],c="r")
+        #scatter(anis,nrgs[3] - nrgs[2],c="r")
+        scatter(anis,nrgs[1],c="b")
+        scatter(anis,nrgs[2],c="r")
+        scatter(anis,nrgs[3],c="g")
         #scatter(intstren,nrgs[4],c="k")
     end
     legend()
     #xlabel("Interaction Strength")
-    xlabel("Filling")
-    ylabel("Energy")=#
+    #xlabel("Filling")
+    xlabel("Hopping Anisotropy tx/ty")
+    ylabel("E2 - E0")#
     #scatter(intstren,nrgs[2] .- nrgs[1],c="b")
     #scatter(intstren,nrgs[3] .- nrgs[2],c="r")
     #if idx == 1
@@ -1468,13 +1477,20 @@ for (idx,alph) in enumerate(alphs)
 
 
 end
-end
 
-for i in 1:20
-    jl = all_states[i]
-    jr = all_states[i+20]
-    val = abs(conj(transpose(jl)) * jr)
-    scatter(alphs[i],val,c="b")
+
+maybefit = curve_fit(hh_gap_fit,anises[end-20:end],gapvals[end-20:end],[1.0,0.0])
+fig = figure()
+plot(anises,hh_gap_fit(anises,maybefit.param) ./ maybefit.param[1],c="r",label="Fit")
+legend()
+title("$lx x $lx N=$n HH Gap Exact: U_eff = $(round(maybefit.param[1],digits=2))")
+#ylim(0.0,1.5)
+
+scatter(anises,gapvals ./ maybefit.param[1],c="b")
+
+xlabel("Hopping Anisotropy tx/ty")
+ylabel("E2 - E0")
+
 end
 
 #=derivs1 = [(all_bulkdens[i+20]-all_bulkdens[i])/(2*0.0001) for i in 1:20]
