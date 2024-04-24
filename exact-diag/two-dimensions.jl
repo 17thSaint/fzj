@@ -1276,12 +1276,19 @@ end
 if true
 #anises = range(0.5,1.0,length=3)
 #for (idx2,anis) in enumerate(anises)
-intstrens = range(0.0,5.0,length=50)
-all_nrgs = []
+#intstrens = range(1.15,1.3,length=30)
+ac = 3 / (0.5 * 5*6)
+as = 3 / (0.2 * 5*6)#ac - 0.05
+af = 3 / (0.6 * 5*6)#ac + 0.1
+alphs = [range(as,af,length=20) .+ 0.01; range(as,af,length=20) .- 0.01]
+all_bulkdens = []
+all_states = []
+#all_bulkdens2 = []
+for (idx,alph) in enumerate(alphs)
 #for (idx,anis) in enumerate(anises)
-for (idx,intstren) in enumerate(intstrens)
+#for (idx,intstren) in enumerate(intstrens)
     #for change in [0,0.0001]
-    params_dict = Dict([("Lx",4),("Ly",5),("N",5),("if_periodic_x",false),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",5),("if_save_data",false)])
+    params_dict = Dict([("Lx",4),("N",4),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("alpha",alph),("nev",3),("if_save_data",false)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
@@ -1351,12 +1358,12 @@ for (idx,intstren) in enumerate(intstrens)
     
     # build magnetic field parameters and check fluxes for periodicity
     alpha = get(params_dict,"alpha",nothing)
+    x_shift,y_shift = !if_periodic_x, !if_periodic_y
     if isnothing(alpha)
         filling = get(params_dict,"filling",0.5)
-        x_shift,y_shift = !if_periodic_x, !if_periodic_y
         alpha = N / (filling * (Lx - x_shift) * (Ly - y_shift))
     end
-    check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y)
+    #check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y)
 
     # build hamiltonian parameters dictionary
     hamilt_params = Dict("alpha"=>alpha,
@@ -1405,7 +1412,12 @@ for (idx,intstren) in enumerate(intstrens)
             states,nrgs,rhos = find_eigenstates(nev,lattice_params,hamilt_params; running_args...)
         end
     end
-    #
+
+    append!(all_states,[states])
+    
+
+    #occs1 = get_occupancy(rhos[1],lattice_params; if_plot=false)
+    #append!(all_bulkdens,[sum(occs1[3:4,3:4])])
 
     #for i in 1:1#nev
     #    occs = get_occupancy(rhos[i],lattice_params; if_plot=true,plot_title="$i E=$(round(nrgs[i],digits=5))")
@@ -1414,14 +1426,27 @@ for (idx,intstren) in enumerate(intstrens)
     #append!(coeffs,[coeff])
     cols = ["b","r","g","k","m","c"]
 
-    scatter(intstren,nrgs[1],c="b")
-    #yscale("log")
-    scatter(intstren,nrgs[2],c="r")
-    scatter(intstren,nrgs[3],c="g")
-    scatter(intstren,nrgs[4],c="k")
-    scatter(intstren,nrgs[5],c="m")
-    xlabel("Interaction Strength")
-    ylabel("Energy")
+    xx = N / (alph * (Lx - x_shift) * (Ly - y_shift))
+    
+    #=if idx == 1
+        #scatter(xx,nrgs[2] - nrgs[1],c="b",label="E1 - E0")
+        #scatter(intstren,nrgs[3] - nrgs[2],c="r",label="E2 - E1")
+        scatter(xx,nrgs[1],c="b",label="E0")
+        scatter(xx,nrgs[2],c="r",label="E1")
+        #scatter(intstren,nrgs[3],c="g",label="E2")
+        #scatter(intstren,nrgs[4],c="k",label="E3")
+    else
+        #scatter(xx,nrgs[2] - nrgs[1],c="b")
+        #scatter(intstren,nrgs[3] - nrgs[2],c="r")
+        scatter(xx,nrgs[1],c="b")
+        scatter(xx,nrgs[2],c="r")
+        #scatter(intstren,nrgs[3],c="g")
+        #scatter(intstren,nrgs[4],c="k")
+    end
+    legend()
+    #xlabel("Interaction Strength")
+    xlabel("Filling")
+    ylabel("Energy")=#
     #scatter(intstren,nrgs[2] .- nrgs[1],c="b")
     #scatter(intstren,nrgs[3] .- nrgs[2],c="r")
     #if idx == 1
@@ -1444,6 +1469,22 @@ for (idx,intstren) in enumerate(intstrens)
 
 end
 end
+
+for i in 1:20
+    jl = all_states[i]
+    jr = all_states[i+20]
+    val = abs(conj(transpose(jl)) * jr)
+    scatter(alphs[i],val,c="b")
+end
+
+#=derivs1 = [(all_bulkdens[i+20]-all_bulkdens[i])/(2*0.0001) for i in 1:20]
+#derivs2 = [(all_bulkdens2[i+20]-all_bulkdens2[i])/0.0001 for i in 1:20]
+fig = figure()
+scatter(3 ./ (alphs[1:20] .* (5*6)),derivs1,label="GS")
+#scatter(4 ./ (alphs[1:20] .* (4*4)),derivs2,label="ES1")
+xlabel("Filling")
+ylabel("Derivative Bulk Density")
+legend()=#
 
 
 #=anises = [1.0,0.8,0.7,0.6,0.5,0.4,0.3]
