@@ -968,6 +968,8 @@ function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwa
     
     start_time = time()
     H = buildHam(lattice_params,hamilt_params; output_level)
+    dimHilb = size(H)[1]
+    #display(H)
     metadata_dict["H"] = H
     output_level > 0 ? println("Sparsity = ",SparseArrays.nnz(H)/size(H)[1]^2) : nothing
 
@@ -1280,21 +1282,96 @@ function hh_gap_fit(x,p)
     return p[1] .* hh_gap_exact.(x,0.25) .+ p[2]
 end
 
-#which_files = find_data_file(Dict([("Lx",6),("N",3)]),"ed",get_folder_location("cluster-data/exact-diag"))
+#=Lx = 4
+Ly = 4
+N = 2
+lattice_params::Dict{String,Any} = Dict("Lx"=>Lx,
+                        "Ly"=>Ly,
+                        "N"=>N,
+                        "if_periodic_x"=>true,
+                        "if_periodic_y"=>true)
+lattice_params["full_basis"] = n_particle_basis(N,Lx,Ly)
+hamilt_params::Dict{String,Any} = Dict("tx"=>1.0,
+                        "ty"=>0.0,
+                        "alpha"=>0.0,
+                        "U"=>[0.0],
+                        "interaction_cutoff"=>0.0)
+ttham = buildHam(lattice_params,hamilt_params)
+
+for i in 1:Ly
+    for j in i+1:Ly
+        thisstate = zeros(ComplexF64,size(ttham,1))
+
+        firstcolinds = linear_index((1,i),Lx,Ly) .+ [k for k in 0:Lx-1]
+        for k in 1:Lx
+            for k2 in 1:Lx
+                if k == k2
+                    continue
+                end
+                thisstate[find_basis_index(sort([firstcolinds[k],firstcolinds[k2]],rev=true))] += 1.0
+            end
+        end
+
+        secondcolinds = linear_index((1,j),Lx,Ly) .+ [k for k in 0:Lx-1]
+        for k in 1:Lx
+            for k2 in 1:Lx
+                if k == k2
+                    continue
+                end
+                thisstate[find_basis_index(sort([secondcolinds[k],secondcolinds[k2]],rev=true))] += 1.0
+            end
+        end
+
+        #=for k in 1:Lx
+            for k2 in 1:Lx
+                thisstate[find_basis_index(sort([firstcolinds[k],secondcolinds[k2]],rev=true))] += 1.0
+            end
+        end=#
+
+        thisstate ./= sqrt(norm(thisstate))
+
+        nrg = round(real((transpose(thisstate) * ttham * thisstate)),digits=3)
+        get_occupancy(thisstate,lattice_params; plot_title="Energy = $nrg")
+    end
+end=#
+
+
+#anises = range(0.1,10.0,length=50)
+#gapvals = zeros(Float64,length(anises))
+change = 0.0001
+#lx = 5
+n = 3
+#=ac = n / (0.5 * (lx-1)*(lx-1))
+as = n / (0.4 * (lx-1)*(lx-1))
+af = n / (0.6 * (lx-1)*(lx-1))
+hm = 20
+alphas = range(af,as,length=hm)=#
+
+#=for thisalpha in alphas
+fig = figure()
+ks = range(-pi,pi,length=1000)
+realks = [2*pi*i/lx - pi for i in 0:lx]
+for s in 1:4
+    plot(ks,-2 .* cos.(2*pi*s*thisalpha .- ks),label="$s")
+    scatter(realks,-2 .* cos.(2*pi*s*thisalpha .- realks),label="Discrete")
+end
+xlabel("Momentum")
+ylabel("Energy")
+title("Alpha = $(thisalpha)")
+end=#
 
 if true
-anises = range(0.1,10.0,length=50)
-gapvals = zeros(Float64,length(anises))
-lx = 4
-n = 4
-#alphas = range(0.0,0.5,length=20)
-#for (idx2,anis) in enumerate(anises)
+#for (idx,n) in enumerate([2,3,4,5])
 #intstrens = range(1.15,1.3,length=30)
 #for (idx,alpha) in enumerate(alphas)
-for (idx,anis) in enumerate(anises)
+for lx in [6,7,8]
+    ac = n / (0.5 * (lx-1)*(lx-1))
+    all_bulkdens = []
+for nextalpha in [0.0,change]
+#for (idx,anis) in enumerate(anises)
 #for (idx,intstren) in enumerate(intstrens)
     #for change in [0,0.0001]
-    params_dict = Dict([("Lx",lx),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",anis),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",3),("if_save_data",false)])
+    params_dict = Dict([("Lx",lx),("N",n),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("alpha",ac-nextalpha),("nev",1),("if_save_data",false)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
@@ -1330,7 +1407,7 @@ for (idx,anis) in enumerate(anises)
     end
     opl = get(params_dict, "output_level", 1)
     running_args = (nev=nev,
-                    if_densmat=false,
+                    if_densmat=true,
                     if_save_data=if_save_data,
                     dataloc=dataloc,
                     basis_dataloc=basis_dataloc,
@@ -1361,6 +1438,8 @@ for (idx,anis) in enumerate(anises)
 		tx = 1.0 * hopping_anisotropy
 		ty = 1.0
 	end
+    #tx = 1.0
+    #ty = 0.0
     
     # build magnetic field parameters and check fluxes for periodicity
     alpha = get(params_dict,"alpha",nothing)
@@ -1419,7 +1498,16 @@ for (idx,anis) in enumerate(anises)
         end
     end
 
-    
+    occs = get_occupancy(rhos[1],lattice_params; if_plot=false,plot_title="N=$n")
+    #bulkdens = sum(occs[2,2:5]) + sum(occs[5,2:5]) + sum(occs[3:4,2]) + sum(occs[3:4,5])
+    bulkdens = iseven(lx) ? sum(occs[Int(lx/2):Int(lx/2)+1,Int(lx/2):Int(lx/2)+1]) : sum(occs[Int(floor(lx/2)):Int(floor(lx/2))+2,Int(floor(lx/2)):Int(floor(lx/2))+2])
+    append!(all_bulkdens,[bulkdens/n])
+
+    #display(nrgs)
+
+    #for i in 1:nev
+    #    get_occupancy(rhos[i],lattice_params; if_plot=true,plot_title="Alpha=$alpha, E=$(round(nrgs[i]/Ly,digits=5))")
+    #end
 
     #occs1 = get_occupancy(rhos[1],lattice_params; if_plot=true,plot_title="tx=$tx ty=$ty")
     #append!(all_bulkdens,[sum(occs1[3:4,3:4])])
@@ -1430,32 +1518,42 @@ for (idx,anis) in enumerate(anises)
     #coeff = (maximum(nrgs) .- nrgs[1]) / hh_gap_exact(anis,alpha)
     #append!(coeffs,[coeff])
     cols = ["b","r","g","k","m","c"]
+    if nev > length(cols)
+        cols = repeat(cols,ceil(Int,nev/length(cols)))
+    end
 
-    #xx = N / (alph * (Lx - x_shift) * (Ly - y_shift))
+    #xx = N / (alpha * (Lx - x_shift) * (Ly - y_shift))
 
-    gapvals[idx] = maximum(nrgs) - minimum(nrgs)
+    #gapvals[idx] = maximum(nrgs) - minimum(nrgs)
     
-    if idx == 1
-        #scatter(anis,nrgs[3] - nrgs[1],c="b",label="E2 - E0")
-        #scatter(anis,nrgs[3] - nrgs[2],c="r",label="E2 - E1")
-        scatter(anis,nrgs[1],c="b",label="E0")
-        scatter(anis,nrgs[2],c="r",label="E1")
-        scatter(anis,nrgs[3],c="g",label="E2")
+    #=if idx == 1
+        for i in 1:nev
+            scatter(alpha,nrgs[i] - nrgs[1],c=cols[i])#,label="E$i")
+        end
+        #scatter(alpha,nrgs[end] - nrgs[1],c="b",label="E2 - E0")
+        #scatter(alpha,nrgs[3] - nrgs[2],c="r",label="E2 - E1")
+        #scatter(alpha,nrgs[1],c="b",label="E0")
+        #scatter(alpha,nrgs[2],c="r",label="E1")
+        #scatter(alpha,nrgs[3],c="g",label="E2")
         #scatter(intstren,nrgs[4],c="k",label="E3")
     else
-        #scatter(anis,nrgs[3] - nrgs[1],c="b")
+        for i in 1:nev
+            scatter(alpha,nrgs[i] - nrgs[1],c=cols[i])
+        end
+        #scatter(alpha,nrgs[end] - nrgs[1],c="b")
         #plot(anises[idx-1:idx],[hh_gap_exact(anises[idx-1],alpha),hh_gap_exact(anises[idx],alpha)],c="r")
-        #scatter(anis,nrgs[3] - nrgs[2],c="r")
-        scatter(anis,nrgs[1],c="b")
-        scatter(anis,nrgs[2],c="r")
-        scatter(anis,nrgs[3],c="g")
+        #scatter(alpha,nrgs[3] - nrgs[2],c="r")
+        #scatter(alpha,nrgs[1],c="b")
+        #scatter(alpha,nrgs[2],c="r")
+        #scatter(alpha,nrgs[3],c="g")
         #scatter(intstren,nrgs[4],c="k")
     end
     legend()
+    #xlabel("System Size")
     #xlabel("Interaction Strength")
-    #xlabel("Filling")
-    xlabel("Hopping Anisotropy tx/ty")
-    ylabel("E2 - E0")#
+    xlabel("Flux Density")
+    #xlabel("Hopping Anisotropy tx/ty")
+    ylabel("Energy")=#
     #scatter(intstren,nrgs[2] .- nrgs[1],c="b")
     #scatter(intstren,nrgs[3] .- nrgs[2],c="r")
     #if idx == 1
@@ -1473,13 +1571,20 @@ for (idx,anis) in enumerate(anises)
     currents = physical_current(rhos,lattice_params; if_plot=true)
     corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
     currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
-#end
+end
+derivbulkdens = (all_bulkdens[1] - all_bulkdens[2])/change
+scatter(lx,derivbulkdens,c="r")
+xlabel("System Size")
+ylabel("Derivative of Bulk Density")
 
 
 end
 
+#plot(alphas,4 .* (sin.(pi .* alphas)).^2,c="r",label="Theory")
+#legend()
 
-maybefit = curve_fit(hh_gap_fit,anises[end-20:end],gapvals[end-20:end],[1.0,0.0])
+
+#=maybefit = curve_fit(hh_gap_fit,anises[end-20:end],gapvals[end-20:end],[1.0,0.0])
 fig = figure()
 plot(anises,hh_gap_fit(anises,maybefit.param) ./ maybefit.param[1],c="r",label="Fit")
 legend()
@@ -1489,58 +1594,9 @@ title("$lx x $lx N=$n HH Gap Exact: U_eff = $(round(maybefit.param[1],digits=2))
 scatter(anises,gapvals ./ maybefit.param[1],c="b")
 
 xlabel("Hopping Anisotropy tx/ty")
-ylabel("E2 - E0")
+ylabel("E2 - E0")=#
 
 end
-
-#=derivs1 = [(all_bulkdens[i+20]-all_bulkdens[i])/(2*0.0001) for i in 1:20]
-#derivs2 = [(all_bulkdens2[i+20]-all_bulkdens2[i])/0.0001 for i in 1:20]
-fig = figure()
-scatter(3 ./ (alphs[1:20] .* (5*6)),derivs1,label="GS")
-#scatter(4 ./ (alphs[1:20] .* (4*4)),derivs2,label="ES1")
-xlabel("Filling")
-ylabel("Derivative Bulk Density")
-legend()=#
-
-
-#=anises = [1.0,0.8,0.7,0.6,0.5,0.4,0.3]
-howmany = length(anises)
-which_files = find_data_file(Dict([("Lx",6),("N",3)]),"ed",get_folder_location("cluster-data/exact-diag"))
-plotting_dict = Dict()
-for anis in anises
-	plotting_dict[anis] = 0
-end
-datapoints = 10
-
-for f in which_files
-    data = read_data_jld2(f,get_folder_location("cluster-data/exact-diag"))
-    anis = data[2]["hopping_anisotropy"]
-    uu = data[2]["U"][1]
-    
-    currents = synthetic_current(data[1]["densmat"],get_lattice_params_from_metadata(data[2]); if_plot=false)
-
-	plotting_dict[anis] += 1
-	shift = findfirst(x -> anises[x] == anis,1:howmany)
-	thisloc = Int(howmany*(plotting_dict[anis]-1) + shift)
-	println("Plotting Anis = $anis, LR Stren = $uu t, this loc = ",thisloc)
-	subplot(datapoints,howmany,thisloc)
-	for i in 1:size(currents)[2]
-        plot(1:size(currents)[1],currents[:,i],"-p")
-    end
-    ylim(-1.0,1.0)
-
-	if plotting_dict[anis] == 1
-		title("H Anis=$anis")
-		if anis == anises[end]
-			scatter([currents[1,1]],[currents[1,1]],label="LR=$uu t",c="b",s=1.0)
-			legend(loc=2,bbox_to_anchor=(1.05,1.0))
-		end
-	elseif anis == anises[end]
-		scatter([currents[1,1]],[currents[1,1]],label="LR=$uu t",c="b",s=1.0)
-		legend(loc=2,bbox_to_anchor=(1.05,1.0))
-	end
-end=#
-
 
 
 
