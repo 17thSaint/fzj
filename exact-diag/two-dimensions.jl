@@ -1336,16 +1336,15 @@ for i in 1:Ly
 end=#
 
 
-#anises = range(0.1,10.0,length=50)
+anises = range(1.0,100.0,length=30)
 #gapvals = zeros(Float64,length(anises))
-change = 0.0001
-#lx = 5
+lx = 6
 n = 3
 #=ac = n / (0.5 * (lx-1)*(lx-1))
 as = n / (0.4 * (lx-1)*(lx-1))
 af = n / (0.6 * (lx-1)*(lx-1))
-hm = 20
-alphas = range(af,as,length=hm)=#
+hm = 20=#
+#alphas = range(0.25,1.25,length=40)#[1/(i*lx/10) for i in 1:10]#[1/(1*lx),1/(0.5*lx),1/(2*lx),1/(0.1*lx),1/(0.2*lx)]#[1/(i*lx) for i in 1:5]
 
 #=for thisalpha in alphas
 fig = figure()
@@ -1364,14 +1363,13 @@ if true
 #for (idx,n) in enumerate([2,3,4,5])
 #intstrens = range(1.15,1.3,length=30)
 #for (idx,alpha) in enumerate(alphas)
-for lx in [6,7,8]
-    ac = n / (0.5 * (lx-1)*(lx-1))
-    all_bulkdens = []
-for nextalpha in [0.0,change]
-#for (idx,anis) in enumerate(anises)
+#for (idx,lx) in enumerate(4:1:30)
+#for nextalpha in [0.0,change]
+for (idx,anis) in enumerate(anises)
 #for (idx,intstren) in enumerate(intstrens)
     #for change in [0,0.0001]
-    params_dict = Dict([("Lx",lx),("N",n),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("alpha",ac-nextalpha),("nev",1),("if_save_data",false)])
+    for (id2,thisanis) in enumerate([anis,1/anis])
+    params_dict = Dict([("Lx",lx),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",thisanis),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",3),("if_save_data",false)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
@@ -1407,7 +1405,7 @@ for nextalpha in [0.0,change]
     end
     opl = get(params_dict, "output_level", 1)
     running_args = (nev=nev,
-                    if_densmat=true,
+                    if_densmat=false,
                     if_save_data=if_save_data,
                     dataloc=dataloc,
                     basis_dataloc=basis_dataloc,
@@ -1448,7 +1446,7 @@ for nextalpha in [0.0,change]
         filling = get(params_dict,"filling",0.5)
         alpha = N / (filling * (Lx - x_shift) * (Ly - y_shift))
     end
-    #check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y)
+    check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y)
 
     # build hamiltonian parameters dictionary
     hamilt_params = Dict("alpha"=>alpha,
@@ -1498,10 +1496,10 @@ for nextalpha in [0.0,change]
         end
     end
 
-    occs = get_occupancy(rhos[1],lattice_params; if_plot=false,plot_title="N=$n")
+    #occs = get_occupancy(rhos[1],lattice_params; if_plot=false,plot_title="N=$n")
     #bulkdens = sum(occs[2,2:5]) + sum(occs[5,2:5]) + sum(occs[3:4,2]) + sum(occs[3:4,5])
-    bulkdens = iseven(lx) ? sum(occs[Int(lx/2):Int(lx/2)+1,Int(lx/2):Int(lx/2)+1]) : sum(occs[Int(floor(lx/2)):Int(floor(lx/2))+2,Int(floor(lx/2)):Int(floor(lx/2))+2])
-    append!(all_bulkdens,[bulkdens/n])
+    #bulkdens = iseven(lx) ? sum(occs[Int(lx/2):Int(lx/2)+1,Int(lx/2):Int(lx/2)+1]) : sum(occs[Int(floor(lx/2)):Int(floor(lx/2))+2,Int(floor(lx/2)):Int(floor(lx/2))+2])
+    #append!(all_bulkdens,[bulkdens/n])
 
     #display(nrgs)
 
@@ -1517,7 +1515,7 @@ for nextalpha in [0.0,change]
     #end
     #coeff = (maximum(nrgs) .- nrgs[1]) / hh_gap_exact(anis,alpha)
     #append!(coeffs,[coeff])
-    cols = ["b","r","g","k","m","c"]
+    cols = ["b","r","g","m","c"]
     if nev > length(cols)
         cols = repeat(cols,ceil(Int,nev/length(cols)))
     end
@@ -1526,34 +1524,47 @@ for nextalpha in [0.0,change]
 
     #gapvals[idx] = maximum(nrgs) - minimum(nrgs)
     
-    #=if idx == 1
-        for i in 1:nev
-            scatter(alpha,nrgs[i] - nrgs[1],c=cols[i])#,label="E$i")
+    #=nrggaps = nrgs .- nrgs[1]
+    theory = 4*(sin(pi*alpha)^2)
+    which_is_close = argmin(abs.(nrggaps .- theory))
+
+    for i in 1:nev
+        if i == which_is_close
+            scatter(alpha,nrggaps[i],c="r")
+        else
+            scatter(alpha,nrggaps[i],c="k")
         end
-        #scatter(alpha,nrgs[end] - nrgs[1],c="b",label="E2 - E0")
-        #scatter(alpha,nrgs[3] - nrgs[2],c="r",label="E2 - E1")
-        #scatter(alpha,nrgs[1],c="b",label="E0")
-        #scatter(alpha,nrgs[2],c="r",label="E1")
-        #scatter(alpha,nrgs[3],c="g",label="E2")
+    end=#
+
+    if idx == 1
+        #for i in 1:nev
+        #    scatter(id2 == 1 ? anis : -anis,nrgs[i] - nrgs[1],c=cols[i],label="E$i")
+        #end
+        scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=cols[id2*2-1],label="E2 - E1")
+        scatter(id2 == 1 ? anis : -anis,nrgs[3] - nrgs[1],c=cols[2*id2],label="E3 - E1")
+        #scatter(id2 == 1 ? anis : -anis,nrgs[1],c="b",label="E0")
+        #scatter(id2 == 1 ? anis : -anis,nrgs[2],c="r",label="E1")
+        #scatter(id2 == 1 ? anis : -anis,nrgs[3],c="g",label="E2")
         #scatter(intstren,nrgs[4],c="k",label="E3")
     else
-        for i in 1:nev
-            scatter(alpha,nrgs[i] - nrgs[1],c=cols[i])
-        end
-        #scatter(alpha,nrgs[end] - nrgs[1],c="b")
+        #for i in 1:nev
+        #    scatter(id2 == 1 ? anis : -anis,nrgs[i] - nrgs[1],c=cols[i])
+        #end
+        scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=c=cols[id2*2-1])
         #plot(anises[idx-1:idx],[hh_gap_exact(anises[idx-1],alpha),hh_gap_exact(anises[idx],alpha)],c="r")
-        #scatter(alpha,nrgs[3] - nrgs[2],c="r")
-        #scatter(alpha,nrgs[1],c="b")
-        #scatter(alpha,nrgs[2],c="r")
-        #scatter(alpha,nrgs[3],c="g")
+        scatter(id2 == 1 ? anis : -anis,nrgs[3] - nrgs[1],c=c=cols[id2*2])
+        #scatter(id2 == 1 ? anis : -anis,nrgs[1],c="b")
+        #scatter(id2 == 1 ? anis : -anis,nrgs[2],c="r")
+        #scatter(id2 == 1 ? anis : -anis,nrgs[3],c="g")
         #scatter(intstren,nrgs[4],c="k")
     end
     legend()
     #xlabel("System Size")
     #xlabel("Interaction Strength")
-    xlabel("Flux Density")
-    #xlabel("Hopping Anisotropy tx/ty")
-    ylabel("Energy")=#
+    #xlabel("Flux")
+    xlabel("Hopping Anisotropy tx/ty")
+    ylabel("Energy - E1")
+    #title("Energy Gap for 2 x $Lx decoupled wires")
     #scatter(intstren,nrgs[2] .- nrgs[1],c="b")
     #scatter(intstren,nrgs[3] .- nrgs[2],c="r")
     #if idx == 1
@@ -1572,13 +1583,10 @@ for nextalpha in [0.0,change]
     corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
     currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
 end
-derivbulkdens = (all_bulkdens[1] - all_bulkdens[2])/change
-scatter(lx,derivbulkdens,c="r")
-xlabel("System Size")
-ylabel("Derivative of Bulk Density")
-
-
 end
+#th_alphas = range(minimum(alphas),maximum(alphas),length=100)
+#plot(th_alphas,4*(sin.(pi .* th_alphas)).^2,label="Theory",c="b")
+#legend()
 
 #plot(alphas,4 .* (sin.(pi .* alphas)).^2,c="r",label="Theory")
 #legend()
