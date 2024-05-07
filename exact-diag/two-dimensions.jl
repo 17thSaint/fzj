@@ -805,7 +805,12 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
                 continue
             end
 
+            # apply magnetic flux but switch for correct cylinder flux counting
             coeff = -tx * exp(im*alpha*starting_site[2]*2*pi)
+            if if_periodic_y && !if_periodic_x
+                coeff = -tx
+            end
+            
             dir == -1 ? coeff = conj(coeff) : nothing
             push!(output_weights,coeff)
 
@@ -834,7 +839,11 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
                 continue
             end
 
-            coeff = -ty #* exp(im*alpha*starting_site[1]*2*pi)
+            coeff = -ty 
+            # apply magnetic flux for correct cylinder flux counting
+            if if_periodic_y && !if_periodic_x
+                coeff *= exp(im*alpha*starting_site[1]*2*pi)
+            end
             dir == -1 ? coeff = conj(coeff) : nothing
             push!(output_weights,coeff)
 
@@ -1336,7 +1345,7 @@ for i in 1:Ly
 end=#
 
 
-anises = range(1.0,100.0,length=30)
+#anises = range(1.0,100.0,length=30)
 #gapvals = zeros(Float64,length(anises))
 lx = 6
 n = 3
@@ -1361,15 +1370,14 @@ end=#
 
 if true
 #for (idx,n) in enumerate([2,3,4,5])
-#intstrens = range(1.15,1.3,length=30)
+intstrens = [0.0]#range(0.0,5.0,length=20)
 #for (idx,alpha) in enumerate(alphas)
 #for (idx,lx) in enumerate(4:1:30)
 #for nextalpha in [0.0,change]
-for (idx,anis) in enumerate(anises)
-#for (idx,intstren) in enumerate(intstrens)
+#for (idx,anis) in enumerate(anises)
+for (idx,intstren) in enumerate(intstrens)
     #for change in [0,0.0001]
-    for (id2,thisanis) in enumerate([anis,1/anis])
-    params_dict = Dict([("Lx",lx),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",thisanis),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",3),("if_save_data",false)])
+    params_dict = Dict([("Lx",lx),("N",n),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",1),("if_save_data",false)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
@@ -1405,7 +1413,7 @@ for (idx,anis) in enumerate(anises)
     end
     opl = get(params_dict, "output_level", 1)
     running_args = (nev=nev,
-                    if_densmat=false,
+                    if_densmat=true,
                     if_save_data=if_save_data,
                     dataloc=dataloc,
                     basis_dataloc=basis_dataloc,
@@ -1496,7 +1504,7 @@ for (idx,anis) in enumerate(anises)
         end
     end
 
-    #occs = get_occupancy(rhos[1],lattice_params; if_plot=false,plot_title="N=$n")
+    occs = get_occupancy(rhos[1],lattice_params; if_plot=true,plot_title="Flux Hopping Physical")
     #bulkdens = sum(occs[2,2:5]) + sum(occs[5,2:5]) + sum(occs[3:4,2]) + sum(occs[3:4,5])
     #bulkdens = iseven(lx) ? sum(occs[Int(lx/2):Int(lx/2)+1,Int(lx/2):Int(lx/2)+1]) : sum(occs[Int(floor(lx/2)):Int(floor(lx/2))+2,Int(floor(lx/2)):Int(floor(lx/2))+2])
     #append!(all_bulkdens,[bulkdens/n])
@@ -1536,23 +1544,23 @@ for (idx,anis) in enumerate(anises)
         end
     end=#
 
-    if idx == 1
-        #for i in 1:nev
-        #    scatter(id2 == 1 ? anis : -anis,nrgs[i] - nrgs[1],c=cols[i],label="E$i")
-        #end
-        scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=cols[id2*2-1],label="E2 - E1")
-        scatter(id2 == 1 ? anis : -anis,nrgs[3] - nrgs[1],c=cols[2*id2],label="E3 - E1")
+    #=if idx == 1
+        for i in 1:nev
+            scatter(intstren,nrgs[i],c=cols[i],label="E$i")
+        end
+        #scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=cols[id2*2-1],label="E2 - E1")
+        #scatter(id2 == 1 ? anis : -anis,nrgs[3] - nrgs[1],c=cols[2*id2],label="E3 - E1")
         #scatter(id2 == 1 ? anis : -anis,nrgs[1],c="b",label="E0")
         #scatter(id2 == 1 ? anis : -anis,nrgs[2],c="r",label="E1")
         #scatter(id2 == 1 ? anis : -anis,nrgs[3],c="g",label="E2")
         #scatter(intstren,nrgs[4],c="k",label="E3")
     else
-        #for i in 1:nev
-        #    scatter(id2 == 1 ? anis : -anis,nrgs[i] - nrgs[1],c=cols[i])
-        #end
-        scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=c=cols[id2*2-1])
+        for i in 1:nev
+            scatter(intstren,nrgs[i],c=cols[i])
+        end
+        #scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=c=cols[id2*2-1])
         #plot(anises[idx-1:idx],[hh_gap_exact(anises[idx-1],alpha),hh_gap_exact(anises[idx],alpha)],c="r")
-        scatter(id2 == 1 ? anis : -anis,nrgs[3] - nrgs[1],c=c=cols[id2*2])
+        #scatter(id2 == 1 ? anis : -anis,nrgs[3] - nrgs[1],c=c=cols[id2*2])
         #scatter(id2 == 1 ? anis : -anis,nrgs[1],c="b")
         #scatter(id2 == 1 ? anis : -anis,nrgs[2],c="r")
         #scatter(id2 == 1 ? anis : -anis,nrgs[3],c="g")
@@ -1560,10 +1568,13 @@ for (idx,anis) in enumerate(anises)
     end
     legend()
     #xlabel("System Size")
-    #xlabel("Interaction Strength")
+    xlabel("Interaction Strength")
     #xlabel("Flux")
-    xlabel("Hopping Anisotropy tx/ty")
-    ylabel("Energy - E1")
+    #xlabel("Hopping Anisotropy tx/ty")
+    ylabel("Energy")=#
+
+
+
     #title("Energy Gap for 2 x $Lx decoupled wires")
     #scatter(intstren,nrgs[2] .- nrgs[1],c="b")
     #scatter(intstren,nrgs[3] .- nrgs[2],c="r")
@@ -1582,7 +1593,6 @@ for (idx,anis) in enumerate(anises)
     currents = physical_current(rhos,lattice_params; if_plot=true)
     corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
     currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
-end
 end
 #th_alphas = range(minimum(alphas),maximum(alphas),length=100)
 #plot(th_alphas,4*(sin.(pi .* th_alphas)).^2,label="Theory",c="b")
