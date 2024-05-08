@@ -94,6 +94,11 @@ function long_range_scaling(x_final,virt_edge_length,initial_strength; kwargs...
 	elseif scaling_func == "lr_flat"
 		strengths[1] = initial_strength
 		strengths[2:x_final+1] .= final_minimum
+	elseif scaling_func == "rydberg"
+		blockade_radius = initial_strength
+		strengths = map(1:virt_edge_length) do x
+			blockade_radius^6 / (blockade_radius^6 + x^6)
+		end
 	end
 	
 	if if_hard_cutoff
@@ -146,7 +151,8 @@ function build_HH_net(num_layers; kwargs...)
 	return net
 end
 
-function get_interaction_coords(given_site,inter_dist,lat,if_periodic_virt) # written by ChatGPT 12.06.2023 then vastly edited 13.06.2023 by me
+# isotropic not implemented for cylinder
+function get_interaction_coords(given_site,inter_dist,lat,if_periodic_virt,if_anis) # written by ChatGPT 12.06.2023 then vastly edited 13.06.2023 by me
 	virtual, physical = given_site
 	coordinates = []
     
@@ -175,6 +181,24 @@ function get_interaction_coords(given_site,inter_dist,lat,if_periodic_virt) # wr
 		end
 
 	end
+
+	if !if_anis
+		for shift in [-inter_dist % phys_edge_length,inter_dist % phys_edge_length]
+			new_physical = physical + shift
+			if if_periodic_virt
+				if new_physical < 1
+					new_physical += phys_edge_length
+				elseif new_physical > phys_edge_length
+					new_physical -= phys_edge_length
+				end
+			end
+
+			if 1 <= new_physical <= phys_edge_length && new_physical != physical
+				append!(coordinates, [[virtual,new_physical]])
+			end
+		end
+	end
+
 	return unique(coordinates)
 end
 
@@ -199,7 +223,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	#hopping_anisotropy = get(kwargs, :hopping_anisotropy, 1.0) t_phys / t_synth = anisotropy
 	
 	long_range_strengths = long_range_scaling(scaling_distance,virt_edge_length,onsite_strength; kwargs...)
-	long_range_strengths[1] = 0.0
+	#long_range_strengths[1] = 0.0
 	display(long_range_strengths)
 	if_interaction = !all(long_range_strengths.==0)
 	
@@ -254,6 +278,11 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	end
 	
 	if if_interaction
+		if kwargs[:scaling] == "rydberg"
+			if_anis = false
+		else
+			if_anis = true
+		end
 		interaction = TTNKit.OpSum()
 		for (idx,stren) in enumerate(long_range_strengths)
 			if stren == 0.0
@@ -262,10 +291,11 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 				if idx == 1
 					for j in TTNKit.eachindex(lat)
 						interaction += (stren,"N * N",TTNKit.coordinate(lat,j))
+						interaction -= (stren,"N",TTNKit.coordinate(lat,j))
 					end
 				else
 					for j in TTNKit.eachindex(lat)
-						interaction_sites = get_interaction_coords(TTNKit.coordinate(lat,j),idx-1,lat,if_periodic_virt)
+						interaction_sites = get_interaction_coords(TTNKit.coordinate(lat,j),idx-1,lat,if_periodic_virt,if_anis)
 						
 						for k in interaction_sites
 							interaction += (stren,"Adag * A",TTNKit.coordinate(lat,j),"Adag * A",Tuple(k))
@@ -872,6 +902,135 @@ function cdw_structure_factor(rho,qvec::Tuple,psi::TreeTensorNetwork; kwargs...)
 	return struc_fact / sum(occs)
 end
 
+function distance_correlation(rho::Matrix,wavefunc::TreeTensorNetwork,layers::Int64,direction::String="x")
+    if layers % 2 == 0.0
+		Lx = Int(sqrt(2^layers))
+		Ly = Int(sqrt(2^layers))
+	else
+		Lx = Int(sqrt(2^(layers+1)))
+		Ly = Int(sqrt(2^(layers-1)))
+	end
+	lat = TTNKit.physical_lattice(TTNKit.network(wavefunc))
+
+    if direction == "x"
+        len = Lx
+        other_len = Ly
+    else
+        len = Ly
+        other_len = Lx
+    end
+    dist_corrs = zeros(Float64,len-1)
+    corr_counts = zeros(Int64,len-1)
+
+    for x1 in 1:len
+        for y1 in 1:other_len
+            s1 = direction == "x" ? TTNKit.linear_ind(lat,(x1,y1)) : TTNKit.linear_ind(lat,(y1,x1))
+            for x2 in 1:len-1
+                if x1 == x2
+                    continue
+                end
+                s2 = direction == "x" ? TTNKit.linear_ind(lat,(x2,y1)) : TTNKit.linear_ind(lat,(y1,x2))
+                dist_corrs[Int(abs(x1-x2))] += abs(rho[s1,s2])
+                corr_counts[Int(abs(x1-x2))] += 1
+            end
+        end
+    end
+
+    dist_corrs ./= corr_counts
+
+    return dist_corrs
+end
+
+function rydberg_2pcorr(rho::Matrix; kwargs...)
+	if_plot = get(kwargs, :if_plot, true)
+	occs = get_occupancy(rho; if_plot=false)
+
+	dist_corrs::Dict{Float64,Float64} = Dict()
+	dist_counts::Dict{Float64,Int64} = Dict()
+	for x1 in 1:size(occs,1)
+		for y1 in 1:size(occs,2)
+			for x2 in 1:size(occs,1)
+				for y2 in 1:size(occs,1)
+					dist_btw = round(sqrt((x2 - x1)^2 + (y2-y1)^2),digits=4)
+					if dist_btw in keys(dist_corrs)
+						dist_corrs[dist_btw] += 1.0
+						dist_counts[dist_btw] += 1
+					else
+						dist_corrs[dist_btw] = 1.0
+						dist_counts[dist_btw] = 1
+					end
+					if (x1,y1) == (x2,y2)
+						dist_corrs[0.0] -= occs[x1,y1] / (occs[x1,y1]*occs[x2,y2])
+					end
+				end
+			end
+		end
+	end
+
+	for k in keys(dist_corrs)
+		dist_corrs[k] /= dist_counts[k]
+	end
+
+	if if_plot
+		plot_title = get(kwargs,:plot_title,"")
+		fig = figure()
+		scatter(collect(keys(dist_corrs)),collect(values(dist_corrs)))
+		xlabel("Distance")
+		ylabel("Two Particle Correlation")
+		title(plot_title)
+	end
+
+	return dist_corrs
+end
+
+function rydberg_2pcorr(wavefunc::TreeTensorNetwork; kwargs...)
+	if_plot = get(kwargs, :if_plot, true)
+
+	site_count = Int(2^TTNKit.number_of_layers(wavefunc))
+	coords = TTNKit.physical_coordinates(TTNKit.network(wavefunc))
+
+	onsite_occs = abs.(TTNKit.expect(wavefunc,"N"))
+
+	dist_corrs::Dict{Float64,Float64} = Dict()
+	dist_counts::Dict{Float64,Int64} = Dict()
+	for x1 in 1:Int(sqrt(site_count))
+		for y1 in 1:Int(sqrt(site_count))
+			s1 = findfirst(i -> (x1,y1) == i,coords)
+			for x2 in 1:Int(sqrt(site_count))
+				for y2 in 1:Int(sqrt(site_count))
+					s2 = findfirst(i -> (x2,y2) == i,coords)
+					dist_btw = round(sqrt((x2 - x1)^2 + (y2-y1)^2),digits=4)
+					if dist_btw in keys(dist_corrs)
+						dist_corrs[dist_btw] += abs(TTNKit.correlation(wavefunc,"N","N",s1,s2))
+						dist_counts[dist_btw] += 1
+					else
+						dist_corrs[dist_btw] = abs(TTNKit.correlation(wavefunc,"N","N",s1,s2))
+						dist_counts[dist_btw] = 1
+					end
+					if (x1,y1) == (x2,y2)
+						dist_corrs[0.0] -= onsite_occs[x1,y1]
+					end
+					#dist_corrs[dist_btw] /= onsite_occs[x1,y1] * onsite_occs[x2,y2]
+				end
+			end
+		end
+	end
+
+	for k in keys(dist_corrs)
+		dist_corrs[k] /= dist_counts[k]
+	end
+
+	if if_plot
+		plot_title = get(kwargs,:plot_title,"")
+		fig = figure()
+		scatter(collect(keys(dist_corrs)),collect(values(dist_corrs)))
+		xlabel("Distance")
+		ylabel("Two Particle Correlation")
+		title(plot_title)
+	end
+
+	return dist_corrs
+end
 
 
 #= Momentum occupation testing
@@ -888,7 +1047,7 @@ fb_occ_mat = get_occupancy(fb_gs)
 
 
 #
-if false
+if true
 
 #nnst = 0.0
 #layers = 6
@@ -912,9 +1071,9 @@ end=#
 #strens = range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	#params_dict = Dict([("hopping_anisotropy",1.0),("nrgtol",1e-8),("particles",4),("layers",4),("mdim",150),("if_save_data",false),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_virt",false)])
+	params_dict = Dict([("hopping_anisotropy",1.0),("nrgtol",5e-5),("particles",2),("layers",6),("mdim",10),("if_save_data",false),("alpha",0.0),("onsite_strength",2.0),("lr","all"),("if_periodic_phys",false),("if_periodic_virt",false)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
-	params_dict = make_args_dict(ARGS)
+	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)
 	if typeof(open_cores) != String
 		BLAS.set_num_threads(open_cores)	
@@ -1014,7 +1173,7 @@ end=#
 	end
 	loc = get(params_dict, "dataloc", dataloc)
 	if_cliff = false
-	sc_type = "flat"
+	sc_type = "rydberg"
 	dists = [i for i in 1:2*edge_sites]
 	longrange_dist == "all" ? longrange_dist = edge_sites-1 : nothing
 	lr_scaling = long_range_scaling(longrange_dist,edge_sites,onsite_strength; cliff=if_cliff,scaling=sc_type,if_plot=false)
@@ -1091,7 +1250,7 @@ end=#
 
 		#
 		println(datafile_name)
-		if_exists,found_data = false,nothing#check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
+		if_exists,found_data = check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
 
 		if if_exists
 			println("Found Data")
@@ -1136,7 +1295,8 @@ end=#
 		xscale("log")
 		=#
 
-		#occs = get_occupancy(wavefunc; densmat=dens,plot_title="Torus")
+		occs = get_occupancy(wavefunc; densmat=dens,plot_title="Rydberg Stuff")
+		rydberg_2pcorr(wavefunc; plot_title="Wavefunc")
 		#=plot(collect(1:Int(sqrt(2^layer_count))),occs[4,:],label="$(round(num_particles/(alpha*tot_sites),digits=4))")
 		legend()
 		xlabel("Sites")

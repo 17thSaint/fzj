@@ -123,6 +123,51 @@ function find_current_transition(all_files,loc; kwargs...) # adding HC part of c
 	return fillings[min_loc+1],fillings,currents
 end
 
+for if_periodic_phys in [true,false]
+	for if_periodic_virt in [true,false]
+		if if_periodic_phys && !if_periodic_virt
+			continue
+		end
+
+		if if_periodic_phys && if_periodic_virt
+			dataloc = get_folder_location("cluster-data/synth-dims/torus")
+			ver = "Torus"
+		elseif if_periodic_phys || if_periodic_virt
+			dataloc = get_folder_location("cluster-data/synth-dims")
+			ver = "Cylinder"
+		elseif !if_periodic_phys && !if_periodic_virt
+			dataloc = get_folder_location("cluster-data/synth-dims/obc")
+			ver = "OBC"
+		end
+
+		for (i,stren) in enumerate([0.0,10.0])
+			files = find_data_file(Dict([("layers",6),("particles",4),("onsite_strength",stren),("hopping_anisotropy",1.0)]),"ttn",dataloc; output_level=0)
+			if ver == "Torus"
+				data,metadata = read_data_jld2(files[1],dataloc)
+				thisloc = i*5
+				println(thisloc)
+				occs = get_occupancy(data["ttn"]; densmat=data["densmat"], plot_title="$ver, LR=$stren, $thisloc",if_plot=true)
+			else
+				for f in files
+					data,metadata = read_data_jld2(f,dataloc)
+					alpha = metadata["alpha"]
+					periodic_shift = alpha != 0.125
+					ver_shift = ver == "Cylinder"
+					thisloc = 2*ver_shift + periodic_shift + (i-1)*5 + 1
+					println(thisloc)
+					occs = get_occupancy(data["ttn"]; densmat=data["densmat"], plot_title="$ver, LR=$stren, alpha=$(round(alpha,digits=3)), $thisloc",if_plot=true)
+				end
+			end
+
+			
+			
+		end
+
+	end
+end
+
+
+
 
 #=
 loc = get_folder_location("cluster-data/synth-dims","fzj")

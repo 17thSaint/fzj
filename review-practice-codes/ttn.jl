@@ -419,34 +419,17 @@ function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwarg
 	end
 	if s1[1] == s2[1] # Synthetic Dimension Hopping
 		thetay = get(kwargs, :thetay, thetay_2)
-		#=if ==(edge_length,s1[2])
-			println("Using ThetaY")
-		end
-		=#
-		stren = -t_strength_synth
-		phase_part = exp(im*2*pi*(phi*s1[1]))
-		return round(stren * phase_part,digits=8) #- ==(edge_length_y,s1[2])*thetay))
+
+		stren = -t_strength_synth #* exp(im*2*pi*(phi*s1[1]))
+		return stren
 	elseif s1[2] == s2[2] # Physical Dimension Hopping
 		thetax = get(kwargs, :thetax, thetax_2)
-		#=if ==(edge_length,s1[1])
-			println("Using ThetaX")
-		end
-		=#
-		return -t_strength_phys * 1 #* exp(-im*2*pi* ==(edge_length_x,s1[1]) *thetax)
+
+		return -t_strength_phys  * exp(im*2*pi*(phi*s1[2]))
 	else
 		return 0.0
 	end
-	#=
-	no_magF = get(kwargs, :no_magF, false)
-	if no_magF
-		phi = 0.0
-	end
-	if s1[1] == s2[1]
-		return -t_strength
-	else
-		return -t_strength * exp(im * 2 * pi * phi * s1[1])
-	end
-	=#
+
 end
 
 function v_central(sz, Vj)
@@ -994,7 +977,7 @@ function TTNKit.ITensors.measure!(o::SavingNRGVarObserver; kwargs...)
     append!(o.nrg,[dmrg.current_energy])
 
 	#modify_data_jld2("ttn",dmrg.ttn,o.file_path,"all_data")
-	alldata_update::Dict{String,Any} = Dict([("ttn",dmrg.ttn)])#,("densmat",density_matrix(dmrg.ttn))])
+	alldata_update::Dict{String,Any} = Dict([("ttn",dmrg.ttn),("densmat",density_matrix(dmrg.ttn))])
 	modify_data_jld2(alldata_update,o.file_path,"all_data")
 	
 	metadata_update = Dict([("observer",o),("maxlinkdim",TTNKit.maxlinkdim(dmrg.ttn))])
