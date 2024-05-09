@@ -991,47 +991,78 @@ function rydberg_2pcorr(wavefunc::TreeTensorNetwork; kwargs...)
 
 	onsite_occs = abs.(TTNKit.expect(wavefunc,"N"))
 
-	dist_corrs::Dict{Float64,Float64} = Dict()
-	dist_counts::Dict{Float64,Int64} = Dict()
+	dist_corrs::Dict{Float64,Vector{Float64}} = Dict()
+	#dist_counts::Dict{Float64,Int64} = Dict()
 	for x1 in 1:Int(sqrt(site_count))
 		for y1 in 1:Int(sqrt(site_count))
 			s1 = findfirst(i -> (x1,y1) == i,coords)
 			for x2 in 1:Int(sqrt(site_count))
 				for y2 in 1:Int(sqrt(site_count))
 					s2 = findfirst(i -> (x2,y2) == i,coords)
+
 					dist_btw = round(sqrt((x2 - x1)^2 + (y2-y1)^2),digits=4)
 					if dist_btw in keys(dist_corrs)
-						dist_corrs[dist_btw] += abs(TTNKit.correlation(wavefunc,"N","N",s1,s2))
-						dist_counts[dist_btw] += 1
+						append!(dist_corrs[dist_btw],[abs(TTNKit.correlation(wavefunc,"N","N",s1,s2))])
 					else
-						dist_corrs[dist_btw] = abs(TTNKit.correlation(wavefunc,"N","N",s1,s2))
-						dist_counts[dist_btw] = 1
+						dist_corrs[dist_btw] = [abs(TTNKit.correlation(wavefunc,"N","N",s1,s2))]
 					end
+					
 					if (x1,y1) == (x2,y2)
-						dist_corrs[0.0] -= onsite_occs[x1,y1]
+						dist_corrs[0.0][end] -= onsite_occs[x1,y1]
 					end
-					#dist_corrs[dist_btw] /= onsite_occs[x1,y1] * onsite_occs[x2,y2]
+
+					dist_corrs[dist_btw][end] /= onsite_occs[x1,y1] * onsite_occs[x2,y2]
 				end
 			end
 		end
 	end
 
-	for k in keys(dist_corrs)
-		dist_corrs[k] /= dist_counts[k]
+	avg_dist_corrs::Dict{Float64,Float64} = Dict()
+	for (k,v) in dist_corrs
+		avg_dist_corrs[k] = mean(v)
 	end
+
 
 	if if_plot
 		plot_title = get(kwargs,:plot_title,"")
 		fig = figure()
-		scatter(collect(keys(dist_corrs)),collect(values(dist_corrs)))
+		scatter(collect(keys(avg_dist_corrs)),collect(values(avg_dist_corrs)))
 		xlabel("Distance")
 		ylabel("Two Particle Correlation")
 		title(plot_title)
 	end
 
-	return dist_corrs
+	return avg_dist_corrs
 end
 
+function average_close_keys(dict, bin_width)
+	# Create bins
+	bins = Dict()
+
+	for (key, value) in dict
+		# Find the bin this key belongs to
+		bin_key = round(key / bin_width) * bin_width
+
+		# If the bin doesn't exist, create it
+		if !haskey(bins, bin_key)
+			bins[bin_key] = []
+		end
+
+		# Add the value to the bin
+		push!(bins[bin_key], value)
+	end
+
+	# Now average the values in each bin
+	averaged_dict = Dict()
+	for (key, values) in bins
+		averaged_dict[key] = mean(values)
+	end
+
+	return averaged_dict
+end
+
+# Usage:
+# averaged_dict = average_close_keys(your_dict, 0.1)
 
 #= Momentum occupation testing
 lnet = build_HH_net(4; syms=true)
@@ -1071,7 +1102,7 @@ end=#
 #strens = range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("hopping_anisotropy",1.0),("nrgtol",5e-5),("particles",2),("layers",6),("mdim",10),("if_save_data",false),("alpha",0.0),("onsite_strength",2.0),("lr","all"),("if_periodic_phys",false),("if_periodic_virt",false)])
+	params_dict = Dict([("hopping_anisotropy",1.0),("nrgtol",5e-5),("particles",4),("layers",6),("mdim",50),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",false),("if_periodic_virt",false)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)
@@ -1164,6 +1195,14 @@ end=#
 	if_continuous_saving = get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 7)
 	save_data ? nothing : if_continuous_saving = false
 
+	
+	if_cliff = false
+	trunc = get(params_dict,"trunc",1e-3)
+	sc_type = "rydberg"
+	dists = [i for i in 1:2*edge_sites]
+	longrange_dist == "all" ? longrange_dist = edge_sites-1 : nothing
+	lr_scaling = long_range_scaling(longrange_dist,edge_sites,onsite_strength; cliff=if_cliff,scaling=sc_type,if_plot=false,trunc=trunc)
+
 	if if_per_phys && if_per_virt
 		dataloc = get_folder_location("cluster-data/synth-dims/torus")
 	elseif if_per_phys || if_per_virt
@@ -1171,13 +1210,10 @@ end=#
 	elseif !if_per_phys && !if_per_virt
 		dataloc = get_folder_location("cluster-data/synth-dims/obc")
 	end
+	if sc_type == "rydberg"
+		dataloc = get_folder_location("cluster-data/synth-dims/rydberg")
+	end
 	loc = get(params_dict, "dataloc", dataloc)
-	if_cliff = false
-	sc_type = "rydberg"
-	dists = [i for i in 1:2*edge_sites]
-	longrange_dist == "all" ? longrange_dist = edge_sites-1 : nothing
-	lr_scaling = long_range_scaling(longrange_dist,edge_sites,onsite_strength; cliff=if_cliff,scaling=sc_type,if_plot=false)
-
 	
 	#counting = 50
 	#strens = range(num_particles/(0.2*tot_sites),num_particles/(2.0*tot_sites),length=counting) #range(0.02,0.25,length=counting)
@@ -1203,7 +1239,7 @@ end=#
 	#for (idx,alpha) in enumerate(strens)
 	#for (idx,num_particles) in enumerate(parts)
 		#alpha = 0.0
-		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_phys",if_per_phys),("onsite_strength",onsite_strength),("hopping_anisotropy",anis)])
+		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_phys",if_per_phys),("onsite_strength",onsite_strength)])#,("hopping_anisotropy",anis)])
 		twist_angle != 0.0 ? filename_dict["twist_angle"] = twist_angle : nothing
 		#if length(keys(params_dict)) == 0
 		#	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
@@ -1229,6 +1265,7 @@ end=#
 						scaling_dist=longrange_dist,
 						onsite_strength=onsite_strength,
 						cliff=if_cliff,
+						trunc=trunc,
 						if_change=if_change,
 						change=change,
 						if_gpu=if_gpu,
