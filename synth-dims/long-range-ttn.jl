@@ -96,9 +96,10 @@ function long_range_scaling(x_final,virt_edge_length,initial_strength; kwargs...
 		strengths[2:x_final+1] .= final_minimum
 	elseif scaling_func == "rydberg"
 		blockade_radius = initial_strength
-		strengths = map(1:virt_edge_length) do x
-			blockade_radius^6 / (blockade_radius^6 + x^6)
+		strengths = map(0:virt_edge_length-1) do x
+			1.0 * (blockade_radius^6) / (blockade_radius^6 + x^6)
 		end
+		x_final < length(strengths) ? strengths[x_final+2:end] .= 0.0 : nothing
 	end
 	
 	if if_hard_cutoff
@@ -209,6 +210,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	
 	scaling_distance = get(kwargs, :scaling_dist, 0)
 	
+	restricted_size = get(kwargs, :restricted_size, [phys_edge_length,virt_edge_length])
 	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
 	if_hopping = get(kwargs, :if_hopping, true)
@@ -306,16 +308,22 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 		end
 		append!(resulting_ham,[interaction])
 	end
-	#=
-	if if_nn_int
-		nn_int = TTNKit.OpSum()
-		nns = TTNKit.nearest_neighbours(lat,collect(TTNKit.eachindex(lat));periodic=if_periodic)
-		for (n1,n2) in nns
-			nn_int += (nn_int_strength,"Adag * A",n1,"Adag * A",n2)
+	
+	if restricted_size != [phys_edge_length,virt_edge_length]
+		restrict_size = TTNKit.OpSum()
+		for i in restricted_size[1]+1:phys_edge_length
+			for j in 1:virt_edge_length
+				restrict_size += (1000000.0,"N",(i,j))
+			end
 		end
-		append!(resulting_ham,[nn_int])
+		for i in 1:restricted_size[2]+1:virt_edge_length
+			for j in 1:restricted_size[1]
+				restrict_size += (1000000.0,"N",(j,i))
+			end
+		end
+		append!(resulting_ham,[restrict_size])
 	end
-	=#
+
 	if chem_strength != 0.0
 		chem = TTNKit.OpSum()
 		for i in TTNKit.eachindex(lat)
@@ -1102,7 +1110,7 @@ end=#
 #strens = range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("hopping_anisotropy",1.0),("nrgtol",5e-5),("particles",4),("layers",6),("mdim",50),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",false),("if_periodic_virt",false)])
+	params_dict = Dict([("make_smaller_lattice",[8,8]),("max_occ",3),("hopping_anisotropy",1.0),("nrgtol",5e-5),("particles",4),("layers",6),("mdim",50),("if_save_data",false),("filling",1/3.36),("onsite_strength",2.5*8/12),("lr","all"),("if_periodic_phys",false),("if_periodic_virt",false)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)
@@ -1148,6 +1156,13 @@ end=#
 		phys_edge_length,synth_edge_length = edge_sites,Int(edge_sites/2)
 		num_particles = get(params_dict, "particles", Int(sqrt(2^(layer_count+1))/2))
 	end
+
+	make_smaller_lattice = get(params_dict, "make_smaller_lattice", [phys_edge_length,synth_edge_length])
+	if make_smaller_lattice != [phys_edge_length,synth_edge_length]
+		phys_edge_length,synth_edge_length = make_smaller_lattice
+		edge_sites = phys_edge_length
+	end
+
 	if_per_phys = get(params_dict, "if_periodic_phys", true)
 	if_per_virt = get(params_dict, "if_periodic_virt", false)
 	if isnothing(alpha)
@@ -1239,7 +1254,7 @@ end=#
 	#for (idx,alpha) in enumerate(strens)
 	#for (idx,num_particles) in enumerate(parts)
 		#alpha = 0.0
-		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_phys",if_per_phys),("onsite_strength",onsite_strength)])#,("hopping_anisotropy",anis)])
+		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_phys",if_per_phys),("onsite_strength",onsite_strength),("scaling",sc_type),("smaller_size",phys_edge_length)])
 		twist_angle != 0.0 ? filename_dict["twist_angle"] = twist_angle : nothing
 		#if length(keys(params_dict)) == 0
 		#	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
@@ -1253,6 +1268,7 @@ end=#
 						if_continuous_saving=if_continuous_saving,
 						nrgtol=nrgtol,
 						if_densmat=if_densmat,
+						restricted_size=make_smaller_lattice,
 						centralflux_strength=centralflux_strength,
 						if_pinning_pot=if_pinning,
 						if_periodic_phys=if_per_phys,
@@ -1332,8 +1348,8 @@ end=#
 		xscale("log")
 		=#
 
-		occs = get_occupancy(wavefunc; densmat=dens,plot_title="Rydberg Stuff")
-		rydberg_2pcorr(wavefunc; plot_title="Wavefunc")
+		#occs = get_occupancy(wavefunc; densmat=dens, if_plot=true)
+		#rydberg_2pcorr(wavefunc)
 		#=plot(collect(1:Int(sqrt(2^layer_count))),occs[4,:],label="$(round(num_particles/(alpha*tot_sites),digits=4))")
 		legend()
 		xlabel("Sites")

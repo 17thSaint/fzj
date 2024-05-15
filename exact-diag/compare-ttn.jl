@@ -29,7 +29,7 @@ end
 
 include_other_files(["other-funcs/data-storage-funcs.jl","synth-dims/long-range-ttn.jl","exact-diag/two-dimensions.jl"])
 
-if_all = false
+if_all = true
 if_plot = false
 
 if false || if_all

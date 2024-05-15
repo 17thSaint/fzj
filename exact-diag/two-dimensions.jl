@@ -1257,7 +1257,7 @@ end
 
 function plot_occupancy(exp_occ; kwargs...)
 	fig = figure()
-	imshow(transpose(exp_occ))
+	imshow(exp_occ)
 	colorbar()
 	plot_title = get(kwargs, :plot_title, "")
 	title_string = "Occupancy, " * plot_title
@@ -1290,6 +1290,45 @@ end
 function hh_gap_fit(x,p)
     return p[1] .* hh_gap_exact.(x,0.25) .+ p[2]
 end
+
+function distance_correlation(rho::Matrix,lattice_params::Dict,direction::String="x")
+    if_periodic_x = lattice_params["if_periodic_x"]
+    if_periodic_y = lattice_params["if_periodic_y"]
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+
+    if direction == "x"
+        len = Lx
+        other_len = Ly
+    else
+        len = Ly
+        other_len = Lx
+    end
+    dist_corrs = zeros(Float64,len-1)
+    corr_counts = zeros(Int64,len-1)
+
+    for x1 in 1:len
+        for y1 in 1:other_len
+            s1 = direction == "x" ? linear_index((x1,y1),Lx,Ly) : linear_index((y1,x1),Lx,Ly)
+            for x2 in 1:len-1
+                if x1 == x2
+                    continue
+                end
+                s2 = direction == "x" ? linear_index((x2,y1),Lx,Ly) : linear_index((y1,x2),Lx,Ly)
+                dist_corrs[Int(abs(x1-x2))] += abs(rho[s1,s2])
+                corr_counts[Int(abs(x1-x2))] += 1
+            end
+        end
+    end
+
+    dist_corrs ./= corr_counts
+
+    return dist_corrs
+end
+
+distance_correlation(x::Vector{ComplexF64},lattice_params::Dict,direction::String="x") = distance_correlation(density_matrix(x,lattice_params),lattice_params,direction)
+
+
 
 #=Lx = 4
 Ly = 4
@@ -1347,8 +1386,8 @@ end=#
 
 #anises = range(1.0,100.0,length=30)
 #gapvals = zeros(Float64,length(anises))
-lx = 6
-n = 3
+#lx = 6
+#n = 4
 #=ac = n / (0.5 * (lx-1)*(lx-1))
 as = n / (0.4 * (lx-1)*(lx-1))
 af = n / (0.6 * (lx-1)*(lx-1))
@@ -1368,16 +1407,18 @@ ylabel("Energy")
 title("Alpha = $(thisalpha)")
 end=#
 
-if true
+if false
+lx = 6
+n = 4
 #for (idx,n) in enumerate([2,3,4,5])
-intstrens = [0.0]#range(0.0,5.0,length=20)
+intstren = 0.0#range(0.0,10.0,length=10)
 #for (idx,alpha) in enumerate(alphas)
 #for (idx,lx) in enumerate(4:1:30)
 #for nextalpha in [0.0,change]
 #for (idx,anis) in enumerate(anises)
-for (idx,intstren) in enumerate(intstrens)
-    #for change in [0,0.0001]
-    params_dict = Dict([("Lx",lx),("N",n),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",1),("if_save_data",false)])
+#for (idx,intstren) in enumerate(intstrens)
+    #for change in [0,0.0001]true
+    params_dict = Dict([("Lx",lx),("N",n),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr",0),("alpha",0.0),("nev",3),("if_save_data",false)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
@@ -1413,7 +1454,7 @@ for (idx,intstren) in enumerate(intstrens)
     end
     opl = get(params_dict, "output_level", 1)
     running_args = (nev=nev,
-                    if_densmat=true,
+                    if_densmat=false,
                     if_save_data=if_save_data,
                     dataloc=dataloc,
                     basis_dataloc=basis_dataloc,
@@ -1434,6 +1475,7 @@ for (idx,intstren) in enumerate(intstrens)
     lr_dist = get(params_dict,"lr", "all")
     lr_dist == "all" ? lr_dist = Ly : nothing
     us = [i < lr_dist+2 ? stren : 0.0 for i in 1:Ly]
+    us[1] = 4.0
 
     # get hopping anisotropy values
     hopping_anisotropy = get(params_dict,"hopping_anisotropy",1.0)
@@ -1504,7 +1546,8 @@ for (idx,intstren) in enumerate(intstrens)
         end
     end
 
-    occs = get_occupancy(rhos[1],lattice_params; if_plot=true,plot_title="Flux Hopping Physical")
+    #dcorrs = distance_correlation(states[1],lattice_params,"x")
+    #display(dcorrs)
     #bulkdens = sum(occs[2,2:5]) + sum(occs[5,2:5]) + sum(occs[3:4,2]) + sum(occs[3:4,5])
     #bulkdens = iseven(lx) ? sum(occs[Int(lx/2):Int(lx/2)+1,Int(lx/2):Int(lx/2)+1]) : sum(occs[Int(floor(lx/2)):Int(floor(lx/2))+2,Int(floor(lx/2)):Int(floor(lx/2))+2])
     #append!(all_bulkdens,[bulkdens/n])
@@ -1573,6 +1616,9 @@ for (idx,intstren) in enumerate(intstrens)
     #xlabel("Hopping Anisotropy tx/ty")
     ylabel("Energy")=#
 
+    occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="LR = $intstren")
+    #scurr = synthetic_current(rhos[1],lattice_params; if_plot=true,plot_title="Int Stren=$intstren")
+    #pcurr = physical_current(rhos[1],lattice_params; if_plot=true,plot_title="Int Stren=$intstren")
 
 
     #title("Energy Gap for 2 x $Lx decoupled wires")
@@ -1593,7 +1639,7 @@ for (idx,intstren) in enumerate(intstrens)
     currents = physical_current(rhos,lattice_params; if_plot=true)
     corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
     currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
-end
+#end
 #th_alphas = range(minimum(alphas),maximum(alphas),length=100)
 #plot(th_alphas,4*(sin.(pi .* th_alphas)).^2,label="Theory",c="b")
 #legend()
