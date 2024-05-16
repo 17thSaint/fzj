@@ -736,6 +736,7 @@ function n_particle_basis(N::Int64,Lx::Int64,Ly::Int64; kwargs...)
         if_exists,data = check_data_exists(metadata_dict,"basis"; location=dataloc,output_level=output_level)
         if if_exists
             output_level > 0 ? println("Found existing file with basis data") : nothing
+            output_level > 0 ? println("Basis has ",length(data[1]["full_basis"])," states") : nothing
             return data[1]["full_basis"]
         end
     end
@@ -968,6 +969,7 @@ function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwa
     output_level = get(kwargs,:output_level,1)
     if_densmat = get(kwargs,:if_densmat,true)
     if_save_data = get(kwargs,:if_save_data,false)
+    if_exact = get(kwargs,:if_exact,false)
 
     metadata_dict = merge(merge(lattice_params,hamilt_params),named_tuple_to_dict(kwargs))
 
@@ -982,8 +984,13 @@ function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwa
     metadata_dict["H"] = H
     output_level > 0 ? println("Sparsity = ",SparseArrays.nnz(H)/size(H)[1]^2) : nothing
 
-    x0 = rand(Float64,size(lattice_params["full_basis"])[2])
-    rez = eigsolve(H,x0,nev,:SR,Lanczos())
+    if if_exact
+        everything = eigen(Matrix(H))
+        rez = (everything.values,everything.vectors)
+    else
+        x0 = rand(Float64,size(lattice_params["full_basis"])[2])
+        rez = eigsolve(H,x0,nev,:SR,Lanczos())
+    end
     output_level > 0 ? println("Ground State: Elapsed time: ",time()-start_time) : nothing
 
     sorted_indices = sortperm(rez[1])
@@ -1407,24 +1414,25 @@ ylabel("Energy")
 title("Alpha = $(thisalpha)")
 end=#
 
-if false
+if true
 lx = 6
-n = 4
+n = 3
 #for (idx,n) in enumerate([2,3,4,5])
-intstren = 0.0#range(0.0,10.0,length=10)
+intstren = 1e0#range(0.0,10.0,length=10)
 #for (idx,alpha) in enumerate(alphas)
 #for (idx,lx) in enumerate(4:1:30)
 #for nextalpha in [0.0,change]
 #for (idx,anis) in enumerate(anises)
 #for (idx,intstren) in enumerate(intstrens)
+#for lrd in [0,1]
     #for change in [0,0.0001]true
-    params_dict = Dict([("Lx",lx),("N",n),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr",0),("alpha",0.0),("nev",3),("if_save_data",false)])
+    params_dict = Dict([("Lx",lx),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr",0),("filling",0.5),("nev",3),("if_save_data",false)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
     open_cores = get(params_dict, "open_cores", 5)
 	if typeof(open_cores) != String
-		BLAS.set_num_threads(open_cores)	
+		BLAS.set_num_threads(open_cores)
 		display(BLAS.get_config())
 	end
 
@@ -1454,6 +1462,7 @@ intstren = 0.0#range(0.0,10.0,length=10)
     end
     opl = get(params_dict, "output_level", 1)
     running_args = (nev=nev,
+                    if_exact=false,
                     if_densmat=false,
                     if_save_data=if_save_data,
                     dataloc=dataloc,
@@ -1475,7 +1484,7 @@ intstren = 0.0#range(0.0,10.0,length=10)
     lr_dist = get(params_dict,"lr", "all")
     lr_dist == "all" ? lr_dist = Ly : nothing
     us = [i < lr_dist+2 ? stren : 0.0 for i in 1:Ly]
-    us[1] = 4.0
+    us[1] = 1.0
 
     # get hopping anisotropy values
     hopping_anisotropy = get(params_dict,"hopping_anisotropy",1.0)
@@ -1486,7 +1495,7 @@ intstren = 0.0#range(0.0,10.0,length=10)
 		tx = 1.0 * hopping_anisotropy
 		ty = 1.0
 	end
-    #tx = 1.0
+    #tx = 0.0
     #ty = 0.0
     
     # build magnetic field parameters and check fluxes for periodicity
@@ -1546,8 +1555,10 @@ intstren = 0.0#range(0.0,10.0,length=10)
         end
     end
 
-    #dcorrs = distance_correlation(states[1],lattice_params,"x")
-    #display(dcorrs)
+    #=dcorrs = distance_correlation(states[1],lattice_params,"x")
+    display(dcorrs)
+    dcorrsy = distance_correlation(states[1],lattice_params,"y")
+    display(dcorrsy)=#
     #bulkdens = sum(occs[2,2:5]) + sum(occs[5,2:5]) + sum(occs[3:4,2]) + sum(occs[3:4,5])
     #bulkdens = iseven(lx) ? sum(occs[Int(lx/2):Int(lx/2)+1,Int(lx/2):Int(lx/2)+1]) : sum(occs[Int(floor(lx/2)):Int(floor(lx/2))+2,Int(floor(lx/2)):Int(floor(lx/2))+2])
     #append!(all_bulkdens,[bulkdens/n])
@@ -1616,7 +1627,7 @@ intstren = 0.0#range(0.0,10.0,length=10)
     #xlabel("Hopping Anisotropy tx/ty")
     ylabel("Energy")=#
 
-    occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="LR = $intstren")
+    #occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="Anis = $hopping_anisotropy")
     #scurr = synthetic_current(rhos[1],lattice_params; if_plot=true,plot_title="Int Stren=$intstren")
     #pcurr = physical_current(rhos[1],lattice_params; if_plot=true,plot_title="Int Stren=$intstren")
 
@@ -1639,6 +1650,7 @@ intstren = 0.0#range(0.0,10.0,length=10)
     currents = physical_current(rhos,lattice_params; if_plot=true)
     corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
     currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
+    display(nrgs)
 #end
 #th_alphas = range(minimum(alphas),maximum(alphas),length=100)
 #plot(th_alphas,4*(sin.(pi .* th_alphas)).^2,label="Theory",c="b")

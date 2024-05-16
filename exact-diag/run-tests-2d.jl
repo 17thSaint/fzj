@@ -1,7 +1,7 @@
 using Test
 include("two-dimensions.jl")
 
-if_all = false
+if_all = true
 
 #=
 if false
@@ -101,7 +101,7 @@ if false
         end
     end
 end
-=#
+#
 
 if false || if_all
     @testset "operator change of basis old with naive" begin
@@ -211,7 +211,7 @@ if false || if_all
         @test isapprox(rho,rho_efficient,atol=1e-5)
     end
 end
-
+=#
 
 if false || if_all
     @testset "New faster Index numbering" begin

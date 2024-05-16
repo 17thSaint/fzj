@@ -262,9 +262,9 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 		end
 		#
 		if if_periodic_virt
-			for i in 1:phys_edge_length
+			for i in 1:restricted_size[1]
 				s1_coord = (i,1)
-				s2_coord = (i,virt_edge_length)
+				s2_coord = (i,restricted_size[2])
 				coeff = get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
 				hopping += (coeff,"Adag",s1_coord,"A",s2_coord)
 				hopping += (conj(coeff),"Adag",s2_coord,"A",s1_coord)
@@ -272,9 +272,9 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 		end
 
 		if if_periodic_phys
-			for i in 1:virt_edge_length
+			for i in 1:restricted_size[2]
 				s1_coord = (1,i)
-				s2_coord = (phys_edge_length,i)
+				s2_coord = (restricted_size[1],i)
 				coeff = get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
 				coeff *= exp(im*2*pi*centralflux_strength/size(lat)[1])
 				coeff *= exp(im*twist_angle*2*pi)
@@ -1087,6 +1087,29 @@ function average_close_keys(dict, bin_width)
 	return averaged_dict
 end
 
+function check_fluxes(alpha,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_y::Bool)
+    if alpha == 0.0
+        return nothing
+    end
+    x_shift,y_shift = !if_periodic_x, !if_periodic_y
+    num_fluxes = round(alpha*(Lx - x_shift) * (Ly - y_shift),digits=5)
+    println("Number of Fluxes = ",num_fluxes," for Lx = ",Lx," and Ly = ",Ly)
+    if !isinteger(num_fluxes)
+        error("Number of fluxes is not an integer")
+    end
+
+    if if_periodic_x && !isinteger(num_fluxes/Lx)
+        error("Number of fluxes is not an integer multiple of Lx")
+    end
+
+    if if_periodic_y && !isinteger(num_fluxes/Ly)
+        error("Number of fluxes is not an integer multiple of Ly")
+    end
+
+    return nothing
+end
+
+
 # Usage:
 # averaged_dict = average_close_keys(your_dict, 0.1)
 
@@ -1128,7 +1151,7 @@ end=#
 #strens = range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("make_smaller_lattice",[6,6]),("max_occ",3),("hopping_anisotropy",1.0),("nrgtol",5e-5),("particles",2),("layers",6),("mdim",10),("if_save_data",false),("alpha",0.0),("onsite_strength",4.0),("lr",0),("if_periodic_phys",false),("if_periodic_virt",false)])
+	params_dict = Dict([("hopping_anisotropy",10000.0),("make_smaller_lattice",[6,6]),("nrgtol",5e-3),("particles",3),("layers",6),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",1.0),("lr",0),("if_periodic_phys",true),("if_periodic_virt",true)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)
@@ -1191,6 +1214,7 @@ end=#
 	else
 		mag_off = alpha == 0.0
 	end
+	check_fluxes(alpha,phys_edge_length,synth_edge_length,if_per_phys,if_per_virt)
 	#
 
 	#
@@ -1400,7 +1424,10 @@ end=#
 
 		#momentum_occupation(wavefuncs[idx],50,1.0; if_plot=true)
 
-		#rez = distance_correlation(wavefuncs[idx]; if_plot=false)#plot_title = "Nu = $(round(num_particles/(alpha*tot_sites),digits=4))")
+		rezx = distance_correlation(dens,wavefunc,layer_count,"x")
+		display(rezx)
+		rezy = distance_correlation(dens,wavefunc,layer_count,"y")
+		display(rezy)
 		#centermoms[idx] = minimum(abs.(rez[2]))
 
 		#=
