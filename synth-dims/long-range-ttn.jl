@@ -238,6 +238,13 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 		for (s1,s2) in TTNKit.nearest_neighbours(lat,collect(1:TTNKit.number_of_sites(lat)))
 			s1_coord = TTNKit.coordinate(lat,s1)
 			s2_coord = TTNKit.coordinate(lat,s2)
+
+			if any([s1_coord[1],s2_coord[1]] .> restricted_size[1])
+				continue
+			end
+			if any([s1_coord[2],s2_coord[2]] .> restricted_size[2])
+				continue
+			end
 						
 			coeff = get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
 			
@@ -292,15 +299,26 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 			else
 				if idx == 1
 					for j in TTNKit.eachindex(lat)
-						interaction += (stren,"N * N",TTNKit.coordinate(lat,j))
-						interaction -= (stren,"N",TTNKit.coordinate(lat,j))
+						s_coord = TTNKit.coordinate(lat,j)
+						if s_coord[1] > restricted_size[1] || s_coord[2] > restricted_size[2]
+							continue
+						end
+						interaction += (stren,"N * N",s_coord)
+						interaction -= (stren,"N",s_coord)
 					end
 				else
 					for j in TTNKit.eachindex(lat)
-						interaction_sites = get_interaction_coords(TTNKit.coordinate(lat,j),idx-1,lat,if_periodic_virt,if_anis)
+						s_coord = TTNKit.coordinate(lat,j)
+						if s_coord[1] > phys_edge_length || s_coord[2] > virt_edge_length
+							continue
+						end
+						interaction_sites = get_interaction_coords(s_coord,idx-1,lat,if_periodic_virt,if_anis)
 						
 						for k in interaction_sites
-							interaction += (stren,"Adag * A",TTNKit.coordinate(lat,j),"Adag * A",Tuple(k))
+							if k[1] > restricted_size[1] || k[2] > restricted_size[2]
+								continue
+							end
+							interaction += (stren,"Adag * A",s_coord,"Adag * A",Tuple(k))
 						end
 					end
 				end
@@ -316,7 +334,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 				restrict_size += (1000000.0,"N",(i,j))
 			end
 		end
-		for i in 1:restricted_size[2]+1:virt_edge_length
+		for i in restricted_size[2]+1:virt_edge_length
 			for j in 1:restricted_size[1]
 				restrict_size += (1000000.0,"N",(j,i))
 			end
@@ -1086,7 +1104,7 @@ fb_occ_mat = get_occupancy(fb_gs)
 
 
 #
-if false
+if true
 
 #nnst = 0.0
 #layers = 6
@@ -1110,7 +1128,7 @@ end=#
 #strens = range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("make_smaller_lattice",[6,6]),("max_occ",3),("hopping_anisotropy",1.0),("nrgtol",5e-5),("particles",4),("layers",6),("mdim",10),("if_save_data",true),("filling",1/3.36),("onsite_strength",2.5*8/12),("lr","all"),("if_periodic_phys",false),("if_periodic_virt",false)])
+	params_dict = Dict([("make_smaller_lattice",[6,6]),("max_occ",3),("hopping_anisotropy",1.0),("nrgtol",5e-5),("particles",2),("layers",6),("mdim",10),("if_save_data",false),("alpha",0.0),("onsite_strength",4.0),("lr",0),("if_periodic_phys",false),("if_periodic_virt",false)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)
@@ -1207,13 +1225,13 @@ end=#
 	save_plot = false
 	save_data = get(params_dict, "if_save_data", true)
 	if_cluster = any([occursin("local",pwd()),occursin("Local",pwd()),occursin("geraghty",pwd())])
-	if_continuous_saving = true#get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 7)
+	if_continuous_saving = get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 7)
 	save_data ? nothing : if_continuous_saving = false
 
 	
 	if_cliff = false
 	trunc = get(params_dict,"trunc",1e-3)
-	sc_type = "rydberg"
+	sc_type = "flat"
 	dists = [i for i in 1:2*edge_sites]
 	longrange_dist == "all" ? longrange_dist = edge_sites-1 : nothing
 	lr_scaling = long_range_scaling(longrange_dist,edge_sites,onsite_strength; cliff=if_cliff,scaling=sc_type,if_plot=false,trunc=trunc)
@@ -1348,7 +1366,7 @@ end=#
 		xscale("log")
 		=#
 
-		#occs = get_occupancy(wavefunc; densmat=dens, if_plot=true)
+		occs = get_occupancy(wavefunc; densmat=dens, if_plot=true)
 		#rydberg_2pcorr(wavefunc)
 		#=plot(collect(1:Int(sqrt(2^layer_count))),occs[4,:],label="$(round(num_particles/(alpha*tot_sites),digits=4))")
 		legend()
