@@ -820,23 +820,15 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 	println("Finished Building Network")
 	
 	if isnothing(ttn)
-		if if_redo
-			data,metadata = read_data_jld2(filename,location)
-			ttn = data["ttn"]
-			println("Starting from Previous End")
-			net = TTNKit.network(ttn)
-			lat = TTNKit.physical_lattice(net)
+		if particle_type .== "Boson"
+			states::Vector{String} = fill("0", num_sites)
+			old_ttn::TTNKit.TreeTensorNetwork = TTNKit.ProductTreeTensorNetwork(net,states)
+			ttn = initialize_ttn(old_ttn,max_dim,particle_count; kwargs...)
 		else
-			if particle_type .== "Boson"
-				states::Vector{String} = fill("0", num_sites)
-				old_ttn::TTNKit.TreeTensorNetwork = TTNKit.ProductTreeTensorNetwork(net,states)
-				ttn = initialize_ttn(old_ttn,max_dim,particle_count; kwargs...)
-			else
-				states = fill_states(particle_count,num_sites,1)
-				old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
-				ttn = TTNKit.increase_dim_tree_tensor_network_zeros(old_ttn, maxdim = max_dim)
-				ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
-			end
+			states = fill_states(particle_count,num_sites,1)
+			old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
+			ttn = TTNKit.increase_dim_tree_tensor_network_zeros(old_ttn, maxdim = max_dim)
+			ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
 		end
 		metadata["seed_ttn"] = ttn
 	end
@@ -848,7 +840,7 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 		else
 			ttn_data_dict = if_gpu ? Dict([("ttn",back2cpu(ttn))]) : Dict([("ttn",ttn)])
 		end
-		actual_filename::String = write_data_jld2(filename,ttn_data_dict,location,metadata)
+		actual_filename::String = if_redo ? modify_data_jld2(ttn_data_dict,location * "/" * filename) : write_data_jld2(filename,ttn_data_dict,location,metadata)
 	else
 		actual_filename = filename
 	end
@@ -996,6 +988,33 @@ function TTNKit.ITensors.checkdone!(o::SavingNRGVarObserver;kwargs...)
   		# Otherwise, keep going
 		return false
 	end
+end
+
+function rerun_findGS(fileloc::String; kwargs...)
+	new_parameters = get(kwargs, :new_parameters, nothing)
+
+	breakdown_fileloc = split(fileloc,"/")
+	filename = breakdown_fileloc[end]
+	dataloc = join(breakdown_fileloc[1:end-1],"/")
+	data,metadata_old = read_data_jld2(filename,dataloc)
+	metadata_old["seed_ttn"] = data["ttn"]
+	metadata_old["if_redo"] = true
+	metadata_old["location"] = dataloc
+
+	if !isnothing(new_parameters)
+		for (key,value) in new_parameters
+			metadata_old[key] = value
+		end
+	end
+
+	ham_op = metadata_old["ham"]
+	ttn_net = metadata_old["net"]
+	model_paras = dict_to_symbols(metadata_old)
+	layers = metadata_old["layers"]
+	num_particles = metadata_old["particles"]
+	og_ttn, hamilt, dm_sp, rezobs, runtime, dens = find_ground_state(layers,num_particles; ham_op=ham_op,ttn_net=ttn_net,model_paras...,metadata=metadata_old)
+
+	return dm_sp.ttn,dens,rezobs
 end
 
 function plot_grid(virt_edge_length,phys_edge_length)

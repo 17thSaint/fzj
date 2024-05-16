@@ -1086,7 +1086,7 @@ fb_occ_mat = get_occupancy(fb_gs)
 
 
 #
-if true
+if false
 
 #nnst = 0.0
 #layers = 6
@@ -1110,7 +1110,7 @@ end=#
 #strens = range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("make_smaller_lattice",[8,8]),("max_occ",3),("hopping_anisotropy",1.0),("nrgtol",5e-5),("particles",4),("layers",6),("mdim",50),("if_save_data",false),("filling",1/3.36),("onsite_strength",2.5*8/12),("lr","all"),("if_periodic_phys",false),("if_periodic_virt",false)])
+	params_dict = Dict([("make_smaller_lattice",[6,6]),("max_occ",3),("hopping_anisotropy",1.0),("nrgtol",5e-5),("particles",4),("layers",6),("mdim",10),("if_save_data",true),("filling",1/3.36),("onsite_strength",2.5*8/12),("lr","all"),("if_periodic_phys",false),("if_periodic_virt",false)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)
@@ -1207,7 +1207,7 @@ end=#
 	save_plot = false
 	save_data = get(params_dict, "if_save_data", true)
 	if_cluster = any([occursin("local",pwd()),occursin("Local",pwd()),occursin("geraghty",pwd())])
-	if_continuous_saving = get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 7)
+	if_continuous_saving = true#get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 7)
 	save_data ? nothing : if_continuous_saving = false
 
 	

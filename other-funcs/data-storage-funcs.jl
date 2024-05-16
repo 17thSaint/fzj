@@ -448,6 +448,7 @@ function modify_data_jld2(key_to_modify::String, new_value, file_path, which_gro
     
     # Close the JLD2 file
     close(jld_file)
+	return split(file_path,"/")[end]
 end
 
 function modify_data_jld2(to_modify_dict::Dict,file_path, which_group="all_data"; kwargs...)
@@ -477,9 +478,10 @@ function modify_data_jld2(to_modify_dict::Dict,file_path, which_group="all_data"
 
 	# Close the JLD2 file
 	close(jld_file)
+	return split(file_path,"/")[end]
 end
 
-function read_data_hdf5(file_name,location=pwd(); kwargs...)
+#=function read_data_hdf5(file_name,location=pwd(); kwargs...)
 	output_level = get(kwargs, :output_level, true)
 	og_location = pwd()
 	cd(location)
@@ -514,7 +516,7 @@ function read_data_hdf5(file_name,location=pwd(); kwargs...)
 	else
 		return output
 	end
-end
+end=#
 
 
 
