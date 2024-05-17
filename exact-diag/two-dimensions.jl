@@ -813,7 +813,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
             end
             
             dir == -1 ? coeff = conj(coeff) : nothing
-            push!(output_weights,coeff)
+            push!(output_weights,round(real(coeff),digits=10) + im*round(imag(coeff),digits=10))
 
             
             output_basis_state = zeros(Int64,length(basis_state)) + basis_state
@@ -821,6 +821,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
             sort!(output_basis_state,rev=true)
             output_basis_state_index = find_basis_index(output_basis_state)
             push!(output_states,output_basis_state_index)
+
         end
 
         # y-direction hopping (synthetic)
@@ -846,7 +847,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
                 coeff *= exp(im*alpha*starting_site[1]*2*pi)
             end
             dir == -1 ? coeff = conj(coeff) : nothing
-            push!(output_weights,coeff)
+            push!(output_weights,round(real(coeff),digits=10) + im*round(imag(coeff),digits=10))
 
             output_basis_state = zeros(Int64,length(basis_state)) + basis_state
             output_basis_state[idx] = linear_index(next_site,Lx,Ly)
@@ -883,7 +884,6 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
         end
     end
 
-        
     return output_states,output_weights
 end
 
@@ -1006,7 +1006,7 @@ function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwa
 
     if_save_data ? save_eigenstates(states,rhos,nrgs,metadata_dict) : nothing
 
-    return states,nrgs,rhos
+    return states,nrgs,rhos,H
 end
 
 function rerun_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict,metadata::Dict,data_dict::Dict; kwargs...)
@@ -1264,7 +1264,7 @@ end
 
 function plot_occupancy(exp_occ; kwargs...)
 	fig = figure()
-	imshow(exp_occ)
+	imshow(transpose(exp_occ))
 	colorbar()
 	plot_title = get(kwargs, :plot_title, "")
 	title_string = "Occupancy, " * plot_title
@@ -1415,10 +1415,10 @@ title("Alpha = $(thisalpha)")
 end=#
 
 if true
-lx = 6
-n = 3
+lx = 4
+n = 4
 #for (idx,n) in enumerate([2,3,4,5])
-intstren = 1e0#range(0.0,10.0,length=10)
+intstren = 1.0#range(0.0,10.0,length=10)
 #for (idx,alpha) in enumerate(alphas)
 #for (idx,lx) in enumerate(4:1:30)
 #for nextalpha in [0.0,change]
@@ -1426,7 +1426,7 @@ intstren = 1e0#range(0.0,10.0,length=10)
 #for (idx,intstren) in enumerate(intstrens)
 #for lrd in [0,1]
     #for change in [0,0.0001]true
-    params_dict = Dict([("Lx",lx),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr",0),("filling",0.5),("nev",3),("if_save_data",false)])
+    params_dict = Dict([("Lx",lx),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1e6),("interaction_strength",intstren),("lr",0),("filling",0.5),("nev",10),("if_save_data",false)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
@@ -1551,14 +1551,14 @@ intstren = 1e0#range(0.0,10.0,length=10)
         if nev == 1
             states,nrgs,rhos = find_ground_state(lattice_params,hamilt_params; running_args...)
         else
-            states,nrgs,rhos = find_eigenstates(nev,lattice_params,hamilt_params; running_args...)
+            states,nrgs,rhos,hh = find_eigenstates(nev,lattice_params,hamilt_params; running_args...)
         end
     end
 
-    #=dcorrs = distance_correlation(states[1],lattice_params,"x")
-    display(dcorrs)
-    dcorrsy = distance_correlation(states[1],lattice_params,"y")
-    display(dcorrsy)=#
+    #dcorrs = distance_correlation(states[1],lattice_params,"x")
+    #display(dcorrs)
+    #dcorrsy = distance_correlation(states[1],lattice_params,"y")
+    #display(dcorrsy)
     #bulkdens = sum(occs[2,2:5]) + sum(occs[5,2:5]) + sum(occs[3:4,2]) + sum(occs[3:4,5])
     #bulkdens = iseven(lx) ? sum(occs[Int(lx/2):Int(lx/2)+1,Int(lx/2):Int(lx/2)+1]) : sum(occs[Int(floor(lx/2)):Int(floor(lx/2))+2,Int(floor(lx/2)):Int(floor(lx/2))+2])
     #append!(all_bulkdens,[bulkdens/n])
@@ -1627,7 +1627,7 @@ intstren = 1e0#range(0.0,10.0,length=10)
     #xlabel("Hopping Anisotropy tx/ty")
     ylabel("Energy")=#
 
-    #occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="Anis = $hopping_anisotropy")
+    occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="ED, Anis=$hopping_anisotropy")
     #scurr = synthetic_current(rhos[1],lattice_params; if_plot=true,plot_title="Int Stren=$intstren")
     #pcurr = physical_current(rhos[1],lattice_params; if_plot=true,plot_title="Int Stren=$intstren")
 
@@ -1650,7 +1650,6 @@ intstren = 1e0#range(0.0,10.0,length=10)
     currents = physical_current(rhos,lattice_params; if_plot=true)
     corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
     currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
-    display(nrgs)
 #end
 #th_alphas = range(minimum(alphas),maximum(alphas),length=100)
 #plot(th_alphas,4*(sin.(pi .* th_alphas)).^2,label="Theory",c="b")

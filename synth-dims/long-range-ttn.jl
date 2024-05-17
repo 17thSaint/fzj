@@ -213,6 +213,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	restricted_size = get(kwargs, :restricted_size, [phys_edge_length,virt_edge_length])
 	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
+	if_per = [if_periodic_phys,if_periodic_virt]
 	if_hopping = get(kwargs, :if_hopping, true)
 	if_nn_int = get(kwargs, :if_nn_int, false)
 	onsite_strength = get(kwargs, :onsite_strength, 0.0)
@@ -231,7 +232,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	
 	lat = TTNKit.physical_lattice(net)
 	
-	if if_hopping
+	#=if if_hopping
 		if_periodic_phys ? nothing : centralflux_strength = 0.0
 		hopping = TTNKit.OpSum()
 		#
@@ -276,13 +277,48 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 				s1_coord = (1,i)
 				s2_coord = (restricted_size[1],i)
 				coeff = get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
-				coeff *= exp(im*2*pi*centralflux_strength/size(lat)[1])
-				coeff *= exp(im*twist_angle*2*pi)
+				#coeff *= exp(im*2*pi*centralflux_strength/size(lat)[1])
+				#coeff *= exp(im*twist_angle*2*pi)
 				hopping += (coeff,"Adag",s1_coord,"A",s2_coord)
 				hopping += (conj(coeff),"Adag",s2_coord,"A",s1_coord)
 			end
 		end
 
+		append!(resulting_ham,[hopping])
+	end=#
+
+	if if_hopping
+		hopping = TTNKit.OpSum()
+		for s_phys in 1:restricted_size[1]
+			for s_synth in 1:restricted_size[2]
+				starting_site = [s_phys,s_synth]
+				for which_axis in [1,2]
+						ending_site = starting_site .+ ((which_axis == 1,which_axis == 2))
+
+						# enforce boundary conditions
+						if ending_site[which_axis] > restricted_size[which_axis]
+							if if_per[which_axis]
+								ending_site[which_axis] = 1
+							else
+								continue
+							end
+						end
+
+						if ending_site[which_axis] < 1
+							if if_per[which_axis]
+								ending_site[which_axis] = restricted_size[which_axis]
+							else
+								continue
+							end
+						end
+
+						coeff = get_inter_coeff(starting_site,ending_site,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
+						#dir == -1 ? coeff = conj(coeff) : nothing
+						hopping += (coeff,"Adag",Tuple(starting_site),"A",Tuple(ending_site))
+						hopping += (conj(coeff),"Adag",Tuple(ending_site),"A",Tuple(starting_site))
+				end
+			end
+		end
 		append!(resulting_ham,[hopping])
 	end
 	
@@ -331,12 +367,12 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 		restrict_size = TTNKit.OpSum()
 		for i in restricted_size[1]+1:phys_edge_length
 			for j in 1:virt_edge_length
-				restrict_size += (1000000.0,"N",(i,j))
+				restrict_size += (1e10,"N",(i,j))
 			end
 		end
 		for i in restricted_size[2]+1:virt_edge_length
 			for j in 1:restricted_size[1]
-				restrict_size += (1000000.0,"N",(j,i))
+				restrict_size += (1e10,"N",(j,i))
 			end
 		end
 		append!(resulting_ham,[restrict_size])
@@ -928,14 +964,14 @@ function cdw_structure_factor(rho,qvec::Tuple,psi::TreeTensorNetwork; kwargs...)
 	return struc_fact / sum(occs)
 end
 
-function distance_correlation(rho::Matrix,wavefunc::TreeTensorNetwork,layers::Int64,direction::String="x")
-    if layers % 2 == 0.0
+function distance_correlation(rho::Matrix,wavefunc::TreeTensorNetwork,Lx::Int64,Ly::Int64,direction::String="x")
+    #=if layers % 2 == 0.0
 		Lx = Int(sqrt(2^layers))
 		Ly = Int(sqrt(2^layers))
 	else
 		Lx = Int(sqrt(2^(layers+1)))
 		Ly = Int(sqrt(2^(layers-1)))
-	end
+	end=#
 	lat = TTNKit.physical_lattice(TTNKit.network(wavefunc))
 
     if direction == "x"
@@ -1151,7 +1187,7 @@ end=#
 #strens = range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("hopping_anisotropy",10000.0),("make_smaller_lattice",[6,6]),("nrgtol",5e-3),("particles",3),("layers",6),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",1.0),("lr",0),("if_periodic_phys",true),("if_periodic_virt",true)])
+	params_dict = Dict([("hopping_anisotropy",1e6),("make_smaller_lattice",[6,6]),("nrgtol",5e-3),("particles",3),("layers",6),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",1.0),("lr",0),("if_periodic_phys",true),("if_periodic_virt",true)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)
@@ -1296,7 +1332,7 @@ end=#
 	#for (idx,alpha) in enumerate(strens)
 	#for (idx,num_particles) in enumerate(parts)
 		#alpha = 0.0
-		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_phys",if_per_phys),("onsite_strength",onsite_strength),("scaling",sc_type),("smaller_size",phys_edge_length)])
+		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_phys",if_per_phys),("onsite_strength",onsite_strength),("hopping_anisotropy",anis),("smaller_size",phys_edge_length)])
 		twist_angle != 0.0 ? filename_dict["twist_angle"] = twist_angle : nothing
 		#if length(keys(params_dict)) == 0
 		#	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
@@ -1345,16 +1381,13 @@ end=#
 
 		#
 		println(datafile_name)
-		if_exists,found_data = check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
+		if_exists,found_data = false,nothing#check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
 
 		if if_exists
 			println("Found Data")
 			wavefunc = found_data[1]["ttn"]
-			try
-				dens = found_data[1]["densmat"]
-			catch
-				dens = nothing
-			end
+			dens = found_data[1]["densmat"]
+
 			rezobs = found_data[2]["observer"]
 			ham = found_data[2]["ham"]
 			#append!(wavefuncs,[wavefunc])
@@ -1390,7 +1423,9 @@ end=#
 		xscale("log")
 		=#
 
-		occs = get_occupancy(wavefunc; densmat=dens, if_plot=true)
+		dcorrs = distance_correlation(dens,wavefunc,make_smaller_lattice[1],make_smaller_lattice[2],"y")
+		display(dcorrs)
+		occs = get_occupancy(wavefunc; densmat=dens, plot_title="TTN, t_synth=0.0")
 		#rydberg_2pcorr(wavefunc)
 		#=plot(collect(1:Int(sqrt(2^layer_count))),occs[4,:],label="$(round(num_particles/(alpha*tot_sites),digits=4))")
 		legend()
@@ -1424,10 +1459,7 @@ end=#
 
 		#momentum_occupation(wavefuncs[idx],50,1.0; if_plot=true)
 
-		rezx = distance_correlation(dens,wavefunc,layer_count,"x")
-		display(rezx)
-		rezy = distance_correlation(dens,wavefunc,layer_count,"y")
-		display(rezy)
+		
 		#centermoms[idx] = minimum(abs.(rez[2]))
 
 		#=

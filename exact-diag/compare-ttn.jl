@@ -29,7 +29,7 @@ end
 
 include_other_files(["other-funcs/data-storage-funcs.jl","synth-dims/long-range-ttn.jl","exact-diag/two-dimensions.jl"])
 
-if_all = true
+if_all = false
 if_plot = false
 
 if false || if_all
@@ -330,8 +330,50 @@ if false || if_all
 	end
 end
 
+if true || if_all
+
+	Lx = 4
+	if Lx <= 4
+		layer_count = 4
+	else
+		layer_count = 6
+	end
+	make_smaller_lattice = [Lx,Lx]
+	N = 4
+	if_periodic_phys = true
+	if_periodic_virt = true
+
+	full_basis = n_particle_basis(N,Lx,Lx; output_level=1)
+	lattice_params = Dict([("Lx",Lx),("Ly",Lx),("N",N),("if_periodic_x",if_periodic_phys),("if_periodic_y",if_periodic_phys),("full_basis",full_basis)])
+
+	tx = 1.0
+	ty = 1.0
+	hopping_anisotropy = 1.0
+	us = zeros(Float64,Lx)
+	us[1] = 1.0
+	filling = 0.5
+	alpha = N / (Lx*Lx*filling)
+	hamilt_params = Dict("alpha"=>alpha,
+                        "tx"=>tx,
+                        "ty"=>ty,
+                        "hopping_anisotropy"=>hopping_anisotropy,
+                        "U"=>us,
+                        "interaction_cutoff"=>1e-5)
+	
+	ed_ham = buildHam(lattice_params,hamilt_params)
+
+	model_paras = (hopping_anisotropy=hopping_anisotropy,
+				    restricted_size=make_smaller_lattice,
+					if_periodic_phys=if_periodic_phys,
+					if_periodic_virt=if_periodic_virt,
+					scaling="flat",
+					scaling_dist=1.0,
+					onsite_strength=1.0)
+	net = build_HH_net(layer_count; syms=true, max_occ=2)
+	ttn_ham = long_range_HH_ham(net,1.0,alpha; model_paras...)
 
 
+end
 
 
 

@@ -425,7 +425,7 @@ function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwarg
 	elseif s1[2] == s2[2] # Physical Dimension Hopping
 		thetax = get(kwargs, :thetax, thetax_2)
 
-		return -t_strength_phys  * exp(im*2*pi*(phi*s1[2]))
+		return -t_strength_phys * exp(im*2*pi*(phi*s1[2]))
 	else
 		return 0.0
 	end
