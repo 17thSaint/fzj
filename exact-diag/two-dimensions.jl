@@ -1335,7 +1335,105 @@ end
 
 distance_correlation(x::Vector{ComplexF64},lattice_params::Dict,direction::String="x") = distance_correlation(density_matrix(x,lattice_params),lattice_params,direction)
 
+function find_dist(p1::Tuple{Int,Int}, p2::Tuple{Int,Int}, size::Tuple{Int,Int}, periodic::Tuple{Bool,Bool}=(false, false))
+    dx = abs(p1[1] - p2[1])
+    dy = abs(p1[2] - p2[2])
 
+    if periodic[1]
+        dx = min(dx, size[1] - dx)
+    end
+
+    if periodic[2]
+        dy = min(dy, size[2] - dy)
+    end
+
+    return sqrt(dx^2 + dy^2),(dx,dy)
+end
+
+function cdw_structure_factor(rho::Array{ComplexF64,2},qvec::Vector,psi::Vector{ComplexF64},lattice_params::Dict; kwargs...)
+    if_periodic_phys = lattice_params["if_periodic_x"]
+    if_periodic_synth = lattice_params["if_periodic_y"]
+    phys_len = lattice_params["Lx"]
+    synth_len = lattice_params["Ly"]
+
+	occs = get_occupancy(psi,lattice_params; if_plot=false,densmat=rho)
+
+	struc_fact = 0.0
+	for j in 1:phys_len
+		for s in 1:synth_len
+			p1 = (j,s)
+			p1_linear = linear_index(p1,phys_len,synth_len)
+			for jj in 1:phys_len
+				for ss in 1:synth_len
+					p2 = (jj,ss)
+					p2_linear = linear_index(p2,phys_len,synth_len)
+					dist = find_dist(p1, p2, (phys_len,synth_len), (if_periodic_phys,if_periodic_synth))[2]
+					struc_fact += occs[p1[1],p1[2]] * occs[p2[1],p2[2]] * exp(im * dot(qvec,dist))
+				end
+			end
+		end
+	end
+	return struc_fact / sum(occs)
+end
+
+function cdw_sf(rho::Array{ComplexF64,2},psi::Vector{ComplexF64},lattice_params::Dict,qend=(0.0,3.0),howmany=50; kwargs...)
+	if_plot = get(kwargs, :if_plot, true)
+
+    if qend[1] == 0.0
+        direction = 2
+        axis_dir = "Y"
+        qmax = qend[2]
+    elseif qend[2] == 0.0
+        direction = 1
+        axis_dir = "X"
+        qmax = qend[1]
+    else
+        direction = 3
+    end
+
+    if direction < 3
+        qvec = zeros(Float64,2)
+        qs = range(0.0,stop=qmax,length=howmany)
+        struct_factor = zeros(ComplexF64,howmany)
+        for (i,qx) in enumerate(qs)
+            qvec[direction] = qx
+            struct_factor[i] = cdw_structure_factor(rho,qvec,psi,lattice_params; kwargs...)
+        end
+
+        if if_plot
+            plot_title = get(kwargs, :plot_title, "")
+            plot_label = get(kwargs, :plot_label, nothing)
+            isnothing(plot_label) ? fig = figure() : nothing
+            isnothing(plot_label) ? plot(qs,abs.(struct_factor)) : plot(qs,abs.(struct_factor),label=plot_label)
+            xlabel("q"*axis_dir)
+            ylabel("Structure Factor")
+            title("CDW Structure Factor, " * plot_title)
+            legend()
+        end
+    else
+        struct_factor = zeros(ComplexF64,howmany,howmany)
+        qxs = range(-qend[1],stop=qend[1],length=howmany)
+        qys = range(-qend[2],stop=qend[2],length=howmany)
+        for (i,qx) in enumerate(qxs)
+            for (j,qy) in enumerate(qys)
+                qvec = [qx,qy]
+                struct_factor[i,j] = cdw_structure_factor(rho,qvec,psi,lattice_params; kwargs...)
+            end
+        end
+
+        if if_plot
+            plot_title = get(kwargs, :plot_title, "")
+            fig = figure()
+            imshow(abs.(struct_factor),extent=[qxs[1],qxs[end],qys[1],qys[end]])
+            colorbar()
+            xlabel("qx")
+            ylabel("qy")
+            title("CDW Structure Factor, " * plot_title)
+        end
+    end
+
+	return struct_factor
+end
 
 #=Lx = 4
 Ly = 4
@@ -1415,18 +1513,19 @@ title("Alpha = $(thisalpha)")
 end=#
 
 if true
-lx = 8
-n = 4
+lx = 6
+n = 3
 #for (idx,n) in enumerate([2,3,4,5])
-#intstrens = [10.0]
+#intstrens = [100.0]
+anises = [1.0,10.0,100.0]
 #for (idx,alpha) in enumerate(alphas)
 #for (idx,lx) in enumerate(4:1:30)
 #for nextalpha in [0.0,change]
-#for (idx,anis) in enumerate(anises)
+for (idx,anis) in enumerate(anises)
 #for (idx,intstren) in enumerate(intstrens)
 #for lrd in [0,1]
     #for change in [0,0.0001]true
-    params_dict = Dict([("Lx",lx),("N",n),("if_periodic_x",true),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",2),("if_save_data",false)])
+    params_dict = Dict([("Lx",lx),("N",n),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",anis),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",1),("if_save_data",false)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
@@ -1463,7 +1562,7 @@ n = 4
     opl = get(params_dict, "output_level", 1)
     running_args = (nev=nev,
                     if_exact=false,
-                    if_densmat=false,
+                    if_densmat=true,
                     if_save_data=if_save_data,
                     dataloc=dataloc,
                     basis_dataloc=basis_dataloc,
@@ -1487,7 +1586,7 @@ n = 4
     if lr_dist == 0.0
         us[1] = stren == 0.0 ? 1.0 : stren
     end
-    us[1] = 0.0
+    #us[1] = 0.0
 
     # get hopping anisotropy values
     hopping_anisotropy = get(params_dict,"hopping_anisotropy",1.0)
@@ -1537,10 +1636,16 @@ n = 4
             states = found_data[1]["state"][1:nev]
             nrgs = found_data[1]["nrg"][1:nev]
             rhos = found_data[1]["densmat"][1:nev]
+            full_basis = n_particle_basis(N,Lx,Ly; output_level=opl,dataloc=basis_dataloc)
+            opl > 0 ? println("Made basis in ",time()-start_time) : nothing
+            lattice_params["full_basis"] = full_basis 
         else
             states = found_data[1]["state"]
             nrgs = found_data[1]["nrg"]
             rhos = found_data[1]["densmat"]
+            full_basis = n_particle_basis(N,Lx,Ly; output_level=opl,dataloc=basis_dataloc)
+            opl > 0 ? println("Made basis in ",time()-start_time) : nothing
+            lattice_params["full_basis"] = full_basis 
         end
     else
 
@@ -1630,7 +1735,8 @@ n = 4
     #xlabel("Hopping Anisotropy tx/ty")
     ylabel("Energy - E1")=#
 
-    #occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="ED, Anis=$hopping_anisotropy")
+    cdw = cdw_sf(rhos[1],states[1],lattice_params,(3.0,0.0); if_plot=true,plot_label="$anis")
+    #occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="ED, Stren=$intstren")
     #scurr = synthetic_current(rhos[1],lattice_params; if_plot=true,plot_title="Int Stren=$intstren")
     #pcurr = physical_current(rhos[1],lattice_params; if_plot=true,plot_title="Int Stren=$intstren")
 
@@ -1653,7 +1759,7 @@ n = 4
     currents = physical_current(rhos,lattice_params; if_plot=true)
     corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
     currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
-#end
+end
 #th_alphas = range(minimum(alphas),maximum(alphas),length=100)
 #plot(th_alphas,4*(sin.(pi .* th_alphas)).^2,label="Theory",c="b")
 #legend()

@@ -664,6 +664,7 @@ end
 
 function do_sweep(ttn,ham,sweep_type; kwargs...)
 
+	if_redo = get(kwargs, :if_redo, false)
 	opl::Int = get(kwargs, :output_level, 0)
 	cutoff::Float64 = get(kwargs, :cutoff, 10^-8)
 	max_dim = get(kwargs, :mdim, 10)
@@ -680,8 +681,12 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	else
 		observer = NRGVarObserver(etol)
 	end
-	#println("PreSweep Link Dim = ",TTNKit.maxlinkdim(ttn))
-	#get_position_dims(ttn)
+	
+	# slowly grow bond dim to optimize more efficiently
+	if max_dim > 50 && !if_redo
+		max_dim = [Int(round(max_dim/4)),Int(round(max_dim/4)),Int(round(max_dim/2)),max_dim]
+	end
+
 	if sweep_type == "dmrg"
 		#println("Before starting DMRG the bond dim is ",TTNKit.maxlinkdim(ttn))
 		#get_occupancy(ttn; plot_title="Before DMRG")
@@ -762,7 +767,7 @@ end
 
 function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 	num_sites::Int = 2^num_layers
-	max_dim::Int = get(kwargs, :mdim, 10)
+	max_dim = get(kwargs, :mdim, 10)
 	sweep_iter::Int = get(kwargs, :sweep_iter, 1)
 	if_sweep::Bool = get(kwargs, :if_sweep, true)
 	if_save_data::Bool = get(kwargs, :if_save_data, true)

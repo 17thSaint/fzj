@@ -946,7 +946,7 @@ function closed_loop(psi::TreeTensorNetwork, starting_site; kwargs...)
 end
 
 function cdw_structure_factor(rho,qvec::Tuple,psi::TreeTensorNetwork; kwargs...)
-	if_periodic_phys = get(kwargs, :if_periodic_phys, true)
+	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
 	if_periodic_synth = get(kwargs, :if_periodic_synth, false)
 
 	lat = TTNKit.physical_lattice(TTNKit.network(psi))
@@ -970,6 +970,29 @@ function cdw_structure_factor(rho,qvec::Tuple,psi::TreeTensorNetwork; kwargs...)
 		end
 	end
 	return struc_fact / sum(occs)
+end
+
+function cdw_struct_full(rho,psi::TreeTensorNetwork,howmany=100,qmax=3.0; kwargs...)
+	if_plot = get(kwargs, :if_plot, true)
+
+	qs = range(-qmax,stop=qmax,length=howmany)
+	struct_factor = zeros(ComplexF64,howmany,howmany)
+	for (i,qx) in enumerate(qs)
+		for (j,qy) in enumerate(qs)
+			struct_factor[i,j] = cdw_structure_factor(rho,(qx,qy),psi; kwargs...)
+		end
+	end
+
+	if if_plot
+		fig = figure()
+		imshow(abs.(struct_factor),extent=[qs[1],qs[end],qs[1],qs[end]])
+		colorbar()
+		xlabel("qx")
+		ylabel("qy")
+		title("CDW Structure Factor")
+	end
+
+	return struct_factor,qs
 end
 
 function distance_correlation(rho::Matrix,wavefunc::TreeTensorNetwork,Lx::Int64,Ly::Int64,direction::String="x")
@@ -1194,7 +1217,7 @@ end=#
 #strens = range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("hopping_anisotropy",1.0),("make_smaller_lattice",[8,8]),("nrgtol",5e-5),("particles",4),("layers",6),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true),("if_periodic_virt",false)])
+	params_dict = Dict([("hopping_anisotropy",1.0),("make_smaller_lattice",[8,8]),("nrgtol",5e-5),("particles",4),("layers",6),("mdim",200),("if_save_data",true),("filling",0.5),("onsite_strength",10.0),("lr","all"),("if_periodic_phys",false),("if_periodic_virt",false)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)
@@ -1391,7 +1414,7 @@ end=#
 
 		#
 		println(datafile_name)
-		if_exists,found_data = false,nothing#check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
+		if_exists,found_data = check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
 
 		if if_exists
 			println("Found Data")
@@ -1433,8 +1456,8 @@ end=#
 		xscale("log")
 		=#
 
-		dcorrs = distance_correlation(dens,wavefunc,make_smaller_lattice[1],make_smaller_lattice[2],"y")
-		display(dcorrs)
+		#dcorrs = distance_correlation(dens,wavefunc,make_smaller_lattice[1],make_smaller_lattice[2],"y")
+		#display(dcorrs)
 		occs = get_occupancy(wavefunc; densmat=dens, plot_title="TTN")
 		#rydberg_2pcorr(wavefunc)
 		#=plot(collect(1:Int(sqrt(2^layer_count))),occs[4,:],label="$(round(num_particles/(alpha*tot_sites),digits=4))")
