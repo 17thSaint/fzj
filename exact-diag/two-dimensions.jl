@@ -736,7 +736,7 @@ function n_particle_basis(N::Int64,Lx::Int64,Ly::Int64; kwargs...)
         if_exists,data = check_data_exists(metadata_dict,"basis"; location=dataloc,output_level=output_level)
         if if_exists
             output_level > 0 ? println("Found existing file with basis data") : nothing
-            output_level > 0 ? println("Basis has ",length(data[1]["full_basis"])," states") : nothing
+            output_level > 0 ? println("Basis has ",size(data[1]["full_basis"],2)," states") : nothing
             return data[1]["full_basis"]
         end
     end
@@ -1415,10 +1415,10 @@ title("Alpha = $(thisalpha)")
 end=#
 
 if true
-lx = 4
+lx = 8
 n = 4
 #for (idx,n) in enumerate([2,3,4,5])
-intstren = 1.0#range(0.0,10.0,length=10)
+#intstrens = [10.0]
 #for (idx,alpha) in enumerate(alphas)
 #for (idx,lx) in enumerate(4:1:30)
 #for nextalpha in [0.0,change]
@@ -1426,7 +1426,7 @@ intstren = 1.0#range(0.0,10.0,length=10)
 #for (idx,intstren) in enumerate(intstrens)
 #for lrd in [0,1]
     #for change in [0,0.0001]true
-    params_dict = Dict([("Lx",lx),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1e6),("interaction_strength",intstren),("lr",0),("filling",0.5),("nev",10),("if_save_data",false)])
+    params_dict = Dict([("Lx",lx),("N",n),("if_periodic_x",true),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",2),("if_save_data",false)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
@@ -1484,7 +1484,10 @@ intstren = 1.0#range(0.0,10.0,length=10)
     lr_dist = get(params_dict,"lr", "all")
     lr_dist == "all" ? lr_dist = Ly : nothing
     us = [i < lr_dist+2 ? stren : 0.0 for i in 1:Ly]
-    us[1] = 1.0
+    if lr_dist == 0.0
+        us[1] = stren == 0.0 ? 1.0 : stren
+    end
+    us[1] = 0.0
 
     # get hopping anisotropy values
     hopping_anisotropy = get(params_dict,"hopping_anisotropy",1.0)
@@ -1600,7 +1603,7 @@ intstren = 1.0#range(0.0,10.0,length=10)
 
     #=if idx == 1
         for i in 1:nev
-            scatter(intstren,nrgs[i],c=cols[i],label="E$i")
+            scatter(intstren,nrgs[i] - nrgs[1],c=cols[i],label="E$i - E1")
         end
         #scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=cols[id2*2-1],label="E2 - E1")
         #scatter(id2 == 1 ? anis : -anis,nrgs[3] - nrgs[1],c=cols[2*id2],label="E3 - E1")
@@ -1610,7 +1613,7 @@ intstren = 1.0#range(0.0,10.0,length=10)
         #scatter(intstren,nrgs[4],c="k",label="E3")
     else
         for i in 1:nev
-            scatter(intstren,nrgs[i],c=cols[i])
+            scatter(intstren,nrgs[i] - nrgs[1],c=cols[i])
         end
         #scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=c=cols[id2*2-1])
         #plot(anises[idx-1:idx],[hh_gap_exact(anises[idx-1],alpha),hh_gap_exact(anises[idx],alpha)],c="r")
@@ -1625,9 +1628,9 @@ intstren = 1.0#range(0.0,10.0,length=10)
     xlabel("Interaction Strength")
     #xlabel("Flux")
     #xlabel("Hopping Anisotropy tx/ty")
-    ylabel("Energy")=#
+    ylabel("Energy - E1")=#
 
-    occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="ED, Anis=$hopping_anisotropy")
+    #occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="ED, Anis=$hopping_anisotropy")
     #scurr = synthetic_current(rhos[1],lattice_params; if_plot=true,plot_title="Int Stren=$intstren")
     #pcurr = physical_current(rhos[1],lattice_params; if_plot=true,plot_title="Int Stren=$intstren")
 

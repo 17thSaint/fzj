@@ -312,7 +312,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 							end
 						end
 
-						coeff = get_inter_coeff(starting_site,ending_site,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
+						coeff = round(get_inter_coeff(starting_site,ending_site,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...),digits=10)
 						#dir == -1 ? coeff = conj(coeff) : nothing
 						hopping += (coeff,"Adag",Tuple(starting_site),"A",Tuple(ending_site))
 						hopping += (conj(coeff),"Adag",Tuple(ending_site),"A",Tuple(starting_site))
@@ -400,6 +400,14 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	else
 		return resulting_ham[1]
 	end
+end
+
+function long_range_HH_ham(metadata::Dict)
+	net = metadata["net"]
+	t_strength = metadata["t_strength"]
+	phi = metadata["phi"]
+	model_paras = dict_to_symbols(metadata)
+	return long_range_HH_ham(net,t_strength,phi; model_paras...)
 end
 
 function get_densdens_corrs(ttn::TTNKit.TreeTensorNetwork,distances; kwargs...)
@@ -1177,7 +1185,6 @@ for (idx,file) in enumerate(all_files)
 	alphas[idx] = get_params_dict_from_filename(file)["alpha"]
 end=#
 
-
 #layers = 6
 #lr = 7
 #anises = [0.01,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.6,0.8,0.9,1.1,1.3,1.5,1.7,1.9,2.0,2.5,3.0,3.5,4.0,6.0,8.0,9.0,10.0,15.0,20.0,25.0,30.0,40.0,50.0,70.0,90.0,100.0,1000.0,10000.0]
@@ -1187,7 +1194,7 @@ end=#
 #strens = range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("hopping_anisotropy",1e6),("make_smaller_lattice",[6,6]),("nrgtol",5e-3),("particles",3),("layers",6),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",1.0),("lr",0),("if_periodic_phys",true),("if_periodic_virt",true)])
+	params_dict = Dict([("hopping_anisotropy",1.0),("make_smaller_lattice",[8,8]),("nrgtol",5e-5),("particles",4),("layers",6),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true),("if_periodic_virt",false)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)
@@ -1332,7 +1339,10 @@ end=#
 	#for (idx,alpha) in enumerate(strens)
 	#for (idx,num_particles) in enumerate(parts)
 		#alpha = 0.0
-		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_phys",if_per_phys),("onsite_strength",onsite_strength),("hopping_anisotropy",anis),("smaller_size",phys_edge_length)])
+		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_phys",if_per_phys),("onsite_strength",onsite_strength),("hopping_anisotropy",anis)])
+		if make_smaller_lattice != [sqrt(2^layer_count),sqrt(2^layer_count)]
+			filename_dict["make_smaller_lattice"] = phys_edge_length
+		end
 		twist_angle != 0.0 ? filename_dict["twist_angle"] = twist_angle : nothing
 		#if length(keys(params_dict)) == 0
 		#	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
@@ -1425,7 +1435,7 @@ end=#
 
 		dcorrs = distance_correlation(dens,wavefunc,make_smaller_lattice[1],make_smaller_lattice[2],"y")
 		display(dcorrs)
-		occs = get_occupancy(wavefunc; densmat=dens, plot_title="TTN, t_synth=0.0")
+		occs = get_occupancy(wavefunc; densmat=dens, plot_title="TTN")
 		#rydberg_2pcorr(wavefunc)
 		#=plot(collect(1:Int(sqrt(2^layer_count))),occs[4,:],label="$(round(num_particles/(alpha*tot_sites),digits=4))")
 		legend()
