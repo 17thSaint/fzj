@@ -331,48 +331,118 @@ if false || if_all
 end
 
 if true || if_all
+	#@testset "equivalence of hamiltonians btw TTN and ED" begin
+		#for Lx in [4,6]
+			#for lr_dist in 0:Lx-1
+				Lx = 4
+				lr_dist = 0
+				int_stren = 0.0
+				if Lx <= 4
+					layer_count = 4
+				else
+					layer_count = 6
+				end
+				make_smaller_lattice = [Lx,Lx]
+				N = Int(Lx/2)
+				if_periodic_phys = true
+				if_periodic_virt = false
 
-	Lx = 4
-	if Lx <= 4
-		layer_count = 4
-	else
-		layer_count = 6
-	end
-	make_smaller_lattice = [Lx,Lx]
-	N = 4
-	if_periodic_phys = true
-	if_periodic_virt = true
+				full_basis = n_particle_basis(N,Lx,Lx; output_level=1)
+				lattice_params = Dict([("Lx",Lx),("Ly",Lx),("N",N),("if_periodic_x",if_periodic_phys),("if_periodic_y",if_periodic_phys),("full_basis",full_basis),("twist_angle",0.0)])
 
-	full_basis = n_particle_basis(N,Lx,Lx; output_level=1)
-	lattice_params = Dict([("Lx",Lx),("Ly",Lx),("N",N),("if_periodic_x",if_periodic_phys),("if_periodic_y",if_periodic_phys),("full_basis",full_basis)])
+				tx = 1.0
+				ty = 1.0
+				hopping_anisotropy = 1.0
+				us = zeros(Float64,Lx)
+				for i in 1:lr_dist
+					us[i] = int_stren
+				end
+				filling = 0.5
+				alpha = N / (Lx*Lx*filling)
+				hamilt_params = Dict("alpha"=>alpha,
+									"tx"=>tx,
+									"ty"=>ty,
+									"hopping_anisotropy"=>hopping_anisotropy,
+									"U"=>us,
+									"interaction_cutoff"=>1e-5)
+				
+				#ed_ham = buildHam(lattice_params,hamilt_params)
 
-	tx = 1.0
-	ty = 1.0
-	hopping_anisotropy = 1.0
-	us = zeros(Float64,Lx)
-	us[1] = 1.0
-	filling = 0.5
-	alpha = N / (Lx*Lx*filling)
-	hamilt_params = Dict("alpha"=>alpha,
-                        "tx"=>tx,
-                        "ty"=>ty,
-                        "hopping_anisotropy"=>hopping_anisotropy,
-                        "U"=>us,
-                        "interaction_cutoff"=>1e-5)
+				model_paras = (hopping_anisotropy=hopping_anisotropy,
+								restricted_size=make_smaller_lattice,
+								if_periodic_phys=if_periodic_phys,
+								if_periodic_virt=if_periodic_virt,
+								scaling="flat",
+								scaling_dist=lr_dist,
+								onsite_strength=int_stren)
+				net = build_HH_net(layer_count; syms=true, max_occ=2)
+				ttn_ham = long_range_HH_ham(net,1.0,alpha; model_paras...)
+
+				rebuilt_ham = spzeros(ComplexF64,size(full_basis)[2],size(full_basis)[2])
+
+				interacting_pairs = []
+				hopping_pairs = []
+				for t1 in TTNKit.terms(ttn_ham)
+					coeff = TTNKit.coefficient(t1)
+					if length(t1) == 1
+						continue
+					end
+					
+					both_terms = TTNKit.terms(t1)
+
+					which_sites = TTNKit.site.(both_terms)
+					if any(which_sites[1] .> Lx) || any(which_sites[2] .> Lx)
+						continue
+					end
+					ops_here = TTNKit.which_op.(both_terms)
+					if ops_here == ["Adag","A"]
+						end_site,start_site = linear_index.(which_sites,make_smaller_lattice[1],make_smaller_lattice[2])
+						#println("Moving from $start_site to $end_site with coeff $coeff")
+						append!(hopping_pairs,[(start_site,end_site,coeff)])
+					elseif ops_here == ["Adag * A","Adag * A"]
+						s1,s2 = linear_index.(which_sites,make_smaller_lattice[1],make_smaller_lattice[2])
+						#println("Interacting at sites $s1 and $s2 with coeff $coeff")
+						append!(interacting_pairs,[(s1,s2,coeff)])
+					end
+				end
+
+				for j in 1:size(full_basis)[2]
+					basis = full_basis[:,j]
+					
+					# check for hopping
+					for (start_site,end_site,coeff) in hopping_pairs
+						if start_site in basis && !(end_site in basis)
+							where_start_site = findfirst(x -> x == start_site,basis)
+							new_basis = copy(basis)
+							new_basis[where_start_site] = end_site
+							sort!(new_basis,rev=true)
+							new_basis_index = find_basis_index(new_basis)
+							rebuilt_ham[new_basis_index,j] += coeff
+						end
+					end
+
+					# add interaction terms
+					for (s1,s2,coeff) in interacting_pairs
+						if s1 in basis && s2 in basis
+							rebuilt_ham[j,j] += coeff
+						end
+					end
+				end
+
+				
+				
+				nev = 5
+				x0 = rand(Float64,size(lattice_params["full_basis"])[2])
+        		rez = eigsolve(rebuilt_ham,x0,nev,:SR,Lanczos())
+				sorted_indices = sortperm(rez[1])
+    			states = rez[2][sorted_indices][1:nev]
+    			nrgs = rez[1][sorted_indices][1:nev]
+				get_occupancy(states[1],lattice_params)
+				#@test ed_ham == rebuilt_ham
+			#end
+		#end
 	
-	ed_ham = buildHam(lattice_params,hamilt_params)
-
-	model_paras = (hopping_anisotropy=hopping_anisotropy,
-				    restricted_size=make_smaller_lattice,
-					if_periodic_phys=if_periodic_phys,
-					if_periodic_virt=if_periodic_virt,
-					scaling="flat",
-					scaling_dist=1.0,
-					onsite_strength=1.0)
-	net = build_HH_net(layer_count; syms=true, max_occ=2)
-	ttn_ham = long_range_HH_ham(net,1.0,alpha; model_paras...)
-
-
+	#end
 end
 
 

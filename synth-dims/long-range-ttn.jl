@@ -232,7 +232,8 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	
 	lat = TTNKit.physical_lattice(net)
 	
-	#=if if_hopping
+	hopping_old = get(kwargs, :hopping_old, false)
+	if if_hopping && hopping_old
 		if_periodic_phys ? nothing : centralflux_strength = 0.0
 		hopping = TTNKit.OpSum()
 		#
@@ -264,8 +265,8 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 		#
 		if if_periodic_virt
 			for i in 1:restricted_size[1]
-				s1_coord = (i,1)
-				s2_coord = (i,restricted_size[2])
+				s2_coord = (i,1)
+				s1_coord = (i,restricted_size[2])
 				coeff = get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
 				hopping += (coeff,"Adag",s1_coord,"A",s2_coord)
 				hopping += (conj(coeff),"Adag",s2_coord,"A",s1_coord)
@@ -274,8 +275,8 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 
 		if if_periodic_phys
 			for i in 1:restricted_size[2]
-				s1_coord = (1,i)
-				s2_coord = (restricted_size[1],i)
+				s2_coord = (1,i)
+				s1_coord = (restricted_size[1],i)
 				coeff = get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
 				#coeff *= exp(im*2*pi*centralflux_strength/size(lat)[1])
 				#coeff *= exp(im*twist_angle*2*pi)
@@ -285,9 +286,9 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 		end
 
 		append!(resulting_ham,[hopping])
-	end=#
+	else
 
-	if if_hopping
+	#if if_hopping
 		hopping = TTNKit.OpSum()
 		for s_phys in 1:restricted_size[1]
 			for s_synth in 1:restricted_size[2]
@@ -334,14 +335,15 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 				continue
 			else
 				if idx == 1
-					for j in TTNKit.eachindex(lat)
+					#=for j in TTNKit.eachindex(lat)
 						s_coord = TTNKit.coordinate(lat,j)
 						if s_coord[1] > restricted_size[1] || s_coord[2] > restricted_size[2]
 							continue
 						end
 						interaction += (stren,"N * N",s_coord)
 						interaction -= (stren,"N",s_coord)
-					end
+					end=#
+					continue
 				else
 					for j in TTNKit.eachindex(lat)
 						s_coord = TTNKit.coordinate(lat,j)
@@ -1194,7 +1196,7 @@ fb_occ_mat = get_occupancy(fb_gs)
 
 
 #
-if true
+if false
 
 #nnst = 0.0
 #layers = 6
