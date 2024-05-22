@@ -335,7 +335,7 @@ if true || if_all
 		#for Lx in [4,6]
 			#for lr_dist in 0:Lx-1
 				Lx = 4
-				lr_dist = 0
+				lr_dist = 3
 				int_stren = 0.0
 				if Lx <= 4
 					layer_count = 4
@@ -376,13 +376,15 @@ if true || if_all
 								scaling_dist=lr_dist,
 								onsite_strength=int_stren)
 				net = build_HH_net(layer_count; syms=true, max_occ=2)
-				ttn_ham = long_range_HH_ham(net,1.0,alpha; model_paras...)
+				ttn_ham_correct = long_range_HH_ham(net,1.0,alpha; model_paras...,hopping_old=false)
+				ttn_ham_wrong = long_range_HH_ham(net,1.0,alpha; model_paras...,hopping_old=true)
 
-				rebuilt_ham = spzeros(ComplexF64,size(full_basis)[2],size(full_basis)[2])
+				rebuilt_ham_correct = spzeros(ComplexF64,size(full_basis)[2],size(full_basis)[2])
+				rebuilt_ham_wrong = spzeros(ComplexF64,size(full_basis)[2],size(full_basis)[2])
 
 				interacting_pairs = []
 				hopping_pairs = []
-				for t1 in TTNKit.terms(ttn_ham)
+				for t1 in TTNKit.terms(ttn_ham_correct)
 					coeff = TTNKit.coefficient(t1)
 					if length(t1) == 1
 						continue
@@ -417,27 +419,77 @@ if true || if_all
 							new_basis[where_start_site] = end_site
 							sort!(new_basis,rev=true)
 							new_basis_index = find_basis_index(new_basis)
-							rebuilt_ham[new_basis_index,j] += coeff
+							rebuilt_ham_correct[new_basis_index,j] += coeff
 						end
 					end
 
 					# add interaction terms
 					for (s1,s2,coeff) in interacting_pairs
 						if s1 in basis && s2 in basis
-							rebuilt_ham[j,j] += coeff
+							rebuilt_ham_correct[j,j] += coeff
 						end
 					end
 				end
 
+				interacting_pairs = []
+				hopping_pairs = []
+				for t1 in TTNKit.terms(ttn_ham_wrong)
+					coeff = TTNKit.coefficient(t1)
+					if length(t1) == 1
+						continue
+					end
+					
+					both_terms = TTNKit.terms(t1)
+
+					which_sites = TTNKit.site.(both_terms)
+					if any(which_sites[1] .> Lx) || any(which_sites[2] .> Lx)
+						continue
+					end
+					ops_here = TTNKit.which_op.(both_terms)
+					if ops_here == ["Adag","A"]
+						end_site,start_site = linear_index.(which_sites,make_smaller_lattice[1],make_smaller_lattice[2])
+						#println("Moving from $start_site to $end_site with coeff $coeff")
+						append!(hopping_pairs,[(start_site,end_site,coeff)])
+					elseif ops_here == ["Adag * A","Adag * A"]
+						s1,s2 = linear_index.(which_sites,make_smaller_lattice[1],make_smaller_lattice[2])
+						#println("Interacting at sites $s1 and $s2 with coeff $coeff")
+						append!(interacting_pairs,[(s1,s2,coeff)])
+					end
+				end
+
+				for j in 1:size(full_basis)[2]
+					basis = full_basis[:,j]
+					
+					# check for hopping
+					for (start_site,end_site,coeff) in hopping_pairs
+						if start_site in basis && !(end_site in basis)
+							where_start_site = findfirst(x -> x == start_site,basis)
+							new_basis = copy(basis)
+							new_basis[where_start_site] = end_site
+							sort!(new_basis,rev=true)
+							new_basis_index = find_basis_index(new_basis)
+							rebuilt_ham_wrong[new_basis_index,j] += coeff
+						end
+					end
+
+					# add interaction terms
+					for (s1,s2,coeff) in interacting_pairs
+						if s1 in basis && s2 in basis
+							rebuilt_ham_wrong[j,j] += coeff
+						end
+					end
+				end
+
+				println("Are these the same Hamiltonian? ",rebuilt_ham_correct == rebuilt_ham_wrong)
 				
 				
-				nev = 5
+				#=nev = 5
 				x0 = rand(Float64,size(lattice_params["full_basis"])[2])
         		rez = eigsolve(rebuilt_ham,x0,nev,:SR,Lanczos())
 				sorted_indices = sortperm(rez[1])
     			states = rez[2][sorted_indices][1:nev]
     			nrgs = rez[1][sorted_indices][1:nev]
-				get_occupancy(states[1],lattice_params)
+				get_occupancy(states[1],lattice_params)=#
 				#@test ed_ham == rebuilt_ham
 			#end
 		#end
