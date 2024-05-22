@@ -176,7 +176,7 @@ function get_interaction_coords(given_site,inter_dist,lat,if_periodic_virt,if_an
 
         # Check if new coordinates are within lattice dimensions
 		if 1 <= new_virtual <= virt_edge_length && new_virtual != virtual
- 			append!(coordinates, [[new_virtual,physical]])
+ 			append!(coordinates, [[physical,new_virtual]])
  		#else
  			#println("Still Outside Lattice")
 		end
@@ -195,7 +195,7 @@ function get_interaction_coords(given_site,inter_dist,lat,if_periodic_virt,if_an
 			end
 
 			if 1 <= new_physical <= phys_edge_length && new_physical != physical
-				append!(coordinates, [[virtual,new_physical]])
+				append!(coordinates, [[new_physical,virtual]])
 			end
 		end
 	end
@@ -1217,7 +1217,7 @@ end=#
 #strens = range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("hopping_anisotropy",1.0),("make_smaller_lattice",[8,8]),("nrgtol",5e-5),("particles",4),("layers",6),("mdim",200),("if_save_data",true),("filling",0.5),("onsite_strength",10.0),("lr","all"),("if_periodic_phys",false),("if_periodic_virt",false)])
+	params_dict = Dict([("hopping_anisotropy",1.0),("make_smaller_lattice",[8,8]),("nrgtol",5e-5),("particles",4),("layers",6),("mdim",100),("if_save_data",true),("filling",0.5),("onsite_strength",10.0),("lr","all"),("if_periodic_phys",false),("if_periodic_virt",false)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)
