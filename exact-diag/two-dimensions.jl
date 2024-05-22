@@ -776,6 +776,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
     if_periodic_y = lattice_params["if_periodic_y"]
     Lx = lattice_params["Lx"]
     Ly = lattice_params["Ly"]
+    twist_angle = lattice_params["twist_angle"]
 
     tx = hamilt_params["tx"]
     ty = hamilt_params["ty"]
@@ -793,10 +794,18 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
         for dir in [1,-1]
 
             # skip term if at boundary and no periodic boundary
-            if starting_site[1] == Lx && !if_periodic_x && dir == 1
-                continue
-            elseif starting_site[1] == 1 && !if_periodic_x && dir == -1
-                continue
+            if starting_site[1] == Lx && dir == 1
+                twist = true
+                if !if_periodic_x
+                    continue
+                end
+            elseif starting_site[1] == 1 && dir == -1
+                twist = true
+                if !if_periodic_x
+                    continue
+                end
+            else
+                twist = false
             end
 
             next_site = (mod1(starting_site[1]+dir,Lx),starting_site[2])
@@ -810,6 +819,11 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
             coeff = -tx * exp(im*alpha*starting_site[2]*2*pi)
             if if_periodic_y && !if_periodic_x
                 coeff = -tx
+            end
+
+            # apply twist at boundary
+            if twist
+                coeff *= exp(im*2*pi*twist_angle)
             end
             
             dir == -1 ? coeff = conj(coeff) : nothing
@@ -828,10 +842,18 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
         for dir in [1,-1]
 
             # skip term if at boundary and no periodic boundary
-            if starting_site[2] == Ly && !if_periodic_y && dir == 1
-                continue
-            elseif starting_site[2] == 1 && !if_periodic_y && dir == -1
-                continue
+            if starting_site[2] == Ly && dir == 1
+                twist = true
+                if !if_periodic_y
+                    continue
+                end
+            elseif starting_site[2] == 1 && dir == -1
+                twist = true
+                if !if_periodic_y
+                    continue
+                end
+            else
+                twist = false
             end
 
             next_site = (starting_site[1],mod1(starting_site[2]+dir,Ly))
@@ -846,6 +868,12 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
             if if_periodic_y && !if_periodic_x
                 coeff *= exp(im*alpha*starting_site[1]*2*pi)
             end
+
+            # apply twist at boundary
+            if twist
+                coeff *= exp(im*2*pi*twist_angle)
+            end
+
             dir == -1 ? coeff = conj(coeff) : nothing
             push!(output_weights,round(real(coeff),digits=10) + im*round(imag(coeff),digits=10))
 
@@ -1435,6 +1463,25 @@ function cdw_sf(rho::Array{ComplexF64,2},psi::Vector{ComplexF64},lattice_params:
 	return struct_factor
 end
 
+function spin_stiffness(energies::Vector,thetas::Vector; kwargs...)
+    if_plot = get(kwargs, :if_plot, true)
+
+    stiffnesses = zeros(Float64,length(thetas)-2)
+    for i in 2:length(thetas)-1
+        stiffnesses[i-1] = (energies[i+1] - 2*energies[i] + energies[i-1]) / (thetas[i+1] - thetas[i])^2
+    end
+
+    if if_plot
+        fig = figure()
+        plot(thetas[2:end-1],stiffnesses,"-p")
+        xlabel("Theta")
+        ylabel("Spin Stiffness")
+        title("Spin Stiffness")
+    end
+
+    return stiffnesses
+end
+
 #=Lx = 4
 Ly = 4
 N = 2
@@ -1512,20 +1559,27 @@ ylabel("Energy")
 title("Alpha = $(thisalpha)")
 end=#
 
-if true
+if false
 lx = 6
 n = 3
 #for (idx,n) in enumerate([2,3,4,5])
 #intstrens = [100.0]
-anises = [1.0,10.0,100.0]
-#for (idx,alpha) in enumerate(alphas)
+#change = 0.001
+#real_alphas = [range(0.1,0.21,length=10); range(0.22,0.28,length=10); range(0.29,0.35,length=5)]
+#howmany = length(real_alphas)
+#alphas = [real_alphas; real_alphas .+ change]
+#all_bds = zeros(Float64,length(alphas))
+#thetas = range(0.01,0.5,length=50)
+#all_nrgs = zeros(Float64,length(thetas))
+#anises = [1.0,10.0,100.0]
+#for (idx,alph) in enumerate(alphas)
 #for (idx,lx) in enumerate(4:1:30)
-#for nextalpha in [0.0,change]
-for (idx,anis) in enumerate(anises)
+#for (idx,theta) in enumerate(thetas)
+#for (idx,anis) in enumerate(anises)
 #for (idx,intstren) in enumerate(intstrens)
 #for lrd in [0,1]
     #for change in [0,0.0001]true
-    params_dict = Dict([("Lx",lx),("N",n),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",anis),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",1),("if_save_data",false)])
+    params_dict = Dict([("Lx",lx),("N",n),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",10.0),("lr","all"),("filling",0.5),("nev",10),("if_save_data",false)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
@@ -1541,6 +1595,7 @@ for (idx,anis) in enumerate(anises)
     N = get(params_dict, "N", 2)
     if_periodic_x = get(params_dict, "if_periodic_x", false)
     if_periodic_y = get(params_dict, "if_periodic_y", false)
+    twist_angle = get(params_dict, "twist_angle", 0.0)
 
 
     # set running operation parameters
@@ -1562,7 +1617,7 @@ for (idx,anis) in enumerate(anises)
     opl = get(params_dict, "output_level", 1)
     running_args = (nev=nev,
                     if_exact=false,
-                    if_densmat=true,
+                    if_densmat=false,
                     if_save_data=if_save_data,
                     dataloc=dataloc,
                     basis_dataloc=basis_dataloc,
@@ -1576,7 +1631,8 @@ for (idx,anis) in enumerate(anises)
                         "Ly"=>Ly,
                         "N"=>N,
                         "if_periodic_x"=>if_periodic_x,
-                        "if_periodic_y"=>if_periodic_y)
+                        "if_periodic_y"=>if_periodic_y,
+                        "twist_angle"=>twist_angle)
 
     # build long range interaction parameters
     stren = get(params_dict,"interaction_strength", 0.0)
@@ -1735,8 +1791,9 @@ for (idx,anis) in enumerate(anises)
     #xlabel("Hopping Anisotropy tx/ty")
     ylabel("Energy - E1")=#
 
-    cdw = cdw_sf(rhos[1],states[1],lattice_params,(3.0,0.0); if_plot=true,plot_label="$anis")
-    #occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="ED, Stren=$intstren")
+    #cdw = cdw_sf(rhos[1],states[1],lattice_params,(3.0,0.0); if_plot=true,plot_label="$anis")
+    #occs = get_occupancy(states[1],lattice_params; if_plot=false,plot_title="ED")
+    #all_bds[idx] = sum(occs[3:4,3:4]) / 4
     #scurr = synthetic_current(rhos[1],lattice_params; if_plot=true,plot_title="Int Stren=$intstren")
     #pcurr = physical_current(rhos[1],lattice_params; if_plot=true,plot_title="Int Stren=$intstren")
 
@@ -1759,7 +1816,15 @@ for (idx,anis) in enumerate(anises)
     currents = physical_current(rhos,lattice_params; if_plot=true)
     corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
     currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
-end
+#end
+
+#bdderivs = (all_bds[howmany+1:end] .- all_bds[1:howmany]) ./ change
+#fillings = n ./ (alphas[1:howmany] .* ((lx-1)*(lx-1)))
+#fig = figure()
+#scatter(fillings,bdderivs)
+#xlabel("Filling")
+#title("Derivative of Bulk Density")
+
 #th_alphas = range(minimum(alphas),maximum(alphas),length=100)
 #plot(th_alphas,4*(sin.(pi .* th_alphas)).^2,label="Theory",c="b")
 #legend()
