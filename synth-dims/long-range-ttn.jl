@@ -1,5 +1,5 @@
-using Pkg
-Pkg.activate(".")
+#using Pkg
+#Pkg.activate(".")
 include("../review-practice-codes/ttn.jl")
 using Profile,MKL
 
@@ -153,49 +153,54 @@ function build_HH_net(num_layers; kwargs...)
 end
 
 # isotropic not implemented for cylinder
-function get_interaction_coords(given_site,inter_dist,lat,if_periodic_virt,if_anis) # written by ChatGPT 12.06.2023 then vastly edited 13.06.2023 by me
-	virtual, physical = given_site
+function get_interaction_coords(given_site,inter_dist,lat,if_per,which_dir) # written by ChatGPT 12.06.2023 then vastly edited 13.06.2023 by me
+	#virtual, physical = given_site
+	physical, virtual = given_site
 	coordinates = []
+	if_periodic_phys,if_periodic_virt = if_per
     
 	virt_edge_length, phys_edge_length = size(lat)
 	#if typeof(given_site) == Int64
 	#	given_site = TTNKit.coordinate(lat,given_site)
 	#end
+	if which_dir == "virt" || which_dir == "both" 
+		for shift in [-inter_dist % virt_edge_length,inter_dist % virt_edge_length] 
+			new_virtual = virtual + shift
+					
+			# Apply periodic boundary conditions along the virtual-axis
+			#=if if_periodic_virt
+				if new_virtual < 1
+					new_virtual += virt_edge_length
+				elseif new_virtual > virt_edge_length
+					new_virtual -= virt_edge_length
+				end
+			end=#
 
-	for shift in [-inter_dist % virt_edge_length,inter_dist % virt_edge_length]
-		new_virtual = virtual + shift
-				
-		# Apply periodic boundary conditions along the virtual-axis
-		if if_periodic_virt
-			if new_virtual < 1
-				new_virtual += virt_edge_length
-			elseif new_virtual > virt_edge_length
-				new_virtual -= virt_edge_length
+			# Check if new coordinates are within lattice dimensions
+			if 1 <= new_virtual <= virt_edge_length && new_virtual != virtual
+				append!(coordinates, [[physical,new_virtual]])
+				#append!(coordinates, [[new_virtual,physical]])
+			#else
+				#println("Still Outside Lattice")
 			end
-		end
 
-        # Check if new coordinates are within lattice dimensions
-		if 1 <= new_virtual <= virt_edge_length && new_virtual != virtual
- 			append!(coordinates, [[physical,new_virtual]])
- 		#else
- 			#println("Still Outside Lattice")
 		end
-
 	end
 
-	if !if_anis
+	if which_dir == "phys" || which_dir == "both"
 		for shift in [-inter_dist % phys_edge_length,inter_dist % phys_edge_length]
 			new_physical = physical + shift
-			if if_periodic_virt
+			#=if if_periodic_phys
 				if new_physical < 1
 					new_physical += phys_edge_length
 				elseif new_physical > phys_edge_length
 					new_physical -= phys_edge_length
 				end
-			end
+			end=#
 
 			if 1 <= new_physical <= phys_edge_length && new_physical != physical
 				append!(coordinates, [[new_physical,virtual]])
+				#append!(coordinates, [[virtual,new_physical]])
 			end
 		end
 	end
@@ -210,6 +215,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	
 	scaling_distance = get(kwargs, :scaling_dist, 0)
 	
+	which_dir = get(kwargs, :which_dir, "virt")
 	restricted_size = get(kwargs, :restricted_size, [phys_edge_length,virt_edge_length])
 	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
@@ -325,9 +331,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	
 	if if_interaction
 		if kwargs[:scaling] == "rydberg"
-			if_anis = false
-		else
-			if_anis = true
+			which_dir = "both"
 		end
 		interaction = TTNKit.OpSum()
 		for (idx,stren) in enumerate(long_range_strengths)
@@ -347,16 +351,17 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 				else
 					for j in TTNKit.eachindex(lat)
 						s_coord = TTNKit.coordinate(lat,j)
-						if s_coord[1] > phys_edge_length || s_coord[2] > virt_edge_length
+						if s_coord[1] > restricted_size[1] || s_coord[2] > restricted_size[2]
 							continue
 						end
-						interaction_sites = get_interaction_coords(s_coord,idx-1,lat,if_periodic_virt,if_anis)
+						interaction_sites = get_interaction_coords(s_coord,idx-1,lat,(if_periodic_phys,if_periodic_virt),which_dir)
 						
 						for k in interaction_sites
 							if k[1] > restricted_size[1] || k[2] > restricted_size[2]
 								continue
 							end
-							interaction += (stren,"Adag * A",s_coord,"Adag * A",Tuple(k))
+							#println("Interacting between ",s_coord," and ",k," with strength ",stren/2)
+							interaction += (stren/2,"Adag * A",s_coord,"Adag * A",Tuple(k))
 						end
 					end
 				end

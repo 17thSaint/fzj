@@ -1,5 +1,5 @@
-using Pkg
-Pkg.activate(".")
+#using Pkg
+#Pkg.activate(".")
 using LinearAlgebra,KrylovKit,Combinatorics,SparseArrays
 
 function find_center()
@@ -774,8 +774,10 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
     
     if_periodic_x = lattice_params["if_periodic_x"]
     if_periodic_y = lattice_params["if_periodic_y"]
+    if_per = (if_periodic_x,if_periodic_y)
     Lx = lattice_params["Lx"]
     Ly = lattice_params["Ly"]
+    Ls = (Lx,Ly)
     twist_angle = lattice_params["twist_angle"]
 
     tx = hamilt_params["tx"]
@@ -783,6 +785,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
     alpha = hamilt_params["alpha"]
     U = hamilt_params["U"]
     interaction_cutoff = hamilt_params["interaction_cutoff"]
+    which_dir = hamilt_params["which_dir"]
 
     particle_locations_linear = basis_state
     particle_locations_coordinate = coordinate.(particle_locations_linear,Lx,Ly)
@@ -891,17 +894,29 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
     lr_dist = sum(abs.(U) .> interaction_cutoff) - 1
     if length(particle_locations_linear) > 1 && lr_dist > 0
         #println("Doing Interactions")
-        for phys_loc in 1:Lx
+        if which_dir == "virt"
+            which_loc = 1
+            other_loc = 2
+        elseif which_dir == "phys"
+            which_loc = 2
+            other_loc = 1
+        else
+            error("which_dir must be either 'virt' or 'phys'")
+        end
+        for loc in 1:Ls[which_loc]
 
             # find interacting particles at given physical site
-            interacting_particles = findall(x->x[1]==phys_loc,particle_locations_coordinate)
+            interacting_particles = findall(x->x[which_loc]==loc,particle_locations_coordinate)
 
             if length(interacting_particles) > 1 # need more than 1 particle to interact
                 for i in 1:length(interacting_particles) # loop over all pairs of interacting particles
                     for j in i+1:length(interacting_particles)
-                        dist = abs(particle_locations_coordinate[interacting_particles[i]][2] - particle_locations_coordinate[interacting_particles[j]][2])
-                        if_periodic_y ? dist = min(dist,Ly-dist) : nothing
+                        dist = abs(particle_locations_coordinate[interacting_particles[i]][other_loc] - particle_locations_coordinate[interacting_particles[j]][other_loc])
+                        #if if_per[other_loc] && which_loc == 2
+                        #    dist = min(dist,Ls[other_loc]-dist)
+                        #end
                         if dist <= lr_dist && abs(U[dist+1]) > interaction_cutoff
+                            #println("Interacting between ",particle_locations_coordinate[interacting_particles[i]]," and ",particle_locations_coordinate[interacting_particles[j]])
                             push!(output_weights,U[dist+1])
                             push!(output_states,which_basis)
                         end
@@ -1292,13 +1307,13 @@ end
 
 function plot_occupancy(exp_occ; kwargs...)
 	fig = figure()
-	imshow(transpose(exp_occ))
+	imshow(exp_occ)
 	colorbar()
 	plot_title = get(kwargs, :plot_title, "")
 	title_string = "Occupancy, " * plot_title
 	title(title_string)
-	xlabel("Synthetic")
-	ylabel("Physical")
+	ylabel("Synthetic")
+	xlabel("Physical")
 
     return nothing
 end

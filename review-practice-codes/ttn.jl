@@ -405,8 +405,11 @@ function get_xy_coeffs(x,y,edge_length,t_strength,phi,thetax=thetax_1,thetay=the
 end
 
 function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwargs...) 
+	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
+	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
 	hopping_anisotropy = get(kwargs, :hopping_anisotropy, 1.0)
 	#t_strength_phys = t_strength * hopping_anisotropy
+	
 	if hopping_anisotropy < 1.0
 		t_strength_synth = t_strength / hopping_anisotropy
 		t_strength_phys = t_strength
@@ -414,18 +417,27 @@ function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwarg
 		t_strength_phys = t_strength * hopping_anisotropy
 		t_strength_synth = t_strength
 	end
+	
 	if get(kwargs, :no_magF, false)
 		phi = 0.0
 	end
+	
 	if s1[1] == s2[1] # Synthetic Dimension Hopping
 		thetay = get(kwargs, :thetay, thetay_2)
 
-		stren = round(-t_strength_synth,digits=10) #* exp(im*2*pi*(phi*s1[1]))
-		return stren
+		stren = -t_strength_synth # * exp(im*2*pi*(phi*s1[1]))
+		if if_periodic_virt && !if_periodic_phys
+			stren *= exp(im*2*pi*(phi*s1[1]))
+		end
+		return round(stren,digits=10)
 	elseif s1[2] == s2[2] # Physical Dimension Hopping
 		thetax = get(kwargs, :thetax, thetax_2)
 
-		return round(-t_strength_phys * exp(im*2*pi*(phi*s1[2])),digits=10)
+		stren = -t_strength_phys * exp(im*2*pi*(phi*s1[2]))
+		if if_periodic_virt && !if_periodic_phys
+			stren = -t_strength_phys
+		end
+		return round(stren,digits=10) #* exp(im*2*pi*(phi*s1[2]))
 	else
 		return 0.0
 	end
@@ -1311,7 +1323,7 @@ function plot_occupancy(exp_occ; kwargs...)
 		exp_occ = data_dict["vals"]
 	end
 	fig = figure()
-	imshow(exp_occ)
+	imshow(transpose(exp_occ))
 	colorbar()
 	plot_title = get(kwargs, :plot_title, "")
 	title_string = "Occupancy, " * plot_title
