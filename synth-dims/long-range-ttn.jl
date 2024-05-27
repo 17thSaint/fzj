@@ -1201,7 +1201,7 @@ fb_occ_mat = get_occupancy(fb_gs)
 
 
 #
-if true
+if false
 
 #nnst = 0.0
 #layers = 6
@@ -1224,7 +1224,7 @@ end=#
 #strens = range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("dataloc",get_folder_location("cluster-data/synth-dims/excited-states")),("hopping_anisotropy",1.0),("make_smaller_lattice",[2,2]),("nrgtol",5e-5),("particles",2),("layers",2),("mdim",100),("if_save_data",true),("alpha",0.0),("onsite_strength",0.0),("lr",0),("if_periodic_phys",false),("if_periodic_virt",false)])
+	params_dict = Dict([("dataloc",get_folder_location("cluster-data/synth-dims/excited-states")),("hopping_anisotropy",1.0),("make_smaller_lattice",[2,2]),("nrgtol",5e-5),("particles",2),("layers",2),("mdim",100),("if_save_data",false),("alpha",0.0),("onsite_strength",0.0),("lr",0),("if_periodic_phys",false),("if_periodic_virt",false)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)

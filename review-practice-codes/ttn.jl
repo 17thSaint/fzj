@@ -729,7 +729,7 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	if isnothing(etol)
 		observer::AbstractObserver = NoObserver()
 	elseif if_continuous_saving
-		observer = SavingNRGVarObserver(file_path,etol)
+		observer = isnothing(psi_ortho) ? SavingNRGVarObserver(file_path,etol) : SavingNRGVarObserver(file_path,etol,length(psi_ortho))
 	else
 		observer = NRGVarObserver(etol)
 	end
@@ -1002,7 +1002,7 @@ function find_excited_state(starting_ttn::TTNKit.TreeTensorNetwork,ttns_ortho::V
 	end
 end
 
-function find_excited_states(num_layers::Int,num_excited_states::Int,particle_count::Int,ground_state::TreeTensorNetwork; kwargs...)
+function find_excited_states(num_layers::Int,num_excited_states::Int,particle_count::Int,ortho_states::Vector; kwargs...)
 	num_sites = Int(2^num_layers)
 	max_dim = get(kwargs, :mdim, 10)
 	if_save_data::Bool = get(kwargs, :if_save_data, true)
@@ -1031,7 +1031,7 @@ function find_excited_states(num_layers::Int,num_excited_states::Int,particle_co
 	
 	start_time = time()
 
-	net = TTNKit.network(ground_state)
+	net = TTNKit.network(ortho_states[1])
 	metadata["ttn_net"] = net
 	lat::TTNKit.AbstractLattice = TTNKit.physical_lattice(net)
 	println("Finished Building Network")
@@ -1075,21 +1075,22 @@ function find_excited_states(num_layers::Int,num_excited_states::Int,particle_co
 	end
 	println("Built Hamiltonian")
 
+	es_start = length(ortho_states)
 	runtimes = zeros(num_excited_states)
 	obss = Vector{TTNKit.AbstractObserver}(undef,num_excited_states)
 	densmats = Vector{Matrix{ComplexF64}}(undef,num_excited_states)
-	ttns_ortho::Vector{TTNKit.TreeTensorNetwork} = [ground_state]
-	for es_number in 1:num_excited_states
+	ttns_ortho::Vector{TTNKit.TreeTensorNetwork} = ortho_states
+	for es_number in es_start:num_excited_states
 		if if_densmat
 			new_ttn, new_ham, new_sp, new_obs, runtime, new_densmat = find_excited_state(ttn,ttns_ortho,ham,sweep_type,if_densmat,location,actual_filename; kwargs...)
 		else
 			new_ttn, new_ham, new_sp, new_obs, runtime = find_excited_state(ttn,ttns_ortho,ham,sweep_type,if_densmat,location,actual_filename; kwargs...)
 		end
 
-		runtimes[es_number] = runtime
+		runtimes[es_number - es_start + 1] = runtime
 		append!(ttns_ortho,[new_sp.ttn])
-		obss[es_number] = new_obs
-		if_densmat ? densmats[es_number] = new_densmat : nothing
+		obss[es_number - es_start + 1] = new_obs
+		if_densmat ? densmats[es_number - es_start + 1] = new_densmat : nothing
 
 		if if_save_data
 			metadata["observer_$es_number"] = new_obs
@@ -1119,26 +1120,63 @@ function find_excited_states(num_layers::Int,num_excited_states::Int,particle_co
 	end
 end
 
-function find_excited_states(filename::String,num_excited_states::Int; kwargs...)
+function find_excited_states(num_layers::Int,num_excited_states::Int,particle_count::Int,ground_state::TreeTensorNetwork; kwargs...)
+	return find_excited_states(num_layers::Int,num_excited_states::Int,particle_count::Int,[ground_state]; kwargs...)
+end
+
+function find_excited_states(filename::String,num_excited_states::Int,new_parameters::Dict{String,Any}=Dict(); kwargs...)
+
 	dataloc,actual_filename = separate_filename_location(filename)
 
 	# put a check that the location actually exists and not running in the wrong directory
 
-	data,metadata = read_data_jld2(actual_filename,dataloc)
+	data,metadata_old = read_data_jld2(actual_filename,dataloc)
 	if "densmat" in keys(data)
 		count_found_states = Int(length(keys(data))/2)
 	else
 		count_found_states = length(keys(data))
 	end
 
+	if_redo = false
+	if !isempty(new_parameters)
+		if_redo = true
+		for (key,value) in new_parameters
+			metadata[key * "_old"] = metadata_old[key]
+			metadata_old[key] = value
+		end
+	end
+
 	# see if already found all states asking for
-	if count_found_states >= num_excited_states
+	if count_found_states >= num_excited_states && !if_redo
 		println("Existing data found")
-		# do the return function here
+		ortho_states = Vector{TTNKit.TreeTensorNetwork}(undef,num_excited_states)
+		densmats = Vector{Matrix{ComplexF64}}(undef,num_excited_states)
+		obss = Vector{TTNKit.AbstractObserver}(undef,num_excited_states)
+		runtimes = zeros(num_excited_states)
+		ortho_states[1] = data["ttn"]
+		densmats[1] = data["densmat"]
+		obss[1] = metadata_old["observer"]
+		runtimes[1] = metadata_old["runtime"]
+		for i in 2:num_exicted_states
+			ortho_states[i] = data["ttn_$(i-1)"]
+			densmats[i] = data["densmat_$(i-1)"]
+			obss[i] = metadata_old["observer_$(i-1)"]
+			runtimes[i] = metadata_old["runtime_$(i-1)"]
+		end
+		
+		return ortho_states, metadata_old["ham"], obss, densmats, runtimes
+	else
+		ortho_states = Vector{TTNKit.TreeTensorNetwork}(undef,count_found_states)
+		ortho_states[1] = data["ttn"]
+		for i in 2:count_found_states
+			ortho_states[i] = data["ttn_$(i-1)"]
+		end
+
+		model_paras = dict_to_symbols(metadata_old)
+		return find_excited_states(metadata_old["layers"],num_excited_states,metadata_old["particles"],ortho_states; model_paras...,metadata=metadata_old)
 	end
 
 end
-	
 
 mutable struct NRGVarObserver <: AbstractObserver
     var_tol::Float64
@@ -1193,6 +1231,42 @@ function TTNKit.ITensors.measure!(o::SavingNRGVarObserver; kwargs...)
 end
 
 function TTNKit.ITensors.checkdone!(o::SavingNRGVarObserver;kwargs...)
+	outputlevel = kwargs[:outputlevel]
+	sh = kwargs[:sweep_handler]
+	sweep_num = sh.current_sweep
+
+	if sweep_num > 5 && abs(o.nrg[end] - o.nrg[end-1]) < o.var_tol
+		outputlevel > 0 ? println("Energy Converged. Stopping DMRG") : nothing
+		return true
+	else
+  		# Otherwise, keep going
+		return false
+	end
+end
+
+mutable struct SavingExcitedNRGVarObserver <: AbstractObserver
+    file_path::String
+	var_tol::Float64
+    nrg::Vector{Float64}
+	nrg_level::Int64
+ 
+    SavingNRGVarObserver(file_path="ttn.jld2",var_tol=0.0,nrg_level=1) = new(file_path,var_tol,[10000.0,1000.0],nrg_level)
+end
+
+function TTNKit.ITensors.measure!(o::SavingExcitedNRGVarObserver; kwargs...)
+    nrg_level = o.nrg_level
+	nrg_level > 0 ? string_part = "_$nrg_level" : string_part = ""
+    dmrg = kwargs[:sweep_handler]
+    append!(o.nrg,[dmrg.current_energy])
+
+	alldata_update::Dict{String,Any} = Dict([("ttn"*string_part,dmrg.ttn),("densmat"*string_part,density_matrix(dmrg.ttn))])
+	modify_data_jld2(alldata_update,o.file_path,"all_data")
+	
+	metadata_update = Dict([("observer"*string_part,o),("maxlinkdim"*string_part,TTNKit.maxlinkdim(dmrg.ttn))])
+	modify_data_jld2(metadata_update,o.file_path,"metadata")
+end
+
+function TTNKit.ITensors.checkdone!(o::SavingExcitedNRGVarObserver;kwargs...)
 	outputlevel = kwargs[:outputlevel]
 	sh = kwargs[:sweep_handler]
 	sweep_num = sh.current_sweep

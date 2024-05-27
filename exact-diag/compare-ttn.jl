@@ -390,14 +390,14 @@ function rebuild_ed_ham(ttn_ham,lattice_params::Dict)
 end
 
 
-if false || if_all
+if true || if_all
 	#@testset "equivalence of hamiltonians btw TTN and ED" begin
 		#for Lx in [4,6]
 
 			nev = 5
 				Lx = 6
 				lr_dist = Lx-1
-				int_stren = 10.0
+				int_stren = 0.0
 				wd = "virt"
 				if Lx <= 4
 					layer_count = 4
@@ -406,7 +406,7 @@ if false || if_all
 				end
 				make_smaller_lattice = [Lx,Lx]
 				N = Int(Lx/2)
-				if_periodic_phys = true
+				if_periodic_phys = false
 				if_periodic_virt = false
 
 				full_basis = n_particle_basis(N,Lx,Lx; output_level=1)
@@ -420,7 +420,8 @@ if false || if_all
 					us[i] = int_stren
 				end
 				filling = 0.5
-				alpha = N / (Lx*Lx*filling)
+				x_shift,yshift = !if_periodic_phys, !if_periodic_virt
+				alpha = N / ((Lx-x_shift)*(Lx-yshift)*filling)
 				hamilt_params = Dict("alpha"=>alpha,
 									"tx"=>tx,
 									"ty"=>ty,
@@ -441,11 +442,11 @@ if false || if_all
 								onsite_strength=int_stren)
 				net = build_HH_net(layer_count; syms=true, max_occ=2)
 
-				#ttn_ham_old = long_range_HH_ham_old(net,1.0,alpha; model_paras...)
-				#rebuilt_ham_old = rebuild_ed_ham(ttn_ham_old,lattice_params)
+				ttn_ham_old = long_range_HH_ham_old(net,1.0,alpha; model_paras...)
+				rebuilt_ham_old = rebuild_ed_ham(ttn_ham_old,lattice_params)
 
-				ttn_ham = long_range_HH_ham(net,1.0,alpha; model_paras...,hopping_old=true)
-				rebuilt_ham = rebuild_ed_ham(ttn_ham,lattice_params)
+				#ttn_ham = long_range_HH_ham(net,1.0,alpha; model_paras...,hopping_old=true)
+				#rebuilt_ham = rebuild_ed_ham(ttn_ham,lattice_params)
 
 				#=fig = figure()
 				imshow(real.(Matrix(rebuilt_ham - rebuilt_ham_old)))
@@ -458,9 +459,10 @@ if false || if_all
 				title("Imag Diff")=#
 
 				#println("Do the TTN methods make the same Hamiltonian? ",rebuilt_ham == rebuilt_ham_old)
-				println("Does the New TTN method match ED? ",rebuilt_ham == ed_ham)
+				#println("Does the New TTN method match ED? ",rebuilt_ham == ed_ham)
+				println("Does the old TTN method match ED? ",rebuilt_ham_old == ed_ham)
 				
-				x0 = rand(Float64,size(lattice_params["full_basis"])[2])
+				#=x0 = rand(Float64,size(lattice_params["full_basis"])[2])
         		#everything = eigen(Matrix(rebuilt_ham))
         		#rez = (everything.values,everything.vectors)
 				rez = eigsolve(rebuilt_ham,x0,nev,:SR,Lanczos())
@@ -468,15 +470,15 @@ if false || if_all
     			states = rez[2][sorted_indices][1:nev]
     			nrgs = rez[1][sorted_indices][1:nev]
 				display(nrgs)
-				get_occupancy(states[1],lattice_params; plot_title="Correct")
+				get_occupancy(states[1],lattice_params; plot_title="Correct")=#
 
-				#=x0_old = rand(Float64,size(lattice_params["full_basis"])[2])
+				x0_old = rand(Float64,size(lattice_params["full_basis"])[2])
         		rez_old = eigsolve(rebuilt_ham_old,x0_old,nev,:SR,Lanczos())
 				sorted_indices_old = sortperm(rez_old[1])
     			states_old = rez_old[2][sorted_indices_old][1:nev]
     			nrgs_old = rez_old[1][sorted_indices_old][1:nev]
 				display(nrgs_old)
-				get_occupancy(states_old[1],lattice_params; plot_title="Old")=#
+				get_occupancy(states_old[1],lattice_params; plot_title="Old")
 
 				x0_ed = rand(Float64,size(lattice_params["full_basis"])[2])
         		#everything_ed = eigen(Matrix(ed_ham))

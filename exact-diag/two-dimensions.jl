@@ -1578,7 +1578,7 @@ if false
 lx = 6
 n = 3
 #for (idx,n) in enumerate([2,3,4,5])
-#intstrens = [100.0]
+intstrens = [10.0]
 #change = 0.001
 #real_alphas = [range(0.1,0.21,length=10); range(0.22,0.28,length=10); range(0.29,0.35,length=5)]
 #howmany = length(real_alphas)
@@ -1591,10 +1591,10 @@ n = 3
 #for (idx,lx) in enumerate(4:1:30)
 #for (idx,theta) in enumerate(thetas)
 #for (idx,anis) in enumerate(anises)
-#for (idx,intstren) in enumerate(intstrens)
+for (idx,intstren) in enumerate(intstrens)
 #for lrd in [0,1]
     #for change in [0,0.0001]true
-    params_dict = Dict([("Lx",lx),("N",n),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",10.0),("lr","all"),("filling",0.5),("nev",10),("if_save_data",false)])
+    params_dict = Dict([("Lx",lx),("N",9),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",4),("if_save_data",false)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
@@ -1679,6 +1679,7 @@ n = 3
         alpha = N / (filling * (Lx - x_shift) * (Ly - y_shift))
     end
     check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y)
+    alpha = N / (Lx * Ly * get(params_dict,"filling",0.5))
 
     # build hamiltonian parameters dictionary
     hamilt_params = Dict("alpha"=>alpha,
@@ -1686,6 +1687,7 @@ n = 3
                         "ty"=>ty,
                         "hopping_anisotropy"=>hopping_anisotropy,
                         "U"=>us,
+                        "which_dir"=>"virt",
                         "interaction_cutoff"=>1e-5)
 
     # build filename dictionary
@@ -1777,7 +1779,7 @@ n = 3
         end
     end=#
 
-    #=if idx == 1
+    if idx == 1
         for i in 1:nev
             scatter(intstren,nrgs[i] - nrgs[1],c=cols[i],label="E$i - E1")
         end
@@ -1804,10 +1806,10 @@ n = 3
     xlabel("Interaction Strength")
     #xlabel("Flux")
     #xlabel("Hopping Anisotropy tx/ty")
-    ylabel("Energy - E1")=#
+    ylabel("Energy - E1")
 
     #cdw = cdw_sf(rhos[1],states[1],lattice_params,(3.0,0.0); if_plot=true,plot_label="$anis")
-    #occs = get_occupancy(states[1],lattice_params; if_plot=false,plot_title="ED")
+    #occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="ED, LR=$intstren")
     #all_bds[idx] = sum(occs[3:4,3:4]) / 4
     #scurr = synthetic_current(rhos[1],lattice_params; if_plot=true,plot_title="Int Stren=$intstren")
     #pcurr = physical_current(rhos[1],lattice_params; if_plot=true,plot_title="Int Stren=$intstren")
@@ -1831,7 +1833,7 @@ n = 3
     currents = physical_current(rhos,lattice_params; if_plot=true)
     corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
     currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
-#end
+end
 
 #bdderivs = (all_bds[howmany+1:end] .- all_bds[1:howmany]) ./ change
 #fillings = n ./ (alphas[1:howmany] .* ((lx-1)*(lx-1)))
