@@ -1201,7 +1201,7 @@ fb_occ_mat = get_occupancy(fb_gs)
 
 
 #
-if false
+if true
 
 #nnst = 0.0
 #layers = 6
@@ -1224,7 +1224,7 @@ end=#
 #strens = range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("hopping_anisotropy",1.0),("make_smaller_lattice",[8,8]),("nrgtol",5e-5),("particles",4),("layers",6),("mdim",100),("if_save_data",true),("filling",0.5),("onsite_strength",10.0),("lr","all"),("if_periodic_phys",false),("if_periodic_virt",false)])
+	params_dict = Dict([("dataloc",get_folder_location("cluster-data/synth-dims/excited-states")),("hopping_anisotropy",1.0),("make_smaller_lattice",[2,2]),("nrgtol",5e-5),("particles",2),("layers",2),("mdim",100),("if_save_data",false),("alpha",0.0),("onsite_strength",0.0),("lr",0),("if_periodic_phys",false),("if_periodic_virt",false)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)
@@ -1242,6 +1242,7 @@ end=#
 	if_densmat = get(params_dict, :if_densmat, true)
 	change = get(params_dict, "change", 0.0001)
 	onsite_strength = get(params_dict, "onsite_strength", 0.0)
+	which_dir = get(params_dict, "which_dir", "virt")
 	anis = get(params_dict, "hopping_anisotropy", 1.0)
 	layer_count = Int(get(params_dict, "layers", 4))
 	mag_off = get(params_dict, "mag_off", true)
@@ -1313,7 +1314,7 @@ end=#
 		end
 	end
 	=#
-	nswps = 100
+	nswps = 1
 	#alpha = 7/64
 	#num_particles = Int(sqrt(2^layer_count)/2)#Int(alpha * tot_sites * nu)
 	
@@ -1398,6 +1399,7 @@ end=#
 						scaling=sc_type,
 						scaling_dist=longrange_dist,
 						onsite_strength=onsite_strength,
+						which_dir=which_dir,
 						cliff=if_cliff,
 						trunc=trunc,
 						if_change=if_change,
@@ -1465,7 +1467,7 @@ end=#
 
 		#dcorrs = distance_correlation(dens,wavefunc,make_smaller_lattice[1],make_smaller_lattice[2],"y")
 		#display(dcorrs)
-		occs = get_occupancy(wavefunc; densmat=dens, plot_title="TTN")
+		#occs = get_occupancy(wavefunc; densmat=dens, plot_title="TTN")
 		#rydberg_2pcorr(wavefunc)
 		#=plot(collect(1:Int(sqrt(2^layer_count))),occs[4,:],label="$(round(num_particles/(alpha*tot_sites),digits=4))")
 		legend()
