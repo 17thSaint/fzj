@@ -155,6 +155,17 @@ function rewrite_filename(old_name,new_params_dict)
 	return new_name
 end
 
+function separate_filename_location(filename::String)
+	if occursin("/",filename)
+		fullsplit = split(filename,"/")
+		location = join(fullsplit[1:end-1],"/")
+		actual_filename = fullsplit[end]
+		return location,actual_filename
+	else
+		error("No directory splits in input: $filename")
+	end
+end
+
 function change_numparticles_metadata(filename)
 	binary_file = jldopen("../cluster-data/$filename","a+")
 	try

@@ -1224,7 +1224,7 @@ end=#
 #strens = range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("dataloc",get_folder_location("cluster-data/synth-dims/excited-states")),("hopping_anisotropy",1.0),("make_smaller_lattice",[2,2]),("nrgtol",5e-5),("particles",2),("layers",2),("mdim",100),("if_save_data",false),("alpha",0.0),("onsite_strength",0.0),("lr",0),("if_periodic_phys",false),("if_periodic_virt",false)])
+	params_dict = Dict([("dataloc",get_folder_location("cluster-data/synth-dims/excited-states")),("hopping_anisotropy",1.0),("make_smaller_lattice",[2,2]),("nrgtol",5e-5),("particles",2),("layers",2),("mdim",100),("if_save_data",true),("alpha",0.0),("onsite_strength",0.0),("lr",0),("if_periodic_phys",false),("if_periodic_virt",false)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)
@@ -1314,7 +1314,7 @@ end=#
 		end
 	end
 	=#
-	nswps = 1
+	nswps = 100
 	#alpha = 7/64
 	#num_particles = Int(sqrt(2^layer_count)/2)#Int(alpha * tot_sites * nu)
 	
@@ -1345,6 +1345,9 @@ end=#
 		dataloc = get_folder_location("cluster-data/synth-dims/rydberg")
 	end
 	loc = get(params_dict, "dataloc", dataloc)
+
+	groundstate_data = read_data_jld2("ttn-if_periodic_phys-false-onsite_strength-0.0-lr-0-particles-2-alpha-0.0-layers-2-hopping_anisotropy-1.0.jld2",loc)
+	groundstate = groundstate_data[1]["ttn"]
 	
 	#counting = 50
 	#strens = range(num_particles/(0.2*tot_sites),num_particles/(2.0*tot_sites),length=counting) #range(0.02,0.25,length=counting)
@@ -1423,7 +1426,7 @@ end=#
 
 		#
 		println(datafile_name)
-		if_exists,found_data = check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
+		if_exists,found_data = false,nothing#check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
 
 		if if_exists
 			println("Found Data")
@@ -1439,13 +1442,15 @@ end=#
 			#if true
 			#densmat = nothing
 			starting = time()
-			net = build_HH_net(layer_count; syms=syms, max_occ=max_occ)
+			net = TTNKit.network(groundstate)#build_HH_net(layer_count; syms=syms, max_occ=max_occ)
 			ham = long_range_HH_ham(net,ts,alpha; model_paras...)
 			#display(ham)
-			og_ttn, hamilt, dm_sp, rezobs, runtime, dens = find_ground_state(layer_count,num_particles; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
+			es_count = 2
+			all_states, hamilt, all_obs, all_densmats, all_runtimes = find_excited_states(layer_count,es_count,num_particles,groundstate; ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("t_strength",ts)])))
+			#og_ttn, hamilt, dm_sp, rezobs, runtime, dens = find_ground_state(layer_count,num_particles; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
 			total_time = time() - starting
 			println("Running time = $total_time")
-			wavefunc = dm_sp.ttn
+			#wavefunc = dm_sp.ttn
 			#append!(wavefuncs,[dm_sp.ttn])
 		end
 

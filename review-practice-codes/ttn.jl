@@ -583,6 +583,45 @@ function count_filled_states(states_vector)
 	return count
 end
 
+function make_metadata_from_kwargs(given_data)
+	max_dim = get(given_data, :mdim, 10)
+	#sweep_iter::Int = get(given_data, :sweep_iter, 1)
+	#if_sweep::Bool = get(given_data, :if_sweep, true)
+	if_save_data::Bool = get(given_data, :if_save_data, true)
+	if_continuous_saving::Bool = get(given_data, :if_continuous_saving, false)
+	if_save_data ? nothing : if_continuous_saving = false
+	sweep_type::String = get(given_data, :sweep_type, "dmrg")
+	#warming_limit::Int = get(given_data, :warming_limit, 100)
+	ham_operator = get(given_data, :ham_op, nothing)
+	ttn = get(given_data, :seed_ttn, nothing)
+	if_gpu::Bool = get(given_data, :if_gpu, false)
+	particle_type::String = get(given_data, :part_type, "Boson")
+	location::String = get(given_data, :location, pwd())
+	#filename::String = get(given_data, :name, "ttn")
+	if_densmat::Bool = get(given_data, :if_densmat, true)
+	#if_redo::Bool = get(given_data, :if_redo, false)
+
+	obs = NoObserver()
+	
+	metadata::Dict = get(given_data, :metadata, Dict())
+	#metadata["layers"] = num_layers
+	#metadata["particles"] = particle_count
+	metadata["max_occ"] = max_occ
+	metadata["sweep_type"] = sweep_type
+	metadata["mdim"] = max_dim
+	#metadata["conserve_qns"] = conserve_qns
+	metadata["if_gpu"] = if_gpu
+	metadata["particle_type"] = particle_type
+	metadata["location"] = location
+	metadata["if_densmat"] = if_densmat
+	metadata["nrgtol"] = get(given_data, :nrgtol, nothing)
+
+	metadata["ham"] = ham_operator
+	metadata["seed_ttn"] = ttn
+
+	return metadata
+end
+
 function localsweep(psi0::TTNKit.TreeTensorNetwork, sp::TTNKit.AbstractSweepHandler; kwargs...)
     
     obs = get(kwargs, :observer, TTNKit.NoObserver())
@@ -676,6 +715,7 @@ end
 
 function do_sweep(ttn,ham,sweep_type; kwargs...)
 
+	psi_ortho = get(kwargs, :psi_ortho, nothing)
 	if_redo = get(kwargs, :if_redo, false)
 	opl::Int = get(kwargs, :output_level, 0)
 	cutoff::Float64 = get(kwargs, :cutoff, 10^-8)
@@ -702,7 +742,11 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	if sweep_type == "dmrg"
 		#println("Before starting DMRG the bond dim is ",TTNKit.maxlinkdim(ttn))
 		#get_occupancy(ttn; plot_title="Before DMRG")
-		sp::TTNKit.AbstractSweepHandler = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff)
+		if isnothing(psi_ortho)
+			sp::TTNKit.AbstractSweepHandler = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff)
+		else
+			sp = TTNKit.dmrg(ttn,psi_ortho,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff)
+		end
 	elseif sweep_type == "simple"
 		proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
 		#println("Finished Making Hamiltonian")
@@ -940,6 +984,161 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 	end_time = time()
 	return ttn,ham,"no sweep",end_time-start_time
 end
+
+function find_excited_state(starting_ttn::TTNKit.TreeTensorNetwork,ttns_ortho::Vector{TTNKit.TreeTensorNetwork},ham_tpo::TTNKit.AbstractTensorProductOperator,sweep_type::String,if_densmat::Bool,location::String,actual_filename::String; kwargs...)
+
+	sp = 0.0
+	time_start::Float64 = time()
+	new_ttn::TTNKit.TreeTensorNetwork, new_ham, new_sp::TTNKit.AbstractSweepHandler, new_obs::AbstractObserver = do_sweep(starting_ttn,ham_tpo,sweep_type; kwargs...,psi_ortho=ttns_ortho,file_path = location * "/" * actual_filename)
+	time_end::Float64 = time()
+	
+	if_densmat ? densmat = density_matrix(new_sp.ttn) : nothing
+	end_time::Float64 = time()
+
+	if if_densmat
+		return new_ttn, new_ham, new_sp, new_obs, time_end-time_start, densmat
+	else
+		return new_ttn, new_ham, new_sp, new_obs, time_end-timestart
+	end
+end
+
+function find_excited_states(num_layers::Int,num_excited_states::Int,particle_count::Int,ground_state::TreeTensorNetwork; kwargs...)
+	num_sites = Int(2^num_layers)
+	max_dim = get(kwargs, :mdim, 10)
+	if_save_data::Bool = get(kwargs, :if_save_data, true)
+	if_save_data ? nothing : if_continuous_saving = false
+	sweep_type::String = get(kwargs, :sweep_type, "dmrg")
+	ham_operator = get(kwargs, :ham_op, nothing)
+	seed_ttn = get(kwargs, :seed_ttn, nothing)
+	if_gpu::Bool = get(kwargs, :if_gpu, false)
+	particle_type::String = get(kwargs, :part_type, "Boson")
+	location::String = get(kwargs, :location, pwd())
+	filename::String = get(kwargs, :name, "ttn")
+	if_densmat::Bool = get(kwargs, :if_densmat, true)
+	
+
+	if_continuous_saving::Bool = get(kwargs, :if_continuous_saving, false)
+	if_redo::Bool = get(kwargs, :if_redo, false)
+	
+	metadata::Dict{String,Any} = get(kwargs, :metadata, Dict())
+	isempty(metadata) ? metadata = make_metadata_from_kwargs(kwargs) : nothing
+
+	gs_search_params::Dict = copy(metadata)
+	delete!(gs_search_params,"ham")
+	delete!(gs_search_params,"seed_ttn")
+	display(gs_search_params)
+	
+	
+	start_time = time()
+
+	net = TTNKit.network(ground_state)
+	metadata["ttn_net"] = net
+	lat::TTNKit.AbstractLattice = TTNKit.physical_lattice(net)
+	println("Finished Building Network")
+	
+	if isnothing(seed_ttn)
+		if particle_type .== "Boson"
+			states::Vector{String} = fill("0", num_sites)
+			old_ttn::TTNKit.TreeTensorNetwork = TTNKit.ProductTreeTensorNetwork(net,states)
+			ttn = initialize_ttn(old_ttn,max_dim,particle_count; kwargs...)
+		else
+			states = fill_states(particle_count,num_sites,1)
+			old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
+			ttn = TTNKit.increase_dim_tree_tensor_network_zeros(old_ttn, maxdim = max_dim)
+			ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
+		end
+		metadata["seed_ttn"] = ttn
+	end
+
+	if if_continuous_saving
+		if if_densmat
+			densmat::Matrix{ComplexF64} = density_matrix(ttn)
+			ttn_data_dict::Dict{String,Any} = if_gpu ? Dict([("ttn",back2cpu(ttn)),("densmat",densmat)]) : Dict([("ttn",ttn),("densmat",densmat)])
+		else
+			ttn_data_dict = if_gpu ? Dict([("ttn",back2cpu(ttn))]) : Dict([("ttn",ttn)])
+		end
+		actual_filename::String = if_redo ? modify_data_jld2(ttn_data_dict,location * "/" * filename) : write_data_jld2(filename,ttn_data_dict,location,metadata)
+	else
+		actual_filename = filename
+	end
+	
+	if if_gpu
+		println("Doing GPU TTN")
+		ttn = TTNKit.gpu(ttn)
+	end
+	println("Added States")
+	
+	ham::TTNKit.AbstractTensorProductOperator = TTNKit.TPO(ham_operator,lat)
+	if if_gpu
+		println("Doing GPU Ham TPO")
+		ham = TTNKit.gpu(ham,ttn)
+	end
+	println("Built Hamiltonian")
+
+	runtimes = zeros(num_excited_states)
+	obss = Vector{TTNKit.AbstractObserver}(undef,num_excited_states)
+	densmats = Vector{Matrix{ComplexF64}}(undef,num_excited_states)
+	ttns_ortho::Vector{TTNKit.TreeTensorNetwork} = [ground_state]
+	for es_number in 1:num_excited_states
+		if if_densmat
+			new_ttn, new_ham, new_sp, new_obs, runtime, new_densmat = find_excited_state(ttn,ttns_ortho,ham,sweep_type,if_densmat,location,actual_filename; kwargs...)
+		else
+			new_ttn, new_ham, new_sp, new_obs, runtime = find_excited_state(ttn,ttns_ortho,ham,sweep_type,if_densmat,location,actual_filename; kwargs...)
+		end
+
+		runtimes[es_number] = runtime
+		append!(ttns_ortho,[new_sp.ttn])
+		obss[es_number] = new_obs
+		if_densmat ? densmats[es_number] = new_densmat : nothing
+
+		if if_save_data
+			metadata["observer_$es_number"] = new_obs
+			metadata["runtime_$es_number"] = runtime
+			try
+				metadata["energies_$es_number"] = new_obs.nrg
+			catch
+				nothing
+			end
+			metadata["maxlinkdim_$es_number"] = TTNKit.maxlinkdim(new_sp.ttn)
+			ttn_data_dict = if_gpu ? Dict([("ttn_$es_number",back2cpu(new_sp.ttn))]) : Dict([("ttn_$es_number",new_sp.ttn)])
+			if_densmat ? ttn_data_dict["densmat_$es_number"] = new_densmat : nothing
+			
+			new_metadata::Dict{String,Any} = Dict([("observer_$es_number",metadata["observer_$es_number"]),("runtime_$es_number",metadata["runtime_$es_number"]),("energies_$es_number",metadata["energies_$es_number"]),("maxlinkdim_$es_number",metadata["maxlinkdim_$es_number"])])
+			modify_data_jld2(new_metadata,location * "/" * actual_filename,"metadata")
+			modify_data_jld2(ttn_data_dict,location * "/" * actual_filename,"all_data")
+		end
+
+		println("Finished Excited State $es_number")
+	end
+
+		
+	if if_densmat
+		return ttns_ortho, ham, obss, densmats, runtimes
+	else
+		return ttns_ortho, ham, obss, runtimes
+	end
+end
+
+function find_excited_states(filename::String,num_excited_states::Int; kwargs...)
+	dataloc,actual_filename = separate_filename_location(filename)
+
+	# put a check that the location actually exists and not running in the wrong directory
+
+	data,metadata = read_data_jld2(actual_filename,dataloc)
+	if "densmat" in keys(data)
+		count_found_states = Int(length(keys(data))/2)
+	else
+		count_found_states = length(keys(data))
+	end
+
+	# see if already found all states asking for
+	if count_found_states >= num_excited_states
+		println("Existing data found")
+		# do the return function here
+	end
+
+end
+	
 
 mutable struct NRGVarObserver <: AbstractObserver
     var_tol::Float64
