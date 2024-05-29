@@ -67,7 +67,7 @@ if typeof(open_cores) != String
     display(BLAS.get_config())
 end
 
-params_dict = Dict([("if_save_data",false),("lattice_size",(2,2)),("alpha",0.0),("if_periodic_phys",false),("if_periodic_virt",false)])
+params_dict = Dict([("if_save_data",false),("lattice_size",(4,4)),("mdim",100),("alpha",0.0),("if_periodic_phys",false),("if_periodic_virt",false)])
 
 nrgtol = 5E-5
 onsite_strength = get(params_dict, "onsite_strength", 0.0)
@@ -76,8 +76,10 @@ mdim = get(params_dict, "mdim", 10)
 longrange_dist = get(params_dict, "lr", 0)
 alpha = get(params_dict, "alpha", nothing)
 phys_edge_length,virt_edge_length = get(params_dict, "lattice_size", [4,4])
-if phys_edge_length <= 4 && virt_edge_length <= 4
+if 2 <= phys_edge_length < 4
     layer_count = 2
+elseif 4 <= phys_edge_length < 8
+	layer_count = 4
 else
     layer_count = 6
 end
@@ -100,7 +102,7 @@ ts = 1.0
 tot_sites = 2^layer_count
 syms = get(params_dict, "syms", true)
 
-nswps = 1
+nswps = 10
 
 save_data = get(params_dict, "if_save_data", true)
 if_cluster = any([occursin("local",pwd()),occursin("Local",pwd()),occursin("geraghty",pwd())])
@@ -155,6 +157,7 @@ model_paras = (hopping_anisotropy=anis,
 						expander=expan,
 						max_occ=1,
 						mdim=mdim,
+						weight=100.0,
 						num_sweeps=nswps,
 						phi=alpha,
 						output_level=0,
@@ -176,7 +179,7 @@ end
 
 # finding excited states TTN
 if true
-    es_count = 1
+    es_count = 3
     all_states, hamilt, all_obs, all_densmats, all_runtimes = find_excited_states(layer_count,es_count,num_particles,dm_sp.ttn; ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("t_strength",ts)])))
 end
 
@@ -187,7 +190,7 @@ if true
     x0_ed = rand(Float64,size(lattice_params["full_basis"])[2])
     rez_ed = eigsolve(ed_ham,x0_ed,es_count+1,:SR,Lanczos())
     sorted_indices_ed = sortperm(rez_ed[1])
-    #states_ed = rez_ed[2][sorted_indices_ed][1:es_count+1]
+    states_ed = rez_ed[2][sorted_indices_ed][1:es_count+1]
     nrgs_ed = rez_ed[1][sorted_indices_ed][1:es_count+1]
 end
 

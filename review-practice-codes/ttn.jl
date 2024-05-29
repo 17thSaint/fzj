@@ -716,6 +716,7 @@ end
 function do_sweep(ttn,ham,sweep_type; kwargs...)
 
 	psi_ortho = get(kwargs, :psi_ortho, nothing)
+	weight = get(kwargs, :weight, 10.0)
 	if_redo = get(kwargs, :if_redo, false)
 	opl::Int = get(kwargs, :output_level, 0)
 	cutoff::Float64 = get(kwargs, :cutoff, 10^-8)
@@ -745,7 +746,7 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 		if isnothing(psi_ortho)
 			sp::TTNKit.AbstractSweepHandler = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff)
 		else
-			sp = TTNKit.dmrg(ttn,psi_ortho,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff)
+			sp = TTNKit.dmrg(ttn,psi_ortho,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff, weight=weight)
 		end
 	elseif sweep_type == "simple"
 		proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
@@ -1109,7 +1110,7 @@ function find_excited_states(num_layers::Int,num_excited_states::Int,particle_co
 			modify_data_jld2(ttn_data_dict,location * "/" * actual_filename,"all_data")
 		end
 
-		println("Finished Excited State $es_number")
+		println("Finished Excited State $es_number \n")
 	end
 
 		
