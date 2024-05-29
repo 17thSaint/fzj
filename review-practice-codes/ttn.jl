@@ -1179,6 +1179,32 @@ function find_excited_states(filename::String,num_excited_states::Int,new_parame
 
 end
 
+function find_spectrum(model_paras::Dict,num_excited_states::Int,metadata::Dict; kwargs...)
+	if_densmat = model_paras[:if_densmat]
+
+	if if_densmat
+		og_ttn, hamilt, gs_sp, gs_obs, gs_runtime, gs_dens = find_ground_state(metadata["layers"],metadata["particles"]; ttn_net=metadata["net"],ham_op=metadata["ham"],model_paras...,metadata=metadata)
+	else
+		og_ttn, hamilt, gs_sp, gs_obs, gs_runtime = find_ground_state(metadata["layers"],metadata["particles"]; ttn_net=metadata["net"],ham_op=metadata["ham"],model_paras...,metadata=metadata)
+	end
+
+	if num_excited_states == 0
+		if if_densmat
+			return og_ttn, hamilt, gs_sp, gs_obs, gs_runtime, gs_dens
+		else
+			return og_ttn, hamilt, gs_sp, gs_obs, gs_runtime
+		end
+	else
+		if if_densmat
+			ttns_ortho, ham, obss, densmats, runtimes = find_excited_states(metadata["layers"],num_excited_states,metadata["particles"],gs_sp.ttn; ham_op=metadata["ham"],model_paras...,metadata=metadata)
+			return ttns_ortho, ham, append!([gs_obs], obss), append!([gs_dens], densmats), append!([gs_runtime], runtimes)
+		else
+			ttns_ortho, ham, obss, runtimes = find_excited_states(metadata["layers"],num_excited_states,metadata["particles"],gs_sp.ttn; ham_op=metadata["ham"],model_paras...,metadata=metadata)
+			return ttns_ortho, ham, append!([gs_obs], obss), append!([gs_runtime], runtimes)
+		end
+	end
+end
+
 mutable struct NRGVarObserver <: AbstractObserver
     var_tol::Float64
     nrg::Vector{Float64}

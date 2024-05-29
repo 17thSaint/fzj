@@ -141,7 +141,7 @@ function plot_long_range_scaling(strengths,virt_edge_length; kwargs...)
 	return
 end
 
-function build_HH_net(num_layers; kwargs...)
+function build_HH_net(num_layers::Int64; kwargs...)
 	conserve_qns = get(kwargs, :syms, true)
 	if_fermion = get(kwargs, :if_fermion, false)
 	particle_type = if_fermion ? "Fermion" : "Boson"
@@ -150,6 +150,13 @@ function build_HH_net(num_layers; kwargs...)
 	net = if_fermion ? TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, particle_type;conserve_nf=conserve_qns,conserve_nfparity=false) : TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, particle_type;conserve_qns=conserve_qns,dim=max_occ+1)
 	
 	return net
+end
+
+function build_HH_net(model_paras::Dict)
+	num_layers = model_paras[:layers]
+	syms = model_paras[:syms]
+	max_occ = model_paras[:max_occ]
+	return build_HH_net(num_layers; syms=syms, max_occ=max_occ)
 end
 
 # isotropic not implemented for cylinder
@@ -213,7 +220,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	phys_edge_length,virt_edge_length = get_lattice_dims(net)
 	println("Phys = ",phys_edge_length,", Virt = ",virt_edge_length)
 	
-	scaling_distance = get(kwargs, :scaling_dist, 0)
+	scaling_distance = get(kwargs, :lr, 0)
 	
 	which_dir = get(kwargs, :which_dir, "virt")
 	restricted_size = get(kwargs, :restricted_size, [phys_edge_length,virt_edge_length])
@@ -1183,25 +1190,186 @@ function check_fluxes(alpha,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_
     return nothing
 end
 
+function make_synthdims_filename(model_parameters::Dict)
+	# Start with the usual stuff for every filename
+	layer_count = model_parameters["layers"]
+	longrange_dist = model_parameters["lr"]
+	num_particles = model_parameters["particles"]
+	alpha = model_parameters["alpha"]
+	if_periodic_phys = model_parameters["if_periodic_phys"]
+	if_periodic_synth = model_parameters["if_periodic_synth"]
+	onsite_strength = model_parameters["onsite_strength"]
+	anis = model_parameters["hopping_anisotropy"]
+	
+	filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_phys",if_periodic_phys),("if_periodic_synth",if_periodic_synth),("onsite_strength",onsite_strength),("hopping_anisotropy",anis)])
 
-# Usage:
-# averaged_dict = average_close_keys(your_dict, 0.1)
+	if model_parameters["scaling"] != "flat"
+		filename_dict["scaling"] = model_parameters["scaling"]
+	end
 
-#= Momentum occupation testing
-lnet = build_HH_net(4; syms=true)
-states = fill("0", 16)
-old_ttn = TTNKit.ProductTreeTensorNetwork(lnet,states)
-ttn = initialize_ttn(old_ttn,50,1)
-freeboson_ham = long_range_HH_ham(lnet,1.0,0.0)
-old, hamilt, dm_sp = find_ground_state(4,1,1.0; ham_op=freeboson_ham,ttn_net=lnet,seed_ttn=ttn,sweep_type="dmrg",output_level=1,mdim=50,num_sweeps=10,if_save_data=false)
-fb_gs = dm_sp.ttn
-fb_occ_mat = get_occupancy(fb_gs)
-=#
+	if model_parameters["ts"] != 1.0
+		filename_dict["ts"] = model_parameters["ts"]
+	end
+
+	if model_parameters["twist_angle"] != 0.0
+		filename_dict["twist_angle"] = model_parameters["twist_angle"]
+	end
+
+	return make_parameters_filename(filename_dict)
+end
+
+
+function get_normal_model_params(params_dict::Dict)
+
+	# DMRG parameters
+	sweep_type = get(params_dict, "sweep_type", "dmrg")
+	nrgtol = get(params_dict, "nrgtol", 1E-4)
+	cutoff = get(params_dict, "cutoff", 0.0)
+	evolve = get(params_dict, "evolve", true)
+	expander_fraction = get(params_dict, "expander_fraction", 1.0)
+	expan = TTNKit.DefaultExpander(expander_fraction)
+	noise = get(params_dict, "noise", [0.0])
+	syms = get(params_dict, "syms", true)
+	nswps = get(params_dict, "num_sweeps", 100)
+
+
+	# Lattice/TTN Parameters
+	layer_count = Int(get(params_dict, "layers", 4))
+	mdim = get(params_dict, "mdim", 300)
+	if_periodic_phys = get(params_dict, "if_periodic_phys", false)
+	if_periodic_synth = get(params_dict, "if_periodic_synth", false)
+	max_occ = get(params_dict, "max_occ", 1)
+
+	# Get Lattice parameters whose values depend on other parameters
+	if layer_count % 2 == 0
+		edge_sites = Int(sqrt(2^layer_count))
+		phys_edge_length,synth_edge_length = edge_sites,edge_sites
+		num_particles = get(params_dict, "particles", Int(edge_sites/2))
+	else
+		edge_sites = Int(sqrt(2^(layer_count+1)))
+		phys_edge_length,synth_edge_length = edge_sites,Int(edge_sites/2)
+		num_particles = get(params_dict, "particles", Int(sqrt(2^(layer_count+1))/2))
+	end
+
+	make_smaller_lattice = get(params_dict, "make_smaller_lattice", [phys_edge_length,synth_edge_length])
+	if make_smaller_lattice != [phys_edge_length,synth_edge_length]
+		phys_edge_length,synth_edge_length = make_smaller_lattice
+		edge_sites = phys_edge_length
+	end
+
+
+	# Hamiltonian parameters
+	alpha = get(params_dict, "alpha", nothing)
+
+	hopping_amplitude = get(params_dict, "ts", 1.0)
+	anis = get(params_dict, "hopping_anisotropy", 1.0)
+
+	onsite_strength = get(params_dict, "onsite_strength", 0.0)
+	longrange_dist = get(params_dict, "lr", 0)
+	longrange_dist == "all" ? longrange_dist = edge_sites-1 : nothing
+	if_cliff = get(params_dict, "if_cliff", false)
+	trunc = get(params_dict,"trunc",1e-3)
+	sc_type = get(params_dict,"scaling","flat")
+	which_dir = get(params_dict, "which_dir", "virt") # which axis does the anisotropic interaction act along
+
+	mu = get(params_dict, "chem_strength", 0.0)
+	mag_off = get(params_dict, "mag_off", true)
+	if_pinning = get(params_dict, "if_pinning", false)
+	centralflux_strength = get(params_dict, "centralflux_strength", 0.0)
+	twist_angle = get(params_dict, "twist_angle", 0.0)
+
+	if isnothing(alpha)
+		filling = get(params_dict, "filling", 1.0)
+		phys_shift,synth_shift = !if_periodic_phys,!if_periodic_synth
+		alpha = num_particles/(filling*(phys_edge_length - phys_shift)*(synth_edge_length - synth_shift))
+		mag_off = false
+	else
+		mag_off = alpha == 0.0
+	end
+	check_fluxes(alpha,phys_edge_length,synth_edge_length,if_periodic_phys,if_periodic_synth)
+
+
+	# What to calculate
+	if_densmat = get(params_dict, :if_densmat, true)
+	save_data = get(params_dict, "if_save_data", true)
+	if_cluster = any([occursin("local",pwd()),occursin("Local",pwd()),occursin("geraghty",pwd())])
+	if_continuous_saving = get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 7)
+	save_data ? nothing : if_continuous_saving = false
+
+	if if_periodic_phys && if_periodic_synth
+		dataloc = get_folder_location("cluster-data/synth-dims/torus")
+	elseif if_periodic_phys || if_periodic_synth
+		dataloc = get_folder_location("cluster-data/synth-dims")
+	elseif !if_periodic_phys && !if_periodic_synth
+		dataloc = get_folder_location("cluster-data/synth-dims/obc")
+	end
+	if sc_type == "rydberg"
+		dataloc = get_folder_location("cluster-data/synth-dims/rydberg")
+	end
+	loc = get(params_dict, "dataloc", dataloc)
 	
 
 
+	# hardware parameters
+	if_gpu = get(params_dict, "if_gpu", false)
+	
+	# Misc, not used anymore
+	if_change = get(params_dict, "if_change", false)
+	change = get(params_dict, "change", 0.0001)
+	if_NN = get(params_dict, "if_nn_int", false)
+
+	
+	model_paras_dict = Dict("hopping_anisotropy"=>anis,
+						"layers"=>layer_count,
+						"particles"=>num_particles,
+						"ts"=>hopping_amplitude,
+						"syms"=>syms,
+						"cutoff"=>cutoff,
+						"twist_angle"=>twist_angle,
+						"if_continuous_saving"=>if_continuous_saving,
+						"nrgtol"=>nrgtol,
+						"if_densmat"=>if_densmat,
+						"restricted_size"=>make_smaller_lattice,
+						"centralflux_strength"=>centralflux_strength,
+						"if_pinning_pot"=>if_pinning,
+						"if_periodic_phys"=>if_periodic_phys,
+						"if_periodic_synth"=>if_periodic_synth,
+						"if_nn_int"=>if_NN,
+						"chem_strength"=>mu,
+						"alpha"=>alpha,
+						"no_magF"=>mag_off,
+						"scaling"=>sc_type,
+						"lr"=>longrange_dist,
+						"onsite_strength"=>onsite_strength,
+						"which_dir"=>which_dir,
+						"cliff"=>if_cliff,
+						"trunc"=>trunc,
+						"if_change"=>if_change,
+						"change"=>change,
+						"if_gpu"=>if_gpu,
+						"noise"=>noise,
+						"if_save_data"=>save_data,
+						"if_sweep"=>evolve,
+						"sweep_type"=>sweep_type,
+						"expander"=>expan,
+						"max_occ"=>max_occ,
+						"mdim"=>mdim,
+						"num_sweeps"=>nswps,
+						"phi"=>alpha,
+						"output_level"=>0,
+						"location"=>loc)
+		
+	filename = make_synthdims_filename(model_paras_dict)
+	model_paras_dict["name"] = "ttn-"*filename
+	
+	return dict_to_symbols(model_paras_dict)
+end
+
+
+
+
 #
-if false
+if true
 
 #nnst = 0.0
 #layers = 6
@@ -1224,7 +1392,7 @@ end=#
 #strens = range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("dataloc",get_folder_location("cluster-data/synth-dims/excited-states")),("hopping_anisotropy",1.0),("make_smaller_lattice",[2,2]),("nrgtol",5e-5),("particles",2),("layers",2),("mdim",100),("if_save_data",false),("alpha",0.0),("onsite_strength",0.0),("lr",0),("if_periodic_phys",false),("if_periodic_virt",false)])
+	params_dict = Dict([("hopping_anisotropy",1.0),("make_smaller_lattice",[4,4]),("nrgtol",5e-5),("particles",2),("layers",4),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
 	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)
@@ -1232,227 +1400,37 @@ end=#
 		BLAS.set_num_threads(open_cores)	
 		display(BLAS.get_config())
 	end
-	#true
-	nrgtol = get(params_dict, "nrgtol", 1E-4)
-	cutoff = get(params_dict, "cutoff", 0.0)
-	if_NN = get(params_dict, "if_nn_int", false)
-	if_pinning = get(params_dict, "if_pinning", false)
-	if_gpu = get(params_dict, "if_gpu", false)
-	if_change = get(params_dict, "if_change", false)
-	if_densmat = get(params_dict, :if_densmat, true)
-	change = get(params_dict, "change", 0.0001)
-	onsite_strength = get(params_dict, "onsite_strength", 0.0)
-	which_dir = get(params_dict, "which_dir", "virt")
-	anis = get(params_dict, "hopping_anisotropy", 1.0)
-	layer_count = Int(get(params_dict, "layers", 4))
-	mag_off = get(params_dict, "mag_off", true)
-	mdim = get(params_dict, "mdim", 300)
-	longrange_dist = get(params_dict, "lr", 0)
-	centralflux_strength = get(params_dict, "centralflux_strength", 0.0)
-	twist_angle = get(params_dict, "twist_angle", 0.0)
-	if if_change in ["pos","neg"]
-		if if_change == "pos"
-			alpha = get(params_dict, "alpha", nothing) + change
-			params_dict["alpha"] = round(alpha,digits=4)
-		elseif if_change == "neg"
-			alpha = get(params_dict, "alpha", nothing) - change
-			params_dict["alpha"] = round(alpha,digits=4)
-		end
-	else
-		alpha = get(params_dict, "alpha", nothing)
-	end
-	#
-	if layer_count % 2 == 0
-		edge_sites = Int(sqrt(2^layer_count))
-		phys_edge_length,synth_edge_length = edge_sites,edge_sites
-		num_particles = get(params_dict, "particles", Int(edge_sites/2))
-	else
-		edge_sites = Int(sqrt(2^(layer_count+1)))
-		phys_edge_length,synth_edge_length = edge_sites,Int(edge_sites/2)
-		num_particles = get(params_dict, "particles", Int(sqrt(2^(layer_count+1))/2))
-	end
-
-	make_smaller_lattice = get(params_dict, "make_smaller_lattice", [phys_edge_length,synth_edge_length])
-	if make_smaller_lattice != [phys_edge_length,synth_edge_length]
-		phys_edge_length,synth_edge_length = make_smaller_lattice
-		edge_sites = phys_edge_length
-	end
-
-	if_per_phys = get(params_dict, "if_periodic_phys", true)
-	if_per_virt = get(params_dict, "if_periodic_virt", false)
-	if isnothing(alpha)
-		filling = get(params_dict, "filling", 1.0)
-		phys_shift,synth_shift = !if_per_phys,!if_per_virt
-		alpha = num_particles/(filling*(phys_edge_length - phys_shift)*(synth_edge_length - synth_shift))
-		mag_off = false
-	else
-		mag_off = alpha == 0.0
-	end
-	check_fluxes(alpha,phys_edge_length,synth_edge_length,if_per_phys,if_per_virt)
-	#
-
-	#
-	#nu = 1.0
-	sweep_type = "dmrg"
-	max_occ = get(params_dict, "max_occ", 1)
 	
-	evolve = true
-	#max_occupation = 3
-	expan = TTNKit.DefaultExpander(1.0)#TTNKit.NoExpander()
-	herenoise = [0.0]
-	ts = 1.0
-	mu = get(params_dict, "chem_strength", 0.0)
-	tot_sites = 2^layer_count
-	syms = get(params_dict, "syms", true)
-	#=
-	nu = 1.0
-	if isnothing(alpha)
-		if !mag_off
-			alpha = num_particles/(nu * (tot_sites))
-		else
-			alpha = 0.0
-		end
-	end
-	=#
-	nswps = 100
-	#alpha = 7/64
-	#num_particles = Int(sqrt(2^layer_count)/2)#Int(alpha * tot_sites * nu)
-	
-
-	plotting = false
-	save_plot = false
-	save_data = get(params_dict, "if_save_data", true)
-	if_cluster = any([occursin("local",pwd()),occursin("Local",pwd()),occursin("geraghty",pwd())])
-	if_continuous_saving = get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 7)
-	save_data ? nothing : if_continuous_saving = false
-
-	
-	if_cliff = false
-	trunc = get(params_dict,"trunc",1e-3)
-	sc_type = "flat"
-	dists = [i for i in 1:2*edge_sites]
-	longrange_dist == "all" ? longrange_dist = edge_sites-1 : nothing
-	lr_scaling = long_range_scaling(longrange_dist,edge_sites,onsite_strength; cliff=if_cliff,scaling=sc_type,if_plot=false,trunc=trunc)
-
-	if if_per_phys && if_per_virt
-		dataloc = get_folder_location("cluster-data/synth-dims/torus")
-	elseif if_per_phys || if_per_virt
-		dataloc = get_folder_location("cluster-data/synth-dims")
-	elseif !if_per_phys && !if_per_virt
-		dataloc = get_folder_location("cluster-data/synth-dims/obc")
-	end
-	if sc_type == "rydberg"
-		dataloc = get_folder_location("cluster-data/synth-dims/rydberg")
-	end
-	loc = get(params_dict, "dataloc", dataloc)
-
-	groundstate_data = read_data_jld2("ttn-if_periodic_phys-false-onsite_strength-0.0-lr-0-particles-2-alpha-0.0-layers-2-hopping_anisotropy-1.0.jld2",loc)
-	groundstate = groundstate_data[1]["ttn"]
-	
-	#counting = 50
-	#strens = range(num_particles/(0.2*tot_sites),num_particles/(2.0*tot_sites),length=counting) #range(0.02,0.25,length=counting)
-	#sforderparams = zeros(counting)
-	#=alpha_start = 0.0525
-	alpha_end = 0.0725
-	alpha_count = 5
-	alphas = [alpha_start + (i-1)*(alpha_end-alpha_start)/(alpha_count-1) for i in 1:alpha_count] .- change/2
-	alphas = [alphas; alphas .+ change]
-	#
-	alpha_center = mag_off ? 0.0 : 1 * num_particles / tot_sites
-	wavefuncs = []
-	currents = []
-	nrgs = []
-	#display(alphas)
-	counting = 50
-	centralflux_strength = 0.0
-	#parts = [i for i in 1:Int(tot_sites/2)]
-	#fillings = range(0.2,3.0,length=counting)
-	strens = range(num_particles/(0.2*tot_sites),num_particles/(3.0*tot_sites),length=counting) #range(0.02,0.25,length=counting)
-	centermoms = [0.0 for i in 1:counting]# .* im
-	=#
-	#for (idx,alpha) in enumerate(strens)
-	#for (idx,num_particles) in enumerate(parts)
-		#alpha = 0.0
-		filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_phys",if_per_phys),("onsite_strength",onsite_strength),("hopping_anisotropy",anis)])
-		if make_smaller_lattice != [sqrt(2^layer_count),sqrt(2^layer_count)]
-			filename_dict["make_smaller_lattice"] = phys_edge_length
-		end
-		twist_angle != 0.0 ? filename_dict["twist_angle"] = twist_angle : nothing
-		#if length(keys(params_dict)) == 0
-		#	datafile_name = "layers-$layer_count-particles-$num_particles-mdim-$mdim-mag-$(!mag_off)-lr-$longrange_dist"
-		#else
-			datafile_name = make_parameters_filename(filename_dict)
-		#end
-		model_paras = (hopping_anisotropy=anis,
-						syms=syms,
-						cutoff=cutoff,
-						twist_angle=twist_angle,
-						if_continuous_saving=if_continuous_saving,
-						nrgtol=nrgtol,
-						if_densmat=if_densmat,
-						restricted_size=make_smaller_lattice,
-						centralflux_strength=centralflux_strength,
-						if_pinning_pot=if_pinning,
-						if_periodic_phys=if_per_phys,
-						if_periodic_virt=if_per_virt,
-						if_nn_int=if_NN,
-						nn_int_strength=lr_scaling[2],
-						chem_strength=mu,
-						no_magF=mag_off,
-						scaling=sc_type,
-						scaling_dist=longrange_dist,
-						onsite_strength=onsite_strength,
-						which_dir=which_dir,
-						cliff=if_cliff,
-						trunc=trunc,
-						if_change=if_change,
-						change=change,
-						if_gpu=if_gpu,
-						noise=herenoise,
-						if_save_data=save_data,
-						if_save_fig=save_plot,
-						if_sweep=evolve,
-						sweep_type=sweep_type,
-						expander=expan,
-						max_occ=max_occ,
-						mdim=mdim,
-						num_sweeps=nswps,
-						phi=alpha,
-						output_level=0,
-						name="ttn-"*datafile_name,
-						location=loc)
+	model_paras = get_normal_model_params(params_dict)
 		
-		metadata_dict = merge(named_tuple_to_dict(model_paras),filename_dict)
+	metadata_dict = named_tuple_to_dict(model_paras)
 
 		#
-		println(datafile_name)
-		if_exists,found_data = false,nothing#check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
+	println(model_paras[:name])
+	if_exists,found_data = false,nothing#check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
 
-		if if_exists
-			println("Found Data")
-			wavefunc = found_data[1]["ttn"]
-			dens = found_data[1]["densmat"]
+	if if_exists
+		println("Found Data")
+		wavefunc = found_data[1]["ttn"]
+		dens = found_data[1]["densmat"]
+		rezobs = found_data[2]["observer"]
+		ham = found_data[2]["ham"]
+		#append!(wavefuncs,[wavefunc])
+	else
 
-			rezobs = found_data[2]["observer"]
-			ham = found_data[2]["ham"]
-			#append!(wavefuncs,[wavefunc])
-		else
-			#title_string = "Np = $num_particles, LR = $longrange_dist at $limit"
-			println("Starting Script using $num_particles particles on $tot_sites sites with $(!mag_off) Mag Field, Bond Dim = $mdim, and Long Range Dist = $longrange_dist")
-			#if true
-			#densmat = nothing
-			starting = time()
-			net = TTNKit.network(groundstate)#build_HH_net(layer_count; syms=syms, max_occ=max_occ)
-			ham = long_range_HH_ham(net,ts,alpha; model_paras...)
-			#display(ham)
-			es_count = 2
-			all_states, hamilt, all_obs, all_densmats, all_runtimes = find_excited_states(layer_count,es_count,num_particles,groundstate; ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("t_strength",ts)])))
-			#og_ttn, hamilt, dm_sp, rezobs, runtime, dens = find_ground_state(layer_count,num_particles; ttn_net=net,ham_op=ham,model_paras...,metadata=merge(metadata_dict,Dict([("ham",ham),("net",net),("t_strength",ts)])))
-			total_time = time() - starting
-			println("Running time = $total_time")
-			#wavefunc = dm_sp.ttn
-			#append!(wavefuncs,[dm_sp.ttn])
-		end
+		println("Starting Script using $(model_paras[:particles]) particles on $(2^model_paras[:layers]) sites with Flux = $(round(model_paras[:alpha],digits=4)), Bond Dim = $(model_paras[:mdim]), and Long Range Dist = $(model_paras[:lr])")
+
+		starting = time()
+		net = build_HH_net(model_paras)
+		ham = long_range_HH_ham(net,model_paras[:ts],model_paras[:alpha]; model_paras...)
+		metadata_dict["ham"] = ham
+		metadata_dict["net"] = net
+		es_count = 2
+		all_states, hamilt, all_obs, all_densmats, all_runtimes = find_spectrum(model_paras,es_count,metadata_dict) #og_ttn, hamilt, gs_sp, gs_obs, gs_runtime, gs_dens
+		total_time = time() - starting
+		println("Running time = $total_time")
+		
+	end
 
 		#imshow(real.(dens))
 		#colorbar()
@@ -1485,7 +1463,9 @@ end=#
 		get_occupancy(wavefunc; plot_title = "Filling = $(round(num_particles/(alpha*tot_sites),digits=4))",densmat=dens)
 		=#
 
-		#occs = get_occupancy(wavefunc; plot_title="$stren")
+		for i in 1:es_count+1
+			occs = get_occupancy(all_states[i]; densmat=all_densmats[i], plot_title="Level $(i-1)")
+		end
 		#densities[idx] = sum(occs) / tot_sites
 		#scatter([mu],[densities[idx]],c="b")
 		#xlabel("Chemical Potential")
