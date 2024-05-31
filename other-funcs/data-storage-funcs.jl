@@ -28,6 +28,20 @@ function named_tuple_to_dict(namedtuple)
 	return new_dict
 end
 
+function check_datafolder_exists(folder_name::String)
+	current_location = pwd()
+	try
+		cd(folder_name)
+		cd(current_location)
+		correct_location = folder_name
+		return correct_location
+	catch
+		println("The directory $folder_name is not accessible")
+		correct_location = get_folder_location("cluster-data"*split(folder_name,"cluster-data")[end])
+		return correct_location
+	end
+end
+
 function dict_to_symbols(given_dict)
 	new_dict = Dict()
 	for (key,value) in given_dict

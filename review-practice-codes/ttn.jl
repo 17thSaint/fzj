@@ -1009,7 +1009,7 @@ function find_excited_states(num_layers::Int,num_excited_states::Int,particle_co
 	if_save_data::Bool = get(kwargs, :if_save_data, true)
 	if_save_data ? nothing : if_continuous_saving = false
 	sweep_type::String = get(kwargs, :sweep_type, "dmrg")
-	ham_operator = get(kwargs, :ham_op, nothing)
+	ham_operator = get(kwargs, :ham, nothing)
 	seed_ttn = get(kwargs, :seed_ttn, nothing)
 	if_gpu::Bool = get(kwargs, :if_gpu, false)
 	particle_type::String = get(kwargs, :part_type, "Boson")
@@ -1125,40 +1125,45 @@ function find_excited_states(num_layers::Int,num_excited_states::Int,particle_co
 	return find_excited_states(num_layers::Int,num_excited_states::Int,particle_count::Int,[ground_state]; kwargs...)
 end
 
-function find_excited_states(filename::String,num_excited_states::Int,new_parameters::Dict{String,Any}=Dict(); kwargs...)
+function find_excited_states(filename::String,num_excited_states::Int,new_parameters::Dict=Dict(); kwargs...)
 
 	dataloc,actual_filename = separate_filename_location(filename)
-
-	# put a check that the location actually exists and not running in the wrong directory
 
 	data,metadata_old = read_data_jld2(actual_filename,dataloc)
 	if "densmat" in keys(data)
 		count_found_states = Int(length(keys(data))/2)
 	else
-		count_found_states = length(keys(data))
+		count_found_states = length(keys(data)) 
+	end
+
+	# changes the data location if old metadata is from another computer
+	correct_dataloc = check_datafolder_exists(dataloc)
+	if correct_dataloc != metadata_old["location"]
+		metadata_old["location"] = correct_dataloc
 	end
 
 	if_redo = false
 	if !isempty(new_parameters)
 		if_redo = true
 		for (key,value) in new_parameters
-			metadata[key * "_old"] = metadata_old[key]
+			metadata_old[key * "_old"] = metadata_old[key]
 			metadata_old[key] = value
 		end
+		modify_data_jld2(metadata_old,correct_dataloc*"/"*actual_filename, "metadata")
 	end
 
 	# see if already found all states asking for
-	if count_found_states >= num_excited_states && !if_redo
+	if count_found_states >= num_excited_states + 1 && !if_redo
 		println("Existing data found")
-		ortho_states = Vector{TTNKit.TreeTensorNetwork}(undef,num_excited_states)
-		densmats = Vector{Matrix{ComplexF64}}(undef,num_excited_states)
-		obss = Vector{TTNKit.AbstractObserver}(undef,num_excited_states)
-		runtimes = zeros(num_excited_states)
+		ortho_states = Vector{TTNKit.TreeTensorNetwork}(undef,num_excited_states+1)
+		densmats = Vector{Matrix{ComplexF64}}(undef,num_excited_states+1)
+		obss = Vector{TTNKit.AbstractObserver}(undef,num_excited_states+1)
+		runtimes = zeros(num_excited_states+1)
 		ortho_states[1] = data["ttn"]
 		densmats[1] = data["densmat"]
 		obss[1] = metadata_old["observer"]
 		runtimes[1] = metadata_old["runtime"]
-		for i in 2:num_exicted_states
+		for i in 2:num_excited_states+1
 			ortho_states[i] = data["ttn_$(i-1)"]
 			densmats[i] = data["densmat_$(i-1)"]
 			obss[i] = metadata_old["observer_$(i-1)"]
@@ -1623,7 +1628,7 @@ function plot_occupancy(exp_occ; kwargs...)
 		exp_occ = data_dict["vals"]
 	end
 	fig = figure()
-	imshow(transpose(exp_occ))
+	imshow(exp_occ)
 	colorbar()
 	plot_title = get(kwargs, :plot_title, "")
 	title_string = "Occupancy, " * plot_title
