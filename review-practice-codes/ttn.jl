@@ -834,7 +834,7 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 	max_occ::Int = get(kwargs, :max_occ, Int(round(particle_count/(num_sites))+1) )
 	warming_limit::Int = get(kwargs, :warming_limit, 100)
 	conserve_qns::Bool = get(kwargs, :syms, true)
-	ham_operator = get(kwargs, :ham_op, nothing)
+	ham_operator = get(kwargs, :ham, nothing)
 	net = get(kwargs, :ttn_net, nothing)
 	ttn = get(kwargs, :seed_ttn, nothing)
 	if_gpu::Bool = get(kwargs, :if_gpu, false)
@@ -1069,6 +1069,9 @@ function find_excited_states(num_layers::Int,num_excited_states::Int,particle_co
 	end
 	println("Added States")
 	
+	if isnothing(ham_operator)
+		ham_operator = metadata["ham"]
+	end
 	ham::TTNKit.AbstractTensorProductOperator = TTNKit.TPO(ham_operator,lat)
 	if if_gpu
 		println("Doing GPU Ham TPO")
@@ -1188,9 +1191,9 @@ function find_spectrum(model_paras::Dict,num_excited_states::Int,metadata::Dict;
 	if_densmat = model_paras[:if_densmat]
 
 	if if_densmat
-		og_ttn, hamilt, gs_sp, gs_obs, gs_runtime, gs_dens = find_ground_state(metadata["layers"],metadata["particles"]; ttn_net=metadata["net"],ham_op=metadata["ham"],model_paras...,metadata=metadata)
+		og_ttn, hamilt, gs_sp, gs_obs, gs_runtime, gs_dens = find_ground_state(metadata["layers"],metadata["particles"]; ttn_net=metadata["net"],ham=metadata["ham"],model_paras...,metadata=metadata)
 	else
-		og_ttn, hamilt, gs_sp, gs_obs, gs_runtime = find_ground_state(metadata["layers"],metadata["particles"]; ttn_net=metadata["net"],ham_op=metadata["ham"],model_paras...,metadata=metadata)
+		og_ttn, hamilt, gs_sp, gs_obs, gs_runtime = find_ground_state(metadata["layers"],metadata["particles"]; ttn_net=metadata["net"],ham=metadata["ham"],model_paras...,metadata=metadata)
 	end
 
 	if num_excited_states == 0
@@ -1201,10 +1204,10 @@ function find_spectrum(model_paras::Dict,num_excited_states::Int,metadata::Dict;
 		end
 	else
 		if if_densmat
-			ttns_ortho, ham, obss, densmats, runtimes = find_excited_states(metadata["layers"],num_excited_states,metadata["particles"],gs_sp.ttn; ham_op=metadata["ham"],model_paras...,metadata=metadata)
+			ttns_ortho, ham, obss, densmats, runtimes = find_excited_states(metadata["layers"],num_excited_states,metadata["particles"],gs_sp.ttn; ham=metadata["ham"],model_paras...,metadata=metadata)
 			return ttns_ortho, ham, append!([gs_obs], obss), append!([gs_dens], densmats), append!([gs_runtime], runtimes)
 		else
-			ttns_ortho, ham, obss, runtimes = find_excited_states(metadata["layers"],num_excited_states,metadata["particles"],gs_sp.ttn; ham_op=metadata["ham"],model_paras...,metadata=metadata)
+			ttns_ortho, ham, obss, runtimes = find_excited_states(metadata["layers"],num_excited_states,metadata["particles"],gs_sp.ttn; ham=metadata["ham"],model_paras...,metadata=metadata)
 			return ttns_ortho, ham, append!([gs_obs], obss), append!([gs_runtime], runtimes)
 		end
 	end

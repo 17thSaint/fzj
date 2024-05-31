@@ -1,5 +1,5 @@
-#using Pkg
-#Pkg.activate(".")
+using Pkg
+Pkg.activate(".")
 include("../review-practice-codes/ttn.jl")
 using Profile,MKL
 
@@ -1218,7 +1218,6 @@ function make_synthdims_filename(model_parameters::Dict)
 	return make_parameters_filename(filename_dict)
 end
 
-
 function get_normal_model_params(params_dict::Dict)
 
 	# DMRG parameters
@@ -1392,9 +1391,9 @@ end=#
 #strens = range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("hopping_anisotropy",1.0),("make_smaller_lattice",[4,4]),("nrgtol",5e-5),("particles",2),("layers",4),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
+	#params_dict = Dict([("hopping_anisotropy",1.0),("es_count",2),("nrgtol",5e-5),("particles",2),("layers",4),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
-	#params_dict = make_args_dict(ARGS)
+	params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)
 	if typeof(open_cores) != String
 		BLAS.set_num_threads(open_cores)	
@@ -1402,22 +1401,62 @@ end=#
 	end
 	
 	model_paras = get_normal_model_params(params_dict)
-		
 	metadata_dict = named_tuple_to_dict(model_paras)
+
+	es_count = get(params_dict, "es_count", 0)
 
 		#
 	println(model_paras[:name])
-	if_exists,found_data = false,nothing#check_data_exists(filename_dict,"ttn"; location=loc,output_level=false)
+	filename_dict = get_params_dict_from_filename(model_paras[:name])
+	if_exists,found_data = check_data_exists(filename_dict,"ttn"; location=model_paras[:location],output_level=false)
 
 	if if_exists
-		println("Found Data")
-		wavefunc = found_data[1]["ttn"]
-		dens = found_data[1]["densmat"]
-		rezobs = found_data[2]["observer"]
-		ham = found_data[2]["ham"]
-		#append!(wavefuncs,[wavefunc])
-	else
+		if es_count > 0 # when need excited states start by counting how many inside the data file
+			if "densmat" in keys(found_data[1])
+				count_found_states = Int(length(keys(found_data[1]))/2)
+			else
+				count_found_states = length(keys(found_data[1])) 
+			end
 
+			if count_found_states < es_count + 1 # found states less than asked for count means run for higher states
+				println("Not Enough States in Data File, Running for $(es_count - count_found_states + 1) more States")
+				ortho_states = Vector{TTNKit.TreeTensorNetwork}(undef,count_found_states)
+				ortho_states[1] = found_data[1]["ttn"]
+				for i in 2:count_found_states
+					ortho_states[i] = found_data[1]["ttn_$(i-1)"]
+				end
+				model_paras[:ham] = found_data[2]["ham"]
+				metadata_dict["ham"] = model_paras[:ham]
+				all_states, hamilt, all_obs, all_densmats, all_runtimes = find_excited_states(params_dict["layers"],es_count,model_paras[:particles],ortho_states; model_paras...,metadata=metadata_dict)
+
+			else # found states is less than or equal to asked for count means use found states
+				println("Found Data")
+				ortho_states = Vector{TTNKit.TreeTensorNetwork}(undef,es_count+1)
+				densmats = Vector{Matrix{ComplexF64}}(undef,es_count+1)
+				obss = Vector{TTNKit.AbstractObserver}(undef,es_count+1)
+				runtimes = zeros(es_count+1)
+				ortho_states[1] = found_data[1]["ttn"]
+				densmats[1] = found_data[1]["densmat"]
+				obss[1] = found_data[2]["observer"]
+				runtimes[1] = found_data[2]["runtime"]
+				for i in 2:es_count+1
+					ortho_states[i] = found_data[1]["ttn_$(i-1)"]
+					densmats[i] = found_data[1]["densmat_$(i-1)"]
+					obss[i] = found_data[2]["observer_$(i-1)"]
+					runtimes[i] = found_data[2]["runtime_$(i-1)"]
+				end
+				
+				all_states, hamilt, all_obs, all_densmats, all_runtimes = ortho_states, found_data[2]["ham"], obss, densmats, runtimes
+			end
+
+		else # if only ask for the ground state then if data if found then have all needed results
+			println("Found Data")
+			wavefunc = found_data[1]["ttn"]
+			dens = found_data[1]["densmat"]
+			rezobs = found_data[2]["observer"]
+			ham = found_data[2]["ham"]
+		end
+	else # if no data found then run from scratch starting from the ground state
 		println("Starting Script using $(model_paras[:particles]) particles on $(2^model_paras[:layers]) sites with Flux = $(round(model_paras[:alpha],digits=4)), Bond Dim = $(model_paras[:mdim]), and Long Range Dist = $(model_paras[:lr])")
 
 		starting = time()
@@ -1425,8 +1464,11 @@ end=#
 		ham = long_range_HH_ham(net,model_paras[:ts],model_paras[:alpha]; model_paras...)
 		metadata_dict["ham"] = ham
 		metadata_dict["net"] = net
-		es_count = 2
-		all_states, hamilt, all_obs, all_densmats, all_runtimes = find_spectrum(model_paras,es_count,metadata_dict) #og_ttn, hamilt, gs_sp, gs_obs, gs_runtime, gs_dens
+		if es_count > 0
+			all_states, hamilt, all_obs, all_densmats, all_runtimes = find_spectrum(model_paras,es_count,metadata_dict)
+		else
+			og_ttn, hamilt, gs_sp, gs_obs, gs_runtime, gs_dens = find_spectrum(model_paras,es_count,metadata_dict)
+		end
 		total_time = time() - starting
 		println("Running time = $total_time")
 		
@@ -1463,9 +1505,9 @@ end=#
 		get_occupancy(wavefunc; plot_title = "Filling = $(round(num_particles/(alpha*tot_sites),digits=4))",densmat=dens)
 		=#
 
-		for i in 1:es_count+1
-			occs = get_occupancy(all_states[i]; densmat=all_densmats[i], plot_title="Level $(i-1)")
-		end
+		#for i in 1:es_count+1
+		#	occs = get_occupancy(all_states[i]; densmat=all_densmats[i], plot_title="Level $(i-1)")
+		#end
 		#densities[idx] = sum(occs) / tot_sites
 		#scatter([mu],[densities[idx]],c="b")
 		#xlabel("Chemical Potential")
