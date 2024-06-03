@@ -251,7 +251,7 @@ function make_sure_file_type(file_name,desired_type)
 			file_name = join(split_name[1:end-1],".") * ".$desired_type"
 		end
 	else
-		println("No File Type: adding $desired_type")
+		#println("No File Type: adding $desired_type")
 		file_name *= "." * desired_type
 	end
 	return file_name

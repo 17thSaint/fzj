@@ -730,7 +730,7 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	if isnothing(etol)
 		observer::AbstractObserver = NoObserver()
 	elseif if_continuous_saving
-		observer = isnothing(psi_ortho) ? SavingNRGVarObserver(file_path,etol) : SavingNRGVarObserver(file_path,etol,length(psi_ortho))
+		observer = isnothing(psi_ortho) ? SavingNRGVarObserver(file_path,etol) : SavingExcitedNRGVarObserver(file_path,etol,length(psi_ortho))
 	else
 		observer = NRGVarObserver(etol)
 	end
@@ -1051,17 +1051,17 @@ function find_excited_states(num_layers::Int,num_excited_states::Int,particle_co
 		metadata["seed_ttn"] = ttn
 	end
 
-	if if_continuous_saving
+	#=if if_continuous_saving
 		if if_densmat
 			densmat::Matrix{ComplexF64} = density_matrix(ttn)
 			ttn_data_dict::Dict{String,Any} = if_gpu ? Dict([("ttn",back2cpu(ttn)),("densmat",densmat)]) : Dict([("ttn",ttn),("densmat",densmat)])
 		else
 			ttn_data_dict = if_gpu ? Dict([("ttn",back2cpu(ttn))]) : Dict([("ttn",ttn)])
 		end
-		actual_filename::String = if_redo ? modify_data_jld2(ttn_data_dict,location * "/" * filename) : write_data_jld2(filename,ttn_data_dict,location,metadata)
-	else
+		actual_filename::String = modify_data_jld2(ttn_data_dict,location * "/" * filename)
+	else=#
 		actual_filename = filename
-	end
+	#end
 	
 	if if_gpu
 		println("Doing GPU TTN")
@@ -1105,7 +1105,7 @@ function find_excited_states(num_layers::Int,num_excited_states::Int,particle_co
 				nothing
 			end
 			metadata["maxlinkdim_$es_number"] = TTNKit.maxlinkdim(new_sp.ttn)
-			ttn_data_dict = if_gpu ? Dict([("ttn_$es_number",back2cpu(new_sp.ttn))]) : Dict([("ttn_$es_number",new_sp.ttn)])
+			ttn_data_dict::Dict{String,Any} = if_gpu ? Dict([("ttn_$es_number",back2cpu(new_sp.ttn))]) : Dict([("ttn_$es_number",new_sp.ttn)])
 			if_densmat ? ttn_data_dict["densmat_$es_number"] = new_densmat : nothing
 			
 			new_metadata::Dict{String,Any} = Dict([("observer_$es_number",metadata["observer_$es_number"]),("runtime_$es_number",metadata["runtime_$es_number"]),("energies_$es_number",metadata["energies_$es_number"]),("maxlinkdim_$es_number",metadata["maxlinkdim_$es_number"])])
@@ -1205,10 +1205,14 @@ function find_spectrum(model_paras::Dict,num_excited_states::Int,metadata::Dict;
 	else
 		if if_densmat
 			ttns_ortho, ham, obss, densmats, runtimes = find_excited_states(metadata["layers"],num_excited_states,metadata["particles"],gs_sp.ttn; ham=metadata["ham"],model_paras...,metadata=metadata)
-			return ttns_ortho, ham, append!([gs_obs], obss), append!([gs_dens], densmats), append!([gs_runtime], runtimes)
+			all_obs::Vector{AbstractObserver} = [gs_obs]
+			append!(all_obs,obss)
+			return ttns_ortho, ham, all_obs, append!([gs_dens], densmats), append!([gs_runtime], runtimes)
 		else
 			ttns_ortho, ham, obss, runtimes = find_excited_states(metadata["layers"],num_excited_states,metadata["particles"],gs_sp.ttn; ham=metadata["ham"],model_paras...,metadata=metadata)
-			return ttns_ortho, ham, append!([gs_obs], obss), append!([gs_runtime], runtimes)
+			all_obs = [gs_obs]
+			append!(all_obs,obss)
+			return ttns_ortho, ham, all_obs, append!([gs_runtime], runtimes)
 		end
 	end
 end
@@ -1282,10 +1286,10 @@ end
 mutable struct SavingExcitedNRGVarObserver <: AbstractObserver
     file_path::String
 	var_tol::Float64
-    nrg::Vector{Float64}
 	nrg_level::Int64
+    nrg::Vector{Float64}
  
-    SavingNRGVarObserver(file_path="ttn.jld2",var_tol=0.0,nrg_level=1) = new(file_path,var_tol,[10000.0,1000.0],nrg_level)
+    SavingExcitedNRGVarObserver(file_path="ttn.jld2",var_tol=0.0,nrg_level=1) = new(file_path,var_tol,nrg_level,[10000.0,1000.0])
 end
 
 function TTNKit.ITensors.measure!(o::SavingExcitedNRGVarObserver; kwargs...)

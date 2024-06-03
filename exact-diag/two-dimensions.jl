@@ -1574,7 +1574,7 @@ ylabel("Energy")
 title("Alpha = $(thisalpha)")
 end=#
 
-if true
+if false
 #lx = 6
 #n = 3
 #for (idx,n) in enumerate([2,3,4,5])
@@ -1678,8 +1678,8 @@ if true
         filling = get(params_dict,"filling",0.5)
         alpha = N / (filling * (Lx - x_shift) * (Ly - y_shift))
     end
-    check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y)
-    alpha = N / (Lx * Ly * get(params_dict,"filling",0.5))
+    if_check_fluxes = get(params_dict,"if_check_fluxes",true)
+    if_check_fluxes ? check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y) : nothing
 
     # build hamiltonian parameters dictionary
     hamilt_params = Dict("alpha"=>alpha,

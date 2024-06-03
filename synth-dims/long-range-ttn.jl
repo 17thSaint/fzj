@@ -1222,8 +1222,8 @@ function get_normal_model_params(params_dict::Dict)
 
 	# DMRG parameters
 	sweep_type = get(params_dict, "sweep_type", "dmrg")
-	nrgtol = get(params_dict, "nrgtol", 1E-4)
-	cutoff = get(params_dict, "cutoff", 0.0)
+	nrgtol = get(params_dict, "nrgtol", 5E-5)
+	cutoff = get(params_dict, "cutoff", 1E-8)
 	evolve = get(params_dict, "evolve", true)
 	expander_fraction = get(params_dict, "expander_fraction", 1.0)
 	expan = TTNKit.DefaultExpander(expander_fraction)
@@ -1285,7 +1285,8 @@ function get_normal_model_params(params_dict::Dict)
 	else
 		mag_off = alpha == 0.0
 	end
-	check_fluxes(alpha,phys_edge_length,synth_edge_length,if_periodic_phys,if_periodic_synth)
+	if_check_fluxes = get(params_dict, "if_check_fluxes", true)
+	if_check_fluxes ? check_fluxes(alpha,phys_edge_length,synth_edge_length,if_periodic_phys,if_periodic_synth) : nothing
 
 
 	# What to calculate
@@ -1364,42 +1365,10 @@ function get_normal_model_params(params_dict::Dict)
 	return dict_to_symbols(model_paras_dict)
 end
 
+function run_synth_dims_generic(params_dict::Dict)
 
+	if_find_data = get(params_dict, "if_find_data", true)
 
-
-#
-if false
-
-#nnst = 0.0
-#layers = 6
-#=layers = 4
-num_parts = 2
-ref_dict = Dict([("layers",layers),("particles",num_parts)])
-loc = get_folder_location("cluster-data/synth-dims")
-all_files = find_data_file(ref_dict,"ttn",loc)
-alphas = zeros(length(all_files))
-for (idx,file) in enumerate(all_files)
-	alphas[idx] = get_params_dict_from_filename(file)["alpha"]
-end=#
-
-#layers = 6
-#lr = 7
-#anises = [0.01,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.6,0.8,0.9,1.1,1.3,1.5,1.7,1.9,2.0,2.5,3.0,3.5,4.0,6.0,8.0,9.0,10.0,15.0,20.0,25.0,30.0,40.0,50.0,70.0,90.0,100.0,1000.0,10000.0]
-#anises = range(1.0,5.0,length=5)
-#strens = range(0.0,5.0,length=10)
-#alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
-#strens = range(0.1,0.5,length=3)
-#for (idx,anis) in enumerate(anises)
-#for (idx,stren) in enumerate(strens)
-	#params_dict = Dict([("hopping_anisotropy",1.0),("es_count",2),("nrgtol",5e-5),("particles",2),("layers",4),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
-	# usually in params: mag_off, layers, mdim, longrange_dist
-	params_dict = make_args_dict(ARGS)
-	open_cores = get(params_dict, "open_cores", 5)
-	if typeof(open_cores) != String
-		BLAS.set_num_threads(open_cores)	
-		display(BLAS.get_config())
-	end
-	
 	model_paras = get_normal_model_params(params_dict)
 	metadata_dict = named_tuple_to_dict(model_paras)
 
@@ -1408,7 +1377,7 @@ end=#
 		#
 	println(model_paras[:name])
 	filename_dict = get_params_dict_from_filename(model_paras[:name])
-	if_exists,found_data = check_data_exists(filename_dict,"ttn"; location=model_paras[:location],output_level=false)
+	if_exists,found_data = if_find_data ? check_data_exists(filename_dict,"ttn"; location=model_paras[:location],output_level=false) : (false,nothing)
 
 	if if_exists
 		if es_count > 0 # when need excited states start by counting how many inside the data file
@@ -1474,6 +1443,49 @@ end=#
 		
 	end
 
+	if es_count < 1
+		return og_ttn, hamilt, gs_sp, gs_obs, gs_runtime, gs_dens
+	else
+		return all_states, hamilt, all_obs, all_densmats, all_runtimes
+	end
+end
+
+
+#
+if true
+
+#nnst = 0.0
+#layers = 6
+#=layers = 4
+num_parts = 2
+ref_dict = Dict([("layers",layers),("particles",num_parts)])
+loc = get_folder_location("cluster-data/synth-dims")
+all_files = find_data_file(ref_dict,"ttn",loc)
+alphas = zeros(length(all_files))
+for (idx,file) in enumerate(all_files)
+	alphas[idx] = get_params_dict_from_filename(file)["alpha"]
+end=#
+
+#layers = 6
+#lr = 7
+#anises = [0.01,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.6,0.8,0.9,1.1,1.3,1.5,1.7,1.9,2.0,2.5,3.0,3.5,4.0,6.0,8.0,9.0,10.0,15.0,20.0,25.0,30.0,40.0,50.0,70.0,90.0,100.0,1000.0,10000.0]
+#anises = range(1.0,5.0,length=5)
+#strens = range(0.0,5.0,length=10)
+#alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
+#strens = range(0.1,0.5,length=3)
+#for (idx,anis) in enumerate(anises)
+#for (idx,stren) in enumerate(strens)
+	#params_dict = Dict([("hopping_anisotropy",1.0),("es_count",2),("nrgtol",5e-5),("particles",2),("layers",4),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
+	# usually in params: mag_off, layers, mdim, longrange_dist
+	params_dict = make_args_dict(ARGS)
+	open_cores = get(params_dict, "open_cores", 5)
+	if typeof(open_cores) != String
+		BLAS.set_num_threads(open_cores)	
+		display(BLAS.get_config())
+	end
+	
+	all_results = run_synth_dims_generic(params_dict)
+	
 		#imshow(real.(dens))
 		#colorbar()
 
