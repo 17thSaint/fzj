@@ -1574,7 +1574,10 @@ ylabel("Energy")
 title("Alpha = $(thisalpha)")
 end=#
 
-if false
+if true
+fig = figure()
+xlabel("Hopping Anisotropy")
+ylabel("Gap")
 #lx = 6
 #n = 3
 #for (idx,n) in enumerate([2,3,4,5])
@@ -1586,16 +1589,16 @@ if false
 #all_bds = zeros(Float64,length(alphas))
 #thetas = range(0.01,0.5,length=50)
 #all_nrgs = zeros(Float64,length(thetas))
-#anises = [1.0,10.0,100.0]
+anises = range(0.1,1.0,length=20)
 #for (idx,alph) in enumerate(alphas)
 #for (idx,lx) in enumerate(4:1:30)
 #for (idx,theta) in enumerate(thetas)
-#for (idx,anis) in enumerate(anises)
+for (idx,anis) in enumerate(anises)
 #for (idx,intstren) in enumerate(intstrens)
 #for lrd in [0,1]
     #for change in [0,0.0001]true
-    #params_dict = Dict([("Lx",lx),("N",9),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",4),("if_save_data",false)])
-    params_dict = make_args_dict(ARGS)
+    params_dict = Dict([("Lx",6),("N",3),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",anis),("interaction_strength",0.5),("lr","all"),("filling",0.5),("nev",2),("if_save_data",false)])
+    #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
     open_cores = get(params_dict, "open_cores", 5)
@@ -1736,6 +1739,8 @@ if false
         end
     end
 
+    scatter(anis,abs(nrgs[2]-nrgs[1]),c="b")
+
     #dcorrs = distance_correlation(states[1],lattice_params,"x")
     #display(dcorrs)
     #dcorrsy = distance_correlation(states[1],lattice_params,"y")
@@ -1758,10 +1763,10 @@ if false
     #end
     #coeff = (maximum(nrgs) .- nrgs[1]) / hh_gap_exact(anis,alpha)
     #append!(coeffs,[coeff])
-    cols = ["b","r","g","m","c"]
-    if nev > length(cols)
-        cols = repeat(cols,ceil(Int,nev/length(cols)))
-    end
+    #cols = ["b","r","g","m","c"]
+    #if nev > length(cols)
+    #    cols = repeat(cols,ceil(Int,nev/length(cols)))
+    #end
 
     #xx = N / (alpha * (Lx - x_shift) * (Ly - y_shift))
 
@@ -1833,7 +1838,7 @@ if false
     currents = physical_current(rhos,lattice_params; if_plot=true)
     corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
     currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
-#end
+end
 
 #bdderivs = (all_bds[howmany+1:end] .- all_bds[1:howmany]) ./ change
 #fillings = n ./ (alphas[1:howmany] .* ((lx-1)*(lx-1)))

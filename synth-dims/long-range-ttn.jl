@@ -418,7 +418,7 @@ end
 
 function long_range_HH_ham(metadata::Dict)
 	net = metadata["net"]
-	t_strength = metadata["t_strength"]
+	t_strength = "t_strength" in keys(metadata) ? metadata["t_strength"] : metadata["ts"]
 	phi = metadata["phi"]
 	model_paras = dict_to_symbols(metadata)
 	return long_range_HH_ham(net,t_strength,phi; model_paras...)
@@ -1469,15 +1469,18 @@ end=#
 #layers = 6
 #lr = 7
 #anises = [0.01,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.6,0.8,0.9,1.1,1.3,1.5,1.7,1.9,2.0,2.5,3.0,3.5,4.0,6.0,8.0,9.0,10.0,15.0,20.0,25.0,30.0,40.0,50.0,70.0,90.0,100.0,1000.0,10000.0]
-#anises = range(1.0,5.0,length=5)
+anises = range(1.0,5.0,length=10)
 #strens = range(0.0,5.0,length=10)
 #alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
 #strens = range(0.1,0.5,length=3)
-#for (idx,anis) in enumerate(anises)
+fig = figure()
+xlabel("Hopping Anisotropy")
+ylabel("Energy Gap")
+for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	#params_dict = Dict([("hopping_anisotropy",1.0),("es_count",2),("nrgtol",5e-5),("particles",2),("layers",4),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
+	params_dict = Dict([("hopping_anisotropy",anis),("es_count",1),("nrgtol",5e-5),("particles",4),("layers",4),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr","all"),("if_periodic_phys",false),("if_periodic_synth",false)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
-	params_dict = make_args_dict(ARGS)
+	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)
 	if typeof(open_cores) != String
 		BLAS.set_num_threads(open_cores)	
@@ -1485,6 +1488,10 @@ end=#
 	end
 	
 	all_results = run_synth_dims_generic(params_dict)
+
+	all_obs = all_results[3]
+	gap = all_obs[2].nrg[end] - all_obs[1].nrg[end]
+	scatter([anis],[gap],c="b")
 	
 		#imshow(real.(dens))
 		#colorbar()
@@ -1564,7 +1571,7 @@ end=#
 		fig = figure()
 		scatter(collect(1:mdim),-log.(specs))
 		=#
-	#end
+end
 end
 
 #

@@ -94,15 +94,22 @@ if true
 			#for (idx,nu) in enumerate(range(0.0,2.0,length=37))
 			nu = 0.4
 
-				params_dict = Dict([("es_count",es_count),("if_save_data",true),("if_continuous_saving",true),("layers",4),("mdim",50),("filling",nu),("if_periodic_phys",phys),("if_periodic_virt",virt)])
+				params_dict = Dict([("es_count",es_count),("if_find_data",false),("if_save_data",false),("layers",4),("mdim",50),("filling",nu),("if_periodic_phys",phys),("if_periodic_virt",virt)])
 
 				if true
 					all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
 				end
 
 				# finding all states ED
-				if false
-					lattice_params = Dict([("Lx",phys_edge_length),("Ly",virt_edge_length),("N",num_particles),("full_basis",n_particle_basis(num_particles,phys_edge_length,phys_edge_length; output_level=1)),("if_periodic_x",if_per_phys),("if_periodic_y",if_per_virt)])
+				if true
+					model_paras = get_normal_model_params(params_dict)
+					phys_edge_length,virt_edge_length = model_paras[:restricted_size]
+					if_periodic_phys,if_periodic_synth = model_paras[:if_periodic_phys],model_paras[:if_periodic_synth]
+					num_particles = model_paras[:particles]
+					net = build_HH_net(model_paras)
+					model_paras[:net] = net
+					ham = long_range_HH_ham(named_tuple_to_dict(model_paras))
+					lattice_params = Dict([("Lx",phys_edge_length),("Ly",virt_edge_length),("N",num_particles),("full_basis",n_particle_basis(num_particles,phys_edge_length,phys_edge_length; output_level=1)),("if_periodic_x",if_periodic_phys),("if_periodic_y",if_periodic_synth)])
 					ed_ham = rebuild_ed_ham(ham,lattice_params)
 					x0_ed = rand(Float64,size(lattice_params["full_basis"])[2])
 					rez_ed = eigsolve(ed_ham,x0_ed,es_count+1,:SR,Lanczos())
@@ -113,8 +120,8 @@ if true
 
 				#all_ed_nrgs[:,idx] = nrgs_ed
 
-				#println("ED Energies:")
-				#display(nrgs_ed)
+				println("ED Energies:")
+				display(nrgs_ed)
 
 				ttn_nrgs = [obs.nrg[end] for obs in all_obs]
 				println("TTN Energies:")
