@@ -1575,13 +1575,13 @@ title("Alpha = $(thisalpha)")
 end=#
 
 if true
-fig = figure()
-xlabel("Hopping Anisotropy")
-ylabel("Gap")
+#fig = figure()
+#xlabel("Hopping Anisotropy")
+#ylabel("Gap")
 #lx = 6
 #n = 3
 #for (idx,n) in enumerate([2,3,4,5])
-#intstrens = [10.0]
+#intstrens = range(0.0,0.1,length=20)
 #change = 0.001
 #real_alphas = [range(0.1,0.21,length=10); range(0.22,0.28,length=10); range(0.29,0.35,length=5)]
 #howmany = length(real_alphas)
@@ -1589,15 +1589,16 @@ ylabel("Gap")
 #all_bds = zeros(Float64,length(alphas))
 #thetas = range(0.01,0.5,length=50)
 #all_nrgs = zeros(Float64,length(thetas))
-anises = range(0.1,1.0,length=20)
+#anises = range(0.1,1.0,length=20)
+nus = range(0.2,1.0,length=100)
 #for (idx,alph) in enumerate(alphas)
 #for (idx,lx) in enumerate(4:1:30)
-#for (idx,theta) in enumerate(thetas)
-for (idx,anis) in enumerate(anises)
+for (idx,nu) in enumerate(nus)
+#for (idx,anis) in enumerate(anises)
 #for (idx,intstren) in enumerate(intstrens)
 #for lrd in [0,1]
     #for change in [0,0.0001]true
-    params_dict = Dict([("Lx",6),("N",3),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",anis),("interaction_strength",0.5),("lr","all"),("filling",0.5),("nev",2),("if_save_data",false)])
+    params_dict = Dict([("Lx",4),("N",4),("if_check_fluxes",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr","all"),("filling",nu),("nev",2),("if_save_data",false)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
@@ -1634,7 +1635,7 @@ for (idx,anis) in enumerate(anises)
     end
     opl = get(params_dict, "output_level", 1)
     running_args = (nev=nev,
-                    if_exact=false,
+                    if_exact=true,
                     if_densmat=false,
                     if_save_data=if_save_data,
                     dataloc=dataloc,
@@ -1695,7 +1696,7 @@ for (idx,anis) in enumerate(anises)
 
     # build filename dictionary
     filename_dict = make_filename_dict(lattice_params,hamilt_params)
-    if_exists,found_data = check_data_exists(filename_dict,"ed"; location=dataloc,output_level=false)
+    if_exists,found_data = false,nothing#check_data_exists(filename_dict,"ed"; location=dataloc,output_level=false)
 
     # check if data exists and rerun if need more eigenstates
     if if_exists
@@ -1739,7 +1740,7 @@ for (idx,anis) in enumerate(anises)
         end
     end
 
-    scatter(anis,abs(nrgs[2]-nrgs[1]),c="b")
+    #scatter(anis,abs(nrgs[2]-nrgs[1]),c="b")
 
     #dcorrs = distance_correlation(states[1],lattice_params,"x")
     #display(dcorrs)
@@ -1755,7 +1756,7 @@ for (idx,anis) in enumerate(anises)
     #    get_occupancy(rhos[i],lattice_params; if_plot=true,plot_title="Alpha=$alpha, E=$(round(nrgs[i]/Ly,digits=5))")
     #end
 
-    #occs1 = get_occupancy(rhos[1],lattice_params; if_plot=true,plot_title="tx=$tx ty=$ty")
+    #occs1 = get_occupancy(rhos[1],lattice_params; if_plot=true)
     #append!(all_bulkdens,[sum(occs1[3:4,3:4])])
 
     #for i in 1:1#nev
@@ -1763,10 +1764,10 @@ for (idx,anis) in enumerate(anises)
     #end
     #coeff = (maximum(nrgs) .- nrgs[1]) / hh_gap_exact(anis,alpha)
     #append!(coeffs,[coeff])
-    #cols = ["b","r","g","m","c"]
-    #if nev > length(cols)
-    #    cols = repeat(cols,ceil(Int,nev/length(cols)))
-    #end
+    cols = ["b","r","g","m","c"]
+    if nev > length(cols)
+        cols = repeat(cols,ceil(Int,nev/length(cols)))
+    end
 
     #xx = N / (alpha * (Lx - x_shift) * (Ly - y_shift))
 
@@ -1784,9 +1785,9 @@ for (idx,anis) in enumerate(anises)
         end
     end=#
 
-    #=if idx == 1
+    if idx == 1
         for i in 1:nev
-            scatter(intstren,nrgs[i] - nrgs[1],c=cols[i],label="E$i - E1")
+            scatter(nu,nrgs[i] - nrgs[1],c=cols[i],label="E$i - E1")
         end
         #scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=cols[id2*2-1],label="E2 - E1")
         #scatter(id2 == 1 ? anis : -anis,nrgs[3] - nrgs[1],c=cols[2*id2],label="E3 - E1")
@@ -1796,7 +1797,7 @@ for (idx,anis) in enumerate(anises)
         #scatter(intstren,nrgs[4],c="k",label="E3")
     else
         for i in 1:nev
-            scatter(intstren,nrgs[i] - nrgs[1],c=cols[i])
+            scatter(nu,nrgs[i] - nrgs[1],c=cols[i])
         end
         #scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=c=cols[id2*2-1])
         #plot(anises[idx-1:idx],[hh_gap_exact(anises[idx-1],alpha),hh_gap_exact(anises[idx],alpha)],c="r")
@@ -1811,7 +1812,7 @@ for (idx,anis) in enumerate(anises)
     xlabel("Interaction Strength")
     #xlabel("Flux")
     #xlabel("Hopping Anisotropy tx/ty")
-    ylabel("Energy - E1")=#
+    ylabel("Energy - E1")
 
     #cdw = cdw_sf(rhos[1],states[1],lattice_params,(3.0,0.0); if_plot=true,plot_label="$anis")
     #occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="ED, LR=$intstren")

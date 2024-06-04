@@ -390,7 +390,7 @@ function rebuild_ed_ham(ttn_ham,lattice_params::Dict)
 end
 
 
-if true || if_all
+if false || if_all
 	@testset "equivalence of hamiltonians btw TTN and ED" begin
 		for Lx in [4,6]
 
