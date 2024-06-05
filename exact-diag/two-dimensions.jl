@@ -765,6 +765,44 @@ function n_particle_basis(N::Int64,Lx::Int64,Ly::Int64; kwargs...)
     return full_basis
 end
 
+function n_particle_basis(lattice_params::Dict; kwargs...)
+    N = lattice_params["N"]
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+    return n_particle_basis(N,Lx,Ly; kwargs...)
+end
+
+function long_range_scaling(x_final::Int64,virt_edge_length::Int64,initial_strength::Float64; kwargs...)
+
+	trunc = get(kwargs, :trunc_digits, 5)
+	scaling_func = get(kwargs, :scaling, "flat")
+	
+	strengths = zeros(virt_edge_length)
+
+    if x_final == 0.0 || initial_strength == 0.0
+        strengths[1] = initial_strength != 0.0 ? initial_strength : 1.0
+        return strengths
+    end
+	
+	if scaling_func == "flat"
+		strengths[1:x_final+1] .= initial_strength
+	elseif scaling_func == "exp"
+        corr_length = get(kwargs, :corr_length, virt_edge_length)
+		strengths = map(1:virt_edge_length) do x
+			initial_strength * exp(-(x-1)/corr_length)	
+		end
+	elseif scaling_func == "rydberg"
+		blockade_radius = get(kwargs, :blockade_radius, 1.0)
+		strengths = map(0:virt_edge_length-1) do x
+			initial_strength * (blockade_radius^6) / (blockade_radius^6 + x^6)
+		end
+	end
+	
+	strengths = round.(strengths,digits=trunc)
+
+	return strengths
+end
+
 function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
     
     output_states = Array{Int64,1}(undef,0)
@@ -1497,116 +1535,7 @@ function spin_stiffness(energies::Vector,thetas::Vector; kwargs...)
     return stiffnesses
 end
 
-#=Lx = 4
-Ly = 4
-N = 2
-lattice_params::Dict{String,Any} = Dict("Lx"=>Lx,
-                        "Ly"=>Ly,
-                        "N"=>N,
-                        "if_periodic_x"=>true,
-                        "if_periodic_y"=>true)
-lattice_params["full_basis"] = n_particle_basis(N,Lx,Ly)
-hamilt_params::Dict{String,Any} = Dict("tx"=>1.0,
-                        "ty"=>0.0,
-                        "alpha"=>0.0,
-                        "U"=>[0.0],
-                        "interaction_cutoff"=>0.0)
-ttham = buildHam(lattice_params,hamilt_params)
-
-for i in 1:Ly
-    for j in i+1:Ly
-        thisstate = zeros(ComplexF64,size(ttham,1))
-
-        firstcolinds = linear_index((1,i),Lx,Ly) .+ [k for k in 0:Lx-1]
-        for k in 1:Lx
-            for k2 in 1:Lx
-                if k == k2
-                    continue
-                end
-                thisstate[find_basis_index(sort([firstcolinds[k],firstcolinds[k2]],rev=true))] += 1.0
-            end
-        end
-
-        secondcolinds = linear_index((1,j),Lx,Ly) .+ [k for k in 0:Lx-1]
-        for k in 1:Lx
-            for k2 in 1:Lx
-                if k == k2
-                    continue
-                end
-                thisstate[find_basis_index(sort([secondcolinds[k],secondcolinds[k2]],rev=true))] += 1.0
-            end
-        end
-
-        #=for k in 1:Lx
-            for k2 in 1:Lx
-                thisstate[find_basis_index(sort([firstcolinds[k],secondcolinds[k2]],rev=true))] += 1.0
-            end
-        end=#
-
-        thisstate ./= sqrt(norm(thisstate))
-
-        nrg = round(real((transpose(thisstate) * ttham * thisstate)),digits=3)
-        get_occupancy(thisstate,lattice_params; plot_title="Energy = $nrg")
-    end
-end=#
-
-
-#anises = range(1.0,100.0,length=30)
-#gapvals = zeros(Float64,length(anises))
-#lx = 6
-#n = 4
-#=ac = n / (0.5 * (lx-1)*(lx-1))
-as = n / (0.4 * (lx-1)*(lx-1))
-af = n / (0.6 * (lx-1)*(lx-1))
-hm = 20=#
-#alphas = range(0.25,1.25,length=40)#[1/(i*lx/10) for i in 1:10]#[1/(1*lx),1/(0.5*lx),1/(2*lx),1/(0.1*lx),1/(0.2*lx)]#[1/(i*lx) for i in 1:5]
-
-#=for thisalpha in alphas
-fig = figure()
-ks = range(-pi,pi,length=1000)
-realks = [2*pi*i/lx - pi for i in 0:lx]
-for s in 1:4
-    plot(ks,-2 .* cos.(2*pi*s*thisalpha .- ks),label="$s")
-    scatter(realks,-2 .* cos.(2*pi*s*thisalpha .- realks),label="Discrete")
-end
-xlabel("Momentum")
-ylabel("Energy")
-title("Alpha = $(thisalpha)")
-end=#
-
-if true
-#fig = figure()
-#xlabel("Hopping Anisotropy")
-#ylabel("Gap")
-#lx = 6
-#n = 3
-#for (idx,n) in enumerate([2,3,4,5])
-#intstrens = range(0.0,0.1,length=20)
-#change = 0.001
-#real_alphas = [range(0.1,0.21,length=10); range(0.22,0.28,length=10); range(0.29,0.35,length=5)]
-#howmany = length(real_alphas)
-#alphas = [real_alphas; real_alphas .+ change]
-#all_bds = zeros(Float64,length(alphas))
-#thetas = range(0.01,0.5,length=50)
-#all_nrgs = zeros(Float64,length(thetas))
-#anises = range(0.1,1.0,length=20)
-nus = range(0.2,1.0,length=100)
-#for (idx,alph) in enumerate(alphas)
-#for (idx,lx) in enumerate(4:1:30)
-for (idx,nu) in enumerate(nus)
-#for (idx,anis) in enumerate(anises)
-#for (idx,intstren) in enumerate(intstrens)
-#for lrd in [0,1]
-    #for change in [0,0.0001]true
-    params_dict = Dict([("Lx",4),("N",4),("if_check_fluxes",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr","all"),("filling",nu),("nev",2),("if_save_data",false)])
-    #params_dict = make_args_dict(ARGS)
-
-    # set number of open cores
-    open_cores = get(params_dict, "open_cores", 5)
-	if typeof(open_cores) != String
-		BLAS.set_num_threads(open_cores)
-		display(BLAS.get_config())
-	end
+function get_normal_model_params_ed(params_dict::Dict)
 
     # set lattice parameters
     Lx = get(params_dict, "Lx", 4)
@@ -1634,9 +1563,11 @@ for (idx,nu) in enumerate(nus)
         basis_dataloc = dataloc
     end
     opl = get(params_dict, "output_level", 1)
+    if_exact = get(params_dict, "if_exact", false)
+    if_densmat = get(params_dict, "if_densmat", false)
     running_args = (nev=nev,
-                    if_exact=true,
-                    if_densmat=false,
+                    if_exact=if_exact,
+                    if_densmat=if_densmat,
                     if_save_data=if_save_data,
                     dataloc=dataloc,
                     basis_dataloc=basis_dataloc,
@@ -1656,12 +1587,9 @@ for (idx,nu) in enumerate(nus)
     # build long range interaction parameters
     stren = get(params_dict,"interaction_strength", 0.0)
     lr_dist = get(params_dict,"lr", "all")
-    lr_dist == "all" ? lr_dist = Ly : nothing
-    us = [i < lr_dist+2 ? stren : 0.0 for i in 1:Ly]
-    if lr_dist == 0.0
-        us[1] = stren == 0.0 ? 1.0 : stren
-    end
-    #us[1] = 0.0
+    lr_dist == "all" ? lr_dist = Ly-1 : nothing
+    scaling_type = get(params_dict,"scaling_type","flat")
+    us = long_range_scaling(lr_dist,Ly,stren; scaling=scaling_type)
 
     # get hopping anisotropy values
     hopping_anisotropy = get(params_dict,"hopping_anisotropy",1.0)
@@ -1672,8 +1600,6 @@ for (idx,nu) in enumerate(nus)
 		tx = 1.0 * hopping_anisotropy
 		ty = 1.0
 	end
-    #tx = 0.0
-    #ty = 0.0
     
     # build magnetic field parameters and check fluxes for periodicity
     alpha = get(params_dict,"alpha",nothing)
@@ -1686,41 +1612,85 @@ for (idx,nu) in enumerate(nus)
     if_check_fluxes ? check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y) : nothing
 
     # build hamiltonian parameters dictionary
+    int_cutoff = get(params_dict,"interaction_cutoff",1e-5)
+    which_dir = get(params_dict,"which_dir","virt")
     hamilt_params = Dict("alpha"=>alpha,
                         "tx"=>tx,
                         "ty"=>ty,
                         "hopping_anisotropy"=>hopping_anisotropy,
                         "U"=>us,
-                        "which_dir"=>"virt",
-                        "interaction_cutoff"=>1e-5)
+                        "which_dir"=>which_dir,
+                        "interaction_cutoff"=>int_cutoff)
+
+    return lattice_params,hamilt_params,running_args
+
+end
+
+if true
+#fig = figure()
+#xlabel("Hopping Anisotropy")
+#ylabel("Gap")
+#lx = 6
+#n = 3
+#for (idx,n) in enumerate([2,3,4,5])
+#intstrens = range(0.0,2.0,length=20)
+#change = 0.001
+#real_alphas = [range(0.1,0.21,length=10); range(0.22,0.28,length=10); range(0.29,0.35,length=5)]
+#howmany = length(real_alphas)
+#alphas = [real_alphas; real_alphas .+ change]
+#all_bds = zeros(Float64,length(alphas))
+#thetas = range(0.01,0.5,length=50)
+#all_nrgs = zeros(Float64,length(thetas))
+#anises = range(1.0,10.0,length=20)
+#nus = range(0.4,0.6,length=100)
+#for (idx,alph) in enumerate(alphas)
+#for (idx,lx) in enumerate([4,6,8])
+#for (idx,nu) in enumerate(nus)
+#for (idx,anis) in enumerate(anises)
+#for (idx,intstren) in enumerate(intstrens)
+#for lrd in [0,1]
+    #for change in [0,0.0001]true
+    #params_dict = Dict([("Lx",lx),("N",Int(lx/2)),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("scaling_type","exp"),("lr","all"),("filling",0.5),("nev",20),("if_save_data",false)])
+    params_dict = make_args_dict(ARGS)
+
+    # set number of open cores
+    open_cores = get(params_dict, "open_cores", 5)
+	if typeof(open_cores) != String
+		BLAS.set_num_threads(open_cores)
+		display(BLAS.get_config())
+	end
+
+    lattice_params,hamilt_params,running_args = get_normal_model_params_ed(params_dict)    
+    basis_dataloc = running_args.basis_dataloc
 
     # build filename dictionary
     filename_dict = make_filename_dict(lattice_params,hamilt_params)
-    if_exists,found_data = false,nothing#check_data_exists(filename_dict,"ed"; location=dataloc,output_level=false)
+    if_exists,found_data = check_data_exists(filename_dict,"ed"; location=running_args.dataloc,output_level=false)
 
     # check if data exists and rerun if need more eigenstates
     if if_exists
+        start_time = time()
         println("Found existing data: ",found_data[2]["filename"])
-        if nev > found_data[2]["nev"]
+        if running_args.nev > found_data[2]["nev"]
             opl > 0 ? println("Asking for more eigenstates than in file, rerunning") : nothing
             start_time = time()
-            full_basis = n_particle_basis(N,Lx,Ly; output_level=opl,dataloc=basis_dataloc)
+            full_basis = n_particle_basis(lattice_params; output_level=running_args.output_level,dataloc=basis_dataloc)
             opl > 0 ? println("Made basis in ",time()-start_time) : nothing
             lattice_params["full_basis"] = full_basis 
-            states,nrgs,rhos = rerun_eigenstates(nev,lattice_params,hamilt_params,found_data[2],found_data[1]; running_args...)
-        elseif nev < found_data[2]["nev"]
+            states,nrgs,rhos = rerun_eigenstates(running_args.nev,lattice_params,hamilt_params,found_data[2],found_data[1]; running_args...)
+        elseif running_args.nev < found_data[2]["nev"]
             opl > 0 ? println("Asking for fewer eigenstates than in file, using existing data") : nothing
-            states = found_data[1]["state"][1:nev]
-            nrgs = found_data[1]["nrg"][1:nev]
-            rhos = found_data[1]["densmat"][1:nev]
-            full_basis = n_particle_basis(N,Lx,Ly; output_level=opl,dataloc=basis_dataloc)
+            states = found_data[1]["state"][1:running_args.nev]
+            nrgs = found_data[1]["nrg"][1:running_args.nev]
+            rhos = found_data[1]["densmat"][1:running_args.nev]
+            full_basis = n_particle_basis(lattice_params; output_level=running_args.output_level,dataloc=basis_dataloc)
             opl > 0 ? println("Made basis in ",time()-start_time) : nothing
             lattice_params["full_basis"] = full_basis 
         else
             states = found_data[1]["state"]
             nrgs = found_data[1]["nrg"]
             rhos = found_data[1]["densmat"]
-            full_basis = n_particle_basis(N,Lx,Ly; output_level=opl,dataloc=basis_dataloc)
+            full_basis = n_particle_basis(lattice_params; output_level=running_args.output_level,dataloc=basis_dataloc)
             opl > 0 ? println("Made basis in ",time()-start_time) : nothing
             lattice_params["full_basis"] = full_basis 
         end
@@ -1728,17 +1698,19 @@ for (idx,nu) in enumerate(nus)
 
         # make basis only if data doesn't exist
         start_time = time()
-        full_basis = n_particle_basis(N,Lx,Ly; output_level=opl,dataloc=basis_dataloc)
-        opl > 0 ? println("Made basis in ",time()-start_time) : nothing
+        full_basis = n_particle_basis(lattice_params; output_level=running_args.output_level,dataloc=basis_dataloc)
+        running_args.output_level > 0 ? println("Made basis in ",time()-start_time) : nothing
         lattice_params["full_basis"] = full_basis 
 
         # run exact diagonalization for find eigenstates
-        if nev == 1
+        if running_args.nev == 1
             states,nrgs,rhos = find_ground_state(lattice_params,hamilt_params; running_args...)
         else
-            states,nrgs,rhos,hh = find_eigenstates(nev,lattice_params,hamilt_params; running_args...)
+            states,nrgs,rhos,hh = find_eigenstates(running_args.nev,lattice_params,hamilt_params; running_args...)
         end
     end
+
+    display(nrgs)
 
     #scatter(anis,abs(nrgs[2]-nrgs[1]),c="b")
 
@@ -1765,8 +1737,8 @@ for (idx,nu) in enumerate(nus)
     #coeff = (maximum(nrgs) .- nrgs[1]) / hh_gap_exact(anis,alpha)
     #append!(coeffs,[coeff])
     cols = ["b","r","g","m","c"]
-    if nev > length(cols)
-        cols = repeat(cols,ceil(Int,nev/length(cols)))
+    if running_args.nev > length(cols)
+        cols = repeat(cols,ceil(Int,running_args.nev/length(cols)))
     end
 
     #xx = N / (alpha * (Lx - x_shift) * (Ly - y_shift))
@@ -1785,9 +1757,9 @@ for (idx,nu) in enumerate(nus)
         end
     end=#
 
-    if idx == 1
-        for i in 1:nev
-            scatter(nu,nrgs[i] - nrgs[1],c=cols[i],label="E$i - E1")
+    #=if idx == 1
+        for i in 1:running_args.nev
+            scatter(lx,nrgs[i] - nrgs[1],c=cols[i],label="E$i - E1")
         end
         #scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=cols[id2*2-1],label="E2 - E1")
         #scatter(id2 == 1 ? anis : -anis,nrgs[3] - nrgs[1],c=cols[2*id2],label="E3 - E1")
@@ -1796,8 +1768,8 @@ for (idx,nu) in enumerate(nus)
         #scatter(id2 == 1 ? anis : -anis,nrgs[3],c="g",label="E2")
         #scatter(intstren,nrgs[4],c="k",label="E3")
     else
-        for i in 1:nev
-            scatter(nu,nrgs[i] - nrgs[1],c=cols[i])
+        for i in 1:running_args.nev
+            scatter(lx,nrgs[i] - nrgs[1],c=cols[i])
         end
         #scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=c=cols[id2*2-1])
         #plot(anises[idx-1:idx],[hh_gap_exact(anises[idx-1],alpha),hh_gap_exact(anises[idx],alpha)],c="r")
@@ -1807,12 +1779,12 @@ for (idx,nu) in enumerate(nus)
         #scatter(id2 == 1 ? anis : -anis,nrgs[3],c="g")
         #scatter(intstren,nrgs[4],c="k")
     end
-    legend()
-    #xlabel("System Size")
-    xlabel("Interaction Strength")
+    #legend()
+    xlabel("System Size")
+    #xlabel("Interaction Strength")
     #xlabel("Flux")
     #xlabel("Hopping Anisotropy tx/ty")
-    ylabel("Energy - E1")
+    ylabel("Energy - E1")=#
 
     #cdw = cdw_sf(rhos[1],states[1],lattice_params,(3.0,0.0); if_plot=true,plot_label="$anis")
     #occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="ED, LR=$intstren")
@@ -1839,7 +1811,7 @@ for (idx,nu) in enumerate(nus)
     currents = physical_current(rhos,lattice_params; if_plot=true)
     corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
     currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
-end
+#end
 
 #bdderivs = (all_bds[howmany+1:end] .- all_bds[1:howmany]) ./ change
 #fillings = n ./ (alphas[1:howmany] .* ((lx-1)*(lx-1)))
