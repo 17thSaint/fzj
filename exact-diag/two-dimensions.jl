@@ -1644,14 +1644,14 @@ if true
 #anises = range(1.0,10.0,length=20)
 #nus = range(0.4,0.6,length=100)
 #for (idx,alph) in enumerate(alphas)
-#for (idx,lx) in enumerate([4,6,8])
+for (idx,lx) in enumerate([3,4,5])
 #for (idx,nu) in enumerate(nus)
 #for (idx,anis) in enumerate(anises)
 #for (idx,intstren) in enumerate(intstrens)
 #for lrd in [0,1]
     #for change in [0,0.0001]true
-    #params_dict = Dict([("Lx",lx),("N",Int(lx/2)),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("scaling_type","exp"),("lr","all"),("filling",0.5),("nev",20),("if_save_data",false)])
-    params_dict = make_args_dict(ARGS)
+    params_dict = Dict([("Lx",lx),("N",lx),("if_check_fluxes",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",10),("if_save_data",true)])
+    #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
     open_cores = get(params_dict, "open_cores", 5)
@@ -1679,19 +1679,19 @@ if true
             lattice_params["full_basis"] = full_basis 
             states,nrgs,rhos = rerun_eigenstates(running_args.nev,lattice_params,hamilt_params,found_data[2],found_data[1]; running_args...)
         elseif running_args.nev < found_data[2]["nev"]
-            opl > 0 ? println("Asking for fewer eigenstates than in file, using existing data") : nothing
+            running_args.output_level > 0 ? println("Asking for fewer eigenstates than in file, using existing data") : nothing
             states = found_data[1]["state"][1:running_args.nev]
             nrgs = found_data[1]["nrg"][1:running_args.nev]
-            rhos = found_data[1]["densmat"][1:running_args.nev]
+            #rhos = found_data[1]["densmat"][1:running_args.nev]
             full_basis = n_particle_basis(lattice_params; output_level=running_args.output_level,dataloc=basis_dataloc)
-            opl > 0 ? println("Made basis in ",time()-start_time) : nothing
+            running_args.output_level > 0 ? println("Made basis in ",time()-start_time) : nothing
             lattice_params["full_basis"] = full_basis 
         else
             states = found_data[1]["state"]
             nrgs = found_data[1]["nrg"]
             rhos = found_data[1]["densmat"]
             full_basis = n_particle_basis(lattice_params; output_level=running_args.output_level,dataloc=basis_dataloc)
-            opl > 0 ? println("Made basis in ",time()-start_time) : nothing
+            running_args.output_level > 0 ? println("Made basis in ",time()-start_time) : nothing
             lattice_params["full_basis"] = full_basis 
         end
     else
@@ -1710,7 +1710,7 @@ if true
         end
     end
 
-    display(nrgs)
+    #display(nrgs)
 
     #scatter(anis,abs(nrgs[2]-nrgs[1]),c="b")
 
@@ -1757,19 +1757,21 @@ if true
         end
     end=#
 
-    #=if idx == 1
-        for i in 1:running_args.nev
-            scatter(lx,nrgs[i] - nrgs[1],c=cols[i],label="E$i - E1")
-        end
+    #if idx == 1
+    #    for i in 1:running_args.nev
+    #        shift = (i - running_args.nev/2) * 0.02
+    #        scatter(lx + shift,nrgs[i] - nrgs[1],c=cols[i],label="E$i - E1")
+    #    end
         #scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=cols[id2*2-1],label="E2 - E1")
         #scatter(id2 == 1 ? anis : -anis,nrgs[3] - nrgs[1],c=cols[2*id2],label="E3 - E1")
         #scatter(id2 == 1 ? anis : -anis,nrgs[1],c="b",label="E0")
         #scatter(id2 == 1 ? anis : -anis,nrgs[2],c="r",label="E1")
         #scatter(id2 == 1 ? anis : -anis,nrgs[3],c="g",label="E2")
         #scatter(intstren,nrgs[4],c="k",label="E3")
-    else
+    #else
         for i in 1:running_args.nev
-            scatter(lx,nrgs[i] - nrgs[1],c=cols[i])
+            shift = (i - running_args.nev/2) * 0.02
+            scatter(lx + shift,nrgs[i] - nrgs[1],c=cols[i])
         end
         #scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=c=cols[id2*2-1])
         #plot(anises[idx-1:idx],[hh_gap_exact(anises[idx-1],alpha),hh_gap_exact(anises[idx],alpha)],c="r")
@@ -1778,13 +1780,13 @@ if true
         #scatter(id2 == 1 ? anis : -anis,nrgs[2],c="r")
         #scatter(id2 == 1 ? anis : -anis,nrgs[3],c="g")
         #scatter(intstren,nrgs[4],c="k")
-    end
+    #end
     #legend()
     xlabel("System Size")
     #xlabel("Interaction Strength")
     #xlabel("Flux")
     #xlabel("Hopping Anisotropy tx/ty")
-    ylabel("Energy - E1")=#
+    ylabel("Energy - E1")
 
     #cdw = cdw_sf(rhos[1],states[1],lattice_params,(3.0,0.0); if_plot=true,plot_label="$anis")
     #occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="ED, LR=$intstren")
@@ -1811,7 +1813,7 @@ if true
     currents = physical_current(rhos,lattice_params; if_plot=true)
     corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
     currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
-#end
+end
 
 #bdderivs = (all_bds[howmany+1:end] .- all_bds[1:howmany]) ./ change
 #fillings = n ./ (alphas[1:howmany] .* ((lx-1)*(lx-1)))

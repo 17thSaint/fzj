@@ -70,11 +70,11 @@ end=#
 
 if true
 	cols = ["b","r","g","m","c"]
-	es_count = 3
+	es_count = 10
 	#for phys in [true,false]
 		#for virt in [true,false]
-			phys = false
-			virt = false
+			phys = true
+			virt = true
 			if phys && virt
 				what_type = "Torus"
 			elseif phys && !virt
@@ -92,33 +92,43 @@ if true
 			all_ttn_nrgs = zeros(es_count+1,10)
 			ttn_count = 0
 			#for (idx,nu) in enumerate(range(0.0,2.0,length=37))
-			nu = 0.4
+			nu = 0.5
 
-				params_dict = Dict([("es_count",es_count),("if_find_data",false),("if_save_data",false),("layers",4),("mdim",50),("filling",nu),("if_periodic_phys",phys),("if_periodic_virt",virt)])
+				params_dict_ttn = Dict([("es_count",es_count),("if_find_data",false),("if_save_data",false),("layers",4),("mdim",50),("filling",nu),("if_periodic_phys",phys),("if_periodic_synth",virt)])
+				params_dict_ed = Dict([("nev",es_count+1),("if_find_data",false),("if_save_data",false),("Lx",4),("N",2),("filling",nu),("if_periodic_x",phys),("if_periodic_y",virt)])
 
 				if true
-					all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
+					all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict_ttn)
 				end
 
 				# finding all states ED
 				if true
-					model_paras = get_normal_model_params(params_dict)
+					lattice_params,hamilt_params,running_args = get_normal_model_params_ed(params_dict_ed)
+					lattice_params["full_basis"] = n_particle_basis(lattice_params)
+					states_ed,nrgs_ed,rhos_ed,ed_ham = find_eigenstates(running_args.nev,lattice_params,hamilt_params; running_args...)
+
+					#=model_paras_ttn = get_normal_model_params(params_dict_ttn)
 					phys_edge_length,virt_edge_length = model_paras[:restricted_size]
 					if_periodic_phys,if_periodic_synth = model_paras[:if_periodic_phys],model_paras[:if_periodic_synth]
 					num_particles = model_paras[:particles]
 					net = build_HH_net(model_paras)
 					model_paras[:net] = net
 					ham = long_range_HH_ham(named_tuple_to_dict(model_paras))
-					lattice_params = Dict([("Lx",phys_edge_length),("Ly",virt_edge_length),("N",num_particles),("full_basis",n_particle_basis(num_particles,phys_edge_length,phys_edge_length; output_level=1)),("if_periodic_x",if_periodic_phys),("if_periodic_y",if_periodic_synth)])
-					ed_ham = rebuild_ed_ham(ham,lattice_params)
-					x0_ed = rand(Float64,size(lattice_params["full_basis"])[2])
-					rez_ed = eigsolve(ed_ham,x0_ed,es_count+1,:SR,Lanczos())
-					sorted_indices_ed = sortperm(rez_ed[1])
-					states_ed = rez_ed[2][sorted_indices_ed][1:es_count+1]
-					nrgs_ed = rez_ed[1][sorted_indices_ed][1:es_count+1]
+					ttn_ham_rebuilt = rebuild_ed_ham(ham,lattice_params)
+
+					x0_ed_ttnham = rand(Float64,size(lattice_params["full_basis"])[2])
+					rez_ed_ttnham = eigsolve(ttn_ham_rebuilt,x0_ed,es_count+1,:SR,Lanczos())
+					sorted_indices_ed_ttnham = sortperm(rez_ed[1])
+					states_ed_ttnham = rez_ed[2][sorted_indices_ed][1:es_count+1]
+					nrgs_ed_ttnham = rez_ed[1][sorted_indices_ed][1:es_count+1]=#
+
+
 				end
 
 				#all_ed_nrgs[:,idx] = nrgs_ed
+
+				#println("ED from TTN-Ham Energies:")
+				#display(nrgs_ed_ttnham)
 
 				println("ED Energies:")
 				display(nrgs_ed)
@@ -150,6 +160,19 @@ if true
 
 end
 
+
+if false
+	params_dict = Dict([("es_count",0),("particles",4),("if_find_data",true),("if_save_data",false),("layers",2),("mdim",10),("filling",0.5),("if_periodic_phys",true),("if_periodic_synth",true)])
+
+	#og_ttn, hamilt, gs_sp, gs_obs, gs_runtime, gs_dens = run_synth_dims_generic(params_dict)
+	#wavefunc = gs_sp.ttn
+
+	model_paras = get_normal_model_params(params_dict)
+	net = build_HH_net(model_paras)
+
+	psi1 = TTNKit.RandomTreeTensorNetwork(net)
+	psi2 = TTNKit.RandomTreeTensorNetwork(net)
+end
 
 
 
