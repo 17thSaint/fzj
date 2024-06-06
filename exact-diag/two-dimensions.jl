@@ -995,7 +995,7 @@ function buildHopping(lattice_params::Dict,site1::Int64,site2::Int64; kwargs...)
 
     if site1 == site2
         for j in 1:size(full_basis)[2]
-            site1 in full_basis[:,j] ? hop[j,j] = 1.0+0.0*im : nothing
+            site1 in full_basis[:,j] ? hop[j,j] += 1.0+0.0*im : nothing
         end
     else
         for j in 1:size(full_basis)[2]
@@ -1044,6 +1044,13 @@ function density_matrix(x::Vector{ComplexF64},lattice_params::Dict{String,Any}; 
     output_level > 0 ? println("Density Matrix: Elapsed time: ",time()-start_time) : nothing
 
     return rho
+end
+
+function site_occupation(x::Vector{ComplexF64},site::Tuple{Int64,Int64},lattice_params::Dict{String,Any})
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+    site_linear = linear_index(site,Lx,Ly)
+    return conj(transpose(x)) * buildHopping(lattice_params,site_linear,site_linear) * x
 end
 
 function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwargs...)
@@ -1145,12 +1152,12 @@ end
 function physical_correlation(densmat::Array{ComplexF64,2},Lx::Int64,Ly::Int64; kwargs...)
     if_plot = get(kwargs,:if_plot,true)
 
-    phys_corrs = Array{Float64,2}(undef,Lx-1,Ly)
-    for j in 2:Lx
+    phys_corrs = Array{Float64,2}(undef,Lx,Ly)
+    for j in 1:Lx
         for s in 1:Ly
             phys_corr = densmat[linear_index((j,s),Lx,Ly),linear_index((1,s),Lx,Ly)]
             phys_corr /= sqrt(densmat[linear_index((j,s),Lx,Ly),linear_index((j,s),Lx,Ly)] * densmat[linear_index((1,s),Lx,Ly),linear_index((1,s),Lx,Ly)])
-            phys_corrs[j-1,s] = abs(phys_corr)
+            phys_corrs[j,s] = abs(phys_corr)
         end
     end
 
@@ -1162,12 +1169,12 @@ end
 function synthetic_correlation(densmat::Array{ComplexF64,2},Lx::Int64,Ly::Int64; kwargs...)
     if_plot = get(kwargs,:if_plot,true)
 
-    syn_corrs = Array{Float64,2}(undef,Lx,Ly-1)
+    syn_corrs = Array{Float64,2}(undef,Lx,Ly)
     for j in 1:Lx
-        for s in 2:Ly
+        for s in 1:Ly
             syn_corr = densmat[linear_index((j,s),Lx,Ly),linear_index((j,1),Lx,Ly)]
             syn_corr /= sqrt(densmat[linear_index((j,s),Lx,Ly),linear_index((j,s),Lx,Ly)] * densmat[linear_index((j,1),Lx,Ly),linear_index((j,1),Lx,Ly)])
-            syn_corrs[j,s-1] = abs(syn_corr)
+            syn_corrs[j,s] = abs(syn_corr)
         end
     end
 
@@ -1180,7 +1187,7 @@ function plot_synthetic_correlation(syn_corrs::Array{Float64,2}; kwargs...)
     plot_title = get(kwargs,:plot_title,"")
     fig = figure()
     for i in 1:size(syn_corrs)[1]
-        plot(1:size(syn_corrs)[2],syn_corrs[i,:],"-p",label="$i")
+        plot(0:size(syn_corrs)[2]-1,syn_corrs[i,:],"-p",label="$i")
     end
     xlabel("Synthetic Distance")
     ylabel("Correlation")
@@ -1194,7 +1201,7 @@ function plot_physical_correlation(phys_corrs::Array{Float64,2}; kwargs...)
     plot_title = get(kwargs,:plot_title,"")
     fig = figure()
     for i in 1:size(phys_corrs)[2]
-        plot(1:size(phys_corrs)[1],phys_corrs[:,i],"-p",label="$i")
+        plot(0:size(phys_corrs)[1]-1,phys_corrs[:,i],"-p",label="$i")
     end
     xlabel("Physical Distance")
     ylabel("Correlation")
@@ -1633,7 +1640,7 @@ if true
 #lx = 6
 #n = 3
 #for (idx,n) in enumerate([2,3,4,5])
-#intstrens = range(0.0,2.0,length=20)
+intstrens = range(0.0,2.0,length=10)
 #change = 0.001
 #real_alphas = [range(0.1,0.21,length=10); range(0.22,0.28,length=10); range(0.29,0.35,length=5)]
 #howmany = length(real_alphas)
@@ -1644,13 +1651,13 @@ if true
 #anises = range(1.0,10.0,length=20)
 #nus = range(0.4,0.6,length=100)
 #for (idx,alph) in enumerate(alphas)
-for (idx,lx) in enumerate([3,4,5])
+#for (idx,lx) in enumerate([3,4,5])
 #for (idx,nu) in enumerate(nus)
 #for (idx,anis) in enumerate(anises)
-#for (idx,intstren) in enumerate(intstrens)
+for (idx,intstren) in enumerate(intstrens)
 #for lrd in [0,1]
     #for change in [0,0.0001]true
-    params_dict = Dict([("Lx",lx),("N",lx),("if_check_fluxes",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",10),("if_save_data",true)])
+    params_dict = Dict([("Lx",5),("N",5),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",0.6),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_save_data",true)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
@@ -1760,7 +1767,7 @@ for (idx,lx) in enumerate([3,4,5])
     #if idx == 1
     #    for i in 1:running_args.nev
     #        shift = (i - running_args.nev/2) * 0.02
-    #        scatter(lx + shift,nrgs[i] - nrgs[1],c=cols[i],label="E$i - E1")
+    #        scatter(intstren + shift,nrgs[i] - nrgs[1],c=cols[i],label="E$i - E1")
     #    end
         #scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=cols[id2*2-1],label="E2 - E1")
         #scatter(id2 == 1 ? anis : -anis,nrgs[3] - nrgs[1],c=cols[2*id2],label="E3 - E1")
@@ -1768,10 +1775,10 @@ for (idx,lx) in enumerate([3,4,5])
         #scatter(id2 == 1 ? anis : -anis,nrgs[2],c="r",label="E1")
         #scatter(id2 == 1 ? anis : -anis,nrgs[3],c="g",label="E2")
         #scatter(intstren,nrgs[4],c="k",label="E3")
-    #else
+    #=else
         for i in 1:running_args.nev
-            shift = (i - running_args.nev/2) * 0.02
-            scatter(lx + shift,nrgs[i] - nrgs[1],c=cols[i])
+            shift = (i - running_args.nev/2) * ((0.1*abs(intstrens[1] - intstrens[2]))/(running_args.nev/2))
+            scatter(intstren + shift,nrgs[i] - nrgs[1],c=cols[i])
         end
         #scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=c=cols[id2*2-1])
         #plot(anises[idx-1:idx],[hh_gap_exact(anises[idx-1],alpha),hh_gap_exact(anises[idx],alpha)],c="r")
@@ -1779,14 +1786,14 @@ for (idx,lx) in enumerate([3,4,5])
         #scatter(id2 == 1 ? anis : -anis,nrgs[1],c="b")
         #scatter(id2 == 1 ? anis : -anis,nrgs[2],c="r")
         #scatter(id2 == 1 ? anis : -anis,nrgs[3],c="g")
-        #scatter(intstren,nrgs[4],c="k")
+        #scafalsetter(intstren,nrgs[4],c="k")
     #end
     #legend()
-    xlabel("System Size")
+    #xlabel("System Size")
     #xlabel("Interaction Strength")
     #xlabel("Flux")
-    #xlabel("Hopping Anisotropy tx/ty")
-    ylabel("Energy - E1")
+    xlabel("Hopping Anisotropy tx/ty")
+    ylabel("Energy - E1")=#
 
     #cdw = cdw_sf(rhos[1],states[1],lattice_params,(3.0,0.0); if_plot=true,plot_label="$anis")
     #occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="ED, LR=$intstren")
