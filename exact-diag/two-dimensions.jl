@@ -1141,12 +1141,19 @@ find_ground_state(lattice_params::Dict,hamilt_params::Dict; kwargs...) = find_ei
 function save_eigenstates(states,densmats,nrgs,metadata::Dict)
     dataloc = get(metadata,"dataloc",get_folder_location("cluster-data/exact-diag"))
     data_dict = Dict([("state",states),("nrg",nrgs),("densmat",densmats)])
-    filename_dict = Dict([("Lx",metadata["Lx"]),("Ly",metadata["Ly"]),("N",metadata["N"]),("alpha",metadata["alpha"]),("hopping_anisotropy",metadata["hopping_anisotropy"]),("interaction_strength",metadata["U"][1]),("if_periodic_x",metadata["if_periodic_x"]),("if_periodic_y",metadata["if_periodic_y"])])
+    lattice_params,hamilt_params = make_latticehamilt_params_from_metadata(metadata)
+    filename_dict = make_filename_dict(lattice_params,hamilt_params)
     filename = join(["ed",make_parameters_filename(filename_dict)],"-")
     metadata["filename"] = filename
     full_loc = join([dataloc,filename],"/")
     println("Filename: ",full_loc)
     write_data_jld2(full_loc,data_dict,metadata)
+end
+
+function make_latticehamilt_params_from_metadata(metadata::Dict)
+    hamilt_params = Dict([("tx",metadata["tx"]),("ty",metadata["ty"]),("hopping_anisotropy",metadata["hopping_anisotropy"]),("alpha",metadata["alpha"]),("U",metadata["U"]),("interaction_cutoff",metadata["interaction_cutoff"]),("which_dir",metadata["which_dir"])])
+    lattice_params = get_lattice_params_from_metadata(metadata)
+    return lattice_params,hamilt_params
 end
 
 function physical_correlation(densmat::Array{ComplexF64,2},Lx::Int64,Ly::Int64; kwargs...)
@@ -1364,7 +1371,12 @@ function plot_occupancy(exp_occ; kwargs...)
 end
 
 function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
-    return Dict([("Lx",lattice_params["Lx"]),("Ly",lattice_params["Ly"]),("N",lattice_params["N"]),("alpha",hamilt_params["alpha"]),("hopping_anisotropy",hamilt_params["tx"]/hamilt_params["ty"]),("interaction_strength",hamilt_params["U"][1]),("if_periodic_x",lattice_params["if_periodic_x"]),("if_periodic_y",lattice_params["if_periodic_y"])])
+    if hamilt_params["U"][2] == 0.0
+        intstren = 0.0
+    else
+        intstren = hamilt_params["U"][1]
+    end
+    return Dict([("Lx",lattice_params["Lx"]),("Ly",lattice_params["Ly"]),("N",lattice_params["N"]),("alpha",hamilt_params["alpha"]),("hopping_anisotropy",hamilt_params["tx"]/hamilt_params["ty"]),("interaction_strength",intstren),("if_periodic_x",lattice_params["if_periodic_x"]),("if_periodic_y",lattice_params["if_periodic_y"])])
 end
 
 function get_lattice_params_from_metadata(metadata::Dict)
@@ -1633,6 +1645,38 @@ function get_normal_model_params_ed(params_dict::Dict)
 
 end
 
+
+if false
+    lx = 5
+    N = 5
+    
+    for anis in [1/0.6]
+        params_dict = Dict([("Lx",lx),("Ly",lx),("N",N),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",anis)])
+        dataloc = get_folder_location("cluster-data/exact-diag/torus")
+        files = find_data_file(params_dict,"ed",dataloc; output_level=0)
+
+        fig = figure()
+        for f in files
+            data,metadata = read_data_jld2(f,dataloc)
+            nrgs = data["nrg"]
+            intstren = metadata["U"][end]
+
+            cols = ["b","r","g","m","c"]
+            if length(nrgs) > length(cols)
+                cols = repeat(cols,ceil(Int,length(nrgs)/length(cols)))
+            end
+
+            for i in 2:length(nrgs)
+                scatter(intstren,nrgs[i] - nrgs[2],c=cols[i])
+            end
+            xlabel("Interaction Strength")
+            ylabel("Energy - E1")
+            title("Energy Spectrum for Hopping Anisotropy = $(round(anis,digits=4))")
+        end
+    end         
+end
+
+
 if true
 #fig = figure()
 #xlabel("Hopping Anisotropy")
@@ -1640,7 +1684,9 @@ if true
 #lx = 6
 #n = 3
 #for (idx,n) in enumerate([2,3,4,5])
-intstrens = range(0.0,2.0,length=10)
+#intstrens = range(0.0,0.5,length=30)
+#other_intstrens = range(2.0,10.0,length=37)
+#intstrens = sort([intstrens; other_intstrens])
 #change = 0.001
 #real_alphas = [range(0.1,0.21,length=10); range(0.22,0.28,length=10); range(0.29,0.35,length=5)]
 #howmany = length(real_alphas)
@@ -1648,16 +1694,16 @@ intstrens = range(0.0,2.0,length=10)
 #all_bds = zeros(Float64,length(alphas))
 #thetas = range(0.01,0.5,length=50)
 #all_nrgs = zeros(Float64,length(thetas))
-#anises = range(1.0,10.0,length=20)
+#anises = range(1.0,3.0,length=20)
 #nus = range(0.4,0.6,length=100)
 #for (idx,alph) in enumerate(alphas)
-#for (idx,lx) in enumerate([3,4,5])
+#for (idx2,lx) in enumerate([3,4,5])
 #for (idx,nu) in enumerate(nus)
 #for (idx,anis) in enumerate(anises)
-for (idx,intstren) in enumerate(intstrens)
+#for (idx,intstren) in enumerate(intstrens)
 #for lrd in [0,1]
     #for change in [0,0.0001]true
-    params_dict = Dict([("Lx",5),("N",5),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",0.6),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_save_data",true)])
+    params_dict = Dict([("Lx",4),("N",2),("if_periodic_x",true),("if_periodic_y",true),("if_check_fluxes",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr","all"),("filling",0.5),("nev",8),("if_save_data",false)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
@@ -1674,15 +1720,23 @@ for (idx,intstren) in enumerate(intstrens)
     filename_dict = make_filename_dict(lattice_params,hamilt_params)
     if_exists,found_data = check_data_exists(filename_dict,"ed"; location=running_args.dataloc,output_level=false)
 
+    # some old data has bad naming with int_stren = 1.0 even though rest of Us is zeros
+    if params_dict["interaction_strength"] == 1.0 && if_exists
+        if found_data[2]["U"] != hamilt_params["U"]
+            println("Found Data has wrong Interaction Potential")
+            if_exists = false
+        end
+    end
+
     # check if data exists and rerun if need more eigenstates
     if if_exists
         start_time = time()
         println("Found existing data: ",found_data[2]["filename"])
         if running_args.nev > found_data[2]["nev"]
-            opl > 0 ? println("Asking for more eigenstates than in file, rerunning") : nothing
+            running_args.output_level > 0 ? println("Asking for more eigenstates than in file, rerunning") : nothing
             start_time = time()
             full_basis = n_particle_basis(lattice_params; output_level=running_args.output_level,dataloc=basis_dataloc)
-            opl > 0 ? println("Made basis in ",time()-start_time) : nothing
+            running_args.output_level > 0 ? println("Made basis in ",time()-start_time) : nothing
             lattice_params["full_basis"] = full_basis 
             states,nrgs,rhos = rerun_eigenstates(running_args.nev,lattice_params,hamilt_params,found_data[2],found_data[1]; running_args...)
         elseif running_args.nev < found_data[2]["nev"]
@@ -1764,6 +1818,9 @@ for (idx,intstren) in enumerate(intstrens)
         end
     end=#
 
+    #get_occupancy(states[1],lattice_params)
+    #display(nrgs)
+
     #if idx == 1
     #    for i in 1:running_args.nev
     #        shift = (i - running_args.nev/2) * 0.02
@@ -1777,8 +1834,10 @@ for (idx,intstren) in enumerate(intstrens)
         #scatter(intstren,nrgs[4],c="k",label="E3")
     #=else
         for i in 1:running_args.nev
-            shift = (i - running_args.nev/2) * ((0.1*abs(intstrens[1] - intstrens[2]))/(running_args.nev/2))
-            scatter(intstren + shift,nrgs[i] - nrgs[1],c=cols[i])
+            change = abs(intstrens[1] - intstrens[2])
+            xval = intstren
+            shift = (i - running_args.nev/2) * ((0.1*change)/(running_args.nev/2))
+            scatter(xval + shift,nrgs[i] - nrgs[1],c=cols[i])
         end
         #scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=c=cols[id2*2-1])
         #plot(anises[idx-1:idx],[hh_gap_exact(anises[idx-1],alpha),hh_gap_exact(anises[idx],alpha)],c="r")
@@ -1790,10 +1849,12 @@ for (idx,intstren) in enumerate(intstrens)
     #end
     #legend()
     #xlabel("System Size")
-    #xlabel("Interaction Strength")
+    xlabel("Interaction Strength")
     #xlabel("Flux")
-    xlabel("Hopping Anisotropy tx/ty")
+    #xlabel("Hopping Anisotropy tx/ty")
     ylabel("Energy - E1")=#
+    #title("5x5 N=5, Anis=$(hamilt_params["hopping_anisotropy"])")
+    #title("Topological Degeneracy Closing in Thermodynamic Limit")#
 
     #cdw = cdw_sf(rhos[1],states[1],lattice_params,(3.0,0.0); if_plot=true,plot_label="$anis")
     #occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="ED, LR=$intstren")
@@ -1820,7 +1881,7 @@ for (idx,intstren) in enumerate(intstrens)
     currents = physical_current(rhos,lattice_params; if_plot=true)
     corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
     currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
-end
+#end
 
 #bdderivs = (all_bds[howmany+1:end] .- all_bds[1:howmany]) ./ change
 #fillings = n ./ (alphas[1:howmany] .* ((lx-1)*(lx-1)))
