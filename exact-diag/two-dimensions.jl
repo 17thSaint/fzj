@@ -1058,30 +1058,50 @@ function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwa
     if_densmat = get(kwargs,:if_densmat,true)
     if_save_data = get(kwargs,:if_save_data,false)
     if_exact = get(kwargs,:if_exact,false)
+    if_function = get(kwargs,:if_function,true)
 
     metadata_dict = merge(merge(lattice_params,hamilt_params),named_tuple_to_dict(kwargs))
 
     metadata_displaying::Dict = copy(metadata_dict)
     delete!(metadata_displaying,"full_basis")
     output_level > 0 ? display(metadata_displaying) : nothing
+
+    dimHilb = size(lattice_params["full_basis"])[2]
     
     start_time = time()
-    H = buildHam(lattice_params,hamilt_params; output_level)
-    dimHilb = size(H)[1]
-    #display(H)
-    metadata_dict["H"] = H
-    output_level > 0 ? println("Sparsity = ",SparseArrays.nnz(H)/size(H)[1]^2) : nothing
+    if if_function
+        
+        function ham_func(x)
+            output_vector::Vector{ComplexF64} = zeros(ComplexF64,dimHilb)
+            for i in 1:dimHilb
+                output_states,output_weights = applyHam(i,lattice_params,hamilt_params)
+                for (idx,state) in enumerate(output_states)
+                    output_vector[state] += output_weights[idx]*x[i]
+                end
+            end
+            return output_vector
+        end
 
-    if if_exact
-        everything = eigen(Matrix(H))
-        rez = (everything.values,everything.vectors)
-    else
+        kdim = get(kwargs,:kdim,nev+10)
         x0 = rand(Float64,size(lattice_params["full_basis"])[2])
-        rez = eigsolve(H,x0,nev,:SR,Lanczos())
+        rez = eigsolve(ham_func,x0,nev,:SR; krylovdim=kdim)
+    else
+        H = buildHam(lattice_params,hamilt_params; output_level)
+        #display(H)
+        metadata_dict["H"] = H
+        output_level > 0 ? println("Sparsity = ",SparseArrays.nnz(H)/size(H)[1]^2) : nothing
+
+        if if_exact
+            everything = eigen(Matrix(H))
+            rez = (everything.values,everything.vectors)
+        else
+            x0 = rand(Float64,size(lattice_params["full_basis"])[2])
+            rez = eigsolve(H,x0,nev,:SR,Lanczos())
+        end
     end
     output_level > 0 ? println("Ground State: Elapsed time: ",time()-start_time) : nothing
 
-    sorted_indices = sortperm(rez[1])
+    sorted_indices = sortperm(real.(rez[1]))
     states = rez[2][sorted_indices][1:nev]
     nrgs = rez[1][sorted_indices][1:nev]
 
@@ -1094,25 +1114,57 @@ function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwa
 
     if_save_data ? save_eigenstates(states,rhos,nrgs,metadata_dict) : nothing
 
-    return states,nrgs,rhos,H
+    if if_function
+        return states,real.(nrgs),rhos
+    else
+        return states,real.(nrgs),rhos,H
+    end
 end
 
 function rerun_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict,metadata::Dict,data_dict::Dict; kwargs...)
     output_level = get(kwargs,:output_level,1)
     if_densmat = get(kwargs,:if_densmat,true)
     if_save_data = get(kwargs,:if_save_data,false)
+    if_exact = get(kwargs,:if_exact,false)
+    if_function = get(kwargs,:if_function,true)
+
 
     metadata_displaying::Dict = copy(metadata)
     delete!(metadata_displaying,"full_basis")
     delete!(metadata_displaying,"H")
     output_level > 0 ? display(metadata_displaying) : nothing
     
-    H = metadata["H"]
-    output_level > 0 ? println("Sparsity = ",nnz(H)/size(H)[1]^2) : nothing
+    dimHilb = size(lattice_params["full_basis"])[2]
 
     start_time = time()
+    if if_function
+
+        function ham_func(x)
+            output_vector::Vector{ComplexF64} = zeros(ComplexF64,dimHilb)
+            for i in 1:dimHilb
+                output_states,output_weights = applyHam(i,lattice_params,hamilt_params)
+                for (idx,state) in enumerate(output_states)
+                    output_vector[state] += output_weights[idx]*x[i]
+                end
+            end
+            return output_vector
+        end
+
+        kdim = get(kwargs,:kdim,nev+10)
+        x0 = rand(Float64,size(lattice_params["full_basis"])[2])
+        rez = eigsolve(ham_func,x0,nev,:SR; krylovdim=kdim)
+    else
+        H = metadata["H"]
+        output_level > 0 ? println("Sparsity = ",nnz(H)/size(H)[1]^2) : nothing
+        if if_exact
+            everything = eigen(Matrix(H))
+            rez = (everything.values,everything.vectors)
+        else
+            x0 = rand(Float64,size(lattice_params["full_basis"])[2])
+            rez = eigsolve(H,x0,nev,:SR,Lanczos())
+        end
+    end
     previous_nev = metadata["nev"]
-    rez = eigsolve(H,nev+3)
     output_level > 0 ? println("Ground State: Elapsed time: ",time()-start_time) : nothing
 
     sorted_indices = sortperm(rez[1])
@@ -1584,9 +1636,13 @@ function get_normal_model_params_ed(params_dict::Dict)
     opl = get(params_dict, "output_level", 1)
     if_exact = get(params_dict, "if_exact", false)
     if_densmat = get(params_dict, "if_densmat", false)
+    if_find_data = get(params_dict, "if_find_data", true)
+    if_function = get(params_dict, "if_function", true)
     running_args = (nev=nev,
                     if_exact=if_exact,
+                    if_function=if_function,
                     if_densmat=if_densmat,
+                    if_find_data=if_find_data,
                     if_save_data=if_save_data,
                     dataloc=dataloc,
                     basis_dataloc=basis_dataloc,
@@ -1650,7 +1706,7 @@ if false
     lx = 5
     N = 5
     
-    for anis in [1/0.6]
+    for anis in [1/0.6,1.2,1.0,0.8,0.6]
         params_dict = Dict([("Lx",lx),("Ly",lx),("N",N),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",anis)])
         dataloc = get_folder_location("cluster-data/exact-diag/torus")
         files = find_data_file(params_dict,"ed",dataloc; output_level=0)
@@ -1666,8 +1722,8 @@ if false
                 cols = repeat(cols,ceil(Int,length(nrgs)/length(cols)))
             end
 
-            for i in 2:length(nrgs)
-                scatter(intstren,nrgs[i] - nrgs[2],c=cols[i])
+            for i in 1:length(nrgs)
+                scatter(intstren,nrgs[i] - nrgs[1],c=cols[i])
             end
             xlabel("Interaction Strength")
             ylabel("Energy - E1")
@@ -1684,7 +1740,7 @@ if true
 #lx = 6
 #n = 3
 #for (idx,n) in enumerate([2,3,4,5])
-#intstrens = range(0.0,0.5,length=30)
+intstrens = range(0.0,2.0,length=10)
 #other_intstrens = range(2.0,10.0,length=37)
 #intstrens = sort([intstrens; other_intstrens])
 #change = 0.001
@@ -1700,10 +1756,10 @@ if true
 #for (idx2,lx) in enumerate([3,4,5])
 #for (idx,nu) in enumerate(nus)
 #for (idx,anis) in enumerate(anises)
-#for (idx,intstren) in enumerate(intstrens)
+for (idx,intstren) in enumerate(intstrens)
 #for lrd in [0,1]
     #for change in [0,0.0001]true
-    params_dict = Dict([("Lx",4),("N",2),("if_periodic_x",true),("if_periodic_y",true),("if_check_fluxes",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr","all"),("filling",0.5),("nev",8),("if_save_data",false)])
+    params_dict = Dict([("Lx",4),("N",2),("if_periodic_x",true),("if_periodic_y",true),("if_check_fluxes",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr","all"),("filling",0.5),("nev",40),("if_save_data",false)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
@@ -1718,7 +1774,7 @@ if true
 
     # build filename dictionary
     filename_dict = make_filename_dict(lattice_params,hamilt_params)
-    if_exists,found_data = check_data_exists(filename_dict,"ed"; location=running_args.dataloc,output_level=false)
+    if_exists,found_data = running_args.if_find_data ? check_data_exists(filename_dict,"ed"; location=running_args.dataloc,output_level=false) : (false,nothing)
 
     # some old data has bad naming with int_stren = 1.0 even though rest of Us is zeros
     if params_dict["interaction_strength"] == 1.0 && if_exists
@@ -1767,7 +1823,11 @@ if true
         if running_args.nev == 1
             states,nrgs,rhos = find_ground_state(lattice_params,hamilt_params; running_args...)
         else
-            states,nrgs,rhos,hh = find_eigenstates(running_args.nev,lattice_params,hamilt_params; running_args...)
+            if running_args.if_function
+                states,nrgs,rhos = find_eigenstates(running_args.nev,lattice_params,hamilt_params; running_args...)
+            else
+                states,nrgs,rhos,hh = find_eigenstates(running_args.nev,lattice_params,hamilt_params; running_args...)
+            end
         end
     end
 
@@ -1832,7 +1892,7 @@ if true
         #scatter(id2 == 1 ? anis : -anis,nrgs[2],c="r",label="E1")
         #scatter(id2 == 1 ? anis : -anis,nrgs[3],c="g",label="E2")
         #scatter(intstren,nrgs[4],c="k",label="E3")
-    #=else
+    #else
         for i in 1:running_args.nev
             change = abs(intstrens[1] - intstrens[2])
             xval = intstren
@@ -1852,7 +1912,7 @@ if true
     xlabel("Interaction Strength")
     #xlabel("Flux")
     #xlabel("Hopping Anisotropy tx/ty")
-    ylabel("Energy - E1")=#
+    ylabel("Energy - E1")#
     #title("5x5 N=5, Anis=$(hamilt_params["hopping_anisotropy"])")
     #title("Topological Degeneracy Closing in Thermodynamic Limit")#
 
@@ -1881,7 +1941,7 @@ if true
     currents = physical_current(rhos,lattice_params; if_plot=true)
     corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
     currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
-#end
+end
 
 #bdderivs = (all_bds[howmany+1:end] .- all_bds[1:howmany]) ./ change
 #fillings = n ./ (alphas[1:howmany] .* ((lx-1)*(lx-1)))
