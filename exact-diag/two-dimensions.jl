@@ -1100,6 +1100,7 @@ function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwa
         end
     end
     output_level > 0 ? println("Ground State: Elapsed time: ",time()-start_time) : nothing
+    metadata_dict["runtime"] = time()-start_time
 
     sorted_indices = sortperm(real.(rez[1]))
     states = rez[2][sorted_indices][1:nev]
@@ -1167,7 +1168,7 @@ function rerun_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict,met
     previous_nev = metadata["nev"]
     output_level > 0 ? println("Ground State: Elapsed time: ",time()-start_time) : nothing
 
-    sorted_indices = sortperm(rez[1])
+    sorted_indices = sortperm(real.(rez[1]))
     states = rez[2][sorted_indices][1:nev]
     nrgs = rez[1][sorted_indices][1:nev]
 
@@ -1615,6 +1616,7 @@ function get_normal_model_params_ed(params_dict::Dict)
     if_periodic_x = get(params_dict, "if_periodic_x", false)
     if_periodic_y = get(params_dict, "if_periodic_y", false)
     twist_angle = get(params_dict, "twist_angle", 0.0)
+    expected_dimHilb = binomial(Lx*Ly,N)
 
 
     # set running operation parameters
@@ -1740,7 +1742,7 @@ if true
 #lx = 6
 #n = 3
 #for (idx,n) in enumerate([2,3,4,5])
-intstrens = range(0.0,2.0,length=10)
+#intstrens = range(0.0,2.0,length=10)
 #other_intstrens = range(2.0,10.0,length=37)
 #intstrens = sort([intstrens; other_intstrens])
 #change = 0.001
@@ -1753,13 +1755,23 @@ intstrens = range(0.0,2.0,length=10)
 #anises = range(1.0,3.0,length=20)
 #nus = range(0.4,0.6,length=100)
 #for (idx,alph) in enumerate(alphas)
-#for (idx2,lx) in enumerate([3,4,5])
+for (idx,lx) in enumerate([3,4,5,6,7,8])
+for n in [lx/2,lx]
+    if !isinteger(n)
+        continue
+    end
+    n = Int(n)
+    if binomial(lx^2,n) > 100000
+        continue
+    end
+    for iffunc in [true,false]
+    for init in [1,2]
 #for (idx,nu) in enumerate(nus)
 #for (idx,anis) in enumerate(anises)
-for (idx,intstren) in enumerate(intstrens)
+#for (idx,intstren) in enumerate(intstrens)
 #for lrd in [0,1]
     #for change in [0,0.0001]true
-    params_dict = Dict([("Lx",4),("N",2),("if_periodic_x",true),("if_periodic_y",true),("if_check_fluxes",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr","all"),("filling",0.5),("nev",40),("if_save_data",false)])
+    params_dict = Dict([("Lx",lx),("N",n),("if_find_data",false),("if_function",iffunc),("if_periodic_x",true),("if_periodic_y",true),("if_check_fluxes",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr","all"),("filling",0.5),("nev",10),("if_save_data",false)])
     #params_dict = make_args_dict(ARGS)
 
     # set number of open cores
@@ -1892,7 +1904,7 @@ for (idx,intstren) in enumerate(intstrens)
         #scatter(id2 == 1 ? anis : -anis,nrgs[2],c="r",label="E1")
         #scatter(id2 == 1 ? anis : -anis,nrgs[3],c="g",label="E2")
         #scatter(intstren,nrgs[4],c="k",label="E3")
-    #else
+    #=else
         for i in 1:running_args.nev
             change = abs(intstrens[1] - intstrens[2])
             xval = intstren
@@ -1912,7 +1924,7 @@ for (idx,intstren) in enumerate(intstrens)
     xlabel("Interaction Strength")
     #xlabel("Flux")
     #xlabel("Hopping Anisotropy tx/ty")
-    ylabel("Energy - E1")#
+    ylabel("Energy - E1")=#
     #title("5x5 N=5, Anis=$(hamilt_params["hopping_anisotropy"])")
     #title("Topological Degeneracy Closing in Thermodynamic Limit")#
 
@@ -1922,6 +1934,15 @@ for (idx,intstren) in enumerate(intstrens)
     #scurr = synthetic_current(rhos[1],lattice_params; if_plot=true,plot_title="Int Stren=$intstren")
     #pcurr = physical_current(rhos[1],lattice_params; if_plot=true,plot_title="Int Stren=$intstren")
 
+    if running_args.if_function
+        col = "b"
+    else
+        col = "r"
+    end
+    init == 2 ? scatter(binomial(lx^2,n),time() - start_time,c=col) : nothing
+    xlabel("Hilbert Space Dimension")
+    ylabel("Time")
+    xscale("log")
 
     #title("Energy Gap for 2 x $Lx decoupled wires")
     #scatter(intstren,nrgs[2] .- nrgs[1],c="b")
@@ -1941,6 +1962,9 @@ for (idx,intstren) in enumerate(intstrens)
     currents = physical_current(rhos,lattice_params; if_plot=true)
     corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
     currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
+end
+end
+end
 end
 
 #bdderivs = (all_bds[howmany+1:end] .- all_bds[1:howmany]) ./ change
