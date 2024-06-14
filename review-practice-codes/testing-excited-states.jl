@@ -1,5 +1,6 @@
 include("../synth-dims/long-range-ttn.jl")
 include("../exact-diag/two-dimensions.jl")
+include("extra-testing-functions.jl")
 using Test,PyPlot
 
 function rebuild_ed_ham(ttn_ham,lattice_params::Dict)
@@ -162,27 +163,19 @@ end
 
 
 if true
-	params_dict = Dict([("es_count",0),("particles",2),("if_save_data",false),("layers",4),("mdim",10),("filling",0.5),("if_periodic_phys",true),("if_periodic_synth",true)])
+	params_dict = Dict([("particles",2),("layers",4),("mdim",10)])
+	
+	max_occ = 1
+	net1 = simple_boson_network(params_dict["layers"],true,max_occ)
+	psi1 = make_randomconfig_ttn(net1,params_dict["particles"],max_occ)
 
-	#og_ttn, hamilt, gs_sp, gs_obs, gs_runtime, gs_dens = run_synth_dims_generic(params_dict)
-	#wavefunc = gs_sp.ttn
-
-	# need a two different wavefunctions that have a non-zero overlap
-	model_paras = get_normal_model_params(params_dict)
-	net1 = build_HH_net(model_paras)
-	net2 = build_HH_net(model_paras)
-
-	psi1 = TTNKit.RandomTreeTensorNetwork(net1)
-
-	states = fill("0", 2^(model_paras[:layers]))
-	old_ttn = TTNKit.ProductTreeTensorNetwork(net2,states)
-	psi2 = initialize_ttn(old_ttn,model_paras[:mdim],model_paras[:particles]; model_paras...)
+	psi2 = make_parton_ttn(net1,params_dict["particles"],params_dict["mdim"],max_occ)
 
 	if true
 		@testset "Up flow for overlap" begin
 			upflow = TTNKit.bottom_overlap_environments(psi1,psi2)
 
-			tensorlist = vcat(psi1[(params_dict["layers"],1)],(upflow[params_dict["layers"]][1])...,dag(psi2[(params_dict["layers"],1)]))
+			tensorlist = vcat(psi1[(params_dict["layers"],1)],(upflow[params_dict["layers"]][1])...,prime(dag(psi2[(params_dict["layers"],1)])))
 			overlap_fromflow = TTNKit.ITensors.scalar(TTNKit.contract(tensorlist))
 			overlap_direct = TTNKit.inner(psi1,psi2)
 			@test isapprox(overlap_fromflow,overlap_direct,atol=1e-10)
@@ -198,7 +191,7 @@ if true
 			for ll in 1:params_dict["layers"]-1
 				for nn in 1:2^(params_dict["layers"]-ll)
 					top,bot_left,bot_right = full_envs[ll][nn]
-					overlap_fromenvs = TTNKit.ITensors.scalar(TTNKit.contract(top,psi1[(ll,nn)],bot_left,bot_right,dag(psi2[(ll,nn)])))
+					overlap_fromenvs = TTNKit.ITensors.scalar(TTNKit.contract(top,psi1[(ll,nn)],bot_left,bot_right,prime(dag(psi2[(ll,nn)]))))
 					@test isapprox(overlap_fromenvs,overlap_direct,atol=1e-10)
 				end
 			end
