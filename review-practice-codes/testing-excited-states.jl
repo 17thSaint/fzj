@@ -68,7 +68,7 @@ if typeof(open_cores) != String
 end=#
 
 
-if true
+if false
 	cols = ["b","r","g","m","c"]
 	es_count = 10
 	#for phys in [true,false]
@@ -161,17 +161,51 @@ if true
 end
 
 
-if false
-	params_dict = Dict([("es_count",0),("particles",4),("if_find_data",true),("if_save_data",false),("layers",2),("mdim",10),("filling",0.5),("if_periodic_phys",true),("if_periodic_synth",true)])
+if true
+	params_dict = Dict([("es_count",0),("particles",2),("if_save_data",false),("layers",4),("mdim",10),("filling",0.5),("if_periodic_phys",true),("if_periodic_synth",true)])
 
 	#og_ttn, hamilt, gs_sp, gs_obs, gs_runtime, gs_dens = run_synth_dims_generic(params_dict)
 	#wavefunc = gs_sp.ttn
 
+	# need a two different wavefunctions that have a non-zero overlap
 	model_paras = get_normal_model_params(params_dict)
-	net = build_HH_net(model_paras)
+	net1 = build_HH_net(model_paras)
+	net2 = build_HH_net(model_paras)
 
-	psi1 = TTNKit.RandomTreeTensorNetwork(net)
-	psi2 = TTNKit.RandomTreeTensorNetwork(net)
+	psi1 = TTNKit.RandomTreeTensorNetwork(net1)
+
+	states = fill("0", 2^(model_paras[:layers]))
+	old_ttn = TTNKit.ProductTreeTensorNetwork(net2,states)
+	psi2 = initialize_ttn(old_ttn,model_paras[:mdim],model_paras[:particles]; model_paras...)
+
+	if true
+		@testset "Up flow for overlap" begin
+			upflow = TTNKit.bottom_overlap_environments(psi1,psi2)
+
+			tensorlist = vcat(psi1[(params_dict["layers"],1)],(upflow[params_dict["layers"]][1])...,dag(psi2[(params_dict["layers"],1)]))
+			overlap_fromflow = TTNKit.ITensors.scalar(TTNKit.contract(tensorlist))
+			overlap_direct = TTNKit.inner(psi1,psi2)
+			@test isapprox(overlap_fromflow,overlap_direct,atol=1e-10)
+		end
+	end
+
+	if true
+		@testset "Overlap environments" begin
+
+			overlap_direct = TTNKit.inner(psi1,psi2)
+
+			full_envs = TTNKit.build_overlap_environments(psi1,psi2)
+			for ll in 1:params_dict["layers"]-1
+				for nn in 1:2^(params_dict["layers"]-ll)
+					top,bot_left,bot_right = full_envs[ll][nn]
+					overlap_fromenvs = TTNKit.ITensors.scalar(TTNKit.contract(top,psi1[(ll,nn)],bot_left,bot_right,dag(psi2[(ll,nn)])))
+					@test isapprox(overlap_fromenvs,overlap_direct,atol=1e-10)
+				end
+			end
+
+		end
+	end
+
 end
 
 
