@@ -45,6 +45,37 @@ function long_range_scaling_old(x_final,virt_edge_length,initial_strength; kwarg
 	return strengths
 end
 
+function long_range_scaling_ed(x_final::Int64,virt_edge_length::Int64,initial_strength::Float64; kwargs...)
+
+	trunc = get(kwargs, :trunc_digits, 5)
+	scaling_func = get(kwargs, :scaling, "flat")
+	
+	strengths = zeros(virt_edge_length)
+
+    if x_final == 0.0 || initial_strength == 0.0
+        strengths[1] = initial_strength != 0.0 ? initial_strength : 1.0
+        return strengths
+    end
+	
+	if scaling_func == "flat"
+		strengths[1:x_final+1] .= initial_strength
+	elseif scaling_func == "exp"
+        corr_length = get(kwargs, :corr_length, virt_edge_length)
+		strengths = map(1:virt_edge_length) do x
+			initial_strength * exp(-(x-1)/corr_length)	
+		end
+	elseif scaling_func == "rydberg"
+		blockade_radius = get(kwargs, :blockade_radius, 1.0)
+		strengths = map(0:virt_edge_length-1) do x
+			initial_strength * (blockade_radius^6) / (blockade_radius^6 + x^6)
+		end
+	end
+	
+	strengths = round.(strengths,digits=trunc)
+
+	return strengths
+end
+
 function save_long_range_scaling_old(strengths,virt_edge_length; kwargs...)
 	filename = get(kwargs, :name, "scaling-strength")
 	location = get(kwargs, :location, pwd())
@@ -113,7 +144,7 @@ function get_interaction_coords_old(given_site,inter_dist,lat,if_periodic_virt) 
 	end
 	return unique(coordinates)
 end
-false
+
 function get_inter_coeff_old(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwargs...) 
 	hopping_anisotropy = get(kwargs, :hopping_anisotropy, 1.0)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
@@ -162,10 +193,10 @@ function long_range_HH_ham_old(net,t_strength,phi; kwargs...)
 	phys_edge_length,virt_edge_length = get_lattice_dims(net)
 	println("Phys = ",phys_edge_length,", Virt = ",virt_edge_length)
 	
-	scaling_distance = get(kwargs, :scaling_dist, 0)
+	scaling_distance = get(kwargs, :lr, 0)
 	
 	restricted_size = get(kwargs, :restricted_size, [phys_edge_length,virt_edge_length])
-	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
+	if_periodic_virt = get(kwargs, :if_periodic_synth, false)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
 	if_hopping = get(kwargs, :if_hopping, true)
 	if_nn_int = get(kwargs, :if_nn_int, false)
@@ -178,7 +209,7 @@ function long_range_HH_ham_old(net,t_strength,phi; kwargs...)
 	twist_angle = get(kwargs, :twist_angle, 0.0)
 	#hopping_anisotropy = get(kwargs, :hopping_anisotropy, 1.0) t_phys / t_synth = anisotropy
 	
-	long_range_strengths = long_range_scaling_old(scaling_distance,virt_edge_length,onsite_strength; kwargs...)
+	long_range_strengths = long_range_scaling_ed(scaling_distance,virt_edge_length,onsite_strength; kwargs...)
 	display(long_range_strengths)
 	if_interaction = !all(long_range_strengths.==0)
 	

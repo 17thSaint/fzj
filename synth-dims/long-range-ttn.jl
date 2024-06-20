@@ -1225,11 +1225,12 @@ function get_normal_model_params(params_dict::Dict)
 	nrgtol = get(params_dict, "nrgtol", 5E-5)
 	cutoff = get(params_dict, "cutoff", 1E-8)
 	evolve = get(params_dict, "evolve", true)
-	expander_fraction = get(params_dict, "expander_fraction", 1.0)
+	expander_fraction = get(params_dict, "expander_fraction", 0.1)
 	expan = TTNKit.DefaultExpander(expander_fraction)
 	noise = get(params_dict, "noise", [0.0])
 	syms = get(params_dict, "syms", true)
 	nswps = get(params_dict, "num_sweeps", 100)
+	if_old_excited = get(params_dict, "if_old_excited", false)
 
 
 	# Lattice/TTN Parameters
@@ -1281,6 +1282,7 @@ function get_normal_model_params(params_dict::Dict)
 		filling = get(params_dict, "filling", 1.0)
 		phys_shift,synth_shift = !if_periodic_phys,!if_periodic_synth
 		alpha = num_particles/(filling*(phys_edge_length - phys_shift)*(synth_edge_length - synth_shift))
+		filling == 0.0 ? alpha = 0.0 : nothing
 		mag_off = false
 	else
 		mag_off = alpha == 0.0
@@ -1295,6 +1297,7 @@ function get_normal_model_params(params_dict::Dict)
 	if_cluster = any([occursin("local",pwd()),occursin("Local",pwd()),occursin("geraghty",pwd())])
 	if_continuous_saving = get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 7)
 	save_data ? nothing : if_continuous_saving = false
+	es_count = get(params_dict, "es_count", 0)
 
 	if if_periodic_phys && if_periodic_synth
 		dataloc = get_folder_location("cluster-data/synth-dims/torus")
@@ -1305,6 +1308,9 @@ function get_normal_model_params(params_dict::Dict)
 	end
 	if sc_type == "rydberg"
 		dataloc = get_folder_location("cluster-data/synth-dims/rydberg")
+	end
+	if es_count > 0
+		dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
 	end
 	loc = get(params_dict, "dataloc", dataloc)
 	
@@ -1351,6 +1357,7 @@ function get_normal_model_params(params_dict::Dict)
 						"if_save_data"=>save_data,
 						"if_sweep"=>evolve,
 						"sweep_type"=>sweep_type,
+						"if_old_excited"=>if_old_excited,
 						"expander"=>expan,
 						"max_occ"=>max_occ,
 						"mdim"=>mdim,
@@ -1476,9 +1483,9 @@ end=#
 #strens = range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("hopping_anisotropy",1.0),("es_count",0),("nrgtol",5e-5),("particles",2),("layers",4),("mdim",100),("if_save_data",false),("alpha",0.0),("onsite_strength",0.0),("lr",0),("if_periodic_phys",false),("if_periodic_synth",true)])
+	#params_dict = Dict([("hopping_anisotropy",1.0),("if_check_fluxes",false),("es_count",3),("nrgtol",5e-5),("particles",2),("layers",4),("mdim",100),("if_save_data",false),("filling",0.3),("onsite_strength",0.0),("lr",0),("if_periodic_phys",false),("if_periodic_synth",false)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
-	#params_dict = make_args_dict(ARGS)
+	params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)
 	if typeof(open_cores) != String
 		BLAS.set_num_threads(open_cores)	
@@ -1487,7 +1494,7 @@ end=#
 	
 	all_results = run_synth_dims_generic(params_dict)
 
-	get_occupancy(all_results[3].ttn; densmat=all_results[end])
+	#get_occupancy(all_results[3].ttn; densmat=all_results[end])
 
 	
 	

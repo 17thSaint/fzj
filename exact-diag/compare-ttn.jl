@@ -363,7 +363,7 @@ function rebuild_ed_ham(ttn_ham,lattice_params::Dict)
 	end
 
 	for j in 1:size(full_basis)[2]
-		#println(round(100*j/size(full_basis)[2],digits=2))
+		println(round(100*j/size(full_basis)[2],digits=3))
 		basis = full_basis[:,j]
 					
 		# check for hopping
@@ -389,6 +389,55 @@ function rebuild_ed_ham(ttn_ham,lattice_params::Dict)
 	return rebuilt_ham
 end
 
+function get_lattice_params_from_ttn_modelparas(model_params::Dict)
+	layer_count = model_params[:layers]
+	if layer_count % 2 != 0
+		Lx = Int(sqrt(2^(layer_count+1)))
+		Ly = Int(sqrt(2^(layer_count-1)))
+	else
+		Lx = Int(sqrt(2^layer_count))
+		Ly = Int(sqrt(2^layer_count))
+	end
+	if model_params[:restricted_size] != [Lx,Ly]
+		Lx,Ly = model_params[:restricted_size]
+	end
+
+	N = model_params[:particles]
+	if_periodic_phys = model_params[:if_periodic_phys]
+	if_periodic_virt = model_params[:if_periodic_synth]
+	full_basis = n_particle_basis(N,Lx,Lx; output_level=1)
+	lattice_params = Dict([("Lx",Lx),("Ly",Ly),("N",N),("if_periodic_x",if_periodic_phys),("if_periodic_y",if_periodic_virt),("twist_angle",0.0),("full_basis",full_basis)])
+	return lattice_params
+end
+
+if true
+	cols = ["b","r","g","m","c"]
+    if 10 > length(cols)
+        cols = repeat(cols,ceil(Int,10/length(cols)))
+    end
+	
+	anis = 0.7
+	intstren = 10.0
+	params_dict = Dict([("hopping_anisotropy",anis),("make_smaller_lattice",[6,6]),("if_check_fluxes",true),("particles",3),("layers",6),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",false),("if_periodic_synth",true)])
+	nev = 10
+	model_paras = get_normal_model_params(params_dict)
+
+	this_alpha = 2*model_paras[:particles]/(prod(model_paras[:restricted_size]))#model_paras[:alpha]
+	net = build_HH_net_old(model_paras[:layers]; syms=true, max_occ=1)
+	ttn_ham = long_range_HH_ham_old(net,1.0,this_alpha; model_paras...)
+
+	lattice_params = get_lattice_params_from_ttn_modelparas(model_paras)
+	rebuilt_ham = rebuild_ed_ham(ttn_ham,lattice_params)
+
+	x0 = rand(Float64,size(lattice_params["full_basis"])[2])
+	rez = eigsolve(rebuilt_ham,x0,nev,:SR,Lanczos())
+	states = rez[2]
+	nrgs = rez[1]
+
+	#occs = get_occupancy(states[1],lattice_params; if_plot=true)
+	#display(occs)
+
+end
 
 if false || if_all
 	@testset "equivalence of hamiltonians btw TTN and ED" begin

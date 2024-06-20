@@ -716,6 +716,7 @@ end
 function do_sweep(ttn,ham,sweep_type; kwargs...)
 
 	psi_ortho = get(kwargs, :psi_ortho, nothing)
+	if_old_excited = get(kwargs, :if_old_excited, false)
 	weight = get(kwargs, :weight, 10.0)
 	if_redo = get(kwargs, :if_redo, false)
 	opl::Int = get(kwargs, :output_level, 0)
@@ -746,7 +747,12 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 		if isnothing(psi_ortho)
 			sp::TTNKit.AbstractSweepHandler = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff)
 		else
-			sp = TTNKit.dmrg(ttn,psi_ortho,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff, weight=weight)
+			# prep the orthogonal states before starting DMRG
+			for ortho_state in psi_ortho
+				TTNKit.move_ortho!(ortho_state,ttn.ortho_center)
+			end
+		
+			sp = TTNKit.dmrg(ttn,psi_ortho,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff, weight=weight, if_old_excited=if_old_excited)
 		end
 	elseif sweep_type == "simple"
 		proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
@@ -1114,6 +1120,7 @@ function find_excited_states(num_layers::Int,num_excited_states::Int,particle_co
 		end
 
 		println("Finished Excited State $es_number \n")
+
 	end
 
 		
