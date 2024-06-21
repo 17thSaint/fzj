@@ -1190,6 +1190,21 @@ function check_fluxes(alpha,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_
     return nothing
 end
 
+function memory_usage(psi::TreeTensorNetwork)
+	number_of_numbers = 0
+	net = TTNKit.network(psi)
+	nlayers = TTNKit.number_of_layers(net)
+	for ll in 1:nlayers
+		for pp in 1:2^(nlayers-ll)
+			number_of_numbers += prod(size(psi[(ll,pp)]))
+		end
+	end
+
+	bytespercomplexnumber = 16
+
+	return (number_of_numbers * bytespercomplexnumber) / 1073741824
+end
+
 function make_synthdims_filename(model_parameters::Dict)
 	# Start with the usual stuff for every filename
 	layer_count = model_parameters["layers"]
@@ -1460,7 +1475,7 @@ end
 
 
 #
-if false
+if true
 
 #nnst = 0.0
 #layers = 6
@@ -1483,9 +1498,9 @@ end=#
 #strens = range(0.1,0.5,length=3)
 #for (idx,anis) in enumerate(anises)
 #for (idx,stren) in enumerate(strens)
-	#params_dict = Dict([("hopping_anisotropy",1.0),("if_check_fluxes",false),("es_count",3),("nrgtol",5e-5),("particles",2),("layers",4),("mdim",100),("if_save_data",false),("filling",0.3),("onsite_strength",0.0),("lr",0),("if_periodic_phys",false),("if_periodic_synth",false)])
+	params_dict = Dict([("hopping_anisotropy",1.0),("if_check_fluxes",false),("es_count",3),("nrgtol",5e-5),("particles",4),("layers",6),("mdim",10),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
 	# usually in params: mag_off, layers, mdim, longrange_dist
-	params_dict = make_args_dict(ARGS)
+	#params_dict = make_args_dict(ARGS)
 	open_cores = get(params_dict, "open_cores", 5)
 	if typeof(open_cores) != String
 		BLAS.set_num_threads(open_cores)	

@@ -889,9 +889,7 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 	
 	if isnothing(ttn)
 		if particle_type .== "Boson"
-			states::Vector{String} = fill("0", num_sites)
-			old_ttn::TTNKit.TreeTensorNetwork = TTNKit.ProductTreeTensorNetwork(net,states)
-			ttn = initialize_ttn(old_ttn,max_dim,particle_count; kwargs...)
+			ttn = initialize_ttn(TTNKit.ProductTreeTensorNetwork(net,fill("0", num_sites)),max_dim,particle_count; kwargs...)
 		else
 			states = fill_states(particle_count,num_sites,1)
 			old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
@@ -903,12 +901,34 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 
 	if if_continuous_saving
 		if if_densmat
-			densmat::Matrix{ComplexF64} = density_matrix(ttn)
-			ttn_data_dict::Dict{String,Any} = if_gpu ? Dict([("ttn",back2cpu(ttn)),("densmat",densmat)]) : Dict([("ttn",ttn),("densmat",densmat)])
+			if if_gpu
+				if if_redo
+					actual_filename::String = modify_data_jld2(Dict([("ttn",back2cpu(ttn)),("densmat",density_matrix(ttn))]),location * "/" * filename)
+				else
+					actual_filename = write_data_jld2(filename,Dict([("ttn",back2cpu(ttn)),("densmat",density_matrix(ttn))]),location,metadata)
+				end
+			else
+				if if_redo
+					actual_filename = modify_data_jld2(Dict([("ttn",ttn),("densmat",density_matrix(ttn))]),location * "/" * filename)
+				else
+					actual_filename = write_data_jld2(filename,Dict([("ttn",ttn),("densmat",density_matrix(ttn))]),location,metadata)
+				end
+			end
 		else
-			ttn_data_dict = if_gpu ? Dict([("ttn",back2cpu(ttn))]) : Dict([("ttn",ttn)])
+			if if_gpu
+				if if_redo
+					actual_filename = modify_data_jld2(Dict([("ttn",back2cpu(ttn))]),location * "/" * filename)
+				else
+					actual_filename = write_data_jld2(filename,Dict([("ttn",back2cpu(ttn))]),location,metadata)
+				end
+			else
+				if if_redo
+					actual_filename = modify_data_jld2(Dict([("ttn",ttn)]),location * "/" * filename)
+				else
+					actual_filename = write_data_jld2(filename,Dict([("ttn",ttn)]),location,metadata)
+				end
+			end
 		end
-		actual_filename::String = if_redo ? modify_data_jld2(ttn_data_dict,location * "/" * filename) : write_data_jld2(filename,ttn_data_dict,location,metadata)
 	else
 		actual_filename = filename
 	end
@@ -969,12 +989,22 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 				nothing
 			end
 			metadata["maxlinkdim"] = TTNKit.maxlinkdim(sp.ttn)
-			ttn_data_dict = if_gpu ? Dict([("ttn",back2cpu(sp.ttn))]) : Dict([("ttn",sp.ttn)])
-			if_densmat ? ttn_data_dict["densmat"] = densmat : nothing
 			if if_continuous_saving || if_redo
 				new_metadata::Dict{String,Any} = Dict([("observer",metadata["observer"]),("runtime",metadata["runtime"]),("energies",metadata["energies"]),("maxlinkdim",metadata["maxlinkdim"])])
 				modify_data_jld2(new_metadata,location * "/" * actual_filename,"metadata")
-				modify_data_jld2(ttn_data_dict,location * "/" * actual_filename,"all_data")
+				if if_densmat
+					if if_gpu
+						modify_data_jld2(Dict([("ttn",back2cpu(ttn)),("densmat",densmat)]),location * "/" * actual_filename,"all_data")
+					else
+						modify_data_jld2(Dict([("ttn",ttn),("densmat",densmat)]),location * "/" * actual_filename,"all_data")
+					end
+				else
+					if if_gpu
+						modify_data_jld2(Dict([("ttn",back2cpu(ttn))]),location * "/" * actual_filename,"all_data")
+					else
+						modify_data_jld2(Dict([("ttn",ttn)]),location * "/" * actual_filename,"all_data")
+					end
+				end
 			else
 				write_data_jld2(filename,ttn_data_dict,location,metadata)
 			end
