@@ -334,7 +334,10 @@ function rebuild_ed_ham(ttn_ham,lattice_params::Dict)
 	full_basis = lattice_params["full_basis"]
 	rebuilt_ham = spzeros(ComplexF64,size(full_basis)[2],size(full_basis)[2])
 	Lx = lattice_params["Lx"]
-	make_smaller_lattice = [Lx,Lx]
+	Ly = lattice_params["Ly"]
+	make_smaller_lattice = [Lx,Ly]
+
+	if_synth_rectangle = get(lattice_params,"if_synth_rectangle",false)
 
 	interacting_pairs = []
 	hopping_pairs = []
@@ -347,6 +350,10 @@ function rebuild_ed_ham(ttn_ham,lattice_params::Dict)
 		both_terms = TTNKit.terms(t1)
 
 		which_sites = TTNKit.site.(both_terms)
+		if if_synth_rectangle
+			which_sites = [(which_sites[1][2],which_sites[1][1]),(which_sites[2][2],which_sites[2][1])]
+		end
+
 		if any(which_sites[1] .> Lx) || any(which_sites[2] .> Lx)
 			continue
 		end
@@ -547,7 +554,7 @@ if false || if_all
 	end
 end
 
-if true
+if false
 	lxs = [4,8,8]
 	lys = [4,4,8]
 	ns = [2,4,8]
@@ -595,6 +602,58 @@ if true
 		end		
 	end
 	
+end
+
+if true
+	partcount = 2
+	layers = 3
+	lx,ly = Int(sqrt(2^(layers+1))),Int(sqrt(2^(layers-1)))
+	if_periodic = false
+	alpha = partcount / ((lx-!if_periodic)*(ly-!if_periodic))
+
+	us_synth = zeros(Float64,lx)
+	us_synth[1] = 1.0
+	hamilt_params_synth = Dict("alpha"=>alpha,
+                        "flux_direction"=>"x",
+                        "tx"=>1.0,
+                        "ty"=>1.0,
+                        "hopping_anisotropy"=>1.0,
+                        "U"=>us,
+                        "which_dir"=>"virt",
+                        "interaction_cutoff"=>1e-8)
+
+	pdict_synthrect = Dict([("hopping_anisotropy",1.0),("es_count",0),("if_synth_rectangle",true),("particles",partcount),("layers",layers),("mdim",50),("if_save_data",false),("alpha",alpha),("onsite_strength",0.0),("lr",0),("if_periodic_phys",if_periodic),("if_periodic_synth",if_periodic)])
+	model_paras_synth = get_normal_model_params(pdict_synthrect)
+	net_synth = build_HH_net(model_paras_synth)
+	ham_synth = long_range_HH_ham(net_synth,model_paras_synth[:ts],model_paras_synth[:alpha]; model_paras_synth...)
+	lattice_params_synth = Dict([("if_synth_rectangle",true),("Lx",ly),("Ly",lx),("N",partcount),("if_periodic_x",pdict_synthrect["if_periodic_synth"]),("if_periodic_y",pdict_synthrect["if_periodic_phys"]),("twist_angle",0.0),("full_basis",n_particle_basis(partcount,ly,lx; output_level=0))])
+	rebuilt_ham_synth = rebuild_ed_ham(ham_synth,lattice_params_synth)
+	ed_ham_synth = buildHam(lattice_params_synth,hamilt_params_synth)
+
+	println("For Synth Rectangle: ",rebuilt_ham_synth == ed_ham_synth)
+
+	#=us_phys = zeros(Float64,ly)
+	us_phys[1] = 1.0
+	hamilt_params_phys = Dict("alpha"=>alpha,
+                        "flux_direction"=>"x",
+                        "tx"=>1.0,
+                        "ty"=>1.0,
+                        "hopping_anisotropy"=>1.0,
+                        "U"=>us,
+                        "which_dir"=>"virt",
+                        "interaction_cutoff"=>1e-8)
+
+	pdict_phys = Dict([("hopping_anisotropy",1.0),("es_count",0),("if_synth_rectangle",false),("particles",partcount),("layers",layers),("mdim",50),("if_save_data",false),("alpha",alpha),("onsite_strength",0.0),("lr",0),("if_periodic_phys",if_periodic),("if_periodic_synth",if_periodic)])
+	model_paras_phys = get_normal_model_params(pdict_phys)
+	net_phys = build_HH_net(model_paras_phys)
+	ham_phys = long_range_HH_ham(net_phys,model_paras_phys[:ts],model_paras_phys[:alpha]; model_paras_phys...)
+	lattice_params_phys = Dict([("Lx",lx),("Ly",ly),("N",partcount),("if_periodic_x",pdict_phys["if_periodic_phys"]),("if_periodic_y",pdict_phys["if_periodic_synth"]),("twist_angle",0.0),("full_basis",n_particle_basis(partcount,lx,ly; output_level=0))])
+	rebuilt_ham_phys = rebuild_ed_ham(ham_phys,lattice_params_phys)
+	ed_ham_phys = buildHam(lattice_params_phys,hamilt_params_phys)
+
+	println("For Phys Rectangle: ",rebuilt_ham_phys == ed_ham_phys)=#
+
+
 end
 
 

@@ -2,7 +2,7 @@
 
 julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "442cc9c3328f8abd119380f032b59eb5129f5855"
+project_hash = "bd0c020628f14935ce9fd9f77a120a8605384932"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra", "Test"]
@@ -876,9 +876,7 @@ version = "1.0.0"
 
 [[deps.TTNKit]]
 deps = ["Distributions", "HDF5", "ITensorGPU", "ITensors", "KrylovKit", "LinearAlgebra", "MPSKit", "MPSKitModels", "NDTensors", "Parameters", "Printf", "Revise", "SparseArrays", "TensorKit"]
-git-tree-sha1 = "7d67c592474cff7ad636b7df7bea680671805461"
-repo-rev = "main"
-repo-url = "/home/patrick/Programs/TTNKit"
+path = "/home/patrick/Programs/TTNKit/"
 uuid = "b44c321c-291e-437f-af1d-05cac99632ef"
 version = "0.1.0"
 

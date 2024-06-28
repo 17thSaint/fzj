@@ -237,10 +237,10 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	chem_strength = get(kwargs, :chem_strength, 0.0)
 	centralflux_strength = get(kwargs, :centralflux_strength, 0.0)
 	twist_angle = get(kwargs, :twist_angle, 0.0)
-	if_synth_rectangle = get(kwargs, :if_synth_rectangle, false)
 	#hopping_anisotropy = get(kwargs, :hopping_anisotropy, 1.0) t_phys / t_synth = anisotropy
 	
-	long_range_strengths = long_range_scaling(scaling_distance,virt_edge_length,onsite_strength; kwargs...)
+	interaction_axis_length = which_dir == "virt" ? virt_edge_length : phys_edge_length
+	long_range_strengths = long_range_scaling(scaling_distance,interaction_axis_length,onsite_strength; kwargs...)
 	#long_range_strengths[1] = 0.0
 	display(long_range_strengths)
 	if_interaction = !all(long_range_strengths.==0)
@@ -1261,19 +1261,16 @@ function get_normal_model_params(params_dict::Dict)
 
 	# Get Lattice parameters whose values depend on other parameters
 	if layer_count % 2 == 0
-		edge_sites = Int(sqrt(2^layer_count))
-		phys_edge_length,synth_edge_length = edge_sites,edge_sites
-		num_particles = get(params_dict, "particles", Int(edge_sites/2))
+		phys_edge_length,synth_edge_length = Int(sqrt(2^layer_count)),Int(sqrt(2^layer_count))
+		num_particles = get(params_dict, "particles", Int(phys_edge_length/2))
 	else
-		edge_sites = Int(sqrt(2^(layer_count+1)))
-		phys_edge_length,synth_edge_length = edge_sites,Int(edge_sites/2)
+		phys_edge_length,synth_edge_length = Int(sqrt(2^(layer_count+1))),Int(sqrt(2^(layer_count+1))/2)
 		num_particles = get(params_dict, "particles", Int(sqrt(2^(layer_count+1))/2))
 	end
 
 	make_smaller_lattice = get(params_dict, "make_smaller_lattice", [phys_edge_length,synth_edge_length])
 	if make_smaller_lattice != [phys_edge_length,synth_edge_length]
 		phys_edge_length,synth_edge_length = make_smaller_lattice
-		edge_sites = phys_edge_length
 	end
 
 
@@ -1291,13 +1288,19 @@ function get_normal_model_params(params_dict::Dict)
 	anis = get(params_dict, "hopping_anisotropy", 1.0)
 
 	onsite_strength = get(params_dict, "onsite_strength", 0.0)
-	longrange_dist = get(params_dict, "lr", 0)
-	longrange_dist == "all" ? longrange_dist = edge_sites-1 : nothing
 	if_cliff = get(params_dict, "if_cliff", false)
 	trunc = get(params_dict,"trunc",1e-3)
 	sc_type = get(params_dict,"scaling","flat")
 	which_dir = get(params_dict, "which_dir", "virt") # which axis does the anisotropic interaction act along
 	if_synth_rectangle ? which_dir = "phys" : nothing
+	longrange_dist = get(params_dict, "lr", 0)
+	if longrange_dist == "all"
+		if which_dir == "phys"
+			longrange_dist = phys_edge_length-1
+		else
+			longrange_dist = synth_edge_length-1
+		end
+	end
 
 	mu = get(params_dict, "chem_strength", 0.0)
 	mag_off = get(params_dict, "mag_off", true)
@@ -1514,7 +1517,7 @@ if false
 end
 
 #
-if true
+if false
 
 	#nnst = 0.0
 	#layers = 6
@@ -1537,7 +1540,7 @@ if true
 	#strens = range(0.1,0.5,length=3)
 	#for (idx,anis) in enumerate(anises)
 	#for (idx,stren) in enumerate(strens)
-		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",0),("if_synth_rectangle",false),("particles",2),("layers",3),("mdim",50),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",0),("if_synth_rectangle",false),("particles",4),("layers",5),("mdim",50),("if_save_data",false),("alpha",0.0),("onsite_strength",0.0),("lr",0),("if_periodic_phys",false),("if_periodic_synth",false)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		open_cores = get(params_dict, "open_cores", 5)
@@ -1549,7 +1552,7 @@ if true
 
 		all_results = run_synth_dims_generic(params_dict)
 
-		get_occupancy(all_results[1]; densmat=all_results[end-1])
+		get_occupancy(all_results[1]; densmat=all_results[end])
 		#=bothoccs = []
 		for i in 1:params_dict["es_count"]+1
 			append!(bothoccs,[get_occupancy(all_results[1][i]; densmat=all_results[end-1][i], plot_title="Level $(i-1) NRG=$(round(all_results[3][i].nrg[end],digits=4))")])
