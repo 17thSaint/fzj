@@ -1436,7 +1436,11 @@ function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
 end
 
 function get_lattice_params_from_metadata(metadata::Dict)
-    return Dict([("Lx",metadata["Lx"]),("Ly",metadata["Ly"]),("N",metadata["N"]),("if_periodic_x",metadata["if_periodic_x"]),("if_periodic_y",metadata["if_periodic_y"]),("full_basis",metadata["full_basis"])])
+    lat_paras = Dict([("Lx",metadata["Lx"]),("Ly",metadata["Ly"]),("N",metadata["N"]),("if_periodic_x",metadata["if_periodic_x"]),("if_periodic_y",metadata["if_periodic_y"]),("full_basis",metadata["full_basis"])])
+    if isnothing(lat_paras["full_basis"])
+        lat_paras["full_basis"] = n_particle_basis(lat_paras)
+    end
+    return lat_paras
 end
 
 function hh_gap_exact(hopping_anisotropy::Float64,alpha::Float64)
@@ -1732,6 +1736,74 @@ function bin_values(vector, num_bins)
     return bins
 end
 
+if false
+    lx = 4
+    ly = 8
+    N = 4
+
+    cols = ["b","r","g","m","c"]
+    if 10 > length(cols)
+        cols = repeat(cols,ceil(Int,10/length(cols)))
+    end
+
+    nrgs1 = []
+    nrgs2 = []
+    nrgs3 = []
+    nrgs4 = []
+    xs = []
+    ys = []
+    
+    params_dict = Dict([("Lx",lx),("Ly",ly),("N",N),("if_periodic_x",true),("if_periodic_y",true)])
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    files = find_data_file(params_dict,"ed",dataloc; output_level=0)
+
+        for f in files
+            data,metadata = read_data_jld2(f,dataloc; output_level=0)
+            nrgs = data["nrg"]
+            intstren = metadata["U"][end]
+            anis = metadata["hopping_anisotropy"]
+
+            append!(xs,[anis])
+            append!(ys,[intstren])
+            #append!(nrgs1,[nrgs[2] - nrgs[1]])
+            append!(nrgs2,[nrgs[3] - nrgs[2]])
+            #append!(nrgs3,[nrgs[4] - nrgs[1]])
+            #append!(nrgs4,[nrgs[5] - nrgs[1]])
+
+        end
+    
+    bin_count = 100
+    data_dict = bin_values(nrgs2,bin_count)
+    bv = [data_dict[val] for val in nrgs2]
+    min_nrgs2, max_nrgs2 = minimum(nrgs2), maximum(nrgs2)
+    normalized_bv = [(val - minimum(bv)) / (maximum(bv) - minimum(bv)) * (max_nrgs2 - min_nrgs2) + min_nrgs2 for val in bv]
+
+    # now try to find linear fit to maximum of nrgs2 at each hopping anis row
+    hanises = unique(xs)
+    max_intstrens = zeros(Float64,length(hanises))
+    for (j,hanis) in enumerate(hanises)
+        indices = findall(x -> x == hanis, xs)
+        max_index = findfirst(x -> x == maximum(nrgs2[i] for i in indices), nrgs2)
+        max_intstrens[j] = ys[max_index]
+    end
+
+    #=linfit(x,p) = p[1] .* x .+ p[2]
+    fit = curve_fit(linfit,max_intstrens,hanises,[1.0,0.0])
+    fit_xs = range(minimum(ys),2.0,length=10)
+    plot(fit_xs,linfit(fit_xs,fit.param),c="r",label="m=$(round(fit.param[1],digits=3))")=#
+
+    fig = figure()
+    scatter(ys, xs, c=normalized_bv, cmap="viridis")
+    colorbar()
+    
+    ylim(minimum(xs)-0.05,0.05+maximum(xs))
+
+    ylabel("Hopping Anisotropy")
+    xlabel("Interaction Strength")
+    legend()
+    title("Energy Gap with linear fit at maximum")
+
+end
 
 if false
     lx = 5
@@ -1831,7 +1903,7 @@ if false
 end
 
 if false
-    dataloc = get_folder_location("cluster-data/exact-diag/time-testing")
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
     params_dict = Dict([("if_periodic_x",true)])
     files = find_data_file(params_dict,"ed",dataloc; output_level=0)
 
@@ -1850,14 +1922,14 @@ if false
     yscale("log")
 end
 
-if true
+if false
     #fig = figure()
     #xlabel("Hopping Anisotropy")
     #ylabel("Gap")
     #lx = 6
     #n = 3
     #for (idx,n) in enumerate([2,3,4,5])
-    #intstrens = range(0.0,5.0,length=30)
+    intstrens = range(0.0,2.0,length=10)
     #other_intstrens = range(2.0,10.0,length=37)
     #intstrens = sort([intstrens; other_intstrens])
     #change = 0.001
@@ -1867,17 +1939,17 @@ if true
     #all_bds = zeros(Float64,length(alphas))
     #thetas = range(0.01,0.5,length=50)
     #all_nrgs = zeros(Float64,length(thetas))
-    #anises = [1.0,0.7,0.5,1/0.7,2.0]#range(1.1,1.3,length=5)
+    #anises = range(1.0,10.0,length=10)
     #nus = range(0.4,0.6,length=100)
     #alphas = range(0.16,2*3/(6*5),length=30)
     #for (idx,alpha) in enumerate(alphas)
-    #for (idx,lx) in enumerate([4,6,8])
+    #for (idx,lx) in enumerate([4,4,8])
     #for (idx,nu) in enumerate(nus)
     #for (idx,anis) in enumerate(anises)
-    #for (idx2,intstren) in enumerate(intstrens)
+    for (idx2,intstren) in enumerate(intstrens)
     #for lrd in [0,1]
         #for change in [0,0.0001]true
-        params_dict = Dict([("Lx",8),("Ly",4),("N",4),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",10),("if_save_data",true)])
+        params_dict = Dict([("Lx",4),("Ly",4),("N",2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
         # set number of open cores
@@ -2000,7 +2072,7 @@ if true
             end
         end=#
 
-        get_occupancy(states[1],lattice_params)
+        #get_occupancy(states[2],lattice_params)
         #display(nrgs)
 
         #=if idx == 1
@@ -2017,7 +2089,7 @@ if true
             #scatter(id2 == 1 ? anis : -anis,nrgs[3],c="g",label="E2")
             #scatter(intstren,nrgs[4],c="k",label="E3")
         else=#
-            #=for i in 1:running_args.nev
+            for i in 1:running_args.nev
                 change = abs(intstrens[1] - intstrens[2])
                 xval = intstren
                 shift = (i - running_args.nev/2) * ((0.1*change)/(running_args.nev/2))
@@ -2036,7 +2108,7 @@ if true
         xlabel("Interaction Strength")
         #xlabel("Flux")
         #xlabel("Hopping Anisotropy tx/ty")
-        ylabel("Energy - E1")=#
+        ylabel("Energy - E1")#
         #title("5x5 N=5, Anis=$(hamilt_params["hopping_anisotropy"])")
         #title("Topological Degeneracy Closing in Thermodynamic Limit")#
 
@@ -2076,7 +2148,7 @@ if true
         currents = physical_current(rhos,lattice_params; if_plot=true)
         corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
         currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
-    #end
+    end
     #end
 
 

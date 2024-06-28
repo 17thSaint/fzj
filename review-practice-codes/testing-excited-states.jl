@@ -71,7 +71,7 @@ end=#
 
 if true
 	cols = ["b","r","g","m","c","k"]
-	es_count = 5
+	es_count = 2
 	#for phys in [true,false]
 		#for virt in [true,false]
 			phys = true

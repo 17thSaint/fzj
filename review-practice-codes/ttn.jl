@@ -409,6 +409,7 @@ function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwarg
 	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
 	hopping_anisotropy = get(kwargs, :hopping_anisotropy, 1.0)
 	#t_strength_phys = t_strength * hopping_anisotropy
+	flux_direction = get(kwargs,:flux_direction,"phys")
 	
 	if hopping_anisotropy < 1.0
 		t_strength_synth = t_strength / hopping_anisotropy
@@ -425,19 +426,15 @@ function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwarg
 	if s1[1] == s2[1] # Synthetic Dimension Hopping
 		thetay = get(kwargs, :thetay, thetay_2)
 
-		stren = -t_strength_synth # * exp(im*2*pi*(phi*s1[1]))
-		if if_periodic_virt && !if_periodic_phys
-			stren *= exp(im*2*pi*(phi*s1[1]))
-		end
+		stren = -t_strength_synth
+		flux_direction == "synth" ? stren *= exp(im*2*pi*(phi*s1[1])) : nothing
 		return round(stren,digits=10)
 	elseif s1[2] == s2[2] # Physical Dimension Hopping
 		thetax = get(kwargs, :thetax, thetax_2)
 
-		stren = -t_strength_phys * exp(im*2*pi*(phi*s1[2]))
-		if if_periodic_virt && !if_periodic_phys
-			stren = -t_strength_phys
-		end
-		return round(stren,digits=10) #* exp(im*2*pi*(phi*s1[2]))
+		stren = -t_strength_phys
+		flux_direction == "phys" ? stren *= exp(im*2*pi*(phi*s1[2])) : nothing
+		return round(stren,digits=10)
 	else
 		return 0.0
 	end
@@ -715,6 +712,7 @@ end
 
 function do_sweep(ttn,ham,sweep_type; kwargs...)
 
+	if_memobs = get(kwargs, :if_memobs, false)
 	psi_ortho = get(kwargs, :psi_ortho, nothing)
 	if_old_excited = get(kwargs, :if_old_excited, false)
 	weight = get(kwargs, :weight, 10.0)
@@ -729,11 +727,14 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	if_continuous_saving::Bool = get(kwargs, :if_continuous_saving, false)
 	file_path::String = get(kwargs, :file_path, "")
 	if isnothing(etol)
-		observer::AbstractObserver = NoObserver()
+		observer = NoObserver()
 	elseif if_continuous_saving
 		observer = isnothing(psi_ortho) ? SavingNRGVarObserver(file_path,etol) : SavingExcitedNRGVarObserver(file_path,etol,length(psi_ortho))
 	else
 		observer = NRGVarObserver(etol)
+	end
+	if if_memobs
+		observer = vcat(observer,MemoryObserver())
 	end
 	
 	# slowly grow bond dim to optimize more efficiently
@@ -950,7 +951,7 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 	if if_sweep
 		for i in 1:sweep_iter
 			time_start::Float64 = time()
-			new_ttn::TTNKit.TreeTensorNetwork, new_ham, new_sp::TTNKit.AbstractSweepHandler, new_obs::AbstractObserver = do_sweep(ttn,ham,sweep_type; kwargs...,file_path = location * "/" * actual_filename)
+			new_ttn::TTNKit.TreeTensorNetwork, new_ham, new_sp::TTNKit.AbstractSweepHandler, new_obs = do_sweep(ttn,ham,sweep_type; kwargs...,file_path = location * "/" * actual_filename)
 			time_end::Float64 = time()
 			append!(times,[time_end - time_start])
 			#return sp.ttn, ham, sp
@@ -1354,6 +1355,36 @@ function TTNKit.ITensors.checkdone!(o::SavingExcitedNRGVarObserver;kwargs...)
   		# Otherwise, keep going
 		return false
 	end
+end
+
+mutable struct MemoryObserver <: AbstractObserver
+	mem::Dict{String,Float64}
+
+	MemoryObserver() = new(Dict())
+end
+
+function TTNKit.ITensors.measure!(o::MemoryObserver,memory_name::String,memory_value; kwargs...)
+	o.mem[memory_name] = float(memory_value)
+end
+
+function TTNKit.ITensors.measure!(o::MemoryObserver,memory_dict::Dict{String,Float64}; kwargs...)
+	for (key,value) in memory_dict
+		TTNKit.ITensors.measure!(o,key,value; kwargs...)
+	end
+end
+
+function TTNKit.ITensors.checkdone!(o::MemoryObserver;kwargs...)
+	return true
+end
+
+function TTNKit.ITensors.measure!(os::Vector{AbstractObserver}; kwargs...)
+	for o in os
+		TTNKit.ITensors.measure!(o; kwargs...)
+	end
+end
+
+function TTNKit.ITensors.checkdone!(os::Vector{AbstractObserver};kwargs...)
+	return all([TTNKit.ITensors.checkdone!(o; kwargs...) for o in os])
 end
 
 function rerun_findGS(fileloc::String; kwargs...)

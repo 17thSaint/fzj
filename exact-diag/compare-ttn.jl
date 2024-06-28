@@ -410,7 +410,7 @@ function get_lattice_params_from_ttn_modelparas(model_params::Dict)
 	return lattice_params
 end
 
-if true
+if false
 	cols = ["b","r","g","m","c"]
     if 10 > length(cols)
         cols = repeat(cols,ceil(Int,10/length(cols)))
@@ -547,20 +547,55 @@ if false || if_all
 	end
 end
 
-#=layers = 4
-Lx = Int(sqrt(2^layers))
-lr_dist = 0
-hopping_anisotropy = 1.0
-dataloc = get_folder_location("cluster-data/synth-dims")
-params_dict = Dict([("layers",layers),("particles",Int(Lx/2)),("if_periodic_phys",true),("alpha",0.25)])
-lattice_params = Dict([("Lx",Lx),("Ly",Lx),("N",params_dict["particles"]),("if_periodic_x",true),("if_periodic_y",false),("full_basis",n_particle_basis(params_dict["particles"],Lx,Lx; output_level=0),("twist_angle",0.0))])
-files = find_data_file(params_dict,"ttn",dataloc; output_level=0)
+if true
+	lxs = [4,8,8]
+	lys = [4,4,8]
+	ns = [2,4,8]
+	cols = ["b","r","g","m","c"]
+	if 10 > length(cols)
+		cols = repeat(cols,ceil(Int,10/length(cols)))
+	end
 
-all_hams = Dict()
-for f in files
-	data,metadata = read_data_jld2(f,dataloc; output_level=0)
-	all_hams[string(metadata["onsite_strength"])] = metadata["ham"]
-end=#
+	thermlim_nrgs = []
+	for (idx,N) in enumerate(ns)
+		if N < 8
+			pdict = Dict([("Lx",lxs[idx]),("Ly",lys[idx]),("N",N),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",10),("if_save_data",false)])
+			lattice_params,hamilt_params,running_args = get_normal_model_params_ed(pdict)    
+			basis_dataloc = running_args.basis_dataloc
+			filename_dict = make_filename_dict(lattice_params,hamilt_params)
+			if_exists,found_data = running_args.if_find_data ? check_data_exists(filename_dict,"ed"; location=running_args.dataloc,output_level=false) : (false,nothing)
+
+			if if_exists
+				nrgs = found_data[1]["nrg"]
+			else
+				full_basis = n_particle_basis(lattice_params; output_level=running_args.output_level,dataloc=basis_dataloc)
+				lattice_params["full_basis"] = full_basis
+				states,nrgs,rhos,hh = find_eigenstates(running_args.nev,lattice_params,hamilt_params; running_args...)
+			end
+		else
+			numlayers = Int(log(2,lxs[idx]*lys[idx]))
+			pdict = Dict([("hopping_anisotropy",1.0),("particles",N),("layers",numlayers),("onsite_strength",0.0)])
+			f = find_data_file(pdict,"ttn",get_folder_location("cluster-data/synth-dims/excited-states"); output_level=0)
+			data,metadata = read_data_jld2(f[1],get_folder_location("cluster-data/synth-dims/excited-states"); output_level=0)
+			nrgs = [metadata["observer"].nrg[end],metadata["observer_1"].nrg[end]]
+		end
+
+		for i in 1:length(nrgs)
+			scatter(lxs[idx]*lys[idx],nrgs[i] - nrgs[1],color=cols[i])
+		end
+		xlabel("System Size")
+		ylabel("Energy - E1")
+
+		if idx == 1
+			append!(thermlim_nrgs,nrgs[8])
+		elseif idx == 2
+			append!(thermlim_nrgs,nrgs[3])
+		else
+			append!(thermlim_nrgs,nrgs[2])
+		end		
+	end
+	
+end
 
 
 

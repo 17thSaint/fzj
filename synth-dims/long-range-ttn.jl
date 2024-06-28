@@ -1,5 +1,5 @@
-using Pkg
-Pkg.activate(".")
+#using Pkg
+#Pkg.activate(".")
 include("../review-practice-codes/ttn.jl")
 using Profile,MKL
 
@@ -223,6 +223,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	scaling_distance = get(kwargs, :lr, 0)
 	
 	which_dir = get(kwargs, :which_dir, "virt")
+	flux_direction = get(kwargs, :flux_direction, "phys")
 	restricted_size = get(kwargs, :restricted_size, [phys_edge_length,virt_edge_length])
 	if_periodic_virt = get(kwargs, :if_periodic_synth, false)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
@@ -236,6 +237,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	chem_strength = get(kwargs, :chem_strength, 0.0)
 	centralflux_strength = get(kwargs, :centralflux_strength, 0.0)
 	twist_angle = get(kwargs, :twist_angle, 0.0)
+	if_synth_rectangle = get(kwargs, :if_synth_rectangle, false)
 	#hopping_anisotropy = get(kwargs, :hopping_anisotropy, 1.0) t_phys / t_synth = anisotropy
 	
 	long_range_strengths = long_range_scaling(scaling_distance,virt_edge_length,onsite_strength; kwargs...)
@@ -1202,7 +1204,7 @@ function memory_usage(psi::TreeTensorNetwork)
 
 	bytespercomplexnumber = 16
 
-	return (number_of_numbers * bytespercomplexnumber) / 1073741824
+	return (number_of_numbers * bytespercomplexnumber) * 1e-6, "MB"
 end
 
 function make_synthdims_filename(model_parameters::Dict)
@@ -1246,6 +1248,7 @@ function get_normal_model_params(params_dict::Dict)
 	syms = get(params_dict, "syms", true)
 	nswps = get(params_dict, "num_sweeps", 100)
 	if_old_excited = get(params_dict, "if_old_excited", false)
+	if_memobs = get(params_dict, "if_memobs", false)
 
 
 	# Lattice/TTN Parameters
@@ -1254,6 +1257,7 @@ function get_normal_model_params(params_dict::Dict)
 	if_periodic_phys = get(params_dict, "if_periodic_phys", false)
 	if_periodic_synth = get(params_dict, "if_periodic_synth", false)
 	max_occ = get(params_dict, "max_occ", 1)
+	if_synth_rectangle = get(params_dict, "if_synth_rectangle", false)
 
 	# Get Lattice parameters whose values depend on other parameters
 	if layer_count % 2 == 0
@@ -1275,6 +1279,13 @@ function get_normal_model_params(params_dict::Dict)
 
 	# Hamiltonian parameters
 	alpha = get(params_dict, "alpha", nothing)
+	flux_direction = get(params_dict,"flux_direction", "phys")
+	if_synth_rectangle ? flux_direction = "synth" : nothing
+	if if_periodic_synth && !if_periodic_phys
+        flux_direction = "synth"
+    elseif !if_periodic_synth && if_periodic_phys
+        flux_direction = "phys"
+    end
 
 	hopping_amplitude = get(params_dict, "ts", 1.0)
 	anis = get(params_dict, "hopping_anisotropy", 1.0)
@@ -1286,6 +1297,7 @@ function get_normal_model_params(params_dict::Dict)
 	trunc = get(params_dict,"trunc",1e-3)
 	sc_type = get(params_dict,"scaling","flat")
 	which_dir = get(params_dict, "which_dir", "virt") # which axis does the anisotropic interaction act along
+	if_synth_rectangle ? which_dir = "phys" : nothing
 
 	mu = get(params_dict, "chem_strength", 0.0)
 	mag_off = get(params_dict, "mag_off", true)
@@ -1342,6 +1354,7 @@ function get_normal_model_params(params_dict::Dict)
 	
 	model_paras_dict = Dict("hopping_anisotropy"=>anis,
 						"layers"=>layer_count,
+						"if_synth_rectangle"=>if_synth_rectangle,
 						"particles"=>num_particles,
 						"ts"=>hopping_amplitude,
 						"syms"=>syms,
@@ -1358,6 +1371,7 @@ function get_normal_model_params(params_dict::Dict)
 						"if_nn_int"=>if_NN,
 						"chem_strength"=>mu,
 						"alpha"=>alpha,
+						"flux_direction"=>flux_direction,
 						"no_magF"=>mag_off,
 						"scaling"=>sc_type,
 						"lr"=>longrange_dist,
@@ -1379,7 +1393,8 @@ function get_normal_model_params(params_dict::Dict)
 						"num_sweeps"=>nswps,
 						"phi"=>alpha,
 						"output_level"=>0,
-						"location"=>loc)
+						"location"=>loc,
+						"if_memobs"=>if_memobs)
 		
 	filename = make_synthdims_filename(model_paras_dict)
 	model_paras_dict["name"] = "ttn-"*filename
@@ -1474,124 +1489,153 @@ function run_synth_dims_generic(params_dict::Dict)
 end
 
 
+if false
+	cols = ["r","b","g","k"]
+	dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
+	pdict = Dict([("layers",6),("particles",8),("if_periodic_phys",true),("if_periodic_synth",true)])
+	allfiles = find_data_file(pdict,"ttn",dataloc)
+	for f in allfiles
+		data,metadata = read_data_jld2(f,dataloc)
+		intstren = metadata["onsite_strength"]
+		nrgs = [metadata["observer"].nrg[end]]
+		for i in 1:Int(length(keys(data))/2)-1
+			if !("observer_$i" in keys(metadata))
+				continue
+			end
+			push!(nrgs,metadata["observer_$i"].nrg[end])
+		end
+		sort!(nrgs)
+		for i in 1:length(nrgs)
+			scatter(intstren,nrgs[i] - nrgs[1],c=cols[i])
+		end
+	end
+	xlabel("Interaction Strength")
+	ylabel("Energy - E1")
+end
+
 #
 if true
 
-#nnst = 0.0
-#layers = 6
-#=layers = 4
-num_parts = 2
-ref_dict = Dict([("layers",layers),("particles",num_parts)])
-loc = get_folder_location("cluster-data/synth-dims")
-all_files = find_data_file(ref_dict,"ttn",loc)
-alphas = zeros(length(all_files))
-for (idx,file) in enumerate(all_files)
-	alphas[idx] = get_params_dict_from_filename(file)["alpha"]
-end=#
+	#nnst = 0.0
+	#layers = 6
+	#=layers = 4
+	num_parts = 2
+	ref_dict = Dict([("layers",layers),("particles",num_parts)])
+	loc = get_folder_location("cluster-data/synth-dims")
+	all_files = find_data_file(ref_dict,"ttn",loc)
+	alphas = zeros(length(all_files))
+	for (idx,file) in enumerate(all_files)
+		alphas[idx] = get_params_dict_from_filename(file)["alpha"]
+	end=#
 
-#layers = 6
-#lr = 7
-#anises = [0.01,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.6,0.8,0.9,1.1,1.3,1.5,1.7,1.9,2.0,2.5,3.0,3.5,4.0,6.0,8.0,9.0,10.0,15.0,20.0,25.0,30.0,40.0,50.0,70.0,90.0,100.0,1000.0,10000.0]
-#anises = range(1.0,5.0,length=10)
-#strens = range(0.0,5.0,length=10)
-#alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
-#strens = range(0.1,0.5,length=3)
-#for (idx,anis) in enumerate(anises)
-#for (idx,stren) in enumerate(strens)
-	params_dict = Dict([("hopping_anisotropy",1.0),("if_check_fluxes",false),("es_count",3),("nrgtol",5e-5),("particles",4),("layers",6),("mdim",10),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
-	# usually in params: mag_off, layers, mdim, longrange_dist
-	#params_dict = make_args_dict(ARGS)
-	open_cores = get(params_dict, "open_cores", 5)
-	if typeof(open_cores) != String
-		BLAS.set_num_threads(open_cores)	
-		display(BLAS.get_config())
-	end
-	
-	all_results = run_synth_dims_generic(params_dict)
+	#layers = 6
+	#lr = 7
+	#anises = [0.01,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.6,0.8,0.9,1.1,1.3,1.5,1.7,1.9,2.0,2.5,3.0,3.5,4.0,6.0,8.0,9.0,10.0,15.0,20.0,25.0,30.0,40.0,50.0,70.0,90.0,100.0,1000.0,10000.0]
+	#anises = range(1.0,5.0,length=10)
+	#strens = range(0.0,5.0,length=10)
+	#alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
+	#strens = range(0.1,0.5,length=3)
+	#for (idx,anis) in enumerate(anises)
+	#for (idx,stren) in enumerate(strens)
+		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",0),("if_synth_rectangle",false),("particles",2),("layers",3),("mdim",50),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
+		# usually in params: mag_off, layers, mdim, longrange_dist
+		#params_dict = make_args_dict(ARGS)
+		open_cores = get(params_dict, "open_cores", 5)
+		if typeof(open_cores) != String
+			BLAS.set_num_threads(open_cores)	
+			display(BLAS.get_config())
+		end
 
-	#get_occupancy(all_results[3].ttn; densmat=all_results[end])
 
-	
-	
-		#imshow(real.(dens))
-		#colorbar()
+		all_results = run_synth_dims_generic(params_dict)
 
-		#scatter(stren,rezobs.nrg[end],c="b")
-		#xlabel("Interaction Strength")
-		#ylabel("Energy")
-
-		#Profile.print()
-
-		#=
-		scatter([anis],[sum(dens) / (tot_sites * num_particles)],c="b")
-		xlabel("Hopping Anisotropy")
-		ylabel("Zero Momentum Occupation")
-		xscale("log")
-		=#
-
-		#dcorrs = distance_correlation(dens,wavefunc,make_smaller_lattice[1],make_smaller_lattice[2],"y")
-		#display(dcorrs)
-		#occs = get_occupancy(wavefunc; densmat=dens, plot_title="TTN")
-		#rydberg_2pcorr(wavefunc)
-		#=plot(collect(1:Int(sqrt(2^layer_count))),occs[4,:],label="$(round(num_particles/(alpha*tot_sites),digits=4))")
-		legend()
-		xlabel("Sites")
-		ylabel("Occupancy")=#
-		#=
-		fig = figure()
-		physical_distance_correlation(wavefunc; densmat=dens,if_plot=true,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt)
-		title("Filling = $(round(num_particles/(alpha*tot_sites),digits=4))")
-		get_occupancy(wavefunc; plot_title = "Filling = $(round(num_particles/(alpha*tot_sites),digits=4))",densmat=dens)
-		=#
-
-		#for i in 1:es_count+1
-		#	occs = get_occupancy(all_states[i]; densmat=all_densmats[i], plot_title="Level $(i-1)")
-		#end
-		#densities[idx] = sum(occs) / tot_sites
-		#scatter([mu],[densities[idx]],c="b")
-		#xlabel("Chemical Potential")
-		#ylabel("Density")
-
-		#=sforderparams[idx] = abs(2*sum(dens)) / (2^layer_count)
-
-		if idx > 1
-			plot(num_particles ./ ((2^layer_count) .* [strens[idx-1],strens[idx]]),[sforderparams[idx-1],sforderparams[idx]],"-p",c="b")
+		get_occupancy(all_results[1]; densmat=all_results[end-1])
+		#=bothoccs = []
+		for i in 1:params_dict["es_count"]+1
+			append!(bothoccs,[get_occupancy(all_results[1][i]; densmat=all_results[end-1][i], plot_title="Level $(i-1) NRG=$(round(all_results[3][i].nrg[end],digits=4))")])
 		end=#
 
-		#physical_distance_correlation(wavefunc; densmat=dens,if_plot=true)
-
-		#get_occupancy(wavefunc)
-
-		#append!(currents,[[ttn_current_site(dm_sp.ttn,i; centralflux_strength=centralflux_strength) for i in 1:edge_sites]])
-		#append!(nrgs,[dm_sp.current_energy])
-
-		#momentum_occupation(wavefuncs[idx],50,1.0; if_plot=true)
-
 		
-		#centermoms[idx] = minimum(abs.(rez[2]))
+		
+			#imshow(real.(dens))
+			#colorbar()
 
-		#=
-		if false
-		allmoms = momentum_occupation(wavefunc,1,0.0; densmat=densmat)
-		centermoms[idx] = allmoms[2][1]
-		if idx > 1
-			plot([num_particles/(strens[idx-1]*tot_sites),num_particles/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
-			#plot([(num_particles-1)/(strens[idx-1]*tot_sites),num_particles/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
-		else
-			scatter([num_particles/(alpha*tot_sites)],[centermoms[idx]],c="b")
-			#scatter([num_particles/(strens[idx]*tot_sites)],[centermoms[idx]],c="b")
-		end
-		end
-		=#
-		#get_occupancy(dm_sp.ttn; plot_title = "Alpha = $(round(alpha,digits=4))")
-		#get_greenfunc(dm_sp.ttn,"phys")
-		#get_greenfunc(dm_sp.ttn,"virt")
-		#=
-		specs = entanglement_spectrum(dm_sp.ttn)
-		fig = figure()
-		scatter(collect(1:mdim),-log.(specs))
-		=#
-#end
+			#scatter(stren,rezobs.nrg[end],c="b")
+			#xlabel("Interaction Strength")
+			#ylabel("Energy")
+
+			#Profile.print()
+
+			#=
+			scatter([anis],[sum(dens) / (tot_sites * num_particles)],c="b")
+			xlabel("Hopping Anisotropy")
+			ylabel("Zero Momentum Occupation")
+			xscale("log")
+			=#
+
+			#dcorrs = distance_correlation(dens,wavefunc,make_smaller_lattice[1],make_smaller_lattice[2],"y")
+			#display(dcorrs)
+			#occs = get_occupancy(wavefunc; densmat=dens, plot_title="TTN")
+			#rydberg_2pcorr(wavefunc)
+			#=plot(collect(1:Int(sqrt(2^layer_count))),occs[4,:],label="$(round(num_particles/(alpha*tot_sites),digits=4))")
+			legend()
+			xlabel("Sites")
+			ylabel("Occupancy")=#
+			#=
+			fig = figure()
+			physical_distance_correlation(wavefunc; densmat=dens,if_plot=true,if_periodic_phys=if_per_phys,if_periodic_virt=if_per_virt)
+			title("Filling = $(round(num_particles/(alpha*tot_sites),digits=4))")
+			get_occupancy(wavefunc; plot_title = "Filling = $(round(num_particles/(alpha*tot_sites),digits=4))",densmat=dens)
+			=#
+
+			#for i in 1:es_count+1
+			#	occs = get_occupancy(all_states[i]; densmat=all_densmats[i], plot_title="Level $(i-1)")
+			#end
+			#densities[idx] = sum(occs) / tot_sites
+			#scatter([mu],[densities[idx]],c="b")
+			#xlabel("Chemical Potential")
+			#ylabel("Density")
+
+			#=sforderparams[idx] = abs(2*sum(dens)) / (2^layer_count)
+
+			if idx > 1
+				plot(num_particles ./ ((2^layer_count) .* [strens[idx-1],strens[idx]]),[sforderparams[idx-1],sforderparams[idx]],"-p",c="b")
+			end=#
+
+			#physical_distance_correlation(wavefunc; densmat=dens,if_plot=true)
+
+			#get_occupancy(wavefunc)
+
+			#append!(currents,[[ttn_current_site(dm_sp.ttn,i; centralflux_strength=centralflux_strength) for i in 1:edge_sites]])
+			#append!(nrgs,[dm_sp.current_energy])
+
+			#momentum_occupation(wavefuncs[idx],50,1.0; if_plot=true)
+
+			
+			#centermoms[idx] = minimum(abs.(rez[2]))
+
+			#=
+			if false
+			allmoms = momentum_occupation(wavefunc,1,0.0; densmat=densmat)
+			centermoms[idx] = allmoms[2][1]
+			if idx > 1
+				plot([num_particles/(strens[idx-1]*tot_sites),num_particles/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
+				#plot([(num_particles-1)/(strens[idx-1]*tot_sites),num_particles/(alpha*tot_sites)],[centermoms[idx-1],centermoms[idx]],"-p",c="b")
+			else
+				scatter([num_particles/(alpha*tot_sites)],[centermoms[idx]],c="b")
+				#scatter([num_particles/(strens[idx]*tot_sites)],[centermoms[idx]],c="b")
+			end
+			end
+			=#
+			#get_occupancy(dm_sp.ttn; plot_title = "Alpha = $(round(alpha,digits=4))")
+			#get_greenfunc(dm_sp.ttn,"phys")
+			#get_greenfunc(dm_sp.ttn,"virt")
+			#=
+			specs = entanglement_spectrum(dm_sp.ttn)
+			fig = figure()
+			scatter(collect(1:mdim),-log.(specs))
+			=#
+	#end
 end
 
 #
