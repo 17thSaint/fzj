@@ -14,115 +14,290 @@ function fix_filling(L,nflavors,nu)
 	println("Not Found")
 	return nothing,nothing
 end
-if true
-save_nothing = true
-params_dict = Dict()
-#L = 24#get(params_dict, "L", 4)
-#nbosons = 5#get(params_dict, "nbosons", nflavors)
-nflavors = 5#get(params_dict, "nflavors", Int(L/2))
-t1 = get(params_dict, "t1", 1.0)
-t2 = get(params_dict, "t2", 1.0)
-U = get(params_dict, "U", 100)
-U1 = 4*t1^2/U
-U2 = U1/2
-conserve_qns = true
-if_nn_int = false#get(params_dict, "if_nn_int", false)
-if_2ord_pert = false#get(params_dict, "if_2ord_pert", false)
-nsweeps = 100
-mdim = get(params_dict, "mdim", 60)
-noises = [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0.0]
-if_save_data = save_nothing ? false : true
-data_loc = "/home/patrick/fzj/main-git/cluster-data/orsay-sept23"
-if_periodic_phys = false
-if_periodic_synth = false
-#nflavors = 9
-#alpha = 23/(24^2)
 
 
-dmrg_obs = TTNKit.DMRGObserver(;energy_tol=10^-3,minsweeps=6)
+function get_1deff_model_params(params_dict::Dict)
 
-other_params_dict = Dict([("U",U),("conserve_qns",conserve_qns),("nsweeps",nsweeps),("mdim",mdim),("noise",noises)])
-savefig_data = save_nothing ? false : true
-savefig = save_nothing ? false : true
-if_lines = false
+	# DMRG parameters
+	nrgtol = get(params_dict, "nrgtol", 5E-5)
+	observer = TTNKit.DMRGObserver(;energy_tol=nrgtol,minsweeps=6)
+	cutoff = get(params_dict, "cutoff", 1E-8)
+	syms = get(params_dict, "syms", true)
+	nswps = get(params_dict, "num_sweeps", 100)
+	noise = get(params_dict, "noise", [0.0])
+	es_count = get(params_dict, "es_count", 0)
 
-#nbosons,alpha = fix_filling(L,nflavors,1/2)
-#alpha = 0.0
 
-density = 5/40
-#Ls = [8]
-L = 1
-count = 5
-alphastart = 0.081
-alphaend = 0.3
-alphas = [0.0]#[alphastart + (i-1)*(alphaend - alphastart)/(count-1) for i in 1:count] .- 0.0001
-#alphas = [alphas; alphas .+ 0.0001]
-display(alphas)
-wavefuncs = []
-rhos = []
-#nbosons = Int(L/2)
-#fillings = ["1/2","2/3","1/3"]
-for (idx,alpha) in enumerate(alphas)
-	nbosons = 1#Int(L*nflavors*density)
-	#alpha = nbosons/((L-1)*nflavors)
-	phi = 2*pi*alpha
-	filename_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons),("alpha",round(alpha,digits=4)),("if_periodic_synth",if_periodic_synth),("if_periodic_phys",if_periodic_phys)])
-	#filename_dict_highdens = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons_highdens),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
+	# Lattice/TTN Parameters
+	Lphys = get(params_dict, "Lphys", 4)
+	Lsynth = get(params_dict, "Lsynth", 4)
+	mdim = get(params_dict, "mdim", 300)
+	if_periodic_phys = get(params_dict, "if_periodic_phys", false)
+	if_periodic_synth = get(params_dict, "if_periodic_synth", false)
+	num_particles = get(params_dict, "particles", 2)
 
-	datafile_name = make_parameters_filename(filename_dict)
-	println(datafile_name)
-	#datafile_name_highdens = make_parameters_filename(filename_dict_highdens)
 
-	model_paras = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noises, if_save_data = if_save_data, location = data_loc, if_periodic_synth=if_periodic_synth, if_periodic_phys=if_periodic_phys, name=datafile_name, observer = dmrg_obs)
+	# Hamiltonian parameters
+	alpha = get(params_dict, "alpha", nothing)
+	flux_direction = get(params_dict,"flux_direction", "phys")
+	if if_periodic_synth && !if_periodic_phys
+        flux_direction = "synth"
+    elseif !if_periodic_synth && if_periodic_phys
+        flux_direction = "phys"
+    end
 
-	#model_paras_highdens = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons_highdens, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noise, if_save_data = if_save_data, location = data_loc, if_periodic=if_periodic, name=datafile_name_highdens)
+	hopping_amplitude = get(params_dict, "ts", 1.0)
+	anis = get(params_dict, "hopping_anisotropy", 1.0)
 
-	#metadata_dict_highdens = merge(named_tuple_to_dict(model_paras_highdens),other_params_dict)
-	metadata_dict = merge(named_tuple_to_dict(model_paras),other_params_dict)
+	if_2ord_pert = get(params_dict, "if_2ord_pert", false)
+	if_NN = get(params_dict, "if_nn_int", false)
+	if_NN ? U1 = get(params_dict, "U1", 1.0) : U1 = 0.0
+	if_2ord_pert ? U2 = get(params_dict, "U2", 1.0) : U2 = 0.0
 
-	psi = execute_mps(U1,U2,phi,L,nflavors,nbosons; model_paras...,metadata=metadata_dict)
-	append!(wavefuncs,[psi])
-	get_occupancy(psi; plot_title="$alpha")
-	get_greenfunc(psi)
-	get_greenfunc(psi,"phys")
-	#densmat = correlation_matrix(psi,"FullDag","FullHat") #./ 2.0
-	#append!(rhos,[densmat])
-	#=if false
-	fig = figure()
-	imshow(real.(densmat))
-	colorbar()
-	title("Virt Dim = $(round(alpha,digits=3))")
+	mag_off = get(params_dict, "mag_off", false)
+	centralflux_strength = get(params_dict, "centralflux_strength", 0.0)
+	twist_angle = [get(params_dict, "tw1", 0.0),get(params_dict, "tw2", 0.0)]
+
+	if isnothing(alpha)
+		filling = get(params_dict, "filling", 0.5)
+		phys_shift,synth_shift = !if_periodic_phys,!if_periodic_synth
+		alpha = num_particles/(filling*(Lphys - phys_shift)*(Lsynth - synth_shift))
+		filling == 0.0 ? alpha = 0.0 : nothing
+		mag_off = false
+	else
+		mag_off = alpha == 0.0
+	end
+	if_check_fluxes = get(params_dict, "if_check_fluxes", true)
+	if_check_fluxes ? check_fluxes(alpha,Lphys,Lsynth,if_periodic_phys,if_periodic_synth) : nothing
+
+
+	# What to calculate
+	if_densmat = get(params_dict, :if_densmat, true)
+	save_data = get(params_dict, "if_save_data", true)
+	if_cluster = any([occursin("local",pwd()),occursin("Local",pwd()),occursin("geraghty",pwd())])
+	if_continuous_saving = false#get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 7)
+	save_data ? nothing : if_continuous_saving = false
+	es_count = get(params_dict, "es_count", 0)
+
+	#=if if_periodic_phys && if_periodic_synth
+		dataloc = get_folder_location("cluster-data/synth-dims/torus")
+	elseif if_periodic_phys || if_periodic_synth
+		dataloc = get_folder_location("cluster-data/synth-dims")
+	elseif !if_periodic_phys && !if_periodic_synth
+		dataloc = get_folder_location("cluster-data/synth-dims/obc")
+	end
+	if sc_type == "rydberg"
+		dataloc = get_folder_location("cluster-data/synth-dims/rydberg")
+	end
+	if es_count > 0
+		dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
 	end=#
-	#append!(all_wavefuncs,[psi])
-	#psi_highdens = execute_mps(U1,U2,phi,L,nflavors,nbosons_highdens; model_paras_highdens...,metadata=metadata_dict_highdens)
-	#mrez = momentum_occupation(psi,nbosons,100,10.0; model_paras...,plot_title="Virt Dim = $nflavors",if_log=false,if_plot=true)
-	#append!(mom_occs,[mrez[2]])
+	dataloc = pwd()
+	loc = get(params_dict, "dataloc", dataloc)
+	
+
+
+	# hardware parameters
+	if_gpu = get(params_dict, "if_gpu", false)
+	
+	model_paras_dict = Dict("hopping_anisotropy"=>anis,
+						"nbosons"=>num_particles,
+						"L"=>Lphys,
+						"nflavors"=>Lsynth,
+						"ts"=>hopping_amplitude,
+						"syms"=>syms,
+						"cutoff"=>cutoff,
+						"observer"=>observer,
+						"twist_angle"=>twist_angle,
+						"if_continuous_saving"=>if_continuous_saving,
+						"nrgtol"=>nrgtol,
+						"if_densmat"=>if_densmat,
+						"es_count"=>es_count,
+						"centralflux_strength"=>centralflux_strength,
+						"if_periodic_phys"=>if_periodic_phys,
+						"if_periodic_synth"=>if_periodic_synth,
+						"if_nn_int"=>if_NN,
+						"if_2ord_pert"=>if_2ord_pert,
+						"U1"=>U1,
+						"U2"=>U2,
+						"alpha"=>alpha,
+						"flux_direction"=>flux_direction,
+						"no_magF"=>mag_off,
+						"if_gpu"=>if_gpu,
+						"if_save_data"=>save_data,
+						"mdim"=>mdim,
+						"num_sweeps"=>nswps,
+						"phi"=>alpha,
+						"noise"=>noise,
+						"output_level"=>1,
+						"location"=>loc)
+		
+	#filename = make_synthdims_filename(model_paras_dict)
+	#model_paras_dict["name"] = "ttn-"*filename
+	
+	return dict_to_symbols(model_paras_dict)
 end
+
+nev = 2
+cols = ["b","g","r","m","c"]
+if nev > length(cols)
+	cols = repeat(cols,ceil(Int,nev/length(cols)))
+end
+
+if true
+	#tws = range(0.0,stop=1.0,length=2)
+	#for tw1 in tws
+	lx = 10
+	ly = 4
+	n = 2
+	alphs = range(n/((lx-1)*(ly-1)*0.55),n/((lx-1)*(ly-1)*0.45),length=20)
+	bds = []
+	for (idx,alpha) in enumerate(alphs)
+		for shift in [0.0,0.001]
+			params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("es_count",0),("if_check_fluxes",false),("nrgtol",1e-6),("mdim",100),("if_periodic_phys",false),("if_periodic_synth",false),("alpha",alpha+shift),("if_save_data",false)])
+			model_paras = get_1deff_model_params(params_dict)
+			if model_paras[:es_count] > 0
+				psis,rhos,nrgs = excited_states_mps(model_paras[:es_count],model_paras[:phi],model_paras[:L],model_paras[:nflavors],model_paras[:nbosons]; model_paras...,metadata=named_tuple_to_dict(model_paras))
+			else
+				psi,rho,nrg = execute_mps(model_paras[:phi],model_paras[:L],model_paras[:nflavors],model_paras[:nbosons]; model_paras...,metadata=named_tuple_to_dict(model_paras))
+			end
+			append!(bds,[bulk_density(psi,Int(lx/2-1),Int(ly/2-1))])
+
+			if idx == 1 && shift == 0.0
+				get_occupancy(psi)
+				fig = figure()
+			end
+		end
+
+		scatter(n/((lx-1)*(ly-1)*alpha),2*pi*(bds[end]-bds[end-1])/-0.001,c="b")
+		xlabel("Filling")
+		ylabel("Derivative Bulk Density")
+
+		#=if tw1 == 0.0
+			for j in 1:nev
+				get_occupancy(psis[j]; plot_title="Eig $j, NRG=$(round(nrgs[j],digits=4))")
+			end
+			fig = figure()
+		end
+
+
+		for i in 1:model_paras[:es_count]+1
+			change = abs(tws[1] - tws[2])
+			xval = tw1
+			shift = 0.0#(i - model_paras[:es_count]/2) * ((0.1*change)/(model_paras[:es_count]/2))
+			scatter(xval + shift,nrgs[i],c=cols[i])
+		end=#
+	end
+end
+
+if false
+	save_nothing = true
+	params_dict = Dict()
+	#L = 24#get(params_dict, "L", 4)
+	#nbosons = 5#get(params_dict, "nbosons", nflavors)
+	nflavors = 5#get(params_dict, "nflavors", Int(L/2))
+	t1 = get(params_dict, "t1", 1.0)
+	t2 = get(params_dict, "t2", 1.0)
+	U = get(params_dict, "U", 100)
+	U1 = 4*t1^2/U
+	U2 = U1/2
+	conserve_qns = true
+	if_nn_int = false#get(params_dict, "if_nn_int", false)
+	if_2ord_pert = false#get(params_dict, "if_2ord_pert", false)
+	nsweeps = 100
+	mdim = get(params_dict, "mdim", 60)
+	noises = [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0.0]
+	if_save_data = save_nothing ? false : true
+	data_loc = "/home/patrick/fzj/main-git/cluster-data/orsay-sept23"
+	if_periodic_phys = false
+	if_periodic_synth = false
+	#nflavors = 9
+	#alpha = 23/(24^2)
+
+
+	dmrg_obs = TTNKit.DMRGObserver(;energy_tol=10^-3,minsweeps=6)
+
+	other_params_dict = Dict([("U",U),("conserve_qns",conserve_qns),("nsweeps",nsweeps),("mdim",mdim),("noise",noises)])
+	savefig_data = save_nothing ? false : true
+	savefig = save_nothing ? false : true
+	if_lines = false
+
+	#nbosons,alpha = fix_filling(L,nflavors,1/2)
+	#alpha = 0.0
+
+	density = 5/40
+	#Ls = [8]
+	L = 1
+	count = 5
+	alphastart = 0.081
+	alphaend = 0.3
+	alphas = [0.0]#[alphastart + (i-1)*(alphaend - alphastart)/(count-1) for i in 1:count] .- 0.0001
+	#alphas = [alphas; alphas .+ 0.0001]
+	display(alphas)
+	wavefuncs = []
+	rhos = []
+	#nbosons = Int(L/2)
+	#fillings = ["1/2","2/3","1/3"]
+	for (idx,alpha) in enumerate(alphas)
+		nbosons = 1#Int(L*nflavors*density)
+		#alpha = nbosons/((L-1)*nflavors)
+		filename_dict = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons),("alpha",round(alpha,digits=4)),("if_periodic_synth",if_periodic_synth),("if_periodic_phys",if_periodic_phys)])
+		#filename_dict_highdens = Dict([("L",L),("nflavors",nflavors),("nbosons",nbosons_highdens),("alpha",round(alpha,digits=4)),("if_nn_int",if_nn_int),("if_2ord_pert",if_2ord_pert),("if_periodic",if_periodic)])
+
+		datafile_name = make_parameters_filename(filename_dict)
+		println(datafile_name)
+		#datafile_name_highdens = make_parameters_filename(filename_dict_highdens)
+
+		model_paras = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noises, if_save_data = if_save_data, location = data_loc, if_periodic_synth=if_periodic_synth, if_periodic_phys=if_periodic_phys, name=datafile_name, observer = dmrg_obs)
+
+		#model_paras_highdens = (t1 = t1, t2 = t2, phi = phi, U1 = U1, U2 = U2, L = L, nflavors = nflavors, nbosons = nbosons_highdens, if_nn_int = if_nn_int, if_2ord_pert = if_2ord_pert, mdim = mdim, nsweeps = nsweeps, noise = noise, if_save_data = if_save_data, location = data_loc, if_periodic=if_periodic, name=datafile_name_highdens)
+
+		#metadata_dict_highdens = merge(named_tuple_to_dict(model_paras_highdens),other_params_dict)
+		metadata_dict = merge(named_tuple_to_dict(model_paras),other_params_dict)
+
+		psi = execute_mps(U1,U2,phi,L,nflavors,nbosons; model_paras...,metadata=metadata_dict)
+		append!(wavefuncs,[psi])
+		get_occupancy(psi; plot_title="$alpha")
+		get_greenfunc(psi)
+		get_greenfunc(psi,"phys")
+		#densmat = correlation_matrix(psi,"FullDag","FullHat") #./ 2.0
+		#append!(rhos,[densmat])
+		#=if false
+		fig = figure()
+		imshow(real.(densmat))
+		colorbar()
+		title("Virt Dim = $(round(alpha,digits=3))")
+		end=#
+		#append!(all_wavefuncs,[psi])
+		#psi_highdens = execute_mps(U1,U2,phi,L,nflavors,nbosons_highdens; model_paras_highdens...,metadata=metadata_dict_highdens)
+		#mrez = momentum_occupation(psi,nbosons,100,10.0; model_paras...,plot_title="Virt Dim = $nflavors",if_log=false,if_plot=true)
+		#append!(mom_occs,[mrez[2]])
+	end
 #
 end
 if false
-L = 54
-bulksize = 20
-dists = [i for i in 1:bulksize]
-for i in 2:length(files)
-	corrs = [0.0 for i in 1:bulksize]
-	corr_errs = [0.0 for i in 1:bulksize]
-	f = files[i]
-	whichone = i
-	ps = get_params_dict_from_filename(f)
-	nf = ps["nflavors"]
-	nb = ps["nbosons"]
-	nuval = "1/" * string(L/nb)
-	for i in 1:bulksize
-		midval = Int(floor((L - i)/2))
-		all_vals = [diag(rhomats[whichone],i)[midval-Int(bulksize/2):midval+Int(bulksize/2)]; diag(rhomats[whichone],-i)[midval-Int(bulksize/2):midval+Int(bulksize/2)]]
-		corrs[i] = mean(real.(all_vals))
-		corr_errs[i] = std(real.(all_vals))
+	L = 54
+	bulksize = 20
+	dists = [i for i in 1:bulksize]
+	for i in 2:length(files)
+		corrs = [0.0 for i in 1:bulksize]
+		corr_errs = [0.0 for i in 1:bulksize]
+		f = files[i]
+		whichone = i
+		ps = get_params_dict_from_filename(f)
+		nf = ps["nflavors"]
+		nb = ps["nbosons"]
+		nuval = "1/" * string(L/nb)
+		for i in 1:bulksize
+			midval = Int(floor((L - i)/2))
+			all_vals = [diag(rhomats[whichone],i)[midval-Int(bulksize/2):midval+Int(bulksize/2)]; diag(rhomats[whichone],-i)[midval-Int(bulksize/2):midval+Int(bulksize/2)]]
+			corrs[i] = mean(real.(all_vals))
+			corr_errs[i] = std(real.(all_vals))
+		end
+		#errorbar(dists,corrs,yerr=corr_errs,label=nuval * ", $nb")
+		plot(dists,corrs,label=nuval * ", $nf")
+		legend()
 	end
-	#errorbar(dists,corrs,yerr=corr_errs,label=nuval * ", $nb")
-	plot(dists,corrs,label=nuval * ", $nf")
-	legend()
-end
 end
 
 if false
@@ -165,11 +340,11 @@ if false
 end
 
 if false
-for i in 1:3
-	ig = figure()
-	plot3D(real.(all_mx[i])[Int(L/2)-20:Int(L/2)+20],real.(all_my[i])[Int(L/2)-20:Int(L/2)+20],[j for j in 1:41],"-p")
-       title("Spin $(spins[i])")
-end
+	for i in 1:3
+		ig = figure()
+		plot3D(real.(all_mx[i])[Int(L/2)-20:Int(L/2)+20],real.(all_my[i])[Int(L/2)-20:Int(L/2)+20],[j for j in 1:41],"-p")
+		title("Spin $(spins[i])")
+	end
 end
 
 if false

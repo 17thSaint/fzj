@@ -291,30 +291,36 @@ function initialize_mps(psi::MPS,particle_count::Int; weight_function = equal_we
 	return psi
 end
 
-function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
-	if_nn_int = get(kwargs, :if_nn_int, true)
-	if_2ord_pert = get(kwargs, :if_2ord_pert, true)
-	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
-	if_periodic_synth = get(kwargs, :if_periodic_synth, false)
-	if_tilt = get(kwargs, :if_tilt, false)
-	tilt_strength = get(kwargs, :tilt_strength, 0.0)
-	if_current = get(kwargs, :if_current, false)
-	current_strength = get(kwargs, :current_strength, 0.0)
+function hamiltonian(t_strength, phi, U1, U2, L, nflavors; kwargs...)
+	if_nn_int = kwargs[:if_nn_int]
+	if_2ord_pert = kwargs[:if_2ord_pert]
+	if_periodic_phys = kwargs[:if_periodic_phys]
+	if_periodic_synth = kwargs[:if_periodic_synth]
+	if_tilt = false
+	tilt_strength = 0.0
+	#if_current = get(kwargs, :if_current, false)
+	#current_strength = get(kwargs, :current_strength, 0.0)
+	twist_angle = kwargs[:twist_angle]
 	
 	ampo = OpSum()
 	for j in 1:L
 		for s in 1:nflavors
+			twist = false
 			# physical dimension hopping
 			next_site = j+1
 			if j == L
 				if if_periodic_phys
 					next_site = 1
+					twist = true
 				else
 					continue
 				end
 			end
-			ampo += (-t1 * exp(im*phi*s*1.0), "Cr$s", j, "Anh$s", next_site)
-			ampo += (-t1 * exp(-im*phi*s*1.0), "Anh$s", j, "Cr$s", next_site)
+			coeff = get_inter_coeff((j,s),(next_site,s),t_strength,phi,L,nflavors+1; kwargs...) 
+			twist ? coeff *= exp(im*2*pi*twist_angle[1]) : nothing
+			coeff = round(coeff,digits=8)
+			ampo += (coeff, "Cr$s", j, "Anh$s", next_site)
+			ampo += (conj(coeff), "Anh$s", j, "Cr$s", next_site)
 		end
 
 		# attractive physical nearest neighbor density interaction
@@ -348,18 +354,22 @@ function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 	
 	for j in 1:L
 		for s in 1:nflavors
+			twist = false
 			# synthetic dimension hopping
 			next_site = s+1
 			if s == nflavors
 				if if_periodic_synth
 					next_site = 1
+					twist = true
 				else
 					continue
 				end
 			end
-			ampo += (-t2 * exp(im*phi*j*0.0), "Cr$(next_site) * Anh$(s)", j)
-			ampo += (-t2 * exp(-im*phi*j*0.0), "Cr$(s) * Anh$(next_site)", j)
-			#ampo += (-t2 * exp(-im*phi*j), "Anh$(next_site) * Cr$(s)", j)
+			coeff = get_inter_coeff((j,s),(j,next_site),t_strength,phi,L,nflavors+1; kwargs...) 
+			twist ? coeff *= exp(im*2*pi*twist_angle[2]) : nothing
+			coeff = round(coeff,digits=8)
+			ampo += (coeff, "Cr$(next_site) * Anh$(s)", j)
+			ampo += (conj(coeff), "Cr$(s) * Anh$(next_site)", j)
 		end
 	end
 
@@ -371,6 +381,7 @@ function hamiltonian(t1, t2, phi, U1, U2, L, nflavors; kwargs...)
 		end
 	end
 	
+	#display(ampo)
 	return ampo
 end
 
@@ -416,13 +427,15 @@ function get_occupancy(wavefunc::MPS; kwargs...)
 	return occ_mat
 end
 
-function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
-	cutoff = get(kwargs, :cutoff, 1E-10)
+function execute_mps(phi,L,nflavors,nbosons; kwargs...)
+	cutoff = kwargs[:cutoff]
+	U1 = kwargs[:U1]
+	U2 = kwargs[:U2]
 	running_again = get(kwargs, :running_again, false)
 	psi_ortho = get(kwargs, :psi_ortho, nothing)
-	opl = get(kwargs, :outputlevel, 1)
-	conserve_qns = get(kwargs, :conserve_qns, false)
-	nsweeps = get(kwargs, :nsweeps, 500)
+	opl = kwargs[:output_level]
+	conserve_qns = kwargs[:syms]
+	nsweeps = kwargs[:num_sweeps]
 	psi0 = get(kwargs, :psi_guess, nothing)
 	if_parton = get(kwargs, :if_parton, true)
 	ham = get(kwargs, :ham, nothing)
@@ -438,38 +451,37 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 	obs = get(kwargs, :observer, NoObserver())
 	if_save_data = get(kwargs, :if_save_data, false)
 	if_gpu = get(kwargs, :if_gpu, false)
-	t1 = 1.0
-	t2 = 1.0
-	if_nrg = get(kwargs, :if_nrg, false)
+	if_nrg = get(kwargs, :if_nrg, true)
 	if_densmat = get(kwargs, :if_densmat, true)
 	particle_type = get(kwargs, :particle_type, "ExtendedHardcore")
 	if_continuous_saving = get(kwargs, :if_continuous_saving, false)
 	if_save_data ? nothing : if_continuous_saving = false
-	location = get(kwargs, :location, pwd())
-
-	if if_parton
-		psi0 = make_vacuum(L,nflavors; kwargs...)
-		psi0 = initialize_mps(psi0, nbosons; maxdim=minimum(mdim))
-	end
+	location = kwargs[:location]
 
 	metadata = get(kwargs, :metadata, Dict())
-	metadata["psi_ortho"] = psi_ortho
+	#=metadata["psi_ortho"] = psi_ortho
 	metadata["cutoff"] = cutoff
 	metadata["outputlevel"] = opl
-	metadata["psi0"] = psi0
 	metadata["if_parton"] = if_parton
-	metadata["ham"] = ham
 	metadata["mdim"] = mdim
 	metadata["noise"] = noise
-	metadata["if_gpu"] = if_gpu
+	metadata["if_gpu"] = if_gpu=#
+	metadata["ham"] = ham
 	filename = get(kwargs, :name, "mps")
 	filename = check_plot_label(filename,"mps")
 	
 	gs_search_params = copy(metadata)
 	delete!(gs_search_params,"ham")
 	delete!(gs_search_params,"psi_ortho")
-	delete!(gs_search_params,"psi0")
 	display(gs_search_params)
+
+	if isnothing(psi0) && if_parton
+		psi0 = make_vacuum(L,nflavors; kwargs...)
+		psi0 = initialize_mps(psi0, nbosons; maxdim=minimum(mdim))
+	end
+
+	metadata["psi0"] = psi0
+
 	
 	if isnothing(psi0) && isnothing(psi_ortho)
 		if particle_type == "ExtendedHardcore"
@@ -483,7 +495,7 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 		sidx = siteinds(psi0)
 	end
 	if isnothing(ham)
-		H = MPO(hamiltonian(t1,t2,phi,U1,U2,L,nflavors; kwargs...), sidx)
+		H = MPO(hamiltonian(kwargs[:ts],phi,U1,U2,L,nflavors; kwargs...), sidx)
 	else
 		H = MPO(ham, sidx)
 	end
@@ -544,6 +556,35 @@ function execute_mps(U1,U2,phi,L,nflavors,nbosons; kwargs...)
 		else
 			return psi
 		end
+	end
+end
+
+function excited_states_mps(es_count,phi,L,nflavors,nbosons; kwargs...)
+	if_densmat = kwargs[:if_densmat]
+
+	all_states = Vector{MPS}(undef,es_count+1)
+	if_densmat ? all_rhos = Vector{Array{Complex{Float64},2}}(undef,es_count+1) : nothing
+	all_nrgs = Vector{Float64}(undef,es_count+1)
+
+	if_densmat ? (ground_state, rho_gs, gs_nrg) = execute_mps(phi,L,nflavors,nbosons; kwargs...) : (ground_state, gs_nrg) = execute_mps(phi,L,nflavors,nbosons; kwargs...)
+	all_states[1] = ground_state
+	if_densmat ? all_rhos[1] = rho_gs : nothing
+	all_nrgs[1] = gs_nrg
+	
+	if if_densmat
+		for i in 1:es_count
+			all_states[i+1], all_rhos[i+1], all_nrgs[i+1] = execute_mps(phi,L,nflavors,nbosons; psi_ortho=all_states[1:i], kwargs...,ham=kwargs[:metadata]["ham"],psi_guess=kwargs[:metadata]["psi0"])
+		end
+	else
+		for i in 1:es_count
+			all_states[i+1], all_nrgs[i+1] = execute_mps(phi,L,nflavors,nbosons; psi_ortho=all_states[1:i], kwargs...,ham=kwargs[:metadata]["ham"],psi_guess=kwargs[:metadata]["psi0"])
+		end
+	end
+
+	if if_densmat
+		return all_states, all_rhos, all_nrgs
+	else
+		return all_states, all_nrgs
 	end
 end
 
@@ -1139,7 +1180,7 @@ function plot_denscorr(denscorrs,corr_errors,distances; kwargs...)
 	return denscorrs,corr_errors
 end
 
-mutable struct NRGVarObserver <: AbstractObserver
+#=mutable struct NRGVarObserver <: AbstractObserver
     var_tol::Float64
     local_ham
     nrg_var::Vector{Float64}
@@ -1215,7 +1256,7 @@ function ITensors.measure!(o::SavingNRGVarObserver; kwargs...)
 		percent_change = length(o.nrg_var) > 10 ? round(100*std(o.nrg_var[end-10:end]/o.nrg_var[end]),digits=2) : round(100*std(o.nrg_var[2:end])/o.nrg_var[end],digits=2)
 		outputlevel > 0 ? println("The energy variance is $(round(o.nrg_var[end],digits=9)) for tolerance $(o.var_tol), AVG = $percent_change %") : nothing
     end
-end
+end=#
 
 
 mutable struct NRGObserver <: AbstractObserver

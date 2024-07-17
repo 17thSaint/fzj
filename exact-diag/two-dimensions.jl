@@ -1,4 +1,4 @@
-using Pkg
+#using Pkg
 #Pkg.activate(".")
 using LinearAlgebra,KrylovKit,Combinatorics,SparseArrays
 
@@ -862,7 +862,8 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
 
             # apply twist at boundary
             if twist
-                coeff *= exp(im*2*pi*twist_angle)
+                #println("Applying twist at $starting_site moving to $next_site along X of $(twist_angle[1])")
+                coeff *= exp(im*2*pi*twist_angle[1])
             end
             
             dir == -1 ? coeff = conj(coeff) : nothing
@@ -907,7 +908,8 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
 
             # apply twist at boundary
             if twist
-                coeff *= exp(im*2*pi*twist_angle)
+                #println("Applying twist at $starting_site moving to $next_site along Y of $(twist_angle[2])")
+                coeff *= exp(im*2*pi*twist_angle[2])
             end
 
             dir == -1 ? coeff = conj(coeff) : nothing
@@ -1354,6 +1356,9 @@ function check_fluxes(alpha,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_
     if alpha == 0.0
         return nothing
     end
+    if alpha > 0.4
+        error("Alpha is too large: ",alpha)
+    end
     x_shift,y_shift = !if_periodic_x, !if_periodic_y
     num_fluxes = round(alpha*(Lx - x_shift) * (Ly - y_shift),digits=5)
     println("Number of Fluxes = ",num_fluxes," for Lx = ",Lx," and Ly = ",Ly)
@@ -1361,6 +1366,7 @@ function check_fluxes(alpha,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_
         error("Number of fluxes is not an integer")
     end
 
+    #println("Not properly checking fluxes")
     if if_periodic_x && !isinteger(num_fluxes/Lx)
         error("Number of fluxes is not an integer multiple of Lx")
     end
@@ -1432,7 +1438,12 @@ function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     else
         intstren = hamilt_params["U"][1]
     end
-    return Dict([("Lx",lattice_params["Lx"]),("Ly",lattice_params["Ly"]),("N",lattice_params["N"]),("alpha",hamilt_params["alpha"]),("hopping_anisotropy",hamilt_params["tx"]/hamilt_params["ty"]),("interaction_strength",intstren),("if_periodic_x",lattice_params["if_periodic_x"]),("if_periodic_y",lattice_params["if_periodic_y"])])
+    fdict = Dict([("Lx",lattice_params["Lx"]),("Ly",lattice_params["Ly"]),("N",lattice_params["N"]),("alpha",hamilt_params["alpha"]),("hopping_anisotropy",hamilt_params["tx"]/hamilt_params["ty"]),("interaction_strength",intstren),("if_periodic_x",lattice_params["if_periodic_x"]),("if_periodic_y",lattice_params["if_periodic_y"])])
+    #=if lattice_params["twist_angle"] != [0.0,0.0]
+        fdict["twist_angle1"] = lattice_params["twist_angle"][1]
+        fdict["twist_angle2"] = lattice_params["twist_angle"][2]
+    end=#
+    return fdict
 end
 
 function get_lattice_params_from_metadata(metadata::Dict)
@@ -1622,7 +1633,21 @@ function get_normal_model_params_ed(params_dict::Dict)
     N = get(params_dict, "N", 2)
     if_periodic_x = get(params_dict, "if_periodic_x", false)
     if_periodic_y = get(params_dict, "if_periodic_y", false)
-    twist_angle = get(params_dict, "twist_angle", 0.0)
+    twist_angle = [get(params_dict, "tw1", 0.0),get(params_dict, "tw2", 0.0)]
+    #=if typeof(twist_angle) == String
+        println("Twist angle string is $twist_angle")
+        tw_str = split(twist_angle,"c")
+        tws = tryparse.(Float64,tw_str)
+        println("Twist angles found are $tws")
+        for (idx,twa) in enumerate(tws)
+            if isnothing(twa)
+                parts = parse.(Float64,split(tw_str[idx],"p"))
+                tws[idx] = sum(parts .* [10.0^(-(i-1)) for i in 1:length(parts)])
+            end
+        end
+        println("Twist angles are $tws")
+        twist_angle = tws
+    end=#
     expected_dimHilb = binomial(Lx*Ly,N)
 
 
@@ -1735,6 +1760,14 @@ function bin_values(vector, num_bins)
 
     return bins
 end
+
+function charge_polarization(psi::Vector{ComplexF64},lattice_params::Dict; kwargs...)
+    occs = get_occupancy(psi,lattice_params; if_plot=false)
+    Ly = lattice_params["Ly"]
+
+    cppul = sum([sum(occs[m,:] .* m) for m in 1:Ly])/(Ly) # charge polarization per unit length
+    return cppul
+end  
 
 if false
     lx = 4
@@ -1922,14 +1955,14 @@ if false
     yscale("log")
 end
 
-if false
+if true
     #fig = figure()
     #xlabel("Hopping Anisotropy")
     #ylabel("Gap")
     #lx = 6
     #n = 3
     #for (idx,n) in enumerate([2,3,4,5])
-    intstrens = range(0.0,2.0,length=10)
+    #intstrens = range(0.0,2.0,length=20)
     #other_intstrens = range(2.0,10.0,length=37)
     #intstrens = sort([intstrens; other_intstrens])
     #change = 0.001
@@ -1939,17 +1972,22 @@ if false
     #all_bds = zeros(Float64,length(alphas))
     #thetas = range(0.01,0.5,length=50)
     #all_nrgs = zeros(Float64,length(thetas))
-    #anises = range(1.0,10.0,length=10)
+    #anises = range(1.0,5.0,length=20)
     #nus = range(0.4,0.6,length=100)
     #alphas = range(0.16,2*3/(6*5),length=30)
     #for (idx,alpha) in enumerate(alphas)
     #for (idx,lx) in enumerate([4,4,8])
     #for (idx,nu) in enumerate(nus)
     #for (idx,anis) in enumerate(anises)
-    for (idx2,intstren) in enumerate(intstrens)
+    #for (idx,intstren) in enumerate(intstrens)
     #for lrd in [0,1]
+    tws = range(0.0,1.0,length=30)
+    cps = zeros(Float64,length(tws))
+    fig = figure()
+    for (idx,tw1) in enumerate(tws)
+    #for tw2 in tws
         #for change in [0,0.0001]true
-        params_dict = Dict([("Lx",4),("Ly",4),("N",2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_save_data",false)])
+        params_dict = Dict([("Lx",6),("Ly",7),("N",3),("tw1",tw1),("tw2",0.0),("if_periodic_x",true),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",10),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
         # set number of open cores
@@ -1964,7 +2002,8 @@ if false
 
         # build filename dictionary
         filename_dict = make_filename_dict(lattice_params,hamilt_params)
-        if_exists,found_data = running_args.if_find_data ? check_data_exists(filename_dict,"ed"; location=running_args.dataloc,output_level=false) : (false,nothing)
+        #display(filename_dict)
+        if_exists,found_data = false,nothing#running_args.if_find_data ? check_data_exists(filename_dict,"ed"; location=running_args.dataloc,output_level=false) : (false,nothing)
 
         # some old data has bad naming with int_stren = 1.0 even though rest of Us is zeros
         if params_dict["interaction_strength"] == 1.0 && if_exists
@@ -2038,12 +2077,23 @@ if false
         #append!(all_bulkdens,[bulkdens/n])
 
         #display(nrgs)
+        #=if idx == 1
+            get_occupancy(states[1],lattice_params; plot_title="U=0.0")
+            fig = figure()
+        end=#
 
-        #for i in 1:nev
-        #    get_occupancy(rhos[i],lattice_params; if_plot=true,plot_title="Alpha=$alpha, E=$(round(nrgs[i]/Ly,digits=5))")
+        #for i in 1:params_dict["nev"]
+        #    get_occupancy(states[i],lattice_params; if_plot=true,plot_title="LR=$intstren, E=$(round(nrgs[i],digits=5))")
         #end
 
-        #occs1 = get_occupancy(rhos[1],lattice_params; if_plot=true)
+        #=fig = figure()
+        occs1 = get_occupancy(states[1],lattice_params; if_plot=false)
+        occs2 = get_occupancy(states[2],lattice_params; if_plot=false)
+        imshow((occs1 .+ occs2) ./ 2)
+        xlabel("Synthetic")
+        ylabel("Physical")
+        colorbar()
+        title("LR=$intstren")=#
         #append!(all_bulkdens,[sum(occs1[3:4,3:4])])
 
         #for i in 1:1#nev
@@ -2051,7 +2101,7 @@ if false
         #end
         #coeff = (maximum(nrgs) .- nrgs[1]) / hh_gap_exact(anis,alpha)
         #append!(coeffs,[coeff])
-        cols = ["b","r","g","m","c"]
+        cols = ["b","g","r","m","c"]
         if running_args.nev > length(cols)
             cols = repeat(cols,ceil(Int,running_args.nev/length(cols)))
         end
@@ -2089,12 +2139,13 @@ if false
             #scatter(id2 == 1 ? anis : -anis,nrgs[3],c="g",label="E2")
             #scatter(intstren,nrgs[4],c="k",label="E3")
         else=#
+            #=xxs = tws
             for i in 1:running_args.nev
-                change = abs(intstrens[1] - intstrens[2])
-                xval = intstren
+                change = abs(xxs[1] - xxs[2])
+                xval = xxs[idx]
                 shift = (i - running_args.nev/2) * ((0.1*change)/(running_args.nev/2))
                 scatter(xval + shift,nrgs[i] - nrgs[1],c=cols[i])
-            end
+            end#
             #scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=c=cols[id2*2-1])
             #plot(anises[idx-1:idx],[hh_gap_exact(anises[idx-1],alpha),hh_gap_exact(anises[idx],alpha)],c="r")
             #scatter(id2 == 1 ? anis : -anis,nrgs[3] - nrgs[1],c=c=cols[id2*2])
@@ -2105,12 +2156,28 @@ if false
         #end
         #legend()
         #xlabel("System Size")
-        xlabel("Interaction Strength")
+        #xlabel("Interaction Strength")
         #xlabel("Flux")
+        xlabel("Theta_x / 2pi")
+        #ylabel("Theta_y")
+        ylabel("NRG")=#
         #xlabel("Hopping Anisotropy tx/ty")
-        ylabel("Energy - E1")#
-        #title("5x5 N=5, Anis=$(hamilt_params["hopping_anisotropy"])")
+        #ylabel("Energy - E1")#
+        #title("4x4 N=2, Anis=$(hamilt_params["hopping_anisotropy"])")
         #title("Topological Degeneracy Closing in Thermodynamic Limit")#
+        #title("Spectrum Twist BC $(params_dict["Lx"])x$(params_dict["Ly"]) N=$(params_dict["N"]) Anis=$(params_dict["hopping_anisotropy"])")
+
+        cps[idx] = charge_polarization(states[1],lattice_params)
+
+        scatter(tw1,cps[idx],c="b")
+        xlabel("Theta")
+        ylabel("Charges Pumped")
+        title("Synth Length = $(params_dict["Ly"])")
+
+        #=xxs = tws
+        if idx == length(xxs)
+            get_occupancy(states[1],lattice_params; plot_title="$(xxs[end])")
+        end=#
 
         #cdw = cdw_sf(rhos[1],states[1],lattice_params,(3.0,0.0); if_plot=true,plot_label="$anis")
         #occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="ED, LR=$intstren")

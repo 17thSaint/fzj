@@ -1703,7 +1703,7 @@ function plot_occupancy(exp_occ; kwargs...)
 		exp_occ = data_dict["vals"]
 	end
 	fig = figure()
-	imshow(exp_occ)
+	imshow(exp_occ)#,vmin=0.0,vmax=maximum(exp_occ))
 	colorbar()
 	plot_title = get(kwargs, :plot_title, "")
 	title_string = "Occupancy, " * plot_title
