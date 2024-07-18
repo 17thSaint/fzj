@@ -166,7 +166,7 @@ function get_interaction_coords(given_site,inter_dist,lat,if_per,which_dir) # wr
 	coordinates = []
 	if_periodic_phys,if_periodic_virt = if_per
     
-	virt_edge_length, phys_edge_length = size(lat)
+	phys_edge_length, virt_edge_length = size(lat)
 	#if typeof(given_site) == Int64
 	#	given_site = TTNKit.coordinate(lat,given_site)
 	#end
@@ -205,6 +205,8 @@ function get_interaction_coords(given_site,inter_dist,lat,if_per,which_dir) # wr
 				end
 			end=#
 
+			#physical == phys_edge_length -1 && inter_dist == 1 ? println("New Physical = ",new_physical,", Old Physical = ",physical,", Inter Dist = ",inter_dist,", Phys Edge = ",phys_edge_length) : nothing
+
 			if 1 <= new_physical <= phys_edge_length && new_physical != physical
 				append!(coordinates, [[new_physical,virtual]])
 				#append!(coordinates, [[virtual,new_physical]])
@@ -227,6 +229,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	restricted_size = get(kwargs, :restricted_size, [phys_edge_length,virt_edge_length])
 	if_periodic_virt = get(kwargs, :if_periodic_synth, false)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
+	println("Checking periodicity $if_periodic_phys and $if_periodic_virt")
 	if_per = [if_periodic_phys,if_periodic_virt]
 	if_hopping = get(kwargs, :if_hopping, true)
 	if_nn_int = get(kwargs, :if_nn_int, false)
@@ -236,7 +239,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	no_magF = get(kwargs, :no_magF, false)
 	chem_strength = get(kwargs, :chem_strength, 0.0)
 	centralflux_strength = get(kwargs, :centralflux_strength, 0.0)
-	twist_angle = get(kwargs, :twist_angle, 0.0)
+	twist_angle = get(kwargs, :twist_angle, [0.0,0.0])
 	#hopping_anisotropy = get(kwargs, :hopping_anisotropy, 1.0) t_phys / t_synth = anisotropy
 	
 	interaction_axis_length = which_dir == "virt" ? virt_edge_length : phys_edge_length
@@ -283,6 +286,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 				s2_coord = (i,1)
 				s1_coord = (i,restricted_size[2])
 				coeff = get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
+				coeff *= exp(im*twist_angle[2]*2*pi)
 				hopping += (coeff,"Adag",s1_coord,"A",s2_coord)
 				hopping += (conj(coeff),"Adag",s2_coord,"A",s1_coord)
 			end
@@ -293,8 +297,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 				s2_coord = (1,i)
 				s1_coord = (restricted_size[1],i)
 				coeff = get_inter_coeff(s1_coord,s2_coord,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
-				#coeff *= exp(im*2*pi*centralflux_strength/size(lat)[1])
-				#coeff *= exp(im*twist_angle*2*pi)
+				coeff *= exp(im*twist_angle[1]*2*pi)
 				hopping += (coeff,"Adag",s1_coord,"A",s2_coord)
 				hopping += (conj(coeff),"Adag",s2_coord,"A",s1_coord)
 			end
@@ -308,6 +311,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 		for s_phys in 1:restricted_size[1]
 			for s_synth in 1:restricted_size[2]
 				starting_site = [s_phys,s_synth]
+				twist = 0
 				for which_axis in [1,2]
 						ending_site = starting_site .+ ((which_axis == 1,which_axis == 2))
 
@@ -315,6 +319,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 						if ending_site[which_axis] > restricted_size[which_axis]
 							if if_per[which_axis]
 								ending_site[which_axis] = 1
+								twist = 1
 							else
 								continue
 							end
@@ -323,15 +328,19 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 						if ending_site[which_axis] < 1
 							if if_per[which_axis]
 								ending_site[which_axis] = restricted_size[which_axis]
+								twist = 2
 							else
 								continue
 							end
 						end
 
-						coeff = round(get_inter_coeff(starting_site,ending_site,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...),digits=10)
-						#dir == -1 ? coeff = conj(coeff) : nothing
+						coeff = get_inter_coeff(starting_site,ending_site,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
+						twist == 1 ? coeff *= exp(im*twist_angle[which_axis]*2*pi) : nothing
+						twist == 2 ? coeff *= exp(-im*twist_angle[which_axis]*2*pi) : nothing
+						coeff = round(coeff,digits=8)
 						hopping += (coeff,"Adag",Tuple(starting_site),"A",Tuple(ending_site))
 						hopping += (conj(coeff),"Adag",Tuple(ending_site),"A",Tuple(starting_site))
+						twist = 0
 				end
 			end
 		end
@@ -364,6 +373,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 							continue
 						end
 						interaction_sites = get_interaction_coords(s_coord,idx-1,lat,(if_periodic_phys,if_periodic_virt),which_dir)
+						#println("Interacting Sites for position $s_coord at distance $(idx-1) in direction $which_dir are ",interaction_sites)
 						
 						for k in interaction_sites
 							if k[1] > restricted_size[1] || k[2] > restricted_size[2]
@@ -1174,6 +1184,9 @@ function check_fluxes(alpha,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_
     if alpha == 0.0
         return nothing
     end
+	if alpha > 0.4
+        error("Alpha is too large: ",alpha)
+    end
     x_shift,y_shift = !if_periodic_x, !if_periodic_y
     num_fluxes = round(alpha*(Lx - x_shift) * (Ly - y_shift),digits=5)
     println("Number of Fluxes = ",num_fluxes," for Lx = ",Lx," and Ly = ",Ly)
@@ -1228,8 +1241,9 @@ function make_synthdims_filename(model_parameters::Dict)
 		filename_dict["ts"] = model_parameters["ts"]
 	end
 
-	if model_parameters["twist_angle"] != 0.0
-		filename_dict["twist_angle"] = model_parameters["twist_angle"]
+	if model_parameters["twist_angle"] != [0.0,0.0]
+		filename_dict["twist_angle1"] = model_parameters["twist_angle"][1]
+		filename_dict["twist_angle2"] = model_parameters["twist_angle"][2]
 	end
 
 	return make_parameters_filename(filename_dict)
@@ -1306,7 +1320,7 @@ function get_normal_model_params(params_dict::Dict)
 	mag_off = get(params_dict, "mag_off", true)
 	if_pinning = get(params_dict, "if_pinning", false)
 	centralflux_strength = get(params_dict, "centralflux_strength", 0.0)
-	twist_angle = get(params_dict, "twist_angle", 0.0)
+	twist_angle = [get(params_dict, "tw1", 0.0),get(params_dict, "tw2", 0.0)]
 
 	if isnothing(alpha)
 		filling = get(params_dict, "filling", 1.0)
@@ -1491,13 +1505,12 @@ function run_synth_dims_generic(params_dict::Dict)
 	end
 end
 
-
 if false
-	cols = ["r","b","g","k"]
+	cols = ["b","r","g","k"]
 	dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
-	pdict = Dict([("layers",6),("particles",8),("if_periodic_phys",true),("if_periodic_synth",true)])
+	pdict = Dict([("layers",6),("particles",8),("hopping_anisotropy",1.1),("if_periodic_phys",true),("if_periodic_synth",true)])
 	allfiles = find_data_file(pdict,"ttn",dataloc)
-	for f in allfiles
+	for (idx,f) in enumerate(allfiles)
 		data,metadata = read_data_jld2(f,dataloc)
 		intstren = metadata["onsite_strength"]
 		nrgs = [metadata["observer"].nrg[end]]
@@ -1509,16 +1522,24 @@ if false
 		end
 		sort!(nrgs)
 		for i in 1:length(nrgs)
-			scatter(intstren,nrgs[i] - nrgs[1],c=cols[i])
+			if idx == 1
+				scatter(intstren,nrgs[i] - nrgs[1],c=cols[i],label="E$(i-1)")
+			else
+				scatter(intstren,nrgs[i] - nrgs[1],c=cols[i])
+			end
 		end
+		#get_occupancy(data["ttn"];densmat=data["densmat"],plot_title="Intstren = $intstren")
 	end
 	xlabel("Interaction Strength")
-	ylabel("Energy - E1")
+	ylabel("Energy - E0")
+	legend()
+	title("Spectrum for 8x8, N=8, flux=0.25 (pi/2)")
 end
 
 #
 if false
 
+	cols = ["b","g","r"]
 	#nnst = 0.0
 	#layers = 6
 	#=layers = 4
@@ -1540,7 +1561,10 @@ if false
 	#strens = range(0.1,0.5,length=3)
 	#for (idx,anis) in enumerate(anises)
 	#for (idx,stren) in enumerate(strens)
-		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",0),("if_synth_rectangle",false),("particles",4),("layers",5),("mdim",50),("if_save_data",false),("alpha",0.0),("onsite_strength",0.0),("lr",0),("if_periodic_phys",false),("if_periodic_synth",false)])
+	#tws = range(0.0,1.0,length=10)
+	#for tw1 in tws
+	#for tw2 in tws
+		#params_dict = Dict([("hopping_anisotropy",1.0),("es_count",2),("tw1",tw1),("if_synth_rectangle",false),("particles",4),("layers",4),("mdim",50),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		open_cores = get(params_dict, "open_cores", 5)
@@ -1552,7 +1576,11 @@ if false
 
 		all_results = run_synth_dims_generic(params_dict)
 
-		get_occupancy(all_results[1]; densmat=all_results[end])
+		#=for i in 1:params_dict["es_count"]+1
+			scatter(tw1,all_results[3][i].nrg[end],c=cols[i])
+		end=#
+
+		#get_occupancy(all_results[1]; densmat=all_results[end])
 		#=bothoccs = []
 		for i in 1:params_dict["es_count"]+1
 			append!(bothoccs,[get_occupancy(all_results[1][i]; densmat=all_results[end-1][i], plot_title="Level $(i-1) NRG=$(round(all_results[3][i].nrg[end],digits=4))")])
@@ -1639,6 +1667,7 @@ if false
 			scatter(collect(1:mdim),-log.(specs))
 			=#
 	#end
+#end
 end
 
 #

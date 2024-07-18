@@ -1031,10 +1031,11 @@ function density_matrix(x::Vector{ComplexF64},lattice_params::Dict{String,Any}; 
 
     start_time = time()
     for i in 1:Lx*Ly
-        for j in 1:i
+        for j in 1:Lx*Ly
             rho[i,j] = hopping_probability(x,coordinate(i,Lx,Ly),coordinate(j,Lx,Ly),lattice_params; kwargs...)
-            rho[j,i] = conj(rho[i,j])
+            #rho[j,i] = conj(rho[i,j])
         end
+        #rho[i,:] ./= abs(hopping_probability(x,coordinate(i,Lx,Ly),coordinate(i,Lx,Ly),lattice_params; kwargs...))
         output_level > 0 ? println(round(i/(Lx*Ly)*100,digits=2),"% done.") : nothing
     end
 
@@ -1767,7 +1768,85 @@ function charge_polarization(psi::Vector{ComplexF64},lattice_params::Dict; kwarg
 
     cppul = sum([sum(occs[m,:] .* m) for m in 1:Ly])/(Ly) # charge polarization per unit length
     return cppul
-end  
+end
+
+function bulk_density(psi::Vector{ComplexF64},lattice_params::Dict,bulk_width_phys=1,bulk_width_synth=1; kwargs...)
+    occ_mat = get_occupancy(psi,lattice_params; if_plot=false)
+    #size(occ_mat)[1] == size(occ_mat)[2] ? bulk_width_virt = bulk_width_phys : nothing
+	bulk_occ_mat = occ_mat[1+bulk_width_phys:end-bulk_width_phys,1+bulk_width_virt:end-bulk_width_virt]
+	bulk_density = sum(bulk_occ_mat)/prod(size(bulk_occ_mat))
+	return bulk_density
+end
+
+function twopointcorrelator(densmat::Array{ComplexF64,2},lattice_params::Dict; kwargs...)
+    !isodd(lattice_params["Lx"]) && !isodd(lattice_params["Ly"]) ? error("Must have odd sized lattice") : nothing
+    lattice_params["Lx"] != lattice_params["Ly"] ? error("Not implemented for non-square lattice") : nothing
+
+    if_plot = get(kwargs,:if_plot,true)
+
+    center_site = (Int((lattice_params["Lx"]+1)/2),Int((lattice_params["Ly"]+1)/2))
+    center_site_linear = linear_index(center_site,lattice_params["Lx"],lattice_params["Ly"])
+
+    twopointcorrs = zeros(Float64,lattice_params["Lx"],lattice_params["Ly"])
+    for j in 1:lattice_params["Lx"]
+        for s in 1:lattice_params["Ly"]
+            next_site = (j,s)
+            next_site_linear = linear_index(next_site,lattice_params["Lx"],lattice_params["Ly"])
+            twopointcorrs[next_site[1],next_site[2]] = abs2(densmat[center_site_linear,next_site_linear])
+        end
+    end
+
+    twopointcorrs ./= twopointcorrs[center_site[1],center_site[2]]
+
+    if if_plot
+        fig = figure()
+        imshow(twopointcorrs)
+        colorbar()
+        title("Two Point Correlator")
+        xlabel("Physical")
+        ylabel("Synthetic")
+    end
+
+    return twopointcorrs
+end
+
+function pointfourhopping(psi::Vector{ComplexF64},s1::Int64,s2::Int64,lattice_params::Dict)
+    hopmat = buildHopping(lattice_params,s1,s2)
+
+    return conj(transpose(psi)) * (conj(transpose(hopmat)) * hopmat) * psi
+end
+
+function fourpointcorrelator(psi::Vector{ComplexF64},lattice_params::Dict; kwargs...)
+    !isodd(lattice_params["Lx"]) && !isodd(lattice_params["Ly"]) ? error("Must have odd sized lattice") : nothing
+    lattice_params["Lx"] != lattice_params["Ly"] ? error("Not implemented for non-square lattice") : nothing
+
+    if_plot = get(kwargs,:if_plot,true)
+
+    center_site = (Int((lattice_params["Lx"]+1)/2),Int((lattice_params["Ly"]+1)/2))
+    center_site_linear = linear_index(center_site,lattice_params["Lx"],lattice_params["Ly"])
+
+    fourpointcorrs = zeros(Float64,lattice_params["Lx"],lattice_params["Ly"])
+    for j in 1:lattice_params["Lx"]
+        for s in 1:lattice_params["Ly"]
+            next_site = (j,s)
+            next_site_linear = linear_index(next_site,lattice_params["Lx"],lattice_params["Ly"])
+            fourpointcorrs[next_site[1],next_site[2]] = abs2(pointfourhopping(psi,center_site_linear,next_site_linear,lattice_params))
+        end
+    end
+
+    #fourpointcorrs ./= fourpointcorrs[center_site[1],center_site[2]]
+
+    if if_plot
+        fig = figure()
+        imshow(fourpointcorrs)
+        colorbar()
+        title("Four Point Correlator")
+        xlabel("Physical")
+        ylabel("Synthetic")
+    end
+
+    return fourpointcorrs
+end
 
 if false
     lx = 4
@@ -1796,6 +1875,10 @@ if false
             intstren = metadata["U"][end]
             anis = metadata["hopping_anisotropy"]
 
+            if anis > 1.3
+                continue
+            end
+
             append!(xs,[anis])
             append!(ys,[intstren])
             #append!(nrgs1,[nrgs[2] - nrgs[1]])
@@ -1811,17 +1894,28 @@ if false
     min_nrgs2, max_nrgs2 = minimum(nrgs2), maximum(nrgs2)
     normalized_bv = [(val - minimum(bv)) / (maximum(bv) - minimum(bv)) * (max_nrgs2 - min_nrgs2) + min_nrgs2 for val in bv]
 
-    # now try to find linear fit to maximum of nrgs2 at each hopping anis row
+    #= now try to find linear fit to maximum of nrgs2 at each hopping anis row
     hanises = unique(xs)
-    max_intstrens = zeros(Float64,length(hanises))
+    #max_intstrens = zeros(Float64,length(hanises))
+    min_intstrens = zeros(Float64,length(hanises))
     for (j,hanis) in enumerate(hanises)
         indices = findall(x -> x == hanis, xs)
-        max_index = findfirst(x -> x == maximum(nrgs2[i] for i in indices), nrgs2)
-        max_intstrens[j] = ys[max_index]
+        if length(indices) == 1
+            #println("Only one data point for Anis=$hanis")
+            continue
+        end
+        #max_index = findfirst(x -> x == maximum(nrgs2[i] for i in indices), nrgs2)
+        #max_intstrens[j] = ys[max_index]
+        relevant_nrgs = [nrgs2[i] for i in indices]
+        min_index = findfirst(i -> isapprox(relevant_nrgs[i],0.0,atol=1e-6),1:length(relevant_nrgs))
+        println("Found Level Crossing for Anis=$hanis at index $min_index")
+        println("It has value $(relevant_nrgs[min_index])")
+        println("This is intstrength of $(ys[indices[min_index]]) \n")
+        min_intstrens[j] = ys[indices[min_index]]
     end
 
-    #=linfit(x,p) = p[1] .* x .+ p[2]
-    fit = curve_fit(linfit,max_intstrens,hanises,[1.0,0.0])
+    linfit(x,p) = p[1] .* x .+ p[2]
+    fit = curve_fit(linfit,min_intstrens,hanises,[1.0,0.0])
     fit_xs = range(minimum(ys),2.0,length=10)
     plot(fit_xs,linfit(fit_xs,fit.param),c="r",label="m=$(round(fit.param[1],digits=3))")=#
 
@@ -1834,7 +1928,7 @@ if false
     ylabel("Hopping Anisotropy")
     xlabel("Interaction Strength")
     legend()
-    title("Energy Gap with linear fit at maximum")
+    title("Energy Gap btw 2nd and 3rd 4x8 N=4")
 
 end
 
@@ -1962,7 +2056,7 @@ if true
     #lx = 6
     #n = 3
     #for (idx,n) in enumerate([2,3,4,5])
-    #intstrens = range(0.0,2.0,length=20)
+    #intstrens = range(8.0,12.0,length=19)
     #other_intstrens = range(2.0,10.0,length=37)
     #intstrens = sort([intstrens; other_intstrens])
     #change = 0.001
@@ -1981,13 +2075,13 @@ if true
     #for (idx,anis) in enumerate(anises)
     #for (idx,intstren) in enumerate(intstrens)
     #for lrd in [0,1]
-    tws = range(0.0,1.0,length=30)
-    cps = zeros(Float64,length(tws))
-    fig = figure()
-    for (idx,tw1) in enumerate(tws)
-    #for tw2 in tws
+    #tws = range(0.0,2.0,length=30)
+    #cps = zeros(Float64,length(tws))
+    #for (idx,tw1) in enumerate(tws)
+    #for tw1 in tws
+    #for ii in 1:1
         #for change in [0,0.0001]true
-        params_dict = Dict([("Lx",6),("Ly",7),("N",3),("tw1",tw1),("tw2",0.0),("if_periodic_x",true),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",10),("if_save_data",false)])
+        params_dict = Dict([("Lx",11),("Ly",11),("N",2),("tw1",0.0),("tw2",0.0),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.1),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",5),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
         # set number of open cores
@@ -2003,7 +2097,7 @@ if true
         # build filename dictionary
         filename_dict = make_filename_dict(lattice_params,hamilt_params)
         #display(filename_dict)
-        if_exists,found_data = false,nothing#running_args.if_find_data ? check_data_exists(filename_dict,"ed"; location=running_args.dataloc,output_level=false) : (false,nothing)
+        if_exists,found_data = running_args.if_find_data ? check_data_exists(filename_dict,"ed"; location=running_args.dataloc,output_level=false) : (false,nothing)
 
         # some old data has bad naming with int_stren = 1.0 even though rest of Us is zeros
         if params_dict["interaction_strength"] == 1.0 && if_exists
@@ -2060,6 +2154,10 @@ if true
             end
         end
 
+        #rho = density_matrix(states[1],lattice_params)
+        #rez2 = twopointcorrelator(rho,lattice_params)
+        rez4 = fourpointcorrelator(states[1],lattice_params)
+
         #for i in 1:5
         #    gaps[i][idx,idx2] = nrgs[i+1] - nrgs[1]
         #end
@@ -2081,6 +2179,7 @@ if true
             get_occupancy(states[1],lattice_params; plot_title="U=0.0")
             fig = figure()
         end=#
+        #get_occupancy(states[1],lattice_params; plot_title="U=0.0")
 
         #for i in 1:params_dict["nev"]
         #    get_occupancy(states[i],lattice_params; if_plot=true,plot_title="LR=$intstren, E=$(round(nrgs[i],digits=5))")
@@ -2139,7 +2238,7 @@ if true
             #scatter(id2 == 1 ? anis : -anis,nrgs[3],c="g",label="E2")
             #scatter(intstren,nrgs[4],c="k",label="E3")
         else=#
-            #=xxs = tws
+            #=xxs = intstrens
             for i in 1:running_args.nev
                 change = abs(xxs[1] - xxs[2])
                 xval = xxs[idx]
@@ -2156,9 +2255,9 @@ if true
         #end
         #legend()
         #xlabel("System Size")
-        #xlabel("Interaction Strength")
+        xlabel("Interaction Strength")
         #xlabel("Flux")
-        xlabel("Theta_x / 2pi")
+        #xlabel("Theta_x / 2pi")
         #ylabel("Theta_y")
         ylabel("NRG")=#
         #xlabel("Hopping Anisotropy tx/ty")
@@ -2167,12 +2266,12 @@ if true
         #title("Topological Degeneracy Closing in Thermodynamic Limit")#
         #title("Spectrum Twist BC $(params_dict["Lx"])x$(params_dict["Ly"]) N=$(params_dict["N"]) Anis=$(params_dict["hopping_anisotropy"])")
 
-        cps[idx] = charge_polarization(states[1],lattice_params)
+        #=cps[idx] = charge_polarization(states[1],lattice_params)
 
         scatter(tw1,cps[idx],c="b")
         xlabel("Theta")
         ylabel("Charges Pumped")
-        title("Synth Length = $(params_dict["Ly"])")
+        title("Synth Length = $(params_dict["Ly"])")=#
 
         #=xxs = tws
         if idx == length(xxs)
@@ -2215,7 +2314,7 @@ if true
         currents = physical_current(rhos,lattice_params; if_plot=true)
         corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
         currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
-    end
+    #end
     #end
 
 
