@@ -336,8 +336,7 @@ function rebuild_ed_ham(ttn_ham,lattice_params::Dict)
 	Lx = lattice_params["Lx"]
 	Ly = lattice_params["Ly"]
 	make_smaller_lattice = [Lx,Ly]
-
-	if_synth_rectangle = get(lattice_params,"if_synth_rectangle",false)
+	if_synth_rectangle = lattice_params["if_synth_rectangle"]
 
 	interacting_pairs = []
 	hopping_pairs = []
@@ -351,12 +350,16 @@ function rebuild_ed_ham(ttn_ham,lattice_params::Dict)
 
 		which_sites = TTNKit.site.(both_terms)
 		if if_synth_rectangle
-			which_sites = [(which_sites[1][2],which_sites[1][1]),(which_sites[2][2],which_sites[2][1])]
+			for i in 1:2
+				which_sites[i] = (which_sites[i][2],which_sites[i][1])
+			end
 		end
 
-		if any(which_sites[1] .> Lx) || any(which_sites[2] .> Lx)
+
+		#=if any(which_sites[1] .> make_smaller_lattice[1]) || any(which_sites[2] .> make_smaller_lattice[2])
+			display(which_sites)
 			continue
-		end
+		end=#
 		ops_here = TTNKit.which_op.(both_terms)
 		if ops_here == ["Adag","A"]
 			end_site,start_site = linear_index.(which_sites,make_smaller_lattice[1],make_smaller_lattice[2])
@@ -364,7 +367,7 @@ function rebuild_ed_ham(ttn_ham,lattice_params::Dict)
 			append!(hopping_pairs,[(start_site,end_site,coeff)])
 		elseif ops_here == ["Adag * A","Adag * A"]
 			s1,s2 = linear_index.(which_sites,make_smaller_lattice[1],make_smaller_lattice[2])
-			#println("Interacting at sites $s1 and $s2 with coeff $coeff")
+			#println("Interacting at sites $s1 and $s2 with coeff $coeff from $which_sites")
 			append!(interacting_pairs,[(s1,s2,coeff)])
 		end
 	end
@@ -393,6 +396,35 @@ function rebuild_ed_ham(ttn_ham,lattice_params::Dict)
 		end
 	end
 
+	return rebuilt_ham
+end
+
+function rebuild_ttn_ham(ed_ham,lattice_params::Dict)
+	lx,ly = lattice_params["Lx"],lattice_params["Ly"]
+	rebuilt_ham = TTNKit.OpSum()
+	hopsites = []
+	for i in 1:size(ed_ham)[1]
+		for j in 1:size(ed_ham)[2]
+			if ed_ham[i,j] != 0.0
+				if i == j
+					basis = lattice_params["full_basis"][:,j]
+					println("not including interaction terms")
+				else
+					basis_start = lattice_params["full_basis"][:,i]
+					basis_end = lattice_params["full_basis"][:,j]
+					
+					allsites = vcat(basis_start,basis_end)
+					which_indices = findall(x -> length(findall(y -> y == x,allsites)) == 1,allsites)
+					
+					starting_site,ending_site = coordinate(allsites[which_indices[1]],lx,ly),coordinate(allsites[which_indices[2]],lx,ly)
+					if !in((allsites[which_indices[1]],allsites[which_indices[2]],ed_ham[i,j]),hopsites)
+						append!(hopsites,[(allsites[which_indices[1]],allsites[which_indices[2]],ed_ham[i,j])])
+						rebuilt_ham += (ed_ham[i,j],"Adag",starting_site,"A",ending_site)
+					end
+				end
+			end
+		end
+	end
 	return rebuilt_ham
 end
 
@@ -554,10 +586,10 @@ if false || if_all
 	end
 end
 
-if false
-	lxs = [4,8,8]
-	lys = [4,4,8]
-	ns = [2,4,8]
+if true
+	lxs = [4,6,8,8]
+	lys = [4,4,4,8]
+	ns = [2,3,4,8]
 	cols = ["b","r","g","m","c"]
 	if 10 > length(cols)
 		cols = repeat(cols,ceil(Int,10/length(cols)))
@@ -584,7 +616,7 @@ if false
 			pdict = Dict([("hopping_anisotropy",1.0),("particles",N),("layers",numlayers),("onsite_strength",0.0)])
 			f = find_data_file(pdict,"ttn",get_folder_location("cluster-data/synth-dims/excited-states"); output_level=0)
 			data,metadata = read_data_jld2(f[1],get_folder_location("cluster-data/synth-dims/excited-states"); output_level=0)
-			nrgs = [metadata["observer"].nrg[end],metadata["observer_1"].nrg[end]]
+			nrgs = [metadata["observer"].nrg[end],metadata["observer_1"].nrg[end],metadata["observer_2"].nrg[end],metadata["observer_3"].nrg[end]]
 		end
 
 		for i in 1:length(nrgs)
@@ -604,25 +636,27 @@ if false
 	
 end
 
-if true
+if false
 	partcount = 2
 	layers = 3
 	lx,ly = Int(sqrt(2^(layers+1))),Int(sqrt(2^(layers-1)))
 	if_periodic = false
 	alpha = partcount / ((lx-!if_periodic)*(ly-!if_periodic))
+	stren = 10.0
 
-	us_synth = zeros(Float64,lx)
-	us_synth[1] = 1.0
+
+	us_synth = stren == 0.0 ? zeros(Float64,lx) : stren .* ones(Float64,lx)
+	us_synth[1] = stren == 0.0 ? 1.0 : stren
 	hamilt_params_synth = Dict("alpha"=>alpha,
                         "flux_direction"=>"x",
                         "tx"=>1.0,
                         "ty"=>1.0,
                         "hopping_anisotropy"=>1.0,
-                        "U"=>us,
+                        "U"=>us_synth,
                         "which_dir"=>"virt",
                         "interaction_cutoff"=>1e-8)
 
-	pdict_synthrect = Dict([("hopping_anisotropy",1.0),("es_count",0),("if_synth_rectangle",true),("particles",partcount),("layers",layers),("mdim",50),("if_save_data",false),("alpha",alpha),("onsite_strength",0.0),("lr",0),("if_periodic_phys",if_periodic),("if_periodic_synth",if_periodic)])
+	pdict_synthrect = Dict([("hopping_anisotropy",1.0),("es_count",0),("if_synth_rectangle",true),("particles",partcount),("layers",layers),("mdim",50),("if_save_data",false),("alpha",alpha),("onsite_strength",stren),("lr",stren == 0.0 ? 0 : "all"),("if_periodic_phys",if_periodic),("if_periodic_synth",if_periodic)])
 	model_paras_synth = get_normal_model_params(pdict_synthrect)
 	net_synth = build_HH_net(model_paras_synth)
 	ham_synth = long_range_HH_ham(net_synth,model_paras_synth[:ts],model_paras_synth[:alpha]; model_paras_synth...)
@@ -632,30 +666,58 @@ if true
 
 	println("For Synth Rectangle: ",rebuilt_ham_synth == ed_ham_synth)
 
-	#=us_phys = zeros(Float64,ly)
-	us_phys[1] = 1.0
+	us_phys = stren == 0.0 ? zeros(Float64,ly) : stren .* ones(Float64,ly)
+	us_phys[1] = stren == 0.0 ? 1.0 : stren
 	hamilt_params_phys = Dict("alpha"=>alpha,
                         "flux_direction"=>"x",
                         "tx"=>1.0,
                         "ty"=>1.0,
                         "hopping_anisotropy"=>1.0,
-                        "U"=>us,
+                        "U"=>us_phys,
                         "which_dir"=>"virt",
                         "interaction_cutoff"=>1e-8)
 
-	pdict_phys = Dict([("hopping_anisotropy",1.0),("es_count",0),("if_synth_rectangle",false),("particles",partcount),("layers",layers),("mdim",50),("if_save_data",false),("alpha",alpha),("onsite_strength",0.0),("lr",0),("if_periodic_phys",if_periodic),("if_periodic_synth",if_periodic)])
+	pdict_phys = Dict([("hopping_anisotropy",1.0),("es_count",0),("if_synth_rectangle",false),("particles",partcount),("layers",layers),("mdim",50),("if_save_data",false),("alpha",alpha),("onsite_strength",stren),("lr",stren == 0.0 ? 0 : "all"),("if_periodic_phys",if_periodic),("if_periodic_synth",if_periodic)])
 	model_paras_phys = get_normal_model_params(pdict_phys)
 	net_phys = build_HH_net(model_paras_phys)
 	ham_phys = long_range_HH_ham(net_phys,model_paras_phys[:ts],model_paras_phys[:alpha]; model_paras_phys...)
-	lattice_params_phys = Dict([("Lx",lx),("Ly",ly),("N",partcount),("if_periodic_x",pdict_phys["if_periodic_phys"]),("if_periodic_y",pdict_phys["if_periodic_synth"]),("twist_angle",0.0),("full_basis",n_particle_basis(partcount,lx,ly; output_level=0))])
+	lattice_params_phys = Dict([("if_synth_rectangle",false),("Lx",lx),("Ly",ly),("N",partcount),("if_periodic_x",pdict_phys["if_periodic_phys"]),("if_periodic_y",pdict_phys["if_periodic_synth"]),("twist_angle",0.0),("full_basis",n_particle_basis(partcount,lx,ly; output_level=0))])
 	rebuilt_ham_phys = rebuild_ed_ham(ham_phys,lattice_params_phys)
 	ed_ham_phys = buildHam(lattice_params_phys,hamilt_params_phys)
 
-	println("For Phys Rectangle: ",rebuilt_ham_phys == ed_ham_phys)=#
+	println("For Phys Rectangle: ",rebuilt_ham_phys == ed_ham_phys)
 
 
 end
 
+if false
+	layers = 2
+	N = 2
+	lx,ly = Int(sqrt(2^layers)),Int(sqrt(2^layers))
+	if_per = true
+	tw1 = 0.32
+	tw2 = 0.78
+
+	pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",N),("tw1",tw1),("tw2",tw2),("if_periodic_x",if_per),("if_periodic_y",if_per),("hopping_anisotropy",1.0)])
+	lattice_params,hamilt_params,running_args = get_normal_model_params_ed(pdict_ed)
+	lattice_params["full_basis"] = n_particle_basis(N,lx,ly; output_level=0)
+	lattice_params["if_synth_rectangle"] = false
+	ham_ed = buildHam(lattice_params,hamilt_params; running_args...)
+	#edham_ttn = rebuild_ttn_ham(ham_ed,lattice_params)
+
+	pdict_ttn = Dict([("hopping_anisotropy",1.0),("tw1",tw1),("tw2",tw2),("es_count",0),("particles",N),("layers",layers),("mdim",50),("if_save_data",false),("filling",0.5),("if_periodic_phys",if_per),("if_periodic_synth",if_per)])
+	model_paras_ttn = get_normal_model_params(pdict_ttn)
+	net = build_HH_net(model_paras_ttn)
+	sumham_ttn = long_range_HH_ham(net,model_paras_ttn[:ts],model_paras_ttn[:alpha]; model_paras_ttn...)
+	ham_ttn = rebuild_ed_ham(sumham_ttn,lattice_params)
+
+	#ttnsum_matches = all(ed_term in TTNKit.terms(sumham_ttn) for ed_term in TTNKit.terms(edham_ttn))
+	#println("TTN Hamilts match: $ttnsum_matches")
+
+
+	diffmat = round.(ham_ed .- ham_ttn,digits=6)
+	display(diffmat)
+end
 
 
 

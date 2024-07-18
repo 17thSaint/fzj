@@ -147,46 +147,62 @@ end
 if true
 	#tws = range(0.0,stop=1.0,length=2)
 	#for tw1 in tws
-	lx = 10
-	ly = 4
-	n = 2
-	alphs = range(n/((lx-1)*(ly-1)*0.55),n/((lx-1)*(ly-1)*0.45),length=20)
+	#lx = 10
+	ly = 8
+	filling = 0.5
+	#n = 2
+	#alphs = range(n/((lx-1)*(ly-1)*0.55),n/((lx-1)*(ly-1)*0.45),length=20)
 	bds = []
-	for (idx,alpha) in enumerate(alphs)
-		for shift in [0.0,0.001]
-			params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("es_count",0),("if_check_fluxes",false),("nrgtol",1e-6),("mdim",100),("if_periodic_phys",false),("if_periodic_synth",false),("alpha",alpha+shift),("if_save_data",false)])
-			model_paras = get_1deff_model_params(params_dict)
-			if model_paras[:es_count] > 0
-				psis,rhos,nrgs = excited_states_mps(model_paras[:es_count],model_paras[:phi],model_paras[:L],model_paras[:nflavors],model_paras[:nbosons]; model_paras...,metadata=named_tuple_to_dict(model_paras))
-			else
-				psi,rho,nrg = execute_mps(model_paras[:phi],model_paras[:L],model_paras[:nflavors],model_paras[:nbosons]; model_paras...,metadata=named_tuple_to_dict(model_paras))
-			end
-			append!(bds,[bulk_density(psi,Int(lx/2-1),Int(ly/2-1))])
+	#for (idx,alpha) in enumerate(alphs)
+	plot([0.0,1.0],[filling,filling],c="k")
+	for lx in 6:10
+		bulk_width = iseven(lx) ? Int(lx/2-1) : Int((lx+1)/2 - 1)
+		for n in 2:2
+			alpha = n/((lx-1)*(ly-1)*filling)
+			for shift in [0.0]#[-0.001,0.001]
+				params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("es_count",0),("if_check_fluxes",false),("nrgtol",1e-5),("mdim",100),("if_periodic_phys",false),("if_periodic_synth",false),("alpha",alpha+shift),("if_save_data",false)])
+				model_paras = get_1deff_model_params(params_dict)
+				if model_paras[:es_count] > 0
+					psis,rhos,nrgs = excited_states_mps(model_paras[:es_count],model_paras[:phi],model_paras[:L],model_paras[:nflavors],model_paras[:nbosons]; model_paras...,metadata=named_tuple_to_dict(model_paras))
+				else
+					psi,rho,nrg = execute_mps(model_paras[:phi],model_paras[:L],model_paras[:nflavors],model_paras[:nbosons]; model_paras...,metadata=named_tuple_to_dict(model_paras))
+				end
+				#append!(bds,[bulk_density(psis[2],bulk_width,Int(ly/2-1))])
 
-			if idx == 1 && shift == 0.0
-				get_occupancy(psi)
+				#get_current_phys(psi; densmat=rho)
+
+				#=if n == 2 && shift == 0.0
+					get_occupancy(psis[1]; plot_title="Eig 1, NRG=$(round(nrgs[1],digits=4))")
+					get_occupancy(psis[2]; plot_title="Eig 2, NRG=$(round(nrgs[2],digits=4))")
+					#fig = figure()
+				end=#
+			end
+
+			#=if n == 2
+				scatter(n/(lx),2*pi*(bds[end]-bds[end-1])/-0.002,c=cols[lx-5],label="$lx")
+			else
+				scatter(n/(lx),2*pi*(bds[end]-bds[end-1])/-0.002,c=cols[lx-5])
+			end
+			#xlabel("Filling")
+			xlabel("Density 1D")
+			ylabel("Derivative Bulk Density")
+			legend()=#
+
+			#=if tw1 == 0.0
+				for j in 1:nev
+					get_occupancy(psis[j]; plot_title="Eig $j, NRG=$(round(nrgs[j],digits=4))")
+				end
 				fig = figure()
 			end
+
+
+			for i in 1:model_paras[:es_count]+1
+				change = abs(tws[1] - tws[2])
+				xval = tw1
+				shift = 0.0#(i - model_paras[:es_count]/2) * ((0.1*change)/(model_paras[:es_count]/2))
+				scatter(xval + shift,nrgs[i],c=cols[i])
+			end=#
 		end
-
-		scatter(n/((lx-1)*(ly-1)*alpha),2*pi*(bds[end]-bds[end-1])/-0.001,c="b")
-		xlabel("Filling")
-		ylabel("Derivative Bulk Density")
-
-		#=if tw1 == 0.0
-			for j in 1:nev
-				get_occupancy(psis[j]; plot_title="Eig $j, NRG=$(round(nrgs[j],digits=4))")
-			end
-			fig = figure()
-		end
-
-
-		for i in 1:model_paras[:es_count]+1
-			change = abs(tws[1] - tws[2])
-			xval = tw1
-			shift = 0.0#(i - model_paras[:es_count]/2) * ((0.1*change)/(model_paras[:es_count]/2))
-			scatter(xval + shift,nrgs[i],c=cols[i])
-		end=#
 	end
 end
 
