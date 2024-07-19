@@ -1505,10 +1505,10 @@ function run_synth_dims_generic(params_dict::Dict)
 	end
 end
 
-if false
+if true
 	cols = ["b","r","g","k"]
 	dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
-	pdict = Dict([("layers",6),("particles",8),("hopping_anisotropy",1.1),("if_periodic_phys",true),("if_periodic_synth",true)])
+	pdict = Dict([("layers",6),("particles",4),("hopping_anisotropy",1.0),("if_periodic_phys",true),("if_periodic_synth",true)])
 	allfiles = find_data_file(pdict,"ttn",dataloc)
 	for (idx,f) in enumerate(allfiles)
 		data,metadata = read_data_jld2(f,dataloc)
@@ -1533,7 +1533,7 @@ if false
 	xlabel("Interaction Strength")
 	ylabel("Energy - E0")
 	legend()
-	title("Spectrum for 8x8, N=8, flux=0.25 (pi/2)")
+	title("Spectrum for 8x8, N=4, flux=0.125 (pi/4)")
 end
 
 #

@@ -786,6 +786,12 @@ function long_range_scaling(x_final::Int64,virt_edge_length::Int64,initial_stren
 	
 	if scaling_func == "flat"
 		strengths[1:x_final+1] .= initial_strength
+    elseif scaling_func == "gaussian"
+        sigma = get(kwargs, :sigma, 1.0)
+        strengths = map(0:virt_edge_length-1) do x
+            #(initial_strength/(sqrt(2*pi)*sigma)) * exp(-x^2/(2*sigma^2))
+            initial_strength * exp(-x^2/(2*sigma^2))
+        end
 	elseif scaling_func == "exp"
         corr_length = get(kwargs, :corr_length, virt_edge_length)
 		strengths = map(1:virt_edge_length) do x
@@ -1031,9 +1037,9 @@ function density_matrix(x::Vector{ComplexF64},lattice_params::Dict{String,Any}; 
 
     start_time = time()
     for i in 1:Lx*Ly
-        for j in 1:Lx*Ly
+        for j in 1:i
             rho[i,j] = hopping_probability(x,coordinate(i,Lx,Ly),coordinate(j,Lx,Ly),lattice_params; kwargs...)
-            #rho[j,i] = conj(rho[i,j])
+            rho[j,i] = conj(rho[i,j])
         end
         #rho[i,:] ./= abs(hopping_probability(x,coordinate(i,Lx,Ly),coordinate(i,Lx,Ly),lattice_params; kwargs...))
         output_level > 0 ? println(round(i/(Lx*Ly)*100,digits=2),"% done.") : nothing
@@ -1368,11 +1374,11 @@ function check_fluxes(alpha,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_
     end
 
     #println("Not properly checking fluxes")
-    if if_periodic_x && !isinteger(num_fluxes/Lx)
+    if if_periodic_x && !isinteger(num_fluxes/Ly)
         error("Number of fluxes is not an integer multiple of Lx")
     end
 
-    if if_periodic_y && !isinteger(num_fluxes/Ly)
+    if if_periodic_y && !isinteger(num_fluxes/Lx)
         error("Number of fluxes is not an integer multiple of Ly")
     end
 
@@ -1519,7 +1525,7 @@ function find_dist(p1::Tuple{Int,Int}, p2::Tuple{Int,Int}, size::Tuple{Int,Int},
         dy = min(dy, size[2] - dy)
     end
 
-    return sqrt(dx^2 + dy^2),(dx,dy)
+    return sqrt(dx^2 + dy^2),(dx,dy),(p1[1]-p2[1],p1[2]-p2[2])
 end
 
 function cdw_structure_factor(rho::Array{ComplexF64,2},qvec::Vector,psi::Vector{ComplexF64},lattice_params::Dict; kwargs...)
@@ -1699,7 +1705,16 @@ function get_normal_model_params_ed(params_dict::Dict)
     lr_dist = get(params_dict,"lr", "all")
     lr_dist == "all" ? lr_dist = Ly-1 : nothing
     scaling_type = get(params_dict,"scaling_type","flat")
-    us = long_range_scaling(lr_dist,Ly,stren; scaling=scaling_type)
+    other_params_dict::Dict{String,Any} = Dict([("scaling",scaling_type)])
+    if scaling_type != "flat"
+        corr_length = get(params_dict,"corr_length",Ly)
+        sigma = get(params_dict, "sigma", 1.0)
+        blockade_radius = get(params_dict, "blockade_radius", 1.0)
+        other_params_dict["corr_length"] = corr_length
+        other_params_dict["sigma"] = sigma
+        other_params_dict["blockade_radius"] = blockade_radius
+    end
+    us = long_range_scaling(lr_dist,Ly,stren; dict_to_symbols(other_params_dict)...)
 
     # get hopping anisotropy values
     hopping_anisotropy = get(params_dict,"hopping_anisotropy",1.0)
@@ -1795,25 +1810,32 @@ function twopointcorrelator(densmat::Array{ComplexF64,2},lattice_params::Dict; k
             twopointcorrs[next_site[1],next_site[2]] = abs2(densmat[center_site_linear,next_site_linear])
         end
     end
-
     twopointcorrs ./= twopointcorrs[center_site[1],center_site[2]]
 
-    if if_plot
-        fig = figure()
-        imshow(twopointcorrs)
-        colorbar()
-        title("Two Point Correlator")
-        xlabel("Physical")
-        ylabel("Synthetic")
-    end
+    if_plot ? plot_twopointcorrelator(twopointcorrs; kwargs...) : nothing
 
     return twopointcorrs
+end
+
+function plot_twopointcorrelator(twopointcorrs::Array{Float64,2}; kwargs...)
+    plot_title = get(kwargs,:plot_title,"")
+    fig = figure()
+    imshow(twopointcorrs)
+    colorbar()
+    title("Two Point Correlator"*plot_title)
+    xlabel("Physical")
+    ylabel("Synthetic")
+    return nothing
 end
 
 function pointfourhopping(psi::Vector{ComplexF64},s1::Int64,s2::Int64,lattice_params::Dict)
     hopmat = buildHopping(lattice_params,s1,s2)
 
-    return conj(transpose(psi)) * (conj(transpose(hopmat)) * hopmat) * psi
+    if s1 != s2
+        return conj(transpose(psi)) * (conj(transpose(hopmat)) * hopmat) * psi
+    else
+        return conj(transpose(psi)) * (conj(transpose(hopmat)) * hopmat - hopmat) * psi
+    end
 end
 
 function fourpointcorrelator(psi::Vector{ComplexF64},lattice_params::Dict; kwargs...)
@@ -1836,16 +1858,20 @@ function fourpointcorrelator(psi::Vector{ComplexF64},lattice_params::Dict; kwarg
 
     #fourpointcorrs ./= fourpointcorrs[center_site[1],center_site[2]]
 
-    if if_plot
-        fig = figure()
-        imshow(fourpointcorrs)
-        colorbar()
-        title("Four Point Correlator")
-        xlabel("Physical")
-        ylabel("Synthetic")
-    end
+    if_plot ? plot_fourpointcorrelator(fourpointcorrs; kwargs...) : nothing
 
     return fourpointcorrs
+end
+
+function plot_fourpointcorrelator(fourpointcorrs::Array{Float64,2}; kwargs...)
+    plot_title = get(kwargs,:plot_title,"")
+    fig = figure()
+    imshow(fourpointcorrs)
+    colorbar()
+    title("Four Point Correlator" * plot_title)
+    xlabel("Physical")
+    ylabel("Synthetic")
+    return nothing
 end
 
 if false
@@ -2056,7 +2082,7 @@ if true
     #lx = 6
     #n = 3
     #for (idx,n) in enumerate([2,3,4,5])
-    #intstrens = range(8.0,12.0,length=19)
+    intstrens = range(0.0,0.1,length=10)
     #other_intstrens = range(2.0,10.0,length=37)
     #intstrens = sort([intstrens; other_intstrens])
     #change = 0.001
@@ -2073,15 +2099,18 @@ if true
     #for (idx,lx) in enumerate([4,4,8])
     #for (idx,nu) in enumerate(nus)
     #for (idx,anis) in enumerate(anises)
-    #for (idx,intstren) in enumerate(intstrens)
+    sigmas = vcat(range(1.0,5.0,length=5),[100.0])
+    for (idx,intstren) in enumerate(intstrens)
+    for (idx2,sigma) in enumerate(sigmas)
     #for lrd in [0,1]
-    #tws = range(0.0,2.0,length=30)
+    #tws = range(0.0,1.0,length=10)
     #cps = zeros(Float64,length(tws))
     #for (idx,tw1) in enumerate(tws)
+    #for (idx2,tw2) in enumerate(tws)
     #for tw1 in tws
     #for ii in 1:1
         #for change in [0,0.0001]true
-        params_dict = Dict([("Lx",11),("Ly",11),("N",2),("tw1",0.0),("tw2",0.0),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.1),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",5),("if_save_data",false)])
+        params_dict = Dict([("Lx",9),("Ly",9),("N",2),("tw1",0.0),("tw2",0.0),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("scaling_type",idx2 == length(sigmas) ? "flat" : "gaussian"),("sigma",sigma),("lr","all"),("filling",0.5),("nev",6),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
         # set number of open cores
@@ -2097,7 +2126,7 @@ if true
         # build filename dictionary
         filename_dict = make_filename_dict(lattice_params,hamilt_params)
         #display(filename_dict)
-        if_exists,found_data = running_args.if_find_data ? check_data_exists(filename_dict,"ed"; location=running_args.dataloc,output_level=false) : (false,nothing)
+        if_exists,found_data = false,nothing#running_args.if_find_data ? check_data_exists(filename_dict,"ed"; location=running_args.dataloc,output_level=false) : (false,nothing)
 
         # some old data has bad naming with int_stren = 1.0 even though rest of Us is zeros
         if params_dict["interaction_strength"] == 1.0 && if_exists
@@ -2154,75 +2183,39 @@ if true
             end
         end
 
-        #rho = density_matrix(states[1],lattice_params)
-        #rez2 = twopointcorrelator(rho,lattice_params)
-        rez4 = fourpointcorrelator(states[1],lattice_params)
+        #=rho1 = density_matrix(states[1],lattice_params)
+        rho2 = density_matrix(states[2],lattice_params)
+        rez21 = twopointcorrelator(rho1,lattice_params; if_plot=false)
+        rez22 = twopointcorrelator(rho2,lattice_params; if_plot=false)
+        plot_twopointcorrelator((rez21+rez22) ./ 2; plot_title=" LR=$(params_dict["interaction_strength"]), Anis=$(params_dict["hopping_anisotropy"])")
+        rez41 = fourpointcorrelator(states[1],lattice_params; if_plot=false)
+        rez42 = fourpointcorrelator(states[2],lattice_params; if_plot=false)
+        plot_fourpointcorrelator((rez41+rez42) ./ 2; plot_title=" LR=$(params_dict["interaction_strength"]), Anis=$(params_dict["hopping_anisotropy"])")=#
 
-        #for i in 1:5
-        #    gaps[i][idx,idx2] = nrgs[i+1] - nrgs[1]
-        #end
+        rho1 = density_matrix(states[1],lattice_params; output_level=0)
+        rez21 = twopointcorrelator(rho1,lattice_params; if_plot=false)#plot_title=" LR=$(params_dict["interaction_strength"]) Sigma=$(params_dict["sigma"]), Anis=$(params_dict["hopping_anisotropy"])")
+        isotropicness = sum(abs.(rez21 .- transpose(rez21))) / sum(rez21)
 
-        #display(nrgs)
-
-        #scatter(anis,abs(nrgs[2]-nrgs[1]),c="b")
-
-        #dcorrs = distance_correlation(states[1],lattice_params,"x")
-        #display(dcorrs)
-        #dcorrsy = distance_correlation(states[1],lattice_params,"y")
-        #display(dcorrsy)
-        #bulkdens = sum(occs[2,2:5]) + sum(occs[5,2:5]) + sum(occs[3:4,2]) + sum(occs[3:4,5])
-        #bulkdens = iseven(lx) ? sum(occs[Int(lx/2):Int(lx/2)+1,Int(lx/2):Int(lx/2)+1]) : sum(occs[Int(floor(lx/2)):Int(floor(lx/2))+2,Int(floor(lx/2)):Int(floor(lx/2))+2])
-        #append!(all_bulkdens,[bulkdens/n])
-
-        #display(nrgs)
-        #=if idx == 1
-            get_occupancy(states[1],lattice_params; plot_title="U=0.0")
-            fig = figure()
-        end=#
-        #get_occupancy(states[1],lattice_params; plot_title="U=0.0")
-
-        #for i in 1:params_dict["nev"]
-        #    get_occupancy(states[i],lattice_params; if_plot=true,plot_title="LR=$intstren, E=$(round(nrgs[i],digits=5))")
-        #end
-
-        #=fig = figure()
-        occs1 = get_occupancy(states[1],lattice_params; if_plot=false)
-        occs2 = get_occupancy(states[2],lattice_params; if_plot=false)
-        imshow((occs1 .+ occs2) ./ 2)
-        xlabel("Synthetic")
-        ylabel("Physical")
-        colorbar()
-        title("LR=$intstren")=#
-        #append!(all_bulkdens,[sum(occs1[3:4,3:4])])
-
-        #for i in 1:1#nev
-        #    occs = get_occupancy(rhos[i],lattice_params; if_plot=true,plot_title="$i E=$(round(nrgs[i],digits=5))")
-        #end
-        #coeff = (maximum(nrgs) .- nrgs[1]) / hh_gap_exact(anis,alpha)
-        #append!(coeffs,[coeff])
+        #rez41 = fourpointcorrelator(states[1],lattice_params; plot_title=" LR=$(params_dict["interaction_strength"]) $(params_dict["scaling_type"]), Anis=$(params_dict["hopping_anisotropy"])")
+        
         cols = ["b","g","r","m","c"]
         if running_args.nev > length(cols)
             cols = repeat(cols,ceil(Int,running_args.nev/length(cols)))
         end
 
-        #xx = N / (alpha * (Lx - x_shift) * (Ly - y_shift))
-
-        #gapvals[idx] = maximum(nrgs) - minimum(nrgs)
-        
-        #=nrggaps = nrgs .- nrgs[1]
-        theory = 4*(sin(pi*alpha)^2)
-        which_is_close = argmin(abs.(nrggaps .- theory))
-
-        for i in 1:nev
-            if i == which_is_close
-                scatter(alpha,nrggaps[i],c="r")
+        xxs = intstrens
+        if idx == 1
+            if idx2 == length(sigmas)
+                scatter(xxs[idx],isotropicness,c=cols[idx2],label="Flat") 
             else
-                scatter(alpha,nrggaps[i],c="k")
+                scatter(xxs[idx],isotropicness,c=cols[idx2],label="$sigma")
             end
-        end=#
-
-        #get_occupancy(states[2],lattice_params)
-        #display(nrgs)
+        else
+            scatter(xxs[idx],isotropicness,c=cols[idx2])    
+        end
+        xlabel("Interaction Strength")
+        ylabel("Anisotropicness")
+        legend()
 
         #=if idx == 1
             for i in 1:running_args.nev
@@ -2238,12 +2231,12 @@ if true
             #scatter(id2 == 1 ? anis : -anis,nrgs[3],c="g",label="E2")
             #scatter(intstren,nrgs[4],c="k",label="E3")
         else=#
-            #=xxs = intstrens
+            #=xxs = tws
             for i in 1:running_args.nev
                 change = abs(xxs[1] - xxs[2])
                 xval = xxs[idx]
                 shift = (i - running_args.nev/2) * ((0.1*change)/(running_args.nev/2))
-                scatter(xval + shift,nrgs[i] - nrgs[1],c=cols[i])
+                scatter(xval + shift,nrgs[i],c=cols[i])
             end#
             #scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=c=cols[id2*2-1])
             #plot(anises[idx-1:idx],[hh_gap_exact(anises[idx-1],alpha),hh_gap_exact(anises[idx],alpha)],c="r")
@@ -2255,9 +2248,9 @@ if true
         #end
         #legend()
         #xlabel("System Size")
-        xlabel("Interaction Strength")
+        #xlabel("Interaction Strength")
         #xlabel("Flux")
-        #xlabel("Theta_x / 2pi")
+        xlabel("Theta_x / 2pi")
         #ylabel("Theta_y")
         ylabel("NRG")=#
         #xlabel("Hopping Anisotropy tx/ty")
@@ -2265,6 +2258,13 @@ if true
         #title("4x4 N=2, Anis=$(hamilt_params["hopping_anisotropy"])")
         #title("Topological Degeneracy Closing in Thermodynamic Limit")#
         #title("Spectrum Twist BC $(params_dict["Lx"])x$(params_dict["Ly"]) N=$(params_dict["N"]) Anis=$(params_dict["hopping_anisotropy"])")
+
+        #=for i in 1:running_args.nev
+            scatter3D(tw1,tw2,nrgs[i],c=cols[i])
+        end
+        xlabel("Theta1 / 2pi")
+        ylabel("Theta2 / 2pi")
+        zlabel("NRG")=#
 
         #=cps[idx] = charge_polarization(states[1],lattice_params)
 
@@ -2314,8 +2314,15 @@ if true
         currents = physical_current(rhos,lattice_params; if_plot=true)
         corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
         currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
-    #end
-    #end
+    end
+    end
+
+    #=plot3D(xs,ys,nrgs1 .- nrgs1,label="E1")
+    plot3D(xs,ys,nrgs2 .- nrgs1,label="E2")
+    plot3D(xs,ys,nrgs3 .- nrgs1,label="E3")
+    xlabel("Theta1 / 2pi")
+    ylabel("Theta2 / 2pi")
+    zlabel("NRG")=#
 
 
     #bdderivs = (all_bds[howmany+1:end] .- all_bds[1:howmany]) ./ change
