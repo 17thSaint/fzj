@@ -1,5 +1,5 @@
-#using Pkg
-#Pkg.activate(".")
+using Pkg
+Pkg.activate(".")
 using LinearAlgebra,KrylovKit,Combinatorics,SparseArrays
 
 function find_center()
@@ -968,6 +968,12 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
         end
     end
 
+    if hamilt_params["disorder_strength"] != 0.0
+        local_disorder_strength = rand() * hamilt_params["disorder_strength"] * 2 - hamilt_params["disorder_strength"]
+        push!(output_weights,local_disorder_strength)
+        push!(output_states,which_basis)
+    end
+
     return output_states,output_weights
 end
 
@@ -1218,6 +1224,7 @@ function make_latticehamilt_params_from_metadata(metadata::Dict)
         flux_dir = "x"
     end
     hamilt_params["flux_direction"] = flux_dir
+    hamilt_params["disorder_strength"] = "disorder_strength" in keys(metadata) ? metadata["disorder_strength"] : 0.0
     return lattice_params,hamilt_params
 end
 
@@ -1359,7 +1366,7 @@ function plot_physical_current(currents::Array{Float64,2}; kwargs...)
     return nothing
 end
 
-function check_fluxes(alpha,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_y::Bool)
+function check_fluxes(alpha,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_y::Bool,flux_direction::String)
     if alpha == 0.0
         return nothing
     end
@@ -1373,16 +1380,40 @@ function check_fluxes(alpha,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_
         error("Number of fluxes is not an integer")
     end
 
-    #println("Not properly checking fluxes")
-    if if_periodic_x && !isinteger(num_fluxes/Ly)
+    println("Checking fluxes only along Gauge Direction")
+    if flux_direction == "y"
+        if if_periodic_x && !isinteger(num_fluxes/Ly)
+            if if_periodic_y && isinteger(num_fluxes/Lx)
+                flux_direction = "x"
+                println("Fluxes don't fit, changing to X direction")
+            else
+                error("Number of fluxes is not an integer multiple of Lx")
+            end
+        end
+    elseif flux_direction == "x"
+        if if_periodic_y && !isinteger(num_fluxes/Lx)
+            if if_periodic_x && isinteger(num_fluxes/Ly)
+                flux_direction = "y"
+                println("Fluxes don't fit, changing to Y direction")
+            else
+                error("Number of fluxes is not an integer multiple of Ly")
+            end
+        end
+    else
+        error("Flux direction is not valid")
+    end
+
+    #=println("Not properly checking fluxes")
+    println("Checking fluxes only along Gauge Direction")
+    if if_periodic_x && flux_direction == "y" && !isinteger(num_fluxes/Ly)
         error("Number of fluxes is not an integer multiple of Lx")
     end
 
-    if if_periodic_y && !isinteger(num_fluxes/Lx)
+    if if_periodic_y && flux_direction == "x" && !isinteger(num_fluxes/Lx)
         error("Number of fluxes is not an integer multiple of Ly")
-    end
+    end=#
 
-    return nothing
+    return flux_direction
 end
 
 function get_occupancy(x::Vector{ComplexF64},lattice_params::Dict{String,Any}; kwargs...)
@@ -1446,15 +1477,18 @@ function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
         intstren = hamilt_params["U"][1]
     end
     fdict = Dict([("Lx",lattice_params["Lx"]),("Ly",lattice_params["Ly"]),("N",lattice_params["N"]),("alpha",hamilt_params["alpha"]),("hopping_anisotropy",hamilt_params["tx"]/hamilt_params["ty"]),("interaction_strength",intstren),("if_periodic_x",lattice_params["if_periodic_x"]),("if_periodic_y",lattice_params["if_periodic_y"])])
-    #=if lattice_params["twist_angle"] != [0.0,0.0]
+    if lattice_params["twist_angle"] != [0.0,0.0]
         fdict["twist_angle1"] = lattice_params["twist_angle"][1]
         fdict["twist_angle2"] = lattice_params["twist_angle"][2]
-    end=#
+    end
+    if hamilt_params["disorder_strength"] != 0.0
+        fdict["disorder_strength"] = hamilt_params["disorder_strength"]
+    end
     return fdict
 end
 
 function get_lattice_params_from_metadata(metadata::Dict)
-    lat_paras = Dict([("Lx",metadata["Lx"]),("Ly",metadata["Ly"]),("N",metadata["N"]),("if_periodic_x",metadata["if_periodic_x"]),("if_periodic_y",metadata["if_periodic_y"]),("full_basis",metadata["full_basis"])])
+    lat_paras = Dict([("Lx",metadata["Lx"]),("Ly",metadata["Ly"]),("N",metadata["N"]),("if_periodic_x",metadata["if_periodic_x"]),("if_periodic_y",metadata["if_periodic_y"]),("full_basis",metadata["full_basis"]),("twist_angle",metadata["twist_angle"])])
     if isnothing(lat_paras["full_basis"])
         lat_paras["full_basis"] = n_particle_basis(lat_paras)
     end
@@ -1700,6 +1734,7 @@ function get_normal_model_params_ed(params_dict::Dict)
                         "if_periodic_y"=>if_periodic_y,
                         "twist_angle"=>twist_angle)
 
+    #println("Finished Building Lattice Parameters")
     # build long range interaction parameters
     stren = get(params_dict,"interaction_strength", 0.0)
     lr_dist = get(params_dict,"lr", "all")
@@ -1729,7 +1764,7 @@ function get_normal_model_params_ed(params_dict::Dict)
     tx = hopping_anisotropy
     ty = 1/hopping_anisotropy=#
     
-    # build magnetic field parameters and check fluxes for periodicity
+    # build magnetic field parameters
     alpha = get(params_dict,"alpha",nothing)
     if_bc_shift = get(params_dict,"if_bc_shift",true)
     x_shift,y_shift = if_bc_shift ? (!if_periodic_x, !if_periodic_y) : (0.0,0.0)
@@ -1738,10 +1773,8 @@ function get_normal_model_params_ed(params_dict::Dict)
         alpha = N / (filling * (Lx - x_shift) * (Ly - y_shift))
         filling == 0.0 ? alpha = 0.0 : nothing
     end
-    if_check_fluxes = get(params_dict,"if_check_fluxes",true)
-    if_check_fluxes ? check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y) : nothing
 
-    # build hamiltonian parameters dictionary
+    # build hamiltonian parameters dictionary and check fluxes for periodicity
     int_cutoff = get(params_dict,"interaction_cutoff",1e-5)
     which_dir = get(params_dict,"which_dir","virt")
     flux_dir = get(params_dict,"flux_direction","x")
@@ -1750,15 +1783,21 @@ function get_normal_model_params_ed(params_dict::Dict)
     elseif !if_periodic_y && if_periodic_x
         flux_dir = "x"
     end
+    if_check_fluxes = get(params_dict,"if_check_fluxes",true)
+    if_check_fluxes ? flux_dir = check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y,flux_dir) : nothing
+
+    disorder_strength = get(params_dict,"disorder_strength",0.0)
     hamilt_params = Dict("alpha"=>alpha,
                         "flux_direction"=>flux_dir,
                         "tx"=>tx,
                         "ty"=>ty,
                         "hopping_anisotropy"=>hopping_anisotropy,
+                        "disorder_strength"=>disorder_strength,
                         "U"=>us,
                         "which_dir"=>which_dir,
                         "interaction_cutoff"=>int_cutoff)
 
+    println("Finished Building Model")
     return lattice_params,hamilt_params,running_args
 
 end
@@ -2075,6 +2114,32 @@ if false
     yscale("log")
 end
 
+if false
+    params_dict = Dict([("Lx",5),("Ly",8),("N",4),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    files = find_data_file(params_dict,"ed",dataloc; output_level=0)
+
+
+    cols = ["b","g","r","m","c"]
+    if 10 > length(cols)
+        cols = repeat(cols,ceil(Int,10/length(cols)))
+    end
+
+    for f in files
+        d,m = read_data_jld2(f,dataloc)
+        intstren = m["U"][end]
+
+        for i in 1:length(d["nrg"])
+            scatter(intstren,d["nrg"][i] - d["nrg"][1],c=cols[i])
+        end
+    end
+    xlabel("Interaction Strength")
+    ylabel("Energy")
+
+end
+        
+    
+
 if true
     #fig = figure()
     #xlabel("Hopping Anisotropy")
@@ -2082,7 +2147,7 @@ if true
     #lx = 6
     #n = 3
     #for (idx,n) in enumerate([2,3,4,5])
-    intstrens = range(0.0,0.1,length=10)
+    #intstrens = range(0.0,3.0,length=20)
     #other_intstrens = range(2.0,10.0,length=37)
     #intstrens = sort([intstrens; other_intstrens])
     #change = 0.001
@@ -2096,21 +2161,23 @@ if true
     #nus = range(0.4,0.6,length=100)
     #alphas = range(0.16,2*3/(6*5),length=30)
     #for (idx,alpha) in enumerate(alphas)
-    #for (idx,lx) in enumerate([4,4,8])
+    #for (idx,ly) in enumerate([5,6,7,8])
     #for (idx,nu) in enumerate(nus)
     #for (idx,anis) in enumerate(anises)
-    sigmas = vcat(range(1.0,5.0,length=5),[100.0])
-    for (idx,intstren) in enumerate(intstrens)
-    for (idx2,sigma) in enumerate(sigmas)
+    #sigmas = vcat([1/i for i in 1:5],[i for i in 2:5])#vcat(range(1.0,5.0,length=5),[100.0])
+    #for (idx,intstren) in enumerate(intstrens)
+    #for (idx2,sigma) in enumerate(sigmas)
     #for lrd in [0,1]
-    #tws = range(0.0,1.0,length=10)
+    #tws = range(0.0,1.0,length=20)
     #cps = zeros(Float64,length(tws))
     #for (idx,tw1) in enumerate(tws)
     #for (idx2,tw2) in enumerate(tws)
     #for tw1 in tws
     #for ii in 1:1
-        #for change in [0,0.0001]true
-        params_dict = Dict([("Lx",9),("Ly",9),("N",2),("tw1",0.0),("tw2",0.0),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("scaling_type",idx2 == length(sigmas) ? "flat" : "gaussian"),("sigma",sigma),("lr","all"),("filling",0.5),("nev",6),("if_save_data",false)])
+        #change_nrgs = zeros(Float64,3)
+        #for (ii,change) in enumerate([0,0.0001,0.0002])
+        change = 0.0
+        params_dict = Dict([("Lx",4),("Ly",4),("N",2),("tw1",0.0),("tw2",0.0),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",10000.0),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
         # set number of open cores
@@ -2126,7 +2193,7 @@ if true
         # build filename dictionary
         filename_dict = make_filename_dict(lattice_params,hamilt_params)
         #display(filename_dict)
-        if_exists,found_data = false,nothing#running_args.if_find_data ? check_data_exists(filename_dict,"ed"; location=running_args.dataloc,output_level=false) : (false,nothing)
+        if_exists,found_data = running_args.if_find_data ? check_data_exists(filename_dict,"ed"; location=running_args.dataloc,output_level=false) : (false,nothing)
 
         # some old data has bad naming with int_stren = 1.0 even though rest of Us is zeros
         if params_dict["interaction_strength"] == 1.0 && if_exists
@@ -2182,6 +2249,13 @@ if true
                 end
             end
         end
+        #change_nrgs[ii] = nrgs[2] - nrgs[1]
+    #end
+
+        #if idx == 1
+        #    get_occupancy(states[1],lattice_params; plot_title=" LR=$(params_dict["interaction_strength"])")
+        #    fig = figure()
+        #end
 
         #=rho1 = density_matrix(states[1],lattice_params)
         rho2 = density_matrix(states[2],lattice_params)
@@ -2192,69 +2266,67 @@ if true
         rez42 = fourpointcorrelator(states[2],lattice_params; if_plot=false)
         plot_fourpointcorrelator((rez41+rez42) ./ 2; plot_title=" LR=$(params_dict["interaction_strength"]), Anis=$(params_dict["hopping_anisotropy"])")=#
 
-        rho1 = density_matrix(states[1],lattice_params; output_level=0)
-        rez21 = twopointcorrelator(rho1,lattice_params; if_plot=false)#plot_title=" LR=$(params_dict["interaction_strength"]) Sigma=$(params_dict["sigma"]), Anis=$(params_dict["hopping_anisotropy"])")
-        isotropicness = sum(abs.(rez21 .- transpose(rez21))) / sum(rez21)
+        #rho1 = density_matrix(states[1],lattice_params; output_level=0)
+        #rez21 = twopointcorrelator(rho1,lattice_params; if_plot=true)
+        #isotropicness = sum(abs.(rez21 .- transpose(rez21))) / sum(rez21)
+        #title("2PT LR=$(params_dict["interaction_strength"]) Sigma=$(params_dict["sigma"]), Anis=$(params_dict["hopping_anisotropy"]), Iso=$(round(isotropicness,digits=3))")
 
         #rez41 = fourpointcorrelator(states[1],lattice_params; plot_title=" LR=$(params_dict["interaction_strength"]) $(params_dict["scaling_type"]), Anis=$(params_dict["hopping_anisotropy"])")
         
         cols = ["b","g","r","m","c"]
         if running_args.nev > length(cols)
             cols = repeat(cols,ceil(Int,running_args.nev/length(cols)))
-        end
+        end#
 
-        xxs = intstrens
+        #=xxs = intstrens
         if idx == 1
-            if idx2 == length(sigmas)
-                scatter(xxs[idx],isotropicness,c=cols[idx2],label="Flat") 
-            else
-                scatter(xxs[idx],isotropicness,c=cols[idx2],label="$sigma")
-            end
+            #if idx2 == length(sigmas)
+            #    scatter(xxs[idx],isotropicness,c=cols[idx2],label="Flat") 
+            #else
+                scatter(xxs[idx],isotropicness,c=cols[idx2],label="$(round(sigma,digits=2))")
+            #end
         else
             scatter(xxs[idx],isotropicness,c=cols[idx2])    
         end
         xlabel("Interaction Strength")
         ylabel("Anisotropicness")
-        legend()
+        legend()=#
+        #=scatter(sigma,isotropicness,c="b")
+        xlabel("Sigma")
+        ylabel("Anisotropicness")
+        yscale("log")
+        xscale("log")
+        title("2pt Anisotropicness vs Sigma")=#
 
-        #=if idx == 1
-            for i in 1:running_args.nev
-                change = abs(anises[1] - anises[2])
-                xval = anis
-                shift = (i - running_args.nev/2) * ((0.1*change)/(running_args.nev/2))
-                scatter(xval + shift,nrgs[i] - nrgs[1],c=cols[i],label="E$i")
-            end
-            #scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=cols[id2*2-1],label="E2 - E1")
-            #scatter(id2 == 1 ? anis : -anis,nrgs[3] - nrgs[1],c=cols[2*id2],label="E3 - E1")
-            #scatter(id2 == 1 ? anis : -anis,nrgs[1],c="b",label="E0")
-            #scatter(id2 == 1 ? anis : -anis,nrgs[2],c="r",label="E1")
-            #scatter(id2 == 1 ? anis : -anis,nrgs[3],c="g",label="E2")
-            #scatter(intstren,nrgs[4],c="k",label="E3")
-        else=#
-            #=xxs = tws
-            for i in 1:running_args.nev
-                change = abs(xxs[1] - xxs[2])
-                xval = xxs[idx]
-                shift = (i - running_args.nev/2) * ((0.1*change)/(running_args.nev/2))
-                scatter(xval + shift,nrgs[i],c=cols[i])
-            end#
-            #scatter(id2 == 1 ? anis : -anis,nrgs[2] - nrgs[1],c=c=cols[id2*2-1])
-            #plot(anises[idx-1:idx],[hh_gap_exact(anises[idx-1],alpha),hh_gap_exact(anises[idx],alpha)],c="r")
-            #scatter(id2 == 1 ? anis : -anis,nrgs[3] - nrgs[1],c=c=cols[id2*2])
-            #scatter(id2 == 1 ? anis : -anis,nrgs[1],c="b")
-            #scatter(id2 == 1 ? anis : -anis,nrgs[2],c="r")
-            #scatter(id2 == 1 ? anis : -anis,nrgs[3],c="g")
-            #scafalsetter(intstren,nrgs[4],c="k")
-        #end
+        #=nrgs_derivative = (change_nrgs[3] - change_nrgs[1]) / 0.0002
+        if idx == 1
+            scatter(intstren,nrgs_derivative,c="b",label="Deriv")
+        else
+            scatter(intstren,nrgs_derivative,c="b")
+        end
+
+        nrgs_2nd_derivative = (change_nrgs[3] - 2*change_nrgs[2] + change_nrgs[1]) / 0.0001^2
+        if idx == 1
+            scatter(intstren,nrgs_2nd_derivative,c="r",label="2nd Deriv")
+        else
+            scatter(intstren,nrgs_2nd_derivative,c="r")
+        end=#
+
+        #=xxs = intstrens
+        for i in 1:running_args.nev
+            change = abs(xxs[1] - xxs[2])
+            xval = xxs[idx]
+            shift = (i - running_args.nev/2) * ((0.1*change)/(running_args.nev/2))
+            scatter(xval + shift,nrgs[i]-nrgs[1],c=cols[i])
+        end
         #legend()
         #xlabel("System Size")
-        #xlabel("Interaction Strength")
+        xlabel("Interaction Strength")
         #xlabel("Flux")
-        xlabel("Theta_x / 2pi")
+        #xlabel("Theta_x / 2pi")
         #ylabel("Theta_y")
         ylabel("NRG")=#
         #xlabel("Hopping Anisotropy tx/ty")
-        #ylabel("Energy - E1")#
         #title("4x4 N=2, Anis=$(hamilt_params["hopping_anisotropy"])")
         #title("Topological Degeneracy Closing in Thermodynamic Limit")#
         #title("Spectrum Twist BC $(params_dict["Lx"])x$(params_dict["Ly"]) N=$(params_dict["N"]) Anis=$(params_dict["hopping_anisotropy"])")
@@ -2278,44 +2350,9 @@ if true
             get_occupancy(states[1],lattice_params; plot_title="$(xxs[end])")
         end=#
 
-        #cdw = cdw_sf(rhos[1],states[1],lattice_params,(3.0,0.0); if_plot=true,plot_label="$anis")
-        #occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="ED, LR=$intstren")
-        #all_bds[idx] = sum(occs[3:4,3:4]) / 4
-        #scurr = synthetic_current(rhos[1],lattice_params; if_plot=true,plot_title="Int Stren=$intstren")
-        #pcurr = physical_current(rhos[1],lattice_params; if_plot=true,plot_title="Int Stren=$intstren")
 
-        #get_occupancy(states[1],lattice_params)
-        
-        #=if running_args.if_function
-            col = "b"
-        else
-            col = "r"
-        end
-        init == 2 ? scatter(binomial(lx^2,n),time() - start_time,c=col) : nothing
-        xlabel("Hilbert Space Dimension")
-        ylabel("Time")
-        xscale("log")=#
-
-        #title("Energy Gap for 2 x $Lx decoupled wires")
-        #scatter(intstren,nrgs[2] .- nrgs[1],c="b")
-        #scatter(intstren,nrgs[3] .- nrgs[2],c="r")
-        #if idx == 1
-        #    plot(anises,ones(length(anises)) .* 4*(sin(pi*alpha)^2),c="g",label="TT-Gap")
-        #end
-        #scatter(anis,nrgs[2] - nrgs[1],c="b")
-        #scatter(anis,nrgs[3] - nrgs[2],c="r")
-        #scatter(anis,nrgs[3],c="g")
-        #scatter(anis,hh_gap_exact(anis,alpha),c="g")
-        #xlabel("Hopping Anisotropy")
-        #xlabel("Interaction Strength")
-        #ylabel("Energy")
-        #ylim(-9.5,-8.5)
-        #=corrs = physical_correlation(rhos,Lx,Ly; if_plot=true)
-        currents = physical_current(rhos,lattice_params; if_plot=true)
-        corrs_syn = synthetic_correlation(rhos,Lx,Ly; if_plot=true)
-        currents_syn = synthetic_current(rhos,lattice_params; if_plot=true,plot_title="Int Stren=$stren")=#
-    end
-    end
+    #end
+    #end
 
     #=plot3D(xs,ys,nrgs1 .- nrgs1,label="E1")
     plot3D(xs,ys,nrgs2 .- nrgs1,label="E2")

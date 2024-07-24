@@ -291,7 +291,7 @@ function initialize_mps(psi::MPS,particle_count::Int; weight_function = equal_we
 	return psi
 end
 
-function hamiltonian(t_strength, phi, U1, U2, L, nflavors; kwargs...)
+function hamiltonian(t_strength::Float64, phi::Float64, U1::Float64, U2::Float64, L::Int, nflavors::Int; kwargs...)
 	if_nn_int = kwargs[:if_nn_int]
 	if_2ord_pert = kwargs[:if_2ord_pert]
 	if_periodic_phys = kwargs[:if_periodic_phys]
@@ -383,6 +383,10 @@ function hamiltonian(t_strength, phi, U1, U2, L, nflavors; kwargs...)
 	
 	#display(ampo)
 	return ampo
+end
+
+function hamiltonian(params::Dict)
+	return hamiltonian(params[:ts],params[:phi],params[:U1],params[:U2],params[:L],params[:nflavors]; dict_to_symbols(params)...)
 end
 
 function run_again(filename; kwargs...)

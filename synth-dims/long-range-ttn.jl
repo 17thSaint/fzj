@@ -1180,7 +1180,7 @@ function average_close_keys(dict, bin_width)
 	return averaged_dict
 end
 
-function check_fluxes(alpha,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_y::Bool)
+function check_fluxes(alpha,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_y::Bool,flux_direction::String)
     if alpha == 0.0
         return nothing
     end
@@ -1194,15 +1194,40 @@ function check_fluxes(alpha,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_
         error("Number of fluxes is not an integer")
     end
 
+	println("Checking fluxes only along Gauge Direction")
+    if flux_direction == "synth"
+        if if_periodic_x && !isinteger(num_fluxes/Ly)
+            if if_periodic_y && isinteger(num_fluxes/Lx)
+                flux_direction = "phys"
+                println("Fluxes don't fit, changing to X direction")
+            else
+                error("Number of fluxes is not an integer multiple of Lx")
+            end
+        end
+    elseif flux_direction == "phys"
+        if if_periodic_y && !isinteger(num_fluxes/Lx)
+            if if_periodic_x && isinteger(num_fluxes/Ly)
+                flux_direction = "synth"
+                println("Fluxes don't fit, changing to Y direction")
+            else
+                error("Number of fluxes is not an integer multiple of Ly")
+            end
+        end
+    else
+        error("Flux direction is not valid")
+    end
+
+
+	#=
     if if_periodic_x && !isinteger(num_fluxes/Lx)
         error("Number of fluxes is not an integer multiple of Lx")
     end
 
     if if_periodic_y && !isinteger(num_fluxes/Ly)
         error("Number of fluxes is not an integer multiple of Ly")
-    end
+    end=#
 
-    return nothing
+    return flux_direction
 end
 
 function memory_usage(psi::TreeTensorNetwork)
@@ -1505,7 +1530,7 @@ function run_synth_dims_generic(params_dict::Dict)
 	end
 end
 
-if true
+if false
 	cols = ["b","r","g","k"]
 	dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
 	pdict = Dict([("layers",6),("particles",4),("hopping_anisotropy",1.0),("if_periodic_phys",true),("if_periodic_synth",true)])
