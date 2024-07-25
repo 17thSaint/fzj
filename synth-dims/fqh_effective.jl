@@ -461,6 +461,7 @@ function execute_mps(phi,L,nflavors,nbosons; kwargs...)
 	if_continuous_saving = get(kwargs, :if_continuous_saving, false)
 	if_save_data ? nothing : if_continuous_saving = false
 	location = kwargs[:location]
+	ortho_weight = 10.0
 
 	metadata = get(kwargs, :metadata, Dict())
 	#=metadata["psi_ortho"] = psi_ortho
@@ -527,7 +528,7 @@ function execute_mps(phi,L,nflavors,nbosons; kwargs...)
 			println("Using $(length(psi_ortho)) orthogonal states")
 		end
 		es_level = length(psi_ortho)
-		E, psi = dmrg(H, psi_ortho, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = cutoff)
+		E, psi = dmrg(H, psi_ortho, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = cutoff, weight = ortho_weight)
 	else
 		es_level = 0
 		E, psi = dmrg(H, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = cutoff)

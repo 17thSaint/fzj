@@ -20,6 +20,14 @@ function find_center()
 	end
 end
 
+function check_cluster()
+	if occursin("local",pwd()) || occursin("Local",pwd())
+		return true
+	else
+		return false
+	end
+end
+
 function named_tuple_to_dict(namedtuple)
 	new_dict = Dict{String,Any}()
 	for key in keys(namedtuple)

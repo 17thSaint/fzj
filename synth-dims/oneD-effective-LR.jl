@@ -207,6 +207,22 @@ if typeof(open_cores) != String
 	display(BLAS.get_config())
 end
 
+if false
+	cd("../cluster-data/synth-dims/excited-states")
+	allfiles = readdir()
+	cd("../../../synth-dims")
+	mpsfiles = allfiles[findall(x -> occursin("mps",x),allfiles)]
+	for f in mpsfiles
+			d,m = read_data_jld2("../cluster-data/synth-dims/excited-states/"*f; output_level=0)
+			nrgs = Vector{Float64}(undef,2)
+			nrgs[1] = m["observer"].energies[end]
+			nrgs[2] = m["observer_1"].energies[end]
+			println("At density $(round(m["nbosons"]/m["L"],digits=4)) with splitting ",nrgs[1] - nrgs[2])
+	end
+
+end
+
+
 if true
 		#tws = range(0.0,stop=1.0,length=2)
 		#for tw1 in tws
@@ -214,10 +230,10 @@ if true
 		#denssets = [(8,4,4),(4,8,4),(6,8,4),(7,6,6),(8,5,5),(9,5,5)]
 		#oneDdensities = [c[end]/c[1] for c in denssets]
 		#for (lx,ly,n) in denssets
-		all_configs = get_all_densities(20,smallest_density=0.5,number_to_keep=10)
-		which_config = 1
-		lx,ly,n = all_configs[which_config]
-			params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("es_count",nev-1),("nrgtol",1e-6),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_save_data",false)])
+		all_configs = get_all_densities(19,smallest_density=0.9,number_to_keep=5)
+		for which_config in 1:5
+			lx,ly,n = all_configs[which_config]
+			params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("es_count",nev-1),("nrgtol",1e-6),("mdim",300),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_save_data",true)])
 			model_paras,found_data = get_1deff_model_params(params_dict)
 			if isnothing(found_data)
 				if model_paras[:es_count] > 0
