@@ -428,6 +428,69 @@ function rebuild_ttn_ham(ed_ham,lattice_params::Dict)
 	return rebuilt_ham
 end
 
+function rebuild_1deff_to_ed_ham(mps_ham,lattice_params::Dict)
+	full_basis = lattice_params["full_basis"]
+	rebuilt_ham = spzeros(ComplexF64,size(full_basis)[2],size(full_basis)[2])
+	Lx = lattice_params["Lx"]
+	Ly = lattice_params["Ly"]
+	make_smaller_lattice = [Lx,Ly]
+	hopping_pairs = []
+	for t1 in TTNKit.terms(mps_ham)
+		coeff = TTNKit.coefficient(t1)
+					
+		all_terms = TTNKit.terms(t1)
+
+		if length(all_terms) == 1
+			this_term = all_terms[1]
+			synth_sites = [parse(Int,ss[end]) for ss in split.(split(TTNKit.which_op(this_term)," * "),"")]
+			phys_site = TTNKit.site(this_term)
+			end_site,start_site = linear_index.([(phys_site,synth_sites[1]),(phys_site,synth_sites[2])],make_smaller_lattice[1],make_smaller_lattice[2])
+			#println("Found Synth Hopping from $synth_sites on Phys $phys_site with coeff $coeff")
+			append!(hopping_pairs,[(start_site,end_site,coeff)])
+		else
+			phys_sites = TTNKit.site.(all_terms)
+			first_operator = TTNKit.which_op(all_terms[1])
+			synth_site = parse(Int,split(first_operator,"")[end])
+			end_site,start_site = first_operator == "Cr$synth_site" ? linear_index.([(phys_sites[1],synth_site),(phys_sites[2],synth_site)],make_smaller_lattice[1],make_smaller_lattice[2]) : linear_index.([(phys_sites[2],synth_site),(phys_sites[1],synth_site)],make_smaller_lattice[1],make_smaller_lattice[2])
+			#println("Found Phys Hopping from $phys_sites on Synth $synth_site with coeff $coeff")
+			append!(hopping_pairs,[(start_site,end_site,coeff)])
+		end
+			
+
+		#=which_sites = TTNKit.site.(both_terms)
+		ops_here = TTNKit.which_op.(both_terms)
+		if ops_here == ["Adag","A"]
+			end_site,start_site = linear_index.(which_sites,make_smaller_lattice[1],make_smaller_lattice[2])
+			#println("Moving from $start_site to $end_site with coeff $coeff")
+			append!(hopping_pairs,[(start_site,end_site,coeff)])
+		elseif ops_here == ["Adag * A","Adag * A"]
+			s1,s2 = linear_index.(which_sites,make_smaller_lattice[1],make_smaller_lattice[2])
+			#println("Interacting at sites $s1 and $s2 with coeff $coeff from $which_sites")
+			append!(interacting_pairs,[(s1,s2,coeff)])
+		end=#
+	end
+
+	for j in 1:size(full_basis)[2]
+		println(round(100*j/size(full_basis)[2],digits=3))
+		basis = full_basis[:,j]
+					
+		# check for hopping
+		for (start_site,end_site,coeff) in hopping_pairs
+			if start_site in basis && !(end_site in basis)
+				where_start_site = findfirst(x -> x == start_site,basis)
+				new_basis = copy(basis)
+				new_basis[where_start_site] = end_site
+				sort!(new_basis,rev=true)
+				new_basis_index = find_basis_index(new_basis)
+				rebuilt_ham[new_basis_index,j] += coeff
+			end
+		end
+
+	end
+
+	return rebuilt_ham
+end
+
 function get_lattice_params_from_ttn_modelparas(model_params::Dict)
 	layer_count = model_params[:layers]
 	if layer_count % 2 != 0
@@ -446,6 +509,13 @@ function get_lattice_params_from_ttn_modelparas(model_params::Dict)
 	if_periodic_virt = model_params[:if_periodic_synth]
 	full_basis = n_particle_basis(N,Lx,Lx; output_level=1)
 	lattice_params = Dict([("Lx",Lx),("Ly",Ly),("N",N),("if_periodic_x",if_periodic_phys),("if_periodic_y",if_periodic_virt),("twist_angle",0.0),("full_basis",full_basis)])
+	return lattice_params
+end
+
+function get_lattice_params_from_1deff_modelparas(model_params::Dict)
+	lattice_params::Dict{String,Any} = Dict([("Lx",model_params[:L]),("Ly",model_params[:nflavors]),("N",model_params[:nbosons]),("if_periodic_x",model_params[:if_periodic_phys]),("if_periodic_y",model_params[:if_periodic_synth]),("twist_angle",[0.0,0.0])])
+	full_basis = n_particle_basis(model_params[:nbosons],model_params[:L],model_params[:nflavors]; output_level=0)
+	lattice_params["full_basis"] = full_basis
 	return lattice_params
 end
 
@@ -586,7 +656,7 @@ if false || if_all
 	end
 end
 
-if true
+if false
 	lxs = [4,6,8,8]
 	lys = [4,4,4,8]
 	ns = [2,3,4,8]
@@ -717,6 +787,30 @@ if false
 
 	diffmat = round.(ham_ed .- ham_ttn,digits=6)
 	display(diffmat)
+end
+
+# comparing ED with 1D effective model
+if false
+	include("../synth-dims/oneD-effective-LR.jl")
+
+	lx = 4
+	ly = 4
+	N = 2
+	if_per = true
+
+	mps_params = Dict([("Lphys",lx),("Lsynth",ly),("if_check_fluxes",false),("particles",N),("if_periodic_phys",if_per),("if_periodic_synth",if_per),("filling",0.5)])
+	model_paras = get_1deff_model_params(mps_params)
+	mps_ham = hamiltonian(model_paras)
+
+	latparas = get_lattice_params_from_1deff_modelparas(model_paras)
+	hamilt_params = Dict([("tx",model_paras[:hopping_anisotropy]),("disorder_strength",0.0),("ty",1.0),("hopping_anisotropy",model_paras[:hopping_anisotropy]),("alpha",model_paras[:alpha]),("U",zeros(ly)),("interaction_cutoff",1e-5),("which_dir","virt"),("flux_direction","x")])
+
+	rebuilt_ham = rebuild_1deff_to_ed_ham(mps_ham,latparas)
+	ed_ham = buildHam(latparas,hamilt_params; output_level=0)
+
+	diffham = round.(ed_ham - rebuilt_ham,digits=6)
+	display(diffham)
+
 end
 
 

@@ -15,12 +15,21 @@ function fix_filling(L,nflavors,nu)
 	return nothing,nothing
 end
 
+function make_1deff_filenamedict(model_paras)
+	fdict = Dict([("Lphys",model_paras[:L]),("Lsynth",model_paras[:nflavors]),("nbosons",model_paras[:nbosons]),("alpha",model_paras[:alpha]),("hopping_anisotropy",model_paras[:hopping_anisotropy]),("if_periodic_phys",model_paras[:if_periodic_phys]),("if_periodic_synth",model_paras[:if_periodic_synth])])
+	model_paras[:if_2ord_pert] ? fdict["U2"] = model_paras[:U2] : nothing
+	model_paras[:if_nn_int] ? fdict["U1"] = model_paras[:U1] : nothing
+	model_paras[:twist_angle] != [0.0,0.0] ? fdict["tw1"] = model_paras[:twist_angle][1] : nothing
+	model_paras[:twist_angle] != [0.0,0.0] ? fdict["tw2"] = model_paras[:twist_angle][2] : nothing
+	return fdict
+end
 
 function get_1deff_model_params(params_dict::Dict)
 
 	# DMRG parameters
 	nrgtol = get(params_dict, "nrgtol", 5E-5)
-	observer = TTNKit.DMRGObserver(;energy_tol=nrgtol,minsweeps=6)
+	minimum_sweeps = get(params_dict, "minimum_sweeps", 10)
+	observer = TTNKit.DMRGObserver(;energy_tol=nrgtol,minsweeps=minimum_sweeps)
 	cutoff = get(params_dict, "cutoff", 1E-8)
 	syms = get(params_dict, "syms", true)
 	nswps = get(params_dict, "num_sweeps", 100)
@@ -67,8 +76,14 @@ function get_1deff_model_params(params_dict::Dict)
 	else
 		mag_off = alpha == 0.0
 	end
+	flux_dir = get(params_dict,"flux_direction","phys")
+    if if_periodic_synth && !if_periodic_phys
+        flux_dir = "synth"
+    elseif !if_periodic_synth && if_periodic_phys
+        flux_dir = "phys"
+    end
 	if_check_fluxes = get(params_dict, "if_check_fluxes", true)
-	if_check_fluxes ? flux_direction = check_fluxes(alpha,Lphys,Lsynth,if_periodic_phys,if_periodic_synth) : nothing
+	if_check_fluxes ? flux_dir = check_fluxes(alpha,Lphys,Lsynth,if_periodic_phys,if_periodic_synth,flux_dir) : nothing
 
 
 	# What to calculate
@@ -79,22 +94,17 @@ function get_1deff_model_params(params_dict::Dict)
 	save_data ? nothing : if_continuous_saving = false
 	es_count = get(params_dict, "es_count", 0)
 
-	#=if if_periodic_phys && if_periodic_synth
+	if if_periodic_phys && if_periodic_synth
 		dataloc = get_folder_location("cluster-data/synth-dims/torus")
 	elseif if_periodic_phys || if_periodic_synth
 		dataloc = get_folder_location("cluster-data/synth-dims")
 	elseif !if_periodic_phys && !if_periodic_synth
 		dataloc = get_folder_location("cluster-data/synth-dims/obc")
 	end
-	if sc_type == "rydberg"
-		dataloc = get_folder_location("cluster-data/synth-dims/rydberg")
-	end
 	if es_count > 0
 		dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
-	end=#
-	dataloc = pwd()
+	end
 	loc = get(params_dict, "dataloc", dataloc)
-	
 
 
 	# hardware parameters
@@ -127,43 +137,46 @@ function get_1deff_model_params(params_dict::Dict)
 						"if_save_data"=>save_data,
 						"mdim"=>mdim,
 						"num_sweeps"=>nswps,
+						"minimum_sweeps"=>minimum_sweeps,
 						"phi"=>alpha,
 						"noise"=>noise,
 						"output_level"=>1,
 						"location"=>loc)
-		
-	#filename = make_synthdims_filename(model_paras_dict)
-	#model_paras_dict["name"] = "ttn-"*filename
 	
 	return dict_to_symbols(model_paras_dict)
 end
 
-nev = 2
+nev = 3
 cols = ["b","g","r","m","c"]
 if nev > length(cols)
 	cols = repeat(cols,ceil(Int,nev/length(cols)))
 end
 
-if false
-	#tws = range(0.0,stop=1.0,length=2)
-	#for tw1 in tws
-	#for (idx,alpha) in enumerate(alphs)
-				params_dict = Dict([("Lphys",4),("Lsynth",4),("particles",2),("es_count",5),("nrgtol",1e-6),("mdim",100),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_save_data",false)])
+if true
+		#tws = range(0.0,stop=1.0,length=2)
+		#for tw1 in tws
+		#for (idx,alpha) in enumerate(alphs)
+		enssets = [(8,4,4),(4,8,4),(6,8,4),(7,6,6),(8,5,5),(9,5,5)]
+		oneDdensities = [c[end]/c[1] for c in denssets]
+		for (lx,ly,n) in denssets
+				params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("es_count",nev),("nrgtol",1e-6),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_save_data",true)])
 				model_paras = get_1deff_model_params(params_dict)
 				if model_paras[:es_count] > 0
 					psis,rhos,nrgs = excited_states_mps(model_paras[:es_count],model_paras[:phi],model_paras[:L],model_paras[:nflavors],model_paras[:nbosons]; model_paras...,metadata=named_tuple_to_dict(model_paras))
 				else
 					psi,rho,nrg = execute_mps(model_paras[:phi],model_paras[:L],model_paras[:nflavors],model_paras[:nbosons]; model_paras...,metadata=named_tuple_to_dict(model_paras))
 				end
-
-			display(nrgs)
-			#=xxs = tws
+			#xxs = tws
 			for i in 1:model_paras[:es_count]+1
-				change = abs(xxs[1] - xxs[2])
+				#=change = abs(xxs[1] - xxs[2])
 				xval = t
 				shift = (i - model_paras[:es_count]/2) * ((0.1*change)/(model_paras[:es_count]/2))
-				scatter(xval + shift,nrgs[i],c=cols[i])
-			end=#
+				scatter(xval + shift,nrgs[i],c=cols[i])=#
+				scatter(n/lx,nrgs[i] - nrgs[1],c=cols[i])
+			end
+			xlabel("1D Density")
+			ylabel("NRG - E0")
+		end
 end
 
 if false
@@ -249,99 +262,11 @@ if false
 		#mrez = momentum_occupation(psi,nbosons,100,10.0; model_paras...,plot_title="Virt Dim = $nflavors",if_log=false,if_plot=true)
 		#append!(mom_occs,[mrez[2]])
 	end
-#
-end
-if false
-	L = 54
-	bulksize = 20
-	dists = [i for i in 1:bulksize]
-	for i in 2:length(files)
-		corrs = [0.0 for i in 1:bulksize]
-		corr_errs = [0.0 for i in 1:bulksize]
-		f = files[i]
-		whichone = i
-		ps = get_params_dict_from_filename(f)
-		nf = ps["nflavors"]
-		nb = ps["nbosons"]
-		nuval = "1/" * string(L/nb)
-		for i in 1:bulksize
-			midval = Int(floor((L - i)/2))
-			all_vals = [diag(rhomats[whichone],i)[midval-Int(bulksize/2):midval+Int(bulksize/2)]; diag(rhomats[whichone],-i)[midval-Int(bulksize/2):midval+Int(bulksize/2)]]
-			corrs[i] = mean(real.(all_vals))
-			corr_errs[i] = std(real.(all_vals))
-		end
-		#errorbar(dists,corrs,yerr=corr_errs,label=nuval * ", $nb")
-		plot(dists,corrs,label=nuval * ", $nf")
-		legend()
-	end
+
 end
 
-if false
-	#L = get_params_dict_from_filename(files[1])["L"]
-	#
-	all_mx = []
-	all_my = []
-	all_mz = []
-	all_mt = []
-	#
-	sites = [i for i in 1:L]
-	spins = [4.0]#[0.5,1.0,1.5,2.0,2.5]
-	for i in 1:length(wavefuncs)
-		psi = wavefuncs[i]
-		mx = get_magnetization(psi,spins[i],"X"; if_plot=false)[1]
-		my = get_magnetization(psi,spins[i],"Y"; if_plot=false)[1]
-		mz = get_magnetization(psi,spins[i],"Z"; if_plot=false)[1]
-		mt = sqrt.(mx .^ 2 + my .^ 2 + mz .^ 2)
-		
-		append!(all_mx,[mx])
-		append!(all_my,[my])
-		append!(all_mz,[mz])
-		append!(all_mt,[mt])
-		#
-		fig = figure()
-		plot(sites .+ 0.1,real.(all_mx[i]),"-p",label="Mx")
-		plot(sites,real.(all_my[i]),"-p",label="My")
-		plot(sites,real.(all_mz[i]),"-p",label="Mz")
-		plot(sites .- 0.1,real.(all_mt[i]),"-p",label="MT")
-		legend()
-		title("Magnetization for Spin-" * string(spins[i]))
-		#=fig2 = figure()
-		plot(sites .+ 0.1,imag.(mx),"-p",label="Mx")
-		plot(sites,imag.(my),"-p",label="My")
-		plot(sites,imag.(mz),"-p",label="Mz")
-		legend()
-		title("Imaginary Magnetization for Spin-" * string(spins[i]))
-		=#
-	end
-end
 
-if false
-	for i in 1:3
-		ig = figure()
-		plot3D(real.(all_mx[i])[Int(L/2)-20:Int(L/2)+20],real.(all_my[i])[Int(L/2)-20:Int(L/2)+20],[j for j in 1:41],"-p")
-		title("Spin $(spins[i])")
-	end
-end
 
-if false
-	count1 = 20
-	left = Int(L/2)-count1
-	right = Int(L/2)+count1
-	spacing = 0.5
-	for i in 1:3
-		fig3 = figure()
-		for j in Int(L/2)-count1:Int(L/2)+count1
-			plot3D([j/10,j/10+real(all_mx[i][j])],[0,real(all_my[i][j])],[0,real(all_mz[i][j])])
-			title("Magnetization for Spin-" * string(spins[i]))
-		end
-		#=
-		plot3D([j+real.(all_mx[i][j]) for j in left:right],[real.(all_my[i][j]) for j in left:right],[real.(all_mz[i][j]) for j in left:right],"-p")
-		title("Magnetization for Spin-" * string(spins[i]))
-		ylim((-1.0,1.0))
-		zlim((0.05,0.1))
-		=#
-	end
-end
 
 #title("Nflavors = $nflavors")
 

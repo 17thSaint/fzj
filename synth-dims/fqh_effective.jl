@@ -448,7 +448,7 @@ function execute_mps(phi,L,nflavors,nbosons; kwargs...)
 		if mdim >= 400
 			mdim = [Int(floor(mdim/4)),Int(floor(mdim/4)),Int(floor(mdim/4)),Int(floor(mdim/2)),Int(floor(mdim/2)),Int(floor(mdim/2)),Int(floor(mdim/2)),Int(floor(mdim/2)), mdim]
 		else
-			mdim = [Int(floor(mdim/4)),Int(floor(mdim/2)), mdim]
+			mdim = [Int(floor(mdim/4)),Int(floor(mdim/4)),Int(floor(mdim/4)),Int(floor(mdim/2)),Int(floor(mdim/2)),Int(floor(mdim/2)), mdim]
 		end
 	end
 	noise = get(kwargs, :noise, 0.0)
@@ -471,8 +471,9 @@ function execute_mps(phi,L,nflavors,nbosons; kwargs...)
 	metadata["noise"] = noise
 	metadata["if_gpu"] = if_gpu=#
 	metadata["ham"] = ham
-	filename = get(kwargs, :name, "mps")
+	filename = join(["mps",make_parameters_filename(make_1deff_filenamedict(kwargs))],"-")
 	filename = check_plot_label(filename,"mps")
+	filepath = location * "/" * filename
 	
 	gs_search_params = copy(metadata)
 	delete!(gs_search_params,"ham")
@@ -517,6 +518,7 @@ function execute_mps(phi,L,nflavors,nbosons; kwargs...)
 	if if_continuous_saving
 		actual_filename = write_data_jld2(filename,Dict([("mps",psi0)]),location,metadata)
 		obs.file_path = location * "/" * actual_filename
+		filepath = obs.file_path
 	end
 
 	if !isnothing(psi_ortho)
@@ -525,28 +527,32 @@ function execute_mps(phi,L,nflavors,nbosons; kwargs...)
 		else
 			println("Using $(length(psi_ortho)) orthogonal states")
 		end
+		es_level = length(psi_ortho)
 		E, psi = dmrg(H, psi_ortho, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = cutoff)
 	else
+		es_level = 0
 		E, psi = dmrg(H, psi0; maxdim = mdim, nsweeps = nsweeps, noise = noise, observer = obs, outputlevel=opl, cutoff = cutoff)
 	end
 
-	if_densmat ? densmat = density_matrix(psi) : nothing
+	densmat = if_densmat ? density_matrix(psi) : nothing
 	
-	if if_save_data
+	#=if if_save_data
 		metadata["observer"] = obs
 		metadata["final_energy"] = E
 		metadata["maxlinkdim"] = maxlinkdim(psi)
-		metadata["final_nrg_variance"] = energy_variance(psi,H)
+		#metadata["final_nrg_variance"] = energy_variance(psi,H)
 		data_dict::Dict{String,Any} = Dict([("mps",psi)])
 		if_densmat ? data_dict["densmat"] = densmat : nothing
 		if if_continuous_saving
-			new_metadata = Dict([("observer",metadata["observer"]),("final_energy",metadata["final_energy"]),("maxlinkdim",metadata["maxlinkdim"]),("final_nrg_variance",metadata["final_nrg_variance"])])
+			new_metadata = Dict([("observer",metadata["observer"]),("final_energy",metadata["final_energy"]),("maxlinkdim",metadata["maxlinkdim"])])#,("final_nrg_variance",metadata["final_nrg_variance"])])
 			modify_data_jld2(new_metadata,location * "/" * actual_filename,"metadata")
 			modify_data_jld2(data_dict,location * "/" * actual_filename,"all_data")
 		else
 			write_data_jld2(filename,data_dict,location,metadata)
 		end
-	end
+	end=#
+
+	if_save_data ? save_mps_data(psi,metadata,obs,E,filepath,if_continuous_saving,densmat,es_level) : nothing
 	
 	if if_nrg
 		if if_densmat
@@ -589,6 +595,25 @@ function excited_states_mps(es_count,phi,L,nflavors,nbosons; kwargs...)
 		return all_states, all_rhos, all_nrgs
 	else
 		return all_states, all_nrgs
+	end
+end
+
+function make_new_metadata(psi::MPS,observer,current_nrg,es_count=0)
+	if es_count == 0
+		return Dict([("observer",observer),("final_energy",current_nrg),("maxlinkdim",maxlinkdim(psi))])
+	else
+		return Dict([("observer_$es_count",observer),("final_energy_$es_count",current_nrg),("maxlinkdim_$es_count",maxlinkdim(psi))])
+	end
+end
+
+function save_mps_data(psi::MPS,metadata::Dict,observer,current_nrg,filepath::String,if_continuous_saving::Bool,densmat,es_level=0)
+	data_dict::Dict{String,Any} = es_level == 0 ? Dict([("mps",psi)]) : Dict([("mps_$es_level",psi)])
+	isnothing(densmat) ? nothing : data_dict["densmat"] = densmat
+	if es_level == 0 && !if_continuous_saving
+		write_data_jld2(filepath,data_dict,merge(metadata,make_new_metadata(psi,observer,current_nrg,es_level)))
+	else
+		modify_data_jld2(data_dict,filepath,"all_data")
+		modify_data_jld2(make_new_metadata(psi,observer,current_nrg,es_level),filepath,"metadata")
 	end
 end
 
