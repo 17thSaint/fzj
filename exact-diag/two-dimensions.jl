@@ -1,5 +1,5 @@
-using Pkg
-Pkg.activate(".")
+#using Pkg
+#Pkg.activate(".")
 using LinearAlgebra,KrylovKit,Combinatorics,SparseArrays
 
 function find_center()
@@ -2140,7 +2140,7 @@ end
         
     
 
-if true
+if false
     #fig = figure()
     #xlabel("Hopping Anisotropy")
     #ylabel("Gap")

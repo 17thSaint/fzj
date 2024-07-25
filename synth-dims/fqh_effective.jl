@@ -471,8 +471,7 @@ function execute_mps(phi,L,nflavors,nbosons; kwargs...)
 	metadata["noise"] = noise
 	metadata["if_gpu"] = if_gpu=#
 	metadata["ham"] = ham
-	filename = join(["mps",make_parameters_filename(make_1deff_filenamedict(kwargs))],"-")
-	filename = check_plot_label(filename,"mps")
+	filename = kwargs[:name]
 	filepath = location * "/" * filename
 	
 	gs_search_params = copy(metadata)
@@ -608,7 +607,9 @@ end
 
 function save_mps_data(psi::MPS,metadata::Dict,observer,current_nrg,filepath::String,if_continuous_saving::Bool,densmat,es_level=0)
 	data_dict::Dict{String,Any} = es_level == 0 ? Dict([("mps",psi)]) : Dict([("mps_$es_level",psi)])
-	isnothing(densmat) ? nothing : data_dict["densmat"] = densmat
+	if !isnothing(densmat)
+		es_level == 0 ? data_dict["densmat"] = densmat : data_dict["densmat_$es_level"] = densmat
+	end
 	if es_level == 0 && !if_continuous_saving
 		write_data_jld2(filepath,data_dict,merge(metadata,make_new_metadata(psi,observer,current_nrg,es_level)))
 	else

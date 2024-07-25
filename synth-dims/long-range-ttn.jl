@@ -1180,7 +1180,7 @@ function average_close_keys(dict, bin_width)
 	return averaged_dict
 end
 
-function check_fluxes(alpha,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_y::Bool,flux_direction::String)
+function check_fluxes(alpha,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_y::Bool,flux_direction::String,if_error=true)
     if alpha == 0.0
         return nothing
     end
@@ -1189,28 +1189,28 @@ function check_fluxes(alpha,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_
     end
     x_shift,y_shift = !if_periodic_x, !if_periodic_y
     num_fluxes = round(alpha*(Lx - x_shift) * (Ly - y_shift),digits=5)
-    println("Number of Fluxes = ",num_fluxes," for Lx = ",Lx," and Ly = ",Ly)
+    if_error ? println("Number of Fluxes = ",num_fluxes," for Lx = ",Lx," and Ly = ",Ly) : nothing
     if !isinteger(num_fluxes)
-        error("Number of fluxes is not an integer")
+        if_error ? error("Number of fluxes is not an integer") : return false
     end
 
-	println("Checking fluxes only along Gauge Direction")
+	if_error ? println("Checking fluxes only along Gauge Direction") : nothing
     if flux_direction == "synth"
         if if_periodic_x && !isinteger(num_fluxes/Ly)
             if if_periodic_y && isinteger(num_fluxes/Lx)
                 flux_direction = "phys"
-                println("Fluxes don't fit, changing to X direction")
+                if_error ? println("Fluxes don't fit, changing to X direction") : nothing
             else
-                error("Number of fluxes is not an integer multiple of Lx")
+                if_error ? error("Number of fluxes is not an integer multiple of Lx") : return false
             end
         end
     elseif flux_direction == "phys"
         if if_periodic_y && !isinteger(num_fluxes/Lx)
             if if_periodic_x && isinteger(num_fluxes/Ly)
                 flux_direction = "synth"
-                println("Fluxes don't fit, changing to Y direction")
+                if_error ? println("Fluxes don't fit, changing to Y direction") : nothing
             else
-                error("Number of fluxes is not an integer multiple of Ly")
+                if_error ? error("Number of fluxes is not an integer multiple of Ly") : return false
             end
         end
     else

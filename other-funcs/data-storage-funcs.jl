@@ -293,7 +293,7 @@ function check_data_exists(filename::AbstractString,data_type="observer"; kwargs
     cd(location)
     if check_duplicates(filename)[1]
         cd(here)
-        return true,read_data_jld2(filename,location; kwargs...)[1][data_type]
+        return true,read_data_jld2(filename,location; kwargs...)
     end
     cd(here)
     return false,nothing

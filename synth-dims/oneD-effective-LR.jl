@@ -1,6 +1,6 @@
 include("fqh_effective.jl")
 include("long-range-ttn.jl")
-using PyPlot
+#using PyPlot
 
 function fix_filling(L,nflavors,nu)
 	prod = L * nu * nflavors
@@ -143,7 +143,56 @@ function get_1deff_model_params(params_dict::Dict)
 						"output_level"=>1,
 						"location"=>loc)
 	
-	return dict_to_symbols(model_paras_dict)
+
+	filename = join(["mps",make_parameters_filename(make_1deff_filenamedict(dict_to_symbols(model_paras_dict)))],"-")
+	filename = check_plot_label(filename,"mps")
+	model_paras_dict["name"] = filename
+	if_find_data = get(params_dict, "if_find_data", true)
+	if_exists, found_data = if_find_data ? check_data_exists(get_params_dict_from_filename(filename),"mps"; location=model_paras_dict["location"],output_level=false) : (false,nothing)
+	return dict_to_symbols(model_paras_dict),found_data
+end
+
+function get_all_densities(Lmax; kwargs...)
+	smallest_density = get(kwargs, :smallest_density, 0.25)
+	smallest_sitecount = get(kwargs, :smallest_sitecount, 20)
+	alpha_limit = get(kwargs, :alpha_limit, 0.35)
+	nmin = get(kwargs, :nmin, 3)
+	number_to_keep = get(kwargs, :number_to_keep, "all")
+
+	edge_length_limit = Int(floor(sqrt(smallest_sitecount)))
+	configurations = []
+	oneDdensities = []
+	for Lx in edge_length_limit:Lmax
+		for Ly in edge_length_limit:Lmax
+			if Lx*Ly < smallest_sitecount || Lx / Ly > 2 || Ly / Lx > 2
+				continue
+			end
+			for n in nmin:Lx-1
+				if n/Lx > smallest_density && n/(0.5 * Lx * Ly) < alpha_limit && !(n/Lx in oneDdensities) && typeof(check_fluxes(n/(0.5 * Lx * Ly),Lx,Ly,true,true,"phys",false)) == String
+					push!(configurations,(Lx,Ly,n))
+					push!(oneDdensities,n/Lx)
+				end
+			end
+		end
+	end
+
+	if number_to_keep != "all"
+		if number_to_keep > length(oneDdensities)
+			println("Number to keep is greater than the number of configurations")
+			return configurations
+		elseif number_to_keep == length(oneDdensities)
+			return configurations
+		end
+		keeping_indices = zeros(Int, number_to_keep)
+		keeping_indices[end] = length(oneDdensities)
+		hopeful_densities = range(minimum(oneDdensities),stop=maximum(oneDdensities),length=number_to_keep)[1:end-1]
+		for (idx,hd) in enumerate(hopeful_densities)
+			keeping_indices[idx] = abs.(oneDdensities .- hd) |> argmin
+		end
+		configurations = configurations[keeping_indices]
+	end
+	configurations = configurations[sortperm([cc[3]/cc[1] for cc in configurations])]
+	return configurations
 end
 
 nev = 3
@@ -152,21 +201,44 @@ if nev > length(cols)
 	cols = repeat(cols,ceil(Int,nev/length(cols)))
 end
 
+open_cores = 5
+if typeof(open_cores) != String
+	BLAS.set_num_threads(open_cores)
+	display(BLAS.get_config())
+end
+
 if true
 		#tws = range(0.0,stop=1.0,length=2)
 		#for tw1 in tws
 		#for (idx,alpha) in enumerate(alphs)
-		enssets = [(8,4,4),(4,8,4),(6,8,4),(7,6,6),(8,5,5),(9,5,5)]
-		oneDdensities = [c[end]/c[1] for c in denssets]
-		for (lx,ly,n) in denssets
-				params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("es_count",nev),("nrgtol",1e-6),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_save_data",true)])
-				model_paras = get_1deff_model_params(params_dict)
+		#denssets = [(8,4,4),(4,8,4),(6,8,4),(7,6,6),(8,5,5),(9,5,5)]
+		#oneDdensities = [c[end]/c[1] for c in denssets]
+		#for (lx,ly,n) in denssets
+		all_configs = get_all_densities(20,smallest_density=0.5,number_to_keep=10)
+		which_config = 1
+		lx,ly,n = all_configs[which_config]
+			params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("es_count",nev-1),("nrgtol",1e-6),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_save_data",false)])
+			model_paras,found_data = get_1deff_model_params(params_dict)
+			if isnothing(found_data)
 				if model_paras[:es_count] > 0
 					psis,rhos,nrgs = excited_states_mps(model_paras[:es_count],model_paras[:phi],model_paras[:L],model_paras[:nflavors],model_paras[:nbosons]; model_paras...,metadata=named_tuple_to_dict(model_paras))
 				else
 					psi,rho,nrg = execute_mps(model_paras[:phi],model_paras[:L],model_paras[:nflavors],model_paras[:nbosons]; model_paras...,metadata=named_tuple_to_dict(model_paras))
 				end
-			#xxs = tws
+			else
+				psis = Vector{MPS}(undef,found_data[2]["es_count"]+1)
+				rhos = Vector{Array}(undef,found_data[2]["es_count"]+1)
+				nrgs = Vector{Float64}(undef,found_data[2]["es_count"]+1)
+				psis[1] = found_data[1]["mps"]
+				rhos[1] = found_data[1]["densmat"]
+				nrgs[1] = found_data[2]["observer"].energies[end]
+				for i in 1:found_data[2]["es_count"]
+					psis[i+1] = found_data[1]["mps_$(i)"]
+					rhos[i+1] = found_data[1]["densmat_$(i)"]
+					nrgs[i+1] = found_data[2]["observer_$(i)"].energies[end]
+				end
+			end
+			#=xxs = tws
 			for i in 1:model_paras[:es_count]+1
 				#=change = abs(xxs[1] - xxs[2])
 				xval = t
@@ -175,8 +247,8 @@ if true
 				scatter(n/lx,nrgs[i] - nrgs[1],c=cols[i])
 			end
 			xlabel("1D Density")
-			ylabel("NRG - E0")
-		end
+			ylabel("NRG - E0")=#
+		#end
 end
 
 if false
