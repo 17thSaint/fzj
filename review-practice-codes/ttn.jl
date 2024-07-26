@@ -982,13 +982,15 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 		end_time::Float64 = time()
 		
 		if if_save_data
-			#try
+			#=try
 			metadata["observer"] = obs
 			metadata["runtime"] = end_time-start_time
 			metadata["energies"] = obs.nrg
-			metadata["maxlinkdim"] = TTNKit.maxlinkdim(sp.ttn)
-			if if_continuous_saving || if_redo
-				new_metadata::Dict{String,Any} = Dict([("observer",metadata["observer"]),("runtime",metadata["runtime"]),("energies",metadata["energies"]),("maxlinkdim",metadata["maxlinkdim"])])
+			metadata["maxlinkdim"] = TTNKit.maxlinkdim(sp.ttn)=#
+			new_metadata::Dict{String,Any} = Dict([("observer",obs),("runtime",end_time-start_time),("energies",obs.nrg),("maxlinkdim",TTNKit.maxlinkdim(sp.ttn))])
+			metadata = merge(metadata,new_metadata)
+			#=if if_continuous_saving || if_redo
+				#new_metadata::Dict{String,Any} = Dict([("observer",metadata["observer"]),("runtime",metadata["runtime"]),("energies",metadata["energies"]),("maxlinkdim",metadata["maxlinkdim"])])
 				modify_data_jld2(new_metadata,location * "/" * actual_filename,"metadata")
 				if if_densmat
 					if if_gpu
@@ -1004,8 +1006,9 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 					end
 				end
 			else
-				write_data_jld2(filename,ttn_data_dict,location,metadata)
-			end
+				write_data_jld2(filename,ttn_data_dict,location,merge(metadata,new_metadata))
+			end=#
+			if_continuous_saving || if_redo ? save_ttn(sp.ttn,new_metadata,actual_filename,densmat; kwargs...) : save_ttn(sp.ttn,metadata,actual_filename,densmat; kwargs...)
 		end
 
 		
@@ -1131,20 +1134,23 @@ function find_excited_states(num_layers::Int,num_excited_states::Int,particle_co
 		if_densmat ? densmats[es_number - es_start + 1] = new_densmat : nothing
 
 		if if_save_data
-			metadata["observer_$es_number"] = new_obs
+			#=metadata["observer_$es_number"] = new_obs
 			metadata["runtime_$es_number"] = runtime
 			try
 				metadata["energies_$es_number"] = new_obs.nrg
 			catch
 				nothing
 			end
-			metadata["maxlinkdim_$es_number"] = TTNKit.maxlinkdim(new_sp.ttn)
-			ttn_data_dict::Dict{String,Any} = if_gpu ? Dict([("ttn_$es_number",back2cpu(new_sp.ttn))]) : Dict([("ttn_$es_number",new_sp.ttn)])
-			if_densmat ? ttn_data_dict["densmat_$es_number"] = new_densmat : nothing
+			metadata["maxlinkdim_$es_number"] = TTNKit.maxlinkdim(new_sp.ttn)=#
+			new_metadata::Dict{String,Any} = Dict([("observer_$es_number",new_obs),("runtime_$es_number",runtime),("energies_$es_number",new_obs.nrg),("maxlinkdim_$es_number",TTNKit.maxlinkdim(new_sp.ttn))])
+			metadata = merge(metadata,new_metadata)
+			#=wavefunc_dict::Dict{String,Any} = if_gpu ? Dict([("ttn_$es_number",back2cpu(new_sp.ttn))]) : Dict([("ttn_$es_number",new_sp.ttn)])
+			densmat_dict::Dict{String,Any} = if_densmat ? Dict([("densmat_$es_number",new_densmat)]) : Dict()
 			
-			new_metadata::Dict{String,Any} = Dict([("observer_$es_number",metadata["observer_$es_number"]),("runtime_$es_number",metadata["runtime_$es_number"]),("energies_$es_number",metadata["energies_$es_number"]),("maxlinkdim_$es_number",metadata["maxlinkdim_$es_number"])])
+			#new_metadata::Dict{String,Any} = Dict([("observer_$es_number",metadata["observer_$es_number"]),("runtime_$es_number",metadata["runtime_$es_number"]),("energies_$es_number",metadata["energies_$es_number"]),("maxlinkdim_$es_number",metadata["maxlinkdim_$es_number"])])
 			modify_data_jld2(new_metadata,location * "/" * actual_filename,"metadata")
-			modify_data_jld2(ttn_data_dict,location * "/" * actual_filename,"all_data")
+			modify_data_jld2(ttn_data_dict,location * "/" * actual_filename,"all_data")=#
+			save_excited_ttn(new_sp.ttn,new_metadata,actual_filename,es_number,new_densmat; kwargs...)
 		end
 
 		println("Finished Excited State $es_number \n")
@@ -1252,11 +1258,62 @@ function find_spectrum(model_paras::Dict,num_excited_states::Int,metadata::Dict;
 	end
 end
 
-function save_ttn(wavefunc_data::Dict,metadata_dict::Dict,densmat_data::Dict=Dict())
-	error("Not implemented yet")
+function save_excited_ttn(ttn::TTNKit.TreeTensorNetwork,metadata::Dict,actual_filename::String,es_number::String,densmat::Matrix{ComplexF64}=zeros(ComplexF64,1,1); kwargs...)
+	if_gpu = kwargs[:if_gpu]
+
+	wavefunc_dict::Dict{String,Any} = if_gpu ? Dict([("ttn_$es_number",back2cpu(ttn))]) : Dict([("ttn_$es_number",ttn)])
+	densmat_dict::Dict{String,Any} = Dict([("densmat_$es_number",densmat)])
+
+	modify_data_jld2(wavefunc_dict,metadata["location"] * "/wavefunc" * actual_filename,"all_data")
+	modify_data_jld2(densmat_dict,metadata["location"] * "/" * actual_filename,"all_data")
+	modify_data_jld2(metadata,metadata["location"] * "/" * actual_filename,"metadata")
 end
 
-function save_initial_ttn(wavefunc::TTNKit.TreeTensorNetwork,metadata::Dict; kwargs...)
+function save_ttn(ttn::TTNKit.TreeTensorNetwork,metadata_dict::Dict,actual_filename::String,densmat::Matrix{ComplexF64}=zeros(ComplexF64,1,1); kwargs...)
+	if_gpu = kwargs[:if_gpu]
+	if_continuous_saving = kwargs[:if_continuous_saving]
+	if_redo = kwargs[:if_redo]
+	if_densmat = kwargs[:if_densmat]
+	location = kwargs[:location]
+
+	if if_continuous_saving || if_redo
+		modify_data_jld2(metadata_dict,location * "/" * actual_filename,"metadata")
+		if if_densmat
+			if if_gpu
+				modify_data_jld2(Dict([("ttn",back2cpu(ttn))]),location * "/wavefunc" * actual_filename,"all_data")
+				modify_data_jld2(Dict([("densmat",densmat)]),location * "/" * actual_filename,"all_data")
+			else
+				modify_data_jld2(Dict([("ttn",ttn),("densmat",densmat)]),location * "/" * actual_filename,"all_data")
+			end
+		else
+			if if_gpu
+				modify_data_jld2(Dict([("ttn",back2cpu(ttn))]),location * "/wavefunc" * actual_filename,"all_data")
+			else
+				modify_data_jld2(Dict([("ttn",ttn)]),location * "/wavefunc" * actual_filename,"all_data")
+			end
+		end
+	else
+		if if_densmat
+			if if_gpu
+				write_data_jld2("wavefunc"*actual_filename,Dict([("ttn",back2cpu(ttn))]),location)
+				write_data_jld2(actual_filename,Dict([("densmat",densmat)]),location,metadata_dict)
+			else
+				write_data_jld2("wavefunc"*actual_filename,Dict([("ttn",ttn)]),location)
+				write_data_jld2(actual_filename,Dict([("densmat",densmat)]),location,metadata_dict)
+			end
+		else
+			if if_gpu
+				write_data_jld2("wavefunc"*actual_filename,Dict([("ttn",back2cpu(ttn))]),location)
+				write_data_jld2(actual_filename,Dict(),location,metadata_dict)
+			else
+				write_data_jld2("wavefunc"*actual_filename,Dict([("ttn",ttn)]),location)
+				write_data_jld2(actual_filename,Dict(),location,metadata_dict)
+			end
+		end
+	end
+end
+
+function save_initial_ttn(ttn::TTNKit.TreeTensorNetwork,metadata::Dict; kwargs...)
 	if_densmat = kwargs[:if_densmat]
 	if_gpu = kwargs[:if_gpu]
 	if_redo = kwargs[:if_redo]
@@ -1346,7 +1403,7 @@ function TTNKit.ITensors.measure!(o::SavingNRGVarObserver; kwargs...)
 
 	#modify_data_jld2("ttn",dmrg.ttn,o.file_path,"all_data")
 	wavefunc_update::Dict{String,Any} = Dict([("ttn",dmrg.ttn)])
-	modify_data_jld2(wavefunc_update,"wavefunc"*(o.file_path),"all_data")
+	modify_data_jld2(wavefunc_update,add_wavefunc_to_filepath(o.file_path),"all_data")
 	
 	densmat_update::Dict{String,Any} = Dict([("densmat",density_matrix(dmrg.ttn))])
 	metadata_update = Dict([("observer",o),("maxlinkdim",TTNKit.maxlinkdim(dmrg.ttn))])
