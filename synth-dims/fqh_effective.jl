@@ -607,14 +607,17 @@ function make_new_metadata(psi::MPS,observer,current_nrg,es_count=0)
 end
 
 function save_mps_data(psi::MPS,metadata::Dict,observer,current_nrg,filepath::String,if_continuous_saving::Bool,densmat,es_level=0)
-	data_dict::Dict{String,Any} = es_level == 0 ? Dict([("mps",psi)]) : Dict([("mps_$es_level",psi)])
+	wavefunc_dict::Dict{String,Any} = es_level == 0 ? Dict([("mps",psi)]) : Dict([("mps_$es_level",psi)])
+	data_dict::Dict{String,Any} = Dict()
 	if !isnothing(densmat)
 		es_level == 0 ? data_dict["densmat"] = densmat : data_dict["densmat_$es_level"] = densmat
 	end
 	if es_level == 0 && !if_continuous_saving
+		write_data_jld2(add_wavefunc_to_filepath(filepath),wavefunc_dict,Dict())
 		write_data_jld2(filepath,data_dict,merge(metadata,make_new_metadata(psi,observer,current_nrg,es_level)))
 	else
 		modify_data_jld2(data_dict,filepath,"all_data")
+		modify_data_jld2(wavefunc_dict,add_wavefunc_to_filepath(filepath),"all_data")
 		modify_data_jld2(make_new_metadata(psi,observer,current_nrg,es_level),filepath,"metadata")
 	end
 end

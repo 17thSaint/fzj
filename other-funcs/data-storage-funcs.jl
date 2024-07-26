@@ -132,7 +132,7 @@ function get_params_dict_from_filename(filename)
 	end
 	if split(filename,"-")[1] in ["virt","phys","Y","X"]
 		split_filename = split(filename,"-")[4:end]
-	elseif split(filename,"-")[1] in ["mps","ttn","rfa","laugh","basis","ed"]
+	elseif split(filename,"-")[1] in ["mps","ttn","rfa","laugh","basis","ed","wavefuncmps","wavefuncttn"]
 		split_filename = split(filename,"-")[2:end]
 	else
 		split_filename = split(filename,"-")
@@ -360,6 +360,21 @@ function check_dict(data)
 		println("Data being sent isn't Dictionary or NamedTuple")
 		return
 	end
+end
+
+function remove_wavefunc_from_filename(filename::String)
+	split_filename = split(filename,"-")
+	if occursin("wavefunc",split_filename[1])
+		datatype = string(split(split_filename[1],"wavefunc")[2])
+		filename = join(vcat([datatype],split_filename[2:end]),"-")
+	end
+	return filename
+end
+
+function add_wavefunc_to_filepath(filepath::String)
+	split_filepath = split(filepath,"/")
+	filename = split_filepath[end]
+	return join(vcat(split_filepath[1:end-1],["wavefunc$filename"]),"/")
 end
 
 function write_data_jld2(file_name::AbstractString,data::Dict,location=pwd(),metadata=nothing; kwargs...)

@@ -195,7 +195,7 @@ function get_all_densities(Lmax; kwargs...)
 	return configurations
 end
 
-nev = 3
+nev = 2
 cols = ["b","g","r","m","c"]
 if nev > length(cols)
 	cols = repeat(cols,ceil(Int,nev/length(cols)))
@@ -230,9 +230,9 @@ if true
 		#denssets = [(8,4,4),(4,8,4),(6,8,4),(7,6,6),(8,5,5),(9,5,5)]
 		#oneDdensities = [c[end]/c[1] for c in denssets]
 		#for (lx,ly,n) in denssets
-		all_configs = get_all_densities(19,smallest_density=0.9,number_to_keep=5)
-		for which_config in 1:5
-			lx,ly,n = all_configs[which_config]
+		#all_configs = get_all_densities(19,smallest_density=0.9,number_to_keep=5)
+		#for which_config in 1:5
+			lx,ly,n = 4,4,2
 			params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("es_count",nev-1),("nrgtol",1e-6),("mdim",300),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_save_data",true)])
 			model_paras,found_data = get_1deff_model_params(params_dict)
 			if isnothing(found_data)

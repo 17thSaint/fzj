@@ -901,7 +901,7 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 	end
 
 	if if_continuous_saving
-		if if_densmat
+		#=if if_densmat
 			if if_gpu
 				if if_redo
 					actual_filename::String = modify_data_jld2(Dict([("ttn",back2cpu(ttn)),("densmat",density_matrix(ttn))]),location * "/" * filename)
@@ -929,7 +929,8 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 					actual_filename = write_data_jld2(filename,Dict([("ttn",ttn)]),location,metadata)
 				end
 			end
-		end
+		end=#
+		actual_filename = save_initial_ttn(ttn,metadata; kwargs...)
 	else
 		actual_filename = filename
 	end
@@ -984,11 +985,7 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 			#try
 			metadata["observer"] = obs
 			metadata["runtime"] = end_time-start_time
-			try
-				metadata["energies"] = obs.nrg
-			catch
-				nothing
-			end
+			metadata["energies"] = obs.nrg
 			metadata["maxlinkdim"] = TTNKit.maxlinkdim(sp.ttn)
 			if if_continuous_saving || if_redo
 				new_metadata::Dict{String,Any} = Dict([("observer",metadata["observer"]),("runtime",metadata["runtime"]),("energies",metadata["energies"]),("maxlinkdim",metadata["maxlinkdim"])])
@@ -1255,6 +1252,54 @@ function find_spectrum(model_paras::Dict,num_excited_states::Int,metadata::Dict;
 	end
 end
 
+function save_ttn(wavefunc_data::Dict,metadata_dict::Dict,densmat_data::Dict=Dict())
+	error("Not implemented yet")
+end
+
+function save_initial_ttn(wavefunc::TTNKit.TreeTensorNetwork,metadata::Dict; kwargs...)
+	if_densmat = kwargs[:if_densmat]
+	if_gpu = kwargs[:if_gpu]
+	if_redo = kwargs[:if_redo]
+	location = kwargs[:location]
+	filename = kwargs[:name]
+
+	if if_densmat
+		if if_gpu
+			if if_redo
+				modify_data_jld2(Dict([("ttn",back2cpu(ttn))]),location * "/wavefunc" * filename)
+				actual_filename::String = modify_data_jld2(Dict([("densmat",density_matrix(ttn))]),location * "/" * filename)
+			else
+				write_data_jld2("wavefunc"*filename,Dict([("ttn",back2cpu(ttn))]),location,metadata)
+				actual_filename = write_data_jld2(filename,Dict([("densmat",density_matrix(ttn))]),location,metadata)
+			end
+		else
+			if if_redo
+				modify_data_jld2(Dict([("ttn",ttn)]),location * "/wavefunc" * filename)
+				actual_filename = modify_data_jld2(Dict([("densmat",density_matrix(ttn))]),location * "/" * filename)
+			else
+				actual_filename = write_data_jld2(filename,Dict([("densmat",density_matrix(ttn))]),location,metadata)
+				write_data_jld2("wavefunc"*filename,Dict([("ttn",ttn)]),location,metadata)
+			end
+		end
+	else
+		if if_gpu
+			if if_redo
+				actual_filename = modify_data_jld2(Dict([("ttn",back2cpu(ttn))]),location * "/wavefunc" * filename)
+			else
+				actual_filename = write_data_jld2("wavefunc"*filename,Dict([("ttn",back2cpu(ttn))]),location,metadata)
+			end
+		else
+			if if_redo
+				actual_filename = modify_data_jld2(Dict([("ttn",ttn)]),"wavefunc"*location * "/wavefunc" * filename)
+			else
+				actual_filename = write_data_jld2("wavefunc"*filename,Dict([("ttn",ttn)]),location,metadata)
+			end
+		end
+		actual_filename = remove_wavefunc_from_filename(actual_filename)
+	end
+	return actual_filename
+end
+
 mutable struct NRGVarObserver <: AbstractObserver
     var_tol::Float64
     nrg::Vector{Float64}
@@ -1300,11 +1345,13 @@ function TTNKit.ITensors.measure!(o::SavingNRGVarObserver; kwargs...)
     append!(o.nrg,[dmrg.current_energy])
 
 	#modify_data_jld2("ttn",dmrg.ttn,o.file_path,"all_data")
-	alldata_update::Dict{String,Any} = Dict([("ttn",dmrg.ttn),("densmat",density_matrix(dmrg.ttn))])
-	modify_data_jld2(alldata_update,o.file_path,"all_data")
+	wavefunc_update::Dict{String,Any} = Dict([("ttn",dmrg.ttn)])
+	modify_data_jld2(wavefunc_update,"wavefunc"*(o.file_path),"all_data")
 	
+	densmat_update::Dict{String,Any} = Dict([("densmat",density_matrix(dmrg.ttn))])
 	metadata_update = Dict([("observer",o),("maxlinkdim",TTNKit.maxlinkdim(dmrg.ttn))])
 	modify_data_jld2(metadata_update,o.file_path,"metadata")
+	modify_data_jld2(densmat_update,o.file_path,"all_data")
 end
 
 function TTNKit.ITensors.checkdone!(o::SavingNRGVarObserver;kwargs...)
