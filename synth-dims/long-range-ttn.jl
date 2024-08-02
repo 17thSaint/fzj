@@ -229,7 +229,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	restricted_size = get(kwargs, :restricted_size, [phys_edge_length,virt_edge_length])
 	if_periodic_virt = get(kwargs, :if_periodic_synth, false)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
-	println("Checking periodicity $if_periodic_phys and $if_periodic_virt")
+	#println("Checking periodicity $if_periodic_phys and $if_periodic_virt")
 	if_per = [if_periodic_phys,if_periodic_virt]
 	if_hopping = get(kwargs, :if_hopping, true)
 	if_nn_int = get(kwargs, :if_nn_int, false)
@@ -1357,7 +1357,7 @@ function get_normal_model_params(params_dict::Dict)
 		mag_off = alpha == 0.0
 	end
 	if_check_fluxes = get(params_dict, "if_check_fluxes", true)
-	if_check_fluxes ? check_fluxes(alpha,phys_edge_length,synth_edge_length,if_periodic_phys,if_periodic_synth) : nothing
+	if_check_fluxes ? check_fluxes(alpha,phys_edge_length,synth_edge_length,if_periodic_phys,if_periodic_synth,flux_direction) : nothing
 
 
 	# What to calculate
@@ -1562,7 +1562,7 @@ if false
 end
 
 #
-if false
+if true
 
 	cols = ["b","g","r"]
 	#nnst = 0.0
@@ -1589,7 +1589,7 @@ if false
 	#tws = range(0.0,1.0,length=10)
 	#for tw1 in tws
 	#for tw2 in tws
-		#params_dict = Dict([("hopping_anisotropy",1.0),("es_count",2),("tw1",tw1),("if_synth_rectangle",false),("particles",4),("layers",4),("mdim",50),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
+		#params_dict = Dict([("hopping_anisotropy",1.0),("es_count",2),("particles",2),("layers",4),("mdim",10),("if_save_data",true),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		open_cores = get(params_dict, "open_cores", 5)

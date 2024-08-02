@@ -184,7 +184,8 @@ function separate_filename_location(filename::String)
 		actual_filename = fullsplit[end]
 		return location,actual_filename
 	else
-		error("No directory splits in input: $filename")
+		println("No directory splits in input: $filename")
+		return nothing,filename
 	end
 end
 
@@ -330,6 +331,14 @@ function check_duplicates(file_name)
 		println("Found Duplicate File, renaming $file_name")
 	end
 	return rename,file_name
+end
+
+function check_duplicates(filename,location)
+	og_loc = pwd()
+	cd(location)
+	result = check_duplicates(filename)
+	cd(og_loc)
+	return result
 end
 
 function prep_file(file_name,desired_type)

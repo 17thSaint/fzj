@@ -1008,7 +1008,7 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 			else
 				write_data_jld2(filename,ttn_data_dict,location,merge(metadata,new_metadata))
 			end=#
-			if_continuous_saving || if_redo ? save_ttn(sp.ttn,new_metadata,actual_filename,densmat; kwargs...) : save_ttn(sp.ttn,metadata,actual_filename,densmat; kwargs...)
+			if_continuous_saving || if_redo ? save_ttn(sp.ttn,new_metadata,actual_filename,densmat; kwargs...) : save_ttn(sp.ttn,metadata,actual_filename,densmat; kwargs...,if_redo=if_redo)
 		end
 
 		
@@ -1142,7 +1142,7 @@ function find_excited_states(num_layers::Int,num_excited_states::Int,particle_co
 				nothing
 			end
 			metadata["maxlinkdim_$es_number"] = TTNKit.maxlinkdim(new_sp.ttn)=#
-			new_metadata::Dict{String,Any} = Dict([("observer_$es_number",new_obs),("runtime_$es_number",runtime),("energies_$es_number",new_obs.nrg),("maxlinkdim_$es_number",TTNKit.maxlinkdim(new_sp.ttn))])
+			new_metadata::Dict{String,Any} = Dict([("location",metadata["location"]),("observer_$es_number",new_obs),("runtime_$es_number",runtime),("energies_$es_number",new_obs.nrg),("maxlinkdim_$es_number",TTNKit.maxlinkdim(new_sp.ttn))])
 			metadata = merge(metadata,new_metadata)
 			#=wavefunc_dict::Dict{String,Any} = if_gpu ? Dict([("ttn_$es_number",back2cpu(new_sp.ttn))]) : Dict([("ttn_$es_number",new_sp.ttn)])
 			densmat_dict::Dict{String,Any} = if_densmat ? Dict([("densmat_$es_number",new_densmat)]) : Dict()
@@ -1258,7 +1258,7 @@ function find_spectrum(model_paras::Dict,num_excited_states::Int,metadata::Dict;
 	end
 end
 
-function save_excited_ttn(ttn::TTNKit.TreeTensorNetwork,metadata::Dict,actual_filename::String,es_number::String,densmat::Matrix{ComplexF64}=zeros(ComplexF64,1,1); kwargs...)
+function save_excited_ttn(ttn::TTNKit.TreeTensorNetwork,metadata::Dict,actual_filename::String,es_number::Int,densmat::Matrix{ComplexF64}=zeros(ComplexF64,1,1); kwargs...)
 	if_gpu = kwargs[:if_gpu]
 
 	wavefunc_dict::Dict{String,Any} = if_gpu ? Dict([("ttn_$es_number",back2cpu(ttn))]) : Dict([("ttn_$es_number",ttn)])
@@ -1356,6 +1356,21 @@ function save_initial_ttn(ttn::TTNKit.TreeTensorNetwork,metadata::Dict; kwargs..
 	end
 	return actual_filename
 end
+
+function convert_data_separatewavefunc(filename::String)
+	location,actual_filename = separate_filename_location(filename)
+	!(isnothing(location)) ? (d,m) = read_data_jld2(filename) : error("No location given")
+	for (key,value) in d
+		if occursin("ttn",key)
+			if !isnothing(value)
+				if_rename,newname = check_duplicates("wavefunc" * actual_filename,location)
+				if_rename ? modify_data_jld2(Dict([(key,value)]),location * "/wavefunc" * actual_filename) : write_data_jld2("wavefunc"*actual_filename,Dict([(key,value)]),location)
+				modify_data_jld2(Dict([(key,nothing)]),filename)
+			end
+		end
+	end
+end
+
 
 mutable struct NRGVarObserver <: AbstractObserver
     var_tol::Float64
