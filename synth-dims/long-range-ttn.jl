@@ -1460,12 +1460,9 @@ function run_synth_dims_generic(params_dict::Dict)
 	if_exists,found_data = if_find_data ? check_data_exists(filename_dict,"ttn"; location=model_paras[:location],output_level=false) : (false,nothing)
 
 	if if_exists
+		if_wavefunc = !isnothing(found_data[1]["ttn"])
 		if es_count > 0 # when need excited states start by counting how many inside the data file
-			if "densmat" in keys(found_data[1])
-				count_found_states = Int(length(keys(found_data[1]))/2)
-			else
-				count_found_states = length(keys(found_data[1])) 
-			end
+			count_found_states = length(findall(x -> occursin("ttn",x),collect(keys(found_data[1]))))
 
 			if count_found_states < es_count + 1 # found states less than asked for count means run for higher states
 				println("Not Enough States in Data File, Running for $(es_count - count_found_states + 1) more States")
@@ -1484,12 +1481,12 @@ function run_synth_dims_generic(params_dict::Dict)
 				densmats = Vector{Matrix{ComplexF64}}(undef,es_count+1)
 				obss = Vector{TTNKit.AbstractObserver}(undef,es_count+1)
 				runtimes = zeros(es_count+1)
-				ortho_states[1] = found_data[1]["ttn"]
+				if_wavefunc ? ortho_states[1] = found_data[1]["ttn"] : nothing
 				densmats[1] = found_data[1]["densmat"]
 				obss[1] = found_data[2]["observer"]
 				runtimes[1] = found_data[2]["runtime"]
 				for i in 2:es_count+1
-					ortho_states[i] = found_data[1]["ttn_$(i-1)"]
+					if_wavefunc ? ortho_states[i] = found_data[1]["ttn_$(i-1)"] : nothing
 					densmats[i] = found_data[1]["densmat_$(i-1)"]
 					obss[i] = found_data[2]["observer_$(i-1)"]
 					runtimes[i] = found_data[2]["runtime_$(i-1)"]
@@ -1500,7 +1497,7 @@ function run_synth_dims_generic(params_dict::Dict)
 
 		else # if only ask for the ground state then if data if found then have all needed results
 			println("Found Data")
-			wavefunc = found_data[1]["ttn"]
+			wavefunc = if_wavefunc ? found_data[1]["ttn"] : nothing
 			dens = found_data[1]["densmat"]
 			rezobs = found_data[2]["observer"]
 			ham = found_data[2]["ham"]
