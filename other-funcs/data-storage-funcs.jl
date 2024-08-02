@@ -414,6 +414,7 @@ function write_data_jld2(file_name::AbstractString,data::Dict,location=pwd(),met
 	end
 	
 	close(binary_file)
+	save(file_name, load(file_name))
 	cd(og_location)
 	println("Data Added, File Closed: $file_name")
 	return file_name
@@ -505,6 +506,7 @@ function modify_data_jld2(key_to_modify::String, new_value, file_path, which_gro
     
     # Close the JLD2 file
     close(jld_file)
+	save(file_path, load(file_path))
 	return split(file_path,"/")[end]
 end
 
@@ -535,6 +537,7 @@ function modify_data_jld2(to_modify_dict::Dict,file_path, which_group="all_data"
 
 	# Close the JLD2 file
 	close(jld_file)
+	save(file_path, load(file_path))
 	return split(file_path,"/")[end]
 end
 
