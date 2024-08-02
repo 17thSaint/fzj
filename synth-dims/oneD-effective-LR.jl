@@ -1,5 +1,5 @@
-include("fqh_effective.jl")
 include("long-range-ttn.jl")
+include("fqh_effective.jl")
 #using PyPlot
 
 function fix_filling(L,nflavors,nu)
@@ -214,11 +214,18 @@ if false
 	mpsfiles = allfiles[findall(x -> occursin("mps",x),allfiles)]
 	for f in mpsfiles
 			d,m = read_data_jld2("../cluster-data/synth-dims/excited-states/"*f; output_level=0)
-			nrgs = Vector{Float64}(undef,2)
+			nrgs = Vector{Float64}(undef,3)
 			nrgs[1] = m["observer"].energies[end]
 			nrgs[2] = m["observer_1"].energies[end]
-			println("At density $(round(m["nbosons"]/m["L"],digits=4)) with splitting ",nrgs[1] - nrgs[2])
+			nrgs[3] = m["observer_2"].energies[end]
+			for i in 1:3
+				change = 0.05
+            	shift = (i - 3/2) * ((0.1*change)/(3/2))
+				scatter(m["nbosons"]/m["L"] + shift,(nrgs[i] - nrgs[1])/m["L"],c=cols[i])
+			end
 	end
+	xlabel("1D Density")
+	ylabel("NRG - E0")
 
 end
 
@@ -230,10 +237,15 @@ if true
 		#denssets = [(8,4,4),(4,8,4),(6,8,4),(7,6,6),(8,5,5),(9,5,5)]
 		#oneDdensities = [c[end]/c[1] for c in denssets]
 		#for (lx,ly,n) in denssets
-		#all_configs = get_all_densities(19,smallest_density=0.9,number_to_keep=5)
-		#for which_config in 1:5
-			lx,ly,n = 4,4,2
-			params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("es_count",nev-1),("nrgtol",1e-6),("mdim",300),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_save_data",true)])
+		all_configs = get_all_densities(19,smallest_density=0.5,number_to_keep=30,smallest_sitecount=30)
+		params_dict = make_args_dict(ARGS)
+		which_configs = all_configs[5*params_dict["config_number"]+1:5*params_dict["config_number"]+5]
+		for (lx,ly,n) in which_configs
+			#lx,ly,n = 4,4,2
+			#params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("es_count",nev-1),("nrgtol",1e-6),("mdim",300),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_save_data",true)])
+			params_dict["Lphys"] = lx
+			params_dict["Lsynth"] = ly
+			params_dict["particles"] = n
 			model_paras,found_data = get_1deff_model_params(params_dict)
 			if isnothing(found_data)
 				if model_paras[:es_count] > 0
@@ -254,6 +266,7 @@ if true
 					nrgs[i+1] = found_data[2]["observer_$(i)"].energies[end]
 				end
 			end
+			display(nrgs)
 			#=xxs = tws
 			for i in 1:model_paras[:es_count]+1
 				#=change = abs(xxs[1] - xxs[2])
@@ -264,7 +277,7 @@ if true
 			end
 			xlabel("1D Density")
 			ylabel("NRG - E0")=#
-		#end
+		end
 end
 
 if false

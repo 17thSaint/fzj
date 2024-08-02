@@ -1,5 +1,5 @@
-#using Pkg
-#Pkg.activate(".")
+using Pkg
+Pkg.activate(".")
 include("../review-practice-codes/ttn.jl")
 using Profile,MKL
 
