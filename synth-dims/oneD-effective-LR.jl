@@ -47,6 +47,8 @@ function get_1deff_model_params(params_dict::Dict)
 
 
 	# Hamiltonian parameters
+	if_remapping = get(params_dict, "if_remapping", if_periodic_phys)
+	remapping = if_remapping ? remapping_nnn(Lphys) : collect(1:Lphys)
 	alpha = get(params_dict, "alpha", nothing)
 	flux_direction = get(params_dict,"flux_direction", "phys")
 	if if_periodic_synth && !if_periodic_phys
@@ -114,6 +116,7 @@ function get_1deff_model_params(params_dict::Dict)
 						"nbosons"=>num_particles,
 						"L"=>Lphys,
 						"nflavors"=>Lsynth,
+						"remapping"=>remapping,
 						"ts"=>hopping_amplitude,
 						"syms"=>syms,
 						"cutoff"=>cutoff,
@@ -195,7 +198,7 @@ function get_all_densities(Lmax; kwargs...)
 	return configurations
 end
 
-nev = 2
+nev = 1
 cols = ["b","g","r","m","c"]
 if nev > length(cols)
 	cols = repeat(cols,ceil(Int,nev/length(cols)))
@@ -214,19 +217,26 @@ if false
 	mpsfiles = allfiles[findall(x -> occursin("mps",x),allfiles)]
 	for f in mpsfiles
 			d,m = read_data_jld2("../cluster-data/synth-dims/excited-states/"*f; output_level=0)
+			if m["L"] * m["nflavors"] < 10
+				continue
+			end
+			if m["maxlinkdim"] == 400
+				continue
+			else
+				println("MaxDim is ",m["maxlinkdim"]," while given is ",m["mdim"])
+			end
 			nrgs = Vector{Float64}(undef,3)
-			nrgs[1] = m["observer"].energies[end]
-			nrgs[2] = m["observer_1"].energies[end]
-			nrgs[3] = m["observer_2"].energies[end]
+			nrgs[1] = abs(m["observer"].energies[end] - m["observer"].energies[end-1]) < m["nrgtol"] ? m["observer"].energies[end] : 10000.0
+			nrgs[2] = abs(m["observer_1"].energies[end] - m["observer_1"].energies[end-1]) < m["nrgtol"] ? m["observer_1"].energies[end] : 10000.0
+			nrgs[3] = "observer_2" in keys(m) ? m["observer_2"].energies[end] : 10000.0
 			for i in 1:3
 				change = 0.05
-            	shift = (i - 3/2) * ((0.1*change)/(3/2))
-				scatter(m["nbosons"]/m["L"] + shift,(nrgs[i] - nrgs[1])/m["L"],c=cols[i])
+            	shift = 0.0#(i - 3/2) * ((0.1*change)/(3/2))
+				scatter(m["nbosons"]/m["L"] + shift,(nrgs[i] - nrgs[1])/(1.0),c=cols[i])#m["L"]*m["nflavors"]
 			end
 	end
 	xlabel("1D Density")
 	ylabel("NRG - E0")
-
 end
 
 
@@ -237,12 +247,12 @@ if true
 		#denssets = [(8,4,4),(4,8,4),(6,8,4),(7,6,6),(8,5,5),(9,5,5)]
 		#oneDdensities = [c[end]/c[1] for c in denssets]
 		#for (lx,ly,n) in denssets
-		all_configs = get_all_densities(19,smallest_density=0.5,number_to_keep=30,smallest_sitecount=30)
-		params_dict = make_args_dict(ARGS)
-		which_configs = all_configs[5*params_dict["config_number"]+1:5*params_dict["config_number"]+5]
-		for (lx,ly,n) in which_configs
-			#lx,ly,n = 4,4,2
-			#params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("es_count",nev-1),("nrgtol",1e-6),("mdim",300),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_save_data",true)])
+		#all_configs = get_all_densities(19,smallest_density=0.5,number_to_keep=30,smallest_sitecount=30)
+		#params_dict = make_args_dict(ARGS)
+		#which_configs = all_configs[5*params_dict["config_number"]+1:5*params_dict["config_number"]+5]
+		#for (lx,ly,n) in which_configs
+			lx,ly,n = 6,5,5
+			params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("if_remapping",false),("if_find_data",false),("es_count",nev-1),("nrgtol",1e-6),("mdim",100),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_save_data",false)])
 			params_dict["Lphys"] = lx
 			params_dict["Lsynth"] = ly
 			params_dict["particles"] = n
@@ -253,7 +263,7 @@ if true
 				else
 					psi,rho,nrg = execute_mps(model_paras[:phi],model_paras[:L],model_paras[:nflavors],model_paras[:nbosons]; model_paras...,metadata=named_tuple_to_dict(model_paras))
 				end
-			else
+			else-
 				psis = Vector{MPS}(undef,found_data[2]["es_count"]+1)
 				rhos = Vector{Array}(undef,found_data[2]["es_count"]+1)
 				nrgs = Vector{Float64}(undef,found_data[2]["es_count"]+1)
@@ -266,7 +276,7 @@ if true
 					nrgs[i+1] = found_data[2]["observer_$(i)"].energies[end]
 				end
 			end
-			display(nrgs)
+			display(nrg)
 			#=xxs = tws
 			for i in 1:model_paras[:es_count]+1
 				#=change = abs(xxs[1] - xxs[2])
@@ -277,7 +287,7 @@ if true
 			end
 			xlabel("1D Density")
 			ylabel("NRG - E0")=#
-		end
+		#end
 end
 
 if false

@@ -301,6 +301,7 @@ function hamiltonian(t_strength::Float64, phi::Float64, U1::Float64, U2::Float64
 	#if_current = get(kwargs, :if_current, false)
 	#current_strength = get(kwargs, :current_strength, 0.0)
 	twist_angle = kwargs[:twist_angle]
+	remapping = kwargs[:remapping]
 	
 	ampo = OpSum()
 	for j in 1:L
@@ -319,8 +320,10 @@ function hamiltonian(t_strength::Float64, phi::Float64, U1::Float64, U2::Float64
 			coeff = get_inter_coeff((j,s),(next_site,s),t_strength,phi,L,nflavors+1; kwargs...) 
 			twist ? coeff *= exp(im*2*pi*twist_angle[1]) : nothing
 			coeff = round(coeff,digits=8)
-			ampo += (coeff, "Cr$s", j, "Anh$s", next_site)
-			ampo += (conj(coeff), "Anh$s", j, "Cr$s", next_site)
+			tn_physical = remapping[j]
+			tn_physical_next = remapping[next_site]
+			ampo += (coeff, "Cr$s", tn_physical, "Anh$s", tn_physical_next)
+			ampo += (conj(coeff), "Anh$s", tn_physical, "Cr$s", tn_physical_next)
 		end
 
 		# attractive physical nearest neighbor density interaction
@@ -368,8 +371,9 @@ function hamiltonian(t_strength::Float64, phi::Float64, U1::Float64, U2::Float64
 			coeff = get_inter_coeff((j,s),(j,next_site),t_strength,phi,L,nflavors+1; kwargs...) 
 			twist ? coeff *= exp(im*2*pi*twist_angle[2]) : nothing
 			coeff = round(coeff,digits=8)
-			ampo += (coeff, "Cr$(next_site) * Anh$(s)", j)
-			ampo += (conj(coeff), "Cr$(s) * Anh$(next_site)", j)
+			tn_physical = remapping[j]
+			ampo += (coeff, "Cr$(next_site) * Anh$(s)", tn_physical)
+			ampo += (conj(coeff), "Cr$(s) * Anh$(next_site)", tn_physical)
 		end
 	end
 
@@ -956,6 +960,69 @@ function plot_distance_correlation(dists,corrs,corr_errors; kwargs...)
 	ylabel("Correlation")
 	title(title_string)
 end
+
+function e_entropy(M::MPS, l::Int)
+        
+	# get length of MPS
+	L = length(M)
+	
+	# catch errors where the cut is "outside of the system"
+	if l < 1 || l >= L
+		return 0.0
+	end
+	
+	# shifting the center of orthogonality to site l
+	ITensors.orthogonalize!(M, l)
+	
+	# perform a singular value decomposition / Schmidt decomposition
+	U,S,V = svd(M[l], (linkind(M, l)))#, siteind(M, l)))
+	
+	# set entropy to zero
+	res = 0.0
+	
+	# loop over all diagonal elements of S
+	for i in 1:size(S, 1)
+		res += -2.0 * S[i,i]^2 * log(S[i,i]) # = - S² * log(S²)
+	end
+
+	return res
+end
+
+
+cc_fit(x,p) = exp(p[1] / 6) .* (p[2]*2*L/pi) .* sin.((pi/(2*L)).*x)
+
+function central_charge(M::MPS; kwargs...)
+	if_plot = get(kwargs, :if_plot, true)
+
+	L = length(M)
+	st,en = 1,L-1
+
+	ee = exp.([e_entropy(M,i) for i in st:en])
+	ee1 = ee[1:2:end]
+	ee2 = ee[2:2:end-1]
+
+	xs = collect(st:2:en)
+	fit1 = curve_fit(cc_fit, xs, ee1, [1.0, 0.0])
+	fit2 = curve_fit(cc_fit, xs[1:end-1] .+ 1, ee2, [1.0, 0.0])
+
+	if if_plot
+		fig = figure()
+		#scatter(collect(st:en),ee,c="r",label="Exp")
+		scatter(xs,ee1,c="r",label="Exp")
+		scatter(xs[1:end-1] .+ 1,ee2,c="g",label="Exp")
+		#ys = cc_fit(collect(st:en),fit.param)
+		#display(ys)
+		#plot(collect(st:en),ys; label="c=$(round(fit.param[1],digits=3))")
+		plot(xs,cc_fit(xs,fit1.param),label="c1=$(round(fit1.param[1],digits=3))")
+		plot(xs[1:end-1] .+ 1,cc_fit(xs[1:end-1] .+ 1,fit2.param),label="c2=$(round(fit2.param[1],digits=3))")
+		legend()
+		xlabel("L")
+		ylabel("Entanglement Entropy")
+	end
+
+	return fit.param[1],fit.param[2],ee
+end
+
 
 function normalize_densmat(dens_mat::Matrix,part_count::Int; kwargs...)
 	if_log = get(kwargs, :if_log, false)
