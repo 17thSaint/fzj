@@ -2147,7 +2147,7 @@ if true
     #lx = 6
     #n = 3
     #for (idx,n) in enumerate([2,3,4,5])
-    intstrens = range(0.0,20.0,length=40)
+    intstrens = range(0.0,5.0,length=10)
     #other_intstrens = range(2.0,10.0,length=37)
     #intstrens = sort([intstrens; other_intstrens])
     #change = 0.001
@@ -2177,7 +2177,7 @@ if true
         #change_nrgs = zeros(Float64,3)
         #for (ii,change) in enumerate([0,0.0001,0.0002])
         change = 0.0
-        params_dict = Dict([("Lx",6),("Ly",6),("N",3),("tw1",0.0),("tw2",0.0),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",15),("if_find_data",false),("if_save_data",false)])
+        params_dict = Dict([("Lx",4),("Ly",8),("N",6),("tw1",0.0),("tw2",0.0),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",15),("if_find_data",false),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
         # set number of open cores

@@ -1617,7 +1617,7 @@ if false
 	#tws = range(0.0,1.0,length=10)
 	#for tw1 in tws
 	#for tw2 in tws
-		#params_dict = Dict([("hopping_anisotropy",1.0),("es_count",2),("particles",2),("layers",4),("mdim",10),("if_save_data",true),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",0),("particles",4),("layers",5),("if_synth_rectangle",true),("mdim",200),("if_save_data",false),("filling",0.5),("onsite_strength",1.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		open_cores = get(params_dict, "open_cores", 5)
@@ -1633,7 +1633,7 @@ if false
 			scatter(tw1,all_results[3][i].nrg[end],c=cols[i])
 		end=#
 
-		#get_occupancy(all_results[1]; densmat=all_results[end])
+		occs = get_occupancy(all_results[1]; densmat=all_results[end])
 		#=bothoccs = []
 		for i in 1:params_dict["es_count"]+1
 			append!(bothoccs,[get_occupancy(all_results[1][i]; densmat=all_results[end-1][i], plot_title="Level $(i-1) NRG=$(round(all_results[3][i].nrg[end],digits=4))")])

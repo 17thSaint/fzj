@@ -905,7 +905,7 @@ function find_dist(p1::Tuple{Int,Int}, p2::Tuple{Int,Int}, size::Tuple{Int,Int},
         dy = min(dy, size[2] - dy)
     end
 
-    return sqrt(dx^2 + dy^2)
+    return sqrt(dx^2 + dy^2),(dx,dy)
 end
 
 function physical_distance_correlation(psi::MPS; kwargs...)
@@ -1019,6 +1019,36 @@ function e_entropy(M::MPS, l::Int)
 	end
 
 	return res
+end
+
+
+function cdw_structure_factor(qvec::Tuple,psi::MPS,phys_len::Int,synth_len::Int; kwargs...)
+	if_periodic_phys = get(kwargs, :if_periodic_phys, true)
+	if_periodic_synth = get(kwargs, :if_periodic_synth, true)
+	remapping = kwargs[:remapping]
+
+	#lat = TTNKit.physical_lattice(TTNKit.network(psi))
+	#phys_len,synth_len = size(lat)[1],size(lat)[2]
+
+	occs = get_occupancy(psi; if_plot=false,remapping=remapping)
+
+	struc_fact = 0.0
+	for j in 1:phys_len
+		for s in 1:synth_len
+			p1 = (j,s)
+			#p1_linear = TTNKit.linear_ind(lat,p1)
+			for jj in 1:phys_len
+				for ss in 1:synth_len
+					p2 = (jj,ss)
+					#p2_linear = TTNKit.linear_ind(lat,p2)
+					#println("Working on $(p1) and $(p2)")
+					dist = find_dist(p1, p2, (phys_len,synth_len), (if_periodic_phys,if_periodic_synth))[2]
+					struc_fact += occs[p1[1],p1[2]] * occs[p2[1],p2[2]] * exp(im * dot(qvec,dist))
+				end
+			end
+		end
+	end
+	return struc_fact / sum(occs)
 end
 
 

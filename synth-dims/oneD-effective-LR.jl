@@ -198,7 +198,7 @@ function get_all_densities(Lmax; kwargs...)
 	return configurations
 end
 
-nev = 4
+nev = 2
 cols = ["b","g","r","m","c"]
 if nev > length(cols)
 	cols = repeat(cols,ceil(Int,nev/length(cols)))
@@ -256,7 +256,7 @@ if true
 			lx,ly,n = 9,6,3#which_configs[i]#6,5,5
 			#lx = Int(3*n)
 			#ly = Int(2*n)
-			params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("es_count",nev-1),("nrgtol",1e-6),("mdim",400),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
+			params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("es_count",nev-1),("nrgtol",1e-6),("mdim",400),("if_remapping",true),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
 			params_dict["Lphys"] = lx
 			params_dict["Lsynth"] = ly
 			params_dict["particles"] = n
@@ -282,9 +282,18 @@ if true
 			end
 			for i in 1:nev
 				get_occupancy(psis[i]; remapping=model_paras[:remapping],plot_title="E$i=$(round(nrgs[i],digits=4)) N = $n")
+				xs = range(0.0,stop=4*pi,length=100)
+				scdw = real.([cdw_structure_factor((x,0),psis[i],lx,ly; remapping=model_paras[:remapping]) for x in xs])
+				fig = figure()
+				plot(xs ./ pi,scdw)
+				title("CDW Structure Factor E$i=$(round(nrgs[i],digits=4)) N = $n")
 			end
-			#s1occ = get_occupancy(psis[1]; if_3d=true, remapping=model_paras[:remapping],plot_title="E1 Phys=$(params_dict["if_periodic_phys"]), Synth=$(params_dict["if_periodic_synth"]) N = $n")
-			#s2occ = get_occupancy(psis[2]; if_3d=true, remapping=model_paras[:remapping],plot_title="E2 Phys=$(params_dict["if_periodic_phys"]), Synth=$(params_dict["if_periodic_synth"]) N = $n")
+			#=get_occupancy(psi; remapping=model_paras[:remapping],plot_title="N = $n")
+			xs = range(0.0,stop=4*pi,length=100)
+			scdw = abs.([cdw_structure_factor((x,0),psi,lx,ly; remapping=model_paras[:remapping]) for x in xs])
+			fig = figure()
+			plot(xs ./ pi,scdw)
+			title("CDW Structure Factor")=#
 
 			#plot(model_paras[:observer].energies .- model_paras[:observer].energies[end],label="$(params_dict["if_remapping"])")
 			#yscale("log")
