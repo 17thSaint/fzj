@@ -1,5 +1,5 @@
-using Pkg
-Pkg.activate(".")
+#using Pkg
+#Pkg.activate(".")
 include("../review-practice-codes/ttn.jl")
 using Profile,MKL
 
@@ -1524,6 +1524,37 @@ function run_synth_dims_generic(params_dict::Dict)
 		return og_ttn, hamilt, gs_sp, gs_obs, gs_runtime, gs_dens
 	else
 		return all_states, hamilt, all_obs, all_densmats, all_runtimes
+	end
+end
+
+if false
+	here = pwd()
+	cd("../cluster-data/synth-dims/excited-states/")
+	files = readdir()
+	cd(here)
+	for f in files
+		nrgs = []
+		if occursin("ttn",f)
+			data,metadata = read_data_jld2(f,"../cluster-data/synth-dims/excited-states/")
+			if !metadata["if_periodic_phys"] || metadata["particles"] != 4 || !metadata["if_periodic_synth"]
+				continue
+			end
+			append!(nrgs,metadata["observer"].nrg[end])
+			if "observer_1" in keys(metadata)
+				append!(nrgs,metadata["observer_1"].nrg[end])
+			end
+			if "observer_2" in keys(metadata)
+				append!(nrgs,metadata["observer_2"].nrg[end])
+			end
+			if "observer_3" in keys(metadata)
+				append!(nrgs,metadata["observer_3"].nrg[end])
+			end
+			for i in 1:length(nrgs)
+				scatter3D(metadata["onsite_strength"],metadata["hopping_anisotropy"],nrgs[i] - nrgs[1],c=cols[i])
+			end
+			xlabel("Onsite Strength")
+			ylabel("Hopping Anisotropy")
+		end
 	end
 end
 

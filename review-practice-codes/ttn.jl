@@ -1800,9 +1800,16 @@ function get_occupancy(densmat::Matrix; kwargs...)
 	if_save_data = get(kwargs, :if_save_data, false)
 	if_save_fig = get(kwargs, :if_save_fig, false)
 	if_plot = get(kwargs, :if_plot, true)
+	if_3d = get(kwargs, :if_3d, false)
 
 	if_save_data ? save_occupancy(exp_occ; kwargs...) : nothing
-	if_plot	|| if_save_fig ? plot_occupancy(exp_occ; kwargs...) : nothing
+	if if_plot
+		if if_3d
+			plot_occupancy_3d(exp_occ; kwargs...)
+		else
+			plot_occupancy(exp_occ; kwargs...)
+		end
+	end
 
 	return exp_occ
 end
@@ -1836,6 +1843,27 @@ function plot_occupancy(exp_occ; kwargs...)
 		fig_name = check_plot_label(fig_name,"occs")
 		save_figure(fig_name; kwargs...)
 	end
+	return
+end
+
+function plot_occupancy_3d(exp_occ; kwargs...)
+	m,n = size(exp_occ)
+
+	x = collect(1:m)  # x-coordinates (1 to m)
+	y = collect(1:n)  # y-coordinates (1 to n)
+
+	# Create the corresponding z-values from the matrix
+	z = exp_occ
+
+	# Now, we need to turn x, y, z into vectors for scatter3D
+	# Use the function `repeat` and `vec` to flatten them
+	x_flat = repeat(x, n)     # Repeat x n times
+	y_flat = repeat(y', m)    # Repeat each y m times
+	z_flat = vec(z)           # Flatten the matrix into a vector
+
+	# Create the 3D scatter plot
+	fig = figure()
+	scatter3D(x_flat, y_flat, z_flat)
 	return
 end
 

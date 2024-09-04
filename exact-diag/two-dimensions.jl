@@ -2140,14 +2140,14 @@ end
         
     
 
-if false
+if true
     #fig = figure()
     #xlabel("Hopping Anisotropy")
     #ylabel("Gap")
     #lx = 6
     #n = 3
     #for (idx,n) in enumerate([2,3,4,5])
-    #intstrens = range(0.0,3.0,length=20)
+    intstrens = range(0.0,20.0,length=40)
     #other_intstrens = range(2.0,10.0,length=37)
     #intstrens = sort([intstrens; other_intstrens])
     #change = 0.001
@@ -2165,7 +2165,7 @@ if false
     #for (idx,nu) in enumerate(nus)
     #for (idx,anis) in enumerate(anises)
     #sigmas = vcat([1/i for i in 1:5],[i for i in 2:5])#vcat(range(1.0,5.0,length=5),[100.0])
-    #for (idx,intstren) in enumerate(intstrens)
+    for (idx,intstren) in enumerate(intstrens)
     #for (idx2,sigma) in enumerate(sigmas)
     #for lrd in [0,1]
     #tws = range(0.0,1.0,length=20)
@@ -2177,7 +2177,7 @@ if false
         #change_nrgs = zeros(Float64,3)
         #for (ii,change) in enumerate([0,0.0001,0.0002])
         change = 0.0
-        params_dict = Dict([("Lx",4),("Ly",4),("N",2),("tw1",0.0),("tw2",0.0),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",10000.0),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+        params_dict = Dict([("Lx",6),("Ly",6),("N",3),("tw1",0.0),("tw2",0.0),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",15),("if_find_data",false),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
         # set number of open cores
@@ -2312,7 +2312,7 @@ if false
             scatter(intstren,nrgs_2nd_derivative,c="r")
         end=#
 
-        #=xxs = intstrens
+        xxs = intstrens
         for i in 1:running_args.nev
             change = abs(xxs[1] - xxs[2])
             xval = xxs[idx]
@@ -2325,7 +2325,7 @@ if false
         #xlabel("Flux")
         #xlabel("Theta_x / 2pi")
         #ylabel("Theta_y")
-        ylabel("NRG")=#
+        ylabel("NRG - E0")#
         #xlabel("Hopping Anisotropy tx/ty")
         #title("4x4 N=2, Anis=$(hamilt_params["hopping_anisotropy"])")
         #title("Topological Degeneracy Closing in Thermodynamic Limit")#
@@ -2351,7 +2351,7 @@ if false
         end=#
 
 
-    #end
+    end
     #end
 
     #=plot3D(xs,ys,nrgs1 .- nrgs1,label="E1")

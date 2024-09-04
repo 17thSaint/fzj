@@ -198,7 +198,7 @@ function get_all_densities(Lmax; kwargs...)
 	return configurations
 end
 
-nev = 1
+nev = 4
 cols = ["b","g","r","m","c"]
 if nev > length(cols)
 	cols = repeat(cols,ceil(Int,nev/length(cols)))
@@ -247,12 +247,16 @@ if true
 		#denssets = [(8,4,4),(4,8,4),(6,8,4),(7,6,6),(8,5,5),(9,5,5)]
 		#oneDdensities = [c[end]/c[1] for c in denssets]
 		#for (lx,ly,n) in denssets
+		#which_configs = get_all_densities(15,smallest_sitecount=100)
 		#all_configs = get_all_densities(19,smallest_density=0.5,number_to_keep=30,smallest_sitecount=30)
 		#params_dict = make_args_dict(ARGS)
 		#which_configs = all_configs[5*params_dict["config_number"]+1:5*params_dict["config_number"]+5]
 		#for (lx,ly,n) in which_configs
-			lx,ly,n = 6,5,5
-			params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("if_remapping",false),("if_find_data",false),("es_count",nev-1),("nrgtol",1e-6),("mdim",100),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_save_data",false)])
+		#for n in 2:6
+			lx,ly,n = 9,6,3#which_configs[i]#6,5,5
+			#lx = Int(3*n)
+			#ly = Int(2*n)
+			params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("es_count",nev-1),("nrgtol",1e-6),("mdim",400),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
 			params_dict["Lphys"] = lx
 			params_dict["Lsynth"] = ly
 			params_dict["particles"] = n
@@ -264,19 +268,27 @@ if true
 					psi,rho,nrg = execute_mps(model_paras[:phi],model_paras[:L],model_paras[:nflavors],model_paras[:nbosons]; model_paras...,metadata=named_tuple_to_dict(model_paras))
 				end
 			else-
-				psis = Vector{MPS}(undef,found_data[2]["es_count"]+1)
-				rhos = Vector{Array}(undef,found_data[2]["es_count"]+1)
+				#psis = Vector{MPS}(undef,found_data[2]["es_count"]+1)
+				#rhos = Vector{Array}(undef,found_data[2]["es_count"]+1)
 				nrgs = Vector{Float64}(undef,found_data[2]["es_count"]+1)
-				psis[1] = found_data[1]["mps"]
-				rhos[1] = found_data[1]["densmat"]
+				#psis[1] = "mps" in keys(found_data[1]) ? found_data[1]["mps"] : nothing
+				#rhos[1] = found_data[1]["densmat"]
 				nrgs[1] = found_data[2]["observer"].energies[end]
 				for i in 1:found_data[2]["es_count"]
-					psis[i+1] = found_data[1]["mps_$(i)"]
-					rhos[i+1] = found_data[1]["densmat_$(i)"]
+					#psis[i+1] = "mps_$i" in keys(found_data[1]) ? found_data[1]["mps_$(i)"] : nothing
+					#rhos[i+1] = found_data[1]["densmat_$(i)"]
 					nrgs[i+1] = found_data[2]["observer_$(i)"].energies[end]
 				end
 			end
-			display(nrg)
+			for i in 1:nev
+				get_occupancy(psis[i]; remapping=model_paras[:remapping],plot_title="E$i=$(round(nrgs[i],digits=4)) N = $n")
+			end
+			#s1occ = get_occupancy(psis[1]; if_3d=true, remapping=model_paras[:remapping],plot_title="E1 Phys=$(params_dict["if_periodic_phys"]), Synth=$(params_dict["if_periodic_synth"]) N = $n")
+			#s2occ = get_occupancy(psis[2]; if_3d=true, remapping=model_paras[:remapping],plot_title="E2 Phys=$(params_dict["if_periodic_phys"]), Synth=$(params_dict["if_periodic_synth"]) N = $n")
+
+			#plot(model_paras[:observer].energies .- model_paras[:observer].energies[end],label="$(params_dict["if_remapping"])")
+			#yscale("log")
+			#legend()
 			#=xxs = tws
 			for i in 1:model_paras[:es_count]+1
 				#=change = abs(xxs[1] - xxs[2])

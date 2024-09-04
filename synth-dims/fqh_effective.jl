@@ -410,8 +410,10 @@ end
 function get_occupancy(wavefunc::MPS; kwargs...)
 	L,nflavors = get_mps_dims(wavefunc)
 	if_squared = get(kwargs, :if_squared, false)
+	remapping = kwargs[:remapping]
 	
 	if_plot = get(kwargs, :if_plot, true)
+	if_3d = get(kwargs, :if_3d, false)
 	if_save_data = get(kwargs, :if_save_data, false)
 	if if_save_data
 		location = get(kwargs, :location, pwd())
@@ -426,9 +428,15 @@ function get_occupancy(wavefunc::MPS; kwargs...)
 		if if_squared
 			loc_op = "Ns$(s) * Ns$(s)"
 		end
-		occ_mat[:, s] = expect(wavefunc, loc_op)
+		occ_mat[:, s] = expect(wavefunc, loc_op)[remapping]
 	end
-	if_plot ? mps_plot_occupancy(occ_mat,L,nflavors; kwargs...) : nothing
+	if if_plot
+		if if_3d
+			mps_plot_occupancy_3d(occ_mat; kwargs...)
+		else
+			mps_plot_occupancy(occ_mat,L,nflavors; kwargs...)
+		end
+	end
 	data_dict = Dict([("vals",occ_mat)])
 	if_save_data ? write_data_jld2(filename,data_dict,location,metadata) : nothing
 	
@@ -706,6 +714,31 @@ function mps_plot_occupancy(occ_mat,L,nflavors; kwargs...)
 		filename = check_plot_label(filename,"occs")
 	end
 	if_save_fig ? save_figure(filename; location=location) : nothing
+	return
+end
+
+function mps_plot_occupancy_3d(exp_occ; kwargs...)
+	m,n = size(exp_occ)
+
+	x = collect(1:m)  # x-coordinates (1 to m)
+	y = collect(1:n)  # y-coordinates (1 to n)
+
+	# Create the corresponding z-values from the matrix
+	z = exp_occ
+
+	# Now, we need to turn x, y, z into vectors for scatter3D
+	# Use the function `repeat` and `vec` to flatten them
+	x_flat = repeat(x, n)     # Repeat x n times
+	y_flat = sort(repeat(y, m))    # Repeat each y m times
+	z_flat = vec(z)           # Flatten the matrix into a vector
+
+	# Create the 3D scatter plot
+	title_string = "Occupancy, " * get(kwargs, :plot_title, "")
+	fig = figure()
+	scatter3D(x_flat, y_flat, z_flat)
+	ylabel("Virtual Dim")
+	xlabel("Physical Dim")
+	title(title_string)
 	return
 end
 
