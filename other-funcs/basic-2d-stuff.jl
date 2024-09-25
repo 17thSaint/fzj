@@ -39,7 +39,19 @@ function bin_values(vector::Vector{T}, num_bins::Int) where T
 end
 
 # checks integer number of fluxes and then if periodic checks maintaining magnetic translations
-function check_fluxes(alpha::Float64,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_y::Bool,flux_direction::String,if_error::Bool=true)
+function check_fluxes(alpha::Float64,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_y::Bool,flux_direction::String; kwargs...)
+    if_error = get(kwargs,:if_error,true)
+    if_ed = get(kwargs,:if_ed,true)
+
+    # needs to be general to ttn and ed
+    if if_ed
+        if flux_direction == "x"
+            flux_direction = "phys"
+        elseif flux_direction == "y"
+            flux_direction = "synth"
+        end
+    end
+
     if alpha == 0.0
         return nothing
     end
@@ -85,6 +97,15 @@ function check_fluxes(alpha::Float64,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_
     if if_periodic_y && !isinteger(num_fluxes/Ly)
         error("Number of fluxes is not an integer multiple of Ly")
     end=#
+
+    # convert flux_direction back to x or y if ED
+    if if_ed
+        if flux_direction == "phys"
+            flux_direction = "x"
+        elseif flux_direction == "synth"
+            flux_direction = "y"
+        end
+    end
 
     return flux_direction
 end

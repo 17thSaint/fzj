@@ -13,7 +13,36 @@ Depends on:
 =#
 ######################################################
 
-include_other_files(["other-funcs/basic-2d-stuff.jl","two-dimensions.jl","observables.jl","hatsugai-mbcn.jl","plottings.jl"])
+#using Pkg
+#Pkg.activate(".")
+
+function find_center()
+	all_folders = split(pwd(),"/")
+	if "fzj" in all_folders
+		return "fzj"
+	elseif "local" in all_folders
+		return all_folders[findfirst(x -> all_folders[x] == "local",1:length(all_folders))+1]
+	elseif "Local" in all_folders
+		return all_folders[findfirst(x -> all_folders[x] == "Local",1:length(all_folders))+1]
+	else
+		println("Not sure where the center is: $(pwd())")
+	end
+end
+
+function include_other_files(all_files,output_level=0)
+	center = find_center()
+	get_to_fzj = split(pwd(),center)[1]
+	if typeof(all_files) == String
+		all_files = [all_files]
+	end
+	for file in all_files
+		occursin("main-git",pwd()) ? include(get_to_fzj * center * "/main-git/" * file) : include(get_to_fzj * center * "/" * file)
+		output_level > 0 ? println("Included $file") : nothing
+	end
+end
+
+
+include_other_files(["other-funcs/basic-2d-stuff.jl","exact-diag/two-dimensions.jl","exact-diag/observables.jl","exact-diag/hatsugai-mbcn.jl","exact-diag/plottings.jl"])
 
 function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     if hamilt_params["U"][2] == 0.0
@@ -285,36 +314,36 @@ if true
     #args_dict = Dict([("which_twist_angle",1)])
     lx,ly,n = 4,4,2
 
+    # set number of open cores
+    open_cores = 5#get(params_dict, "open_cores", 5)
+    if typeof(open_cores) != String
+        BLAS.set_num_threads(open_cores)
+        display(BLAS.get_config())
+    end
+
     tws = range(0.0,1.0,length=11)
     #omegas = zeros(ComplexF64,length(tws),length(tws))
     #gammas1::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
     #gammas2::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
-    ref_multiplets,rm1_name,rm2_name = get_reference_multiplets(lx,ly,n)
+    #ref_multiplets,rm1_name,rm2_name = get_reference_multiplets(lx,ly,n)
     #cps = zeros(Float64,length(tws))    tws[args_dict["which_twist_angle"]]
     for (idx,tw1) in enumerate(tws)
-    for (idx2,tw2) in enumerate(tws)
+    #for (idx2,tw2) in enumerate(tws)
     #for tw1 in tws
     #for ii in 1:1
-        params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
+        params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",0.33),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
-
-        # set number of open cores
-        open_cores = get(params_dict, "open_cores", 5)
-        if typeof(open_cores) != String
-            BLAS.set_num_threads(open_cores)
-            display(BLAS.get_config())
-        end
 
         states,nrgs,rhos,filename = run_normal_ed(params_dict)
 
-        
+        #plot_spectrum(collect(tws),nrgs,idx,params_dict["nev"],"Theta / 2 pi",true)
 
         gamma1,gamma2,omega = get_hatsugaifull(states[1],states[2],ref_multiplets; if_save=false)
         
 
 
     end
-    end
+    #end
 
 end
 

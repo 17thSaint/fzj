@@ -12,9 +12,6 @@ Depends on:
 =#
 ######################################################
 
-include("execute-ed.jl")
-
-
 
 # 2D phase diagram of hopping anisotropy vs interaction strength and energy gap
 # needs testing, not sure about the commented out stuff
@@ -202,7 +199,7 @@ function quick_spectrum_closedopen(which_one::String="closed")
 
 end
 
-function plot_spectrum(xxs::Vector,nrgs::Vector,nev::Int,xstring::String="x",if_diff::Bool=true; kwargs...)
+function plot_spectrum(xxs::Vector,nrgs::Vector,idx::Int,nev::Int,xstring::String="x",if_diff::Bool=true; kwargs...)
     plot_title = get(kwargs,:title,"")
 
     cols = ["b","g","r","m","c"]

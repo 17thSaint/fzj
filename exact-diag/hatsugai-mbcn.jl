@@ -93,7 +93,7 @@ function get_hatsugaifull(gs1::Vector{ComplexF64},gs2::Vector{ComplexF64},refere
     if_save = get(kwargs,:if_save,false)
 
     gamma1::ComplexF64 = get_gamma(gs1,gs2,reference_multiplets[1:2]; if_save=false)
-    gamma1::ComplexF64 = get_gamma(gs1,gs2,reference_multiplets[3:4]; if_save=false)
+    gamma2::ComplexF64 = get_gamma(gs1,gs2,reference_multiplets[3:4]; if_save=false)
     omega::ComplexF64 = get_omega(gs1,gs2,reference_multiplets; if_save=false)
 
     if if_save
