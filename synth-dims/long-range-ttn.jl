@@ -1,6 +1,7 @@
 #using Pkg
 #Pkg.activate(".")
 include("../review-practice-codes/ttn.jl")
+include("../other-funcs/basic-2d-stuff.jl")
 using Profile,MKL
 
 function spin_matrix_element(m1,m2,spin,direction::String)
@@ -241,6 +242,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	centralflux_strength = get(kwargs, :centralflux_strength, 0.0)
 	twist_angle = get(kwargs, :twist_angle, [0.0,0.0])
 	#hopping_anisotropy = get(kwargs, :hopping_anisotropy, 1.0) t_phys / t_synth = anisotropy
+	if_pfaffian = kwargs[:if_pfaffian]
 	
 	interaction_axis_length = which_dir == "virt" ? virt_edge_length : phys_edge_length
 	long_range_strengths = long_range_scaling(scaling_distance,interaction_axis_length,onsite_strength; kwargs...)
@@ -356,15 +358,15 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 			if stren == 0.0
 				continue
 			else
-				if idx == 1
-					#=for j in TTNKit.eachindex(lat)
+				if idx == 1 && if_pfaffian
+					for j in TTNKit.eachindex(lat)
 						s_coord = TTNKit.coordinate(lat,j)
 						if s_coord[1] > restricted_size[1] || s_coord[2] > restricted_size[2]
 							continue
 						end
 						interaction += (stren,"N * N",s_coord)
 						interaction -= (stren,"N",s_coord)
-					end=#
+					end
 					continue
 				else
 					for j in TTNKit.eachindex(lat)
@@ -1180,7 +1182,7 @@ function average_close_keys(dict, bin_width)
 	return averaged_dict
 end
 
-function check_fluxes(alpha,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_y::Bool,flux_direction::String,if_error=true)
+#=function check_fluxes(alpha,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_y::Bool,flux_direction::String,if_error=true)
     if alpha == 0.0
         return nothing
     end
@@ -1228,7 +1230,7 @@ function check_fluxes(alpha,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_
     end=#
 
     return flux_direction
-end
+end=#
 
 function memory_usage(psi::TreeTensorNetwork)
 	number_of_numbers = 0
@@ -1314,11 +1316,12 @@ function get_normal_model_params(params_dict::Dict)
 
 
 	# Hamiltonian parameters
+	if_pfaffian = get(params_dict, "if_pfaffian", false)
 	alpha = get(params_dict, "alpha", nothing)
 	flux_direction = get(params_dict,"flux_direction", "phys")
 	if_synth_rectangle ? flux_direction = "synth" : nothing
 	if if_periodic_synth && !if_periodic_phys
-        flux_direction = "synth"
+	    flux_direction = "synth"
     elseif !if_periodic_synth && if_periodic_phys
         flux_direction = "phys"
     end
@@ -1361,6 +1364,7 @@ function get_normal_model_params(params_dict::Dict)
 
 
 	# What to calculate
+	if_redo = get(params_dict, "if_redo", false)
 	if_densmat = get(params_dict, :if_densmat, true)
 	save_data = get(params_dict, "if_save_data", true)
 	if_cluster = any([occursin("local",pwd()),occursin("Local",pwd()),occursin("geraghty",pwd())])
@@ -1380,6 +1384,9 @@ function get_normal_model_params(params_dict::Dict)
 	end
 	if es_count > 0
 		dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
+	end
+	if if_pfaffian
+		dataloc = get_folder_location("cluster-data/pfaffian")
 	end
 	loc = get(params_dict, "dataloc", dataloc)
 	
@@ -1401,10 +1408,12 @@ function get_normal_model_params(params_dict::Dict)
 						"ts"=>hopping_amplitude,
 						"syms"=>syms,
 						"cutoff"=>cutoff,
+						"if_pfaffian"=>if_pfaffian,
 						"twist_angle"=>twist_angle,
 						"if_continuous_saving"=>if_continuous_saving,
 						"nrgtol"=>nrgtol,
 						"if_densmat"=>if_densmat,
+						"if_redo"=>if_redo,
 						"restricted_size"=>make_smaller_lattice,
 						"centralflux_strength"=>centralflux_strength,
 						"if_pinning_pot"=>if_pinning,
@@ -1497,10 +1506,12 @@ function run_synth_dims_generic(params_dict::Dict)
 
 		else # if only ask for the ground state then if data if found then have all needed results
 			println("Found Data")
-			wavefunc = if_wavefunc ? found_data[1]["ttn"] : nothing
-			dens = found_data[1]["densmat"]
-			rezobs = found_data[2]["observer"]
-			ham = found_data[2]["ham"]
+			og_ttn = if_wavefunc ? found_data[1]["ttn"] : nothing
+			gs_dens = found_data[1]["densmat"]
+			gs_obs = found_data[2]["observer"]
+			hamilt = found_data[2]["ham"]
+			gs_runtime = found_data[2]["runtime"]
+			gs_sp = nothing
 		end
 	else # if no data found then run from scratch starting from the ground state
 		println("Starting Script using $(model_paras[:particles]) particles on $(2^model_paras[:layers]) sites with Flux = $(round(model_paras[:alpha],digits=4)), Bond Dim = $(model_paras[:mdim]), and Long Range Dist = $(model_paras[:lr])")
@@ -1561,7 +1572,7 @@ end
 if false
 	cols = ["b","r","g","k"]
 	dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
-	pdict = Dict([("layers",6),("particles",4),("hopping_anisotropy",1.0),("if_periodic_phys",true),("if_periodic_synth",true)])
+	pdict = Dict([("layers",6),("particles",8),("hopping_anisotropy",1.0),("if_periodic_phys",true),("if_periodic_synth",true)])
 	allfiles = find_data_file(pdict,"ttn",dataloc)
 	for (idx,f) in enumerate(allfiles)
 		data,metadata = read_data_jld2(f,dataloc)
@@ -1589,6 +1600,116 @@ if false
 	title("Spectrum for 8x8, N=4, flux=0.125 (pi/4)")
 end
 
+# pfaffian on-cluster c2/c3 calculation and saving
+if false
+	open_cores = 5#get(params_dict, "open_cores", 5)
+	if typeof(open_cores) != String
+		BLAS.set_num_threads(open_cores)	
+		display(BLAS.get_config())
+	end
+
+	og_loc = pwd()
+	data_loc = get_folder_location("cluster-data/pfaffian")
+	cd(data_loc)
+	all_files = readdir()
+	cd(og_loc)
+	for f in all_files
+		if occursin("wavefuncttn",f)
+			other_f = string(split(f,"wavefunc")[2])
+			d,m = read_data_jld2(dataloc*"/"*other_f; output_level=0)
+			if !("c2_value" in keys(m)) && !("c3_value" in keys(m))
+				println("Didn't find c2/c3 values, calculating for file $other_f")
+				data = read_data_jld2(data_loc*"/"*f; output_level=0)
+				c2val,c3val = c23(data["ttn"])
+				new_data_dict = Dict([("c2_value",c2val),("c3_value",c3val)])
+				modify_data_jld2(new_data_dict,data_loc*"/"*other_f,"metadata")
+				println("Saved c2/c3 values")
+			end
+		end
+	end
+
+end
+
+# pfaffian plotting c2/c3 saved values
+if true
+	#params_dict = Dict([("particles",4),("layers",6),("if_periodic_phys",false),("if_periodic_synth",true)])
+	params_dict = Dict([("alpha",0.1429),("layers",6),("if_periodic_phys",false),("if_periodic_synth",true)])
+	data_loc = get_folder_location("cluster-data/pfaffian")
+	allfiles = find_data_file(params_dict,"ttn",data_loc)
+	c2vals = []
+	c3vals = []
+	fillings = []
+	nrgs = []
+	bdims = []
+	for f in allfiles
+		data,metadata = read_data_jld2(f,data_loc; output_level=0)
+		#typeof(check_fluxes(metadata["alpha"],Int(sqrt(2^metadata["layers"])),Int(sqrt(2^metadata["layers"])),metadata["if_periodic_phys"],metadata["if_periodic_synth"],metadata["flux_direction"],false)) == Bool ? println("No") : println("Yes")
+		if !("c2_value" in keys(metadata)) || !("c3_value" in keys(metadata))
+			println("Didn't find C2/C3 value at $f")
+			continue
+		end
+		push!(c2vals,metadata["c2_value"]/metadata["particles"])
+		push!(c3vals,metadata["c3_value"]/metadata["particles"])
+		nu = metadata["particles"] / (metadata["alpha"] * (8*7))
+		push!(fillings,nu)
+		#push!(nrgs,metadata["observer"].nrg[end]/metadata["particles"])
+		#push!(bdims,metadata["maxlinkdim"])
+	end
+	fig = figure()
+	scatter(fillings,c2vals,c="b")
+	xlabel("Filling")
+	title("C2")
+
+	fig = figure()
+	scatter(fillings,c3vals,c="r")
+	xlabel("Filling")
+	title("C3")
+
+	#=fig = figure()
+	scatter(fillings,nrgs,c="k")
+	xlabel("Filling")
+	title("Ground State Energy per Particle")=#
+
+	#=fig = figure()
+	scatter(fillings,bdims,c="g")
+	xlabel("Filling")
+	title("Max Link Dim")=#
+end
+
+# pfaffian search
+if false
+
+	#=open_cores = 5#get(params_dict, "open_cores", 5)
+	if typeof(open_cores) != String
+		BLAS.set_num_threads(open_cores)	
+		display(BLAS.get_config())
+	end=#
+
+	nps = collect(2:15)
+	#nus = range(0.3,stop=0.7,length=20)
+	#for (idx,nu) in enumerate(nus)
+	Threads.@threads for (idx,np) in enumerate(nps)
+	#for (idx,bonddim) in enumerate([50,75,100,125,150,175,200])
+	#nu = 1.0
+		params_dict = Dict([("particles",np),("layers",6),("mdim",40),("if_save_data",false),("if_pfaffian",true),("if_check_fluxes",true),("alpha",1/7),("onsite_strength",2.0),("lr",0),("if_periodic_phys",false),("if_periodic_synth",true),("max_occ",3)])
+		#lx,ly = get_shape(params_dict["layers"],false)
+		#nu = np / (params_dict["alpha"] * (lx-1)*ly)
+		#println("Doing filling = $(round(nu,digits=4))")
+		all_results = run_synth_dims_generic(params_dict)
+		#=c2val,c3val = c23(all_results[1]; densmat=all_results[end], if_plot=false)
+		if idx == 1
+			scatter(nu,c2val,c="b",label="C2")
+			scatter(nu,c3val,c="r",label="C3")
+			legend()
+			xlabel("Filling")
+		else
+			scatter(nu,c2val,c="b")
+			scatter(nu,c3val,c="r")
+		end=#
+		#occs = get_occupancy(all_results[1]; densmat=all_results[end])
+	end
+end
+
 #
 if false
 
@@ -1611,13 +1732,13 @@ if false
 	#anises = range(1.0,5.0,length=10)
 	#strens = range(0.0,5.0,length=10)
 	#alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
-	#strens = range(0.1,0.5,length=3)
+	#strens = [0.0,0.5,1.0,1.5,2.0]#range(0.1,0.5,length=3)
 	#for (idx,anis) in enumerate(anises)
 	#for (idx,stren) in enumerate(strens)
 	#tws = range(0.0,1.0,length=10)
 	#for tw1 in tws
 	#for tw2 in tws
-		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",0),("particles",4),("layers",5),("if_synth_rectangle",true),("mdim",200),("if_save_data",false),("filling",0.5),("onsite_strength",1.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",0),("particles",4),("layers",6),("mdim",20),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",false),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		open_cores = get(params_dict, "open_cores", 5)

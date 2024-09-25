@@ -198,7 +198,7 @@ function get_all_densities(Lmax; kwargs...)
 	return configurations
 end
 
-nev = 2
+nev = 1
 cols = ["b","g","r","m","c"]
 if nev > length(cols)
 	cols = repeat(cols,ceil(Int,nev/length(cols)))
@@ -253,7 +253,7 @@ if true
 		#which_configs = all_configs[5*params_dict["config_number"]+1:5*params_dict["config_number"]+5]
 		#for (lx,ly,n) in which_configs
 		#for n in 2:6
-			lx,ly,n = 9,6,3#which_configs[i]#6,5,5
+			lx,ly,n = 4,8,4#which_configs[i]#6,5,5
 			#lx = Int(3*n)
 			#ly = Int(2*n)
 			params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("es_count",nev-1),("nrgtol",1e-6),("mdim",400),("if_remapping",true),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
@@ -280,20 +280,31 @@ if true
 					nrgs[i+1] = found_data[2]["observer_$(i)"].energies[end]
 				end
 			end
-			for i in 1:nev
+			#=for i in 1:nev
 				get_occupancy(psis[i]; remapping=model_paras[:remapping],plot_title="E$i=$(round(nrgs[i],digits=4)) N = $n")
 				xs = range(0.0,stop=4*pi,length=100)
 				scdw = real.([cdw_structure_factor((x,0),psis[i],lx,ly; remapping=model_paras[:remapping]) for x in xs])
 				fig = figure()
 				plot(xs ./ pi,scdw)
 				title("CDW Structure Factor E$i=$(round(nrgs[i],digits=4)) N = $n")
-			end
-			#=get_occupancy(psi; remapping=model_paras[:remapping],plot_title="N = $n")
+			end=#
+			occs = get_occupancy(psi; remapping=model_paras[:remapping],plot_title="N = $n")
 			xs = range(0.0,stop=4*pi,length=100)
-			scdw = abs.([cdw_structure_factor((x,0),psi,lx,ly; remapping=model_paras[:remapping]) for x in xs])
+			scdw = zeros(ComplexF64,length(xs),length(xs))
+			for (i,x) in enumerate(xs)
+				for (j,y) in enumerate(xs)
+					scdw[i,j] = cdw_structure_factor((x,y),psi,lx,ly; remapping=model_paras[:remapping], occs=occs)
+				end
+			end
 			fig = figure()
-			plot(xs ./ pi,scdw)
-			title("CDW Structure Factor")=#
+			imshow(real.(scdw))
+			title("Real CDW Structure Factor")
+			colorbar()
+
+			fig = figure()
+			imshow(imag.(scdw))
+			title("Imaginary CDW Structure Factor")
+			colorbar()
 
 			#plot(model_paras[:observer].energies .- model_paras[:observer].energies[end],label="$(params_dict["if_remapping"])")
 			#yscale("log")

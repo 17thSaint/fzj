@@ -1026,11 +1026,14 @@ function cdw_structure_factor(qvec::Tuple,psi::MPS,phys_len::Int,synth_len::Int;
 	if_periodic_phys = get(kwargs, :if_periodic_phys, true)
 	if_periodic_synth = get(kwargs, :if_periodic_synth, true)
 	remapping = kwargs[:remapping]
+	occs = get(kwargs, :occs, nothing)
 
 	#lat = TTNKit.physical_lattice(TTNKit.network(psi))
 	#phys_len,synth_len = size(lat)[1],size(lat)[2]
 
-	occs = get_occupancy(psi; if_plot=false,remapping=remapping)
+	if isnothing(occs)
+		occs = get_occupancy(psi; if_plot=false,remapping=remapping)
+	end
 
 	struc_fact = 0.0
 	for j in 1:phys_len

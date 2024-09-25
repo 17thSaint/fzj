@@ -234,14 +234,15 @@ function find_data_file(params_dict,calc_type,location="/home/patrick/fzj/main-g
 			try
 				current_file_params_dict[params] in params_dict[params] ? nothing : append!(remove_indices,i)
 			catch
-				try
+				#=try
 					#println("Error in first Attempt, $current_file")
 					current_file_metadata_dict = read_data_jld2(current_file; kwargs...)[2]
 					current_file_metadata_dict[params] in params_dict[params] ? nothing : append!(remove_indices,i)
 				catch
 					#println("Parameter $params could not be found in file $current_file, skipping")
 					append!(remove_indices,i)
-				end
+				end=#
+				append!(remove_indices,i)
 			end
 		end
 	end
@@ -289,6 +290,7 @@ function check_data_exists(params_dict::Dict,data_type::String; kwargs...)
 	else
 		if length(possible_files) > 1
 			println("Too Many files")
+			display(possible_files)
 			return false,nothing
 		else
 			return true,read_data_jld2(possible_files[1],location; kwargs...)

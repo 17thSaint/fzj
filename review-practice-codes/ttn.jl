@@ -375,6 +375,21 @@ function get_current_xfunc(ttn; kwargs...)
 	return all_xvals,all_currents
 end
 
+function get_shape(layers::Int,if_synth_rectangle::Bool=false)
+	if layers % 2 != 0
+		phys_edge_length = Int(sqrt(2^(layers+1)))
+		virt_edge_length = Int(phys_edge_length / 2)
+	else
+		edge_length = Int(sqrt(2^layers))
+		phys_edge_length = edge_length
+		virt_edge_length = edge_length
+	end
+	if if_synth_rectangle
+		phys_edge_length = Int(sqrt(2^(layers+1)))
+		virt_edge_length = Int(sqrt(2^(layers-1)))
+	end
+	return phys_edge_length,virt_edge_length
+end
 
 function get_chain_hofstadter(edge_length,u_strength,t_strength,phi; kwargs...)
 	onsite = TTNKit.OpSum()
@@ -1316,7 +1331,7 @@ end
 function save_initial_ttn(ttn::TTNKit.TreeTensorNetwork,metadata::Dict; kwargs...)
 	if_densmat = kwargs[:if_densmat]
 	if_gpu = kwargs[:if_gpu]
-	if_redo = kwargs[:if_redo]
+	if_redo = get(kwargs, :if_redo, false)
 	location = kwargs[:location]
 	filename = kwargs[:name]
 
@@ -1864,6 +1879,68 @@ function plot_occupancy_3d(exp_occ; kwargs...)
 	# Create the 3D scatter plot
 	fig = figure()
 	scatter3D(x_flat, y_flat, z_flat)
+	return
+end
+
+function c2(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+	if_c3 = get(kwargs, :if_c3, false)
+	if_plot = get(kwargs, :if_plot, false)
+	
+	n1 = get_occupancy(wavefunc; kwargs...,if_plot=false)
+	n2 = real.(TTNKit.expect(wavefunc,"N * N")) ./ sum(n1)
+
+	if_plot ? plot_c2(n1,n2; kwargs...) : nothing
+
+	if if_c3
+		return n1,n2
+	else
+		return sum(n2 .- n1)
+	end
+end
+
+function plot_c2(n1::Matrix,n2::Matrix; kwargs...)
+	fig = figure()
+	imshow(n2 .- n1)
+	colorbar()
+	title_string = "C2" * get(kwargs, :plot_title, "")
+	title(title_string)
+	return
+end
+
+function c3(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+	if_plot = get(kwargs, :if_plot, false)
+
+	n1,n2 = c2(wavefunc; if_c3=true,kwargs...,if_plot=false)
+	n3 = real.(TTNKit.expect(wavefunc,"N * N * N")) ./ sum(n1)
+
+	if_plot ? plot_c3(n1,n2,n3; kwargs...) : nothing
+
+	return sum(n3 .- 3*n2 .+ 2*n1)
+end
+
+function plot_c3(n1::Matrix,n2::Matrix,n3::Matrix; kwargs...)
+	fig = figure()
+	imshow(n3 .- 3*n2 .+ 2*n1)
+	colorbar()
+	title_string = "C3" * get(kwargs, :plot_title, "")
+	title(title_string)
+	return
+end
+
+function c23(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+	if_plot = get(kwargs, :if_plot, false)
+
+	n1,n2 = c2(wavefunc; if_c3=true,kwargs...,if_plot=false)
+	n3 = real.(TTNKit.expect(wavefunc,"N * N * N")) ./ sum(n1)
+
+	if_plot ? plot_c23(n1,n2,n3; kwargs...) : nothing
+
+	return sum(n2 .- n1),sum(n3 .- 3*n2 .+ 2*n1)
+end
+
+function plot_c23(n1::Matrix,n2::Matrix,n3::Matrix; kwargs...)
+	plot_c2(n1,n2; kwargs...)
+	plot_c3(n1,n2,n3; kwargs...)
 	return
 end
 
@@ -2499,62 +2576,6 @@ function plot_physical_correlation(phys_corrs::Array{Float64,2}; kwargs...)
     yscale("log")
     return nothing
 end
-
-#=
-
-#final_time = 0.1
-if_per = false
-mag_off = true
-evolve = true
-chemical = false
-mu = 0.5
-#max_occupation = 3
-bc_string = get_periodic_title_string(if_per)
-mag_string = get_mag_string(mag_off)
-expan = TTNKit.DefaultExpander(0.5)
-#us = 1.0
-ts = 0.01
-nu = 1/2
-layers = 6
-tot_sites = 2^layers
-edge_sites = Int(sqrt(2^layers))
-alpha = 1/edge_sites
-num_particles = Int(edge_sites/2)#get_particles_needed(layers; nu=nu)#tot_sites - 
-mdim = 70
-nswps = 3
-
-println("Using $num_particles particles on $tot_sites sites")
-
-
-og_ttn, hamilt, dm_sp = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
-
-rez1 = get_occupancy(dm_sp.ttn)
-rez2 = get_current_yfunc(dm_sp.ttn)
-rez3 = get_ydir_greenfunc(dm_sp.ttn)
-rez4 = get_xdir_greenfunc(dm_sp.ttn)
-=#
-#=
-og_ttn_pin, hamilt_pin, dm_sp_pin = build_full_harperhofstadter(layers,num_particles,ts,nu; max_dim=mdim, num_sweeps=nswps,phi=alpha, if_periodic=if_per,max_occ=1,if_pinning_pot=true,if_sweep=evolve,sweep_type="dmrg",expander=expan,if_chem=chemical,chem_strength=mu,no_magF=mag_off,output_level=0)
-
-rez4 = get_occupancy(dm_sp_pin.ttn; plot_title="Pinning")
-rez5 = get_current_yfunc(dm_sp_pin.ttn; plot_title="Pinning")
-rez6 = get_ydir_greenfunc(dm_sp_pin.ttn; plot_title="Pinning")
-
-fig = figure()
-imshow(rez1 - rez4)
-colorbar()
-title("Difference btw Pinning Potential")
-=#
-
-#=rez6 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
-rez5 = get_xdir_greenfunc(Int(sqrt(2^layers)),dm_sp.ttn; direction="reverse",plot_title="$bc_string")
-rez4 = get_current_xfunc(Int(sqrt(2^layers)),dm_sp.ttn; plot_title="$bc_string")
-
-=#
-#end
-#
-#all_paths = get_all_sites_paths_and_plot(dm_sp.ttn,edge_sites; likely_path=true)
-
 
 
 
