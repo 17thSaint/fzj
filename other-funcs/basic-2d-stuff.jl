@@ -42,6 +42,7 @@ end
 function check_fluxes(alpha::Float64,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_y::Bool,flux_direction::String; kwargs...)
     if_error = get(kwargs,:if_error,true)
     if_ed = get(kwargs,:if_ed,true)
+    output_level = kwargs[:output_level]
 
     # needs to be general to ttn and ed
     if if_ed
@@ -60,17 +61,17 @@ function check_fluxes(alpha::Float64,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_
     end
     x_shift,y_shift = !if_periodic_x, !if_periodic_y
     num_fluxes::Float64 = round(alpha*(Lx - x_shift) * (Ly - y_shift),digits=5)
-    if_error ? println("Number of Fluxes = ",num_fluxes," for Lx = ",Lx," and Ly = ",Ly) : nothing
+    if_error && output_level > 0 ? println("Number of Fluxes = ",num_fluxes," for Lx = ",Lx," and Ly = ",Ly) : nothing
     if !isinteger(num_fluxes)
         if_error ? error("Number of fluxes is not an integer") : return false
     end
 
-	if_error ? println("Checking fluxes only along Gauge Direction") : nothing
+	if_error && output_level > 0 ? println("Checking fluxes only along Gauge Direction") : nothing
     if flux_direction == "synth"
         if if_periodic_x && !isinteger(num_fluxes/Ly)
             if if_periodic_y && isinteger(num_fluxes/Lx)
                 flux_direction = "phys"
-                if_error ? println("Fluxes don't fit, changing to X direction") : nothing
+                if_error && output_level > 0 ? println("Fluxes don't fit, changing to X direction") : nothing
             else
                 if_error ? error("Number of fluxes is not an integer multiple of Lx") : return false
             end
@@ -79,7 +80,7 @@ function check_fluxes(alpha::Float64,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_
         if if_periodic_y && !isinteger(num_fluxes/Lx)
             if if_periodic_x && isinteger(num_fluxes/Ly)
                 flux_direction = "synth"
-                if_error ? println("Fluxes don't fit, changing to Y direction") : nothing
+                if_error && output_level > 0 ? println("Fluxes don't fit, changing to Y direction") : nothing
             else
                 if_error ? error("Number of fluxes is not an integer multiple of Ly") : return false
             end

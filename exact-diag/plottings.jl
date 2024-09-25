@@ -221,6 +221,109 @@ function plot_spectrum(xxs::Vector,nrgs::Vector,idx::Int,nev::Int,xstring::Strin
     return
 end
 
+function plot_gamma_fromsaveddata(lx::Int,ly::Int,N::Int,which_gamma::Int; kwargs...)
+    intstren = get(kwargs,:interaction_strength,0.0)
+    hanis = get(kwargs,:hopping_anisotropy,1.0)
+    ref_twists = get(kwargs,:ref_twists,[0.33,0.67])
+    bin_count = get(kwargs,:bin_count,100)
+
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    params_dict = Dict([("Lx",lx),("Ly",ly),("N",N),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren),("hopping_anisotropy",hanis)])
+    files = find_data_file(params_dict,"ed",dataloc; output_level=0)
+
+    theta_xs::Vector{Float64} = []
+    theta_ys::Vector{Float64} = []
+    gammas_mag::Vector{Float64} = []
+    #gammas_phase::Vector{Float64} = []
+    for f in files
+        filename_dict = get_params_dict_from_filename(f)
+        try
+            if filename_dict["twist_angle1"] in ref_twists || filename_dict["twist_angle2"] in ref_twists
+                continue
+            end
+        catch
+            continue
+        end
+
+        data,metadata = read_data_jld2(f,dataloc;output_level=0)
+        append!(theta_xs,filename_dict["twist_angle1"])
+        append!(theta_ys,filename_dict["twist_angle2"])
+        append!(gammas_mag,abs(metadata["gamma$(which_gamma)"]))
+        #append!(gammas_phase,angle(metadata["gamma$(which_gamma)"]))
+    end
+    
+    data_dict_mag = bin_values(gammas_mag,bin_count)
+    gmag = [data_dict_mag[val] for val in gammas_mag]
+    min_gammas_mag, max_gammas_mag = minimum(gammas_mag), maximum(gammas_mag)
+    normalized_gmag = [(val - minimum(gmag)) / (maximum(gmag) - minimum(gmag)) * (max_gammas_mag - min_gammas_mag) + min_gammas_mag for val in gmag]
+
+    fig = figure()
+    scatter(theta_xs, theta_ys, c=normalized_gmag, cmap="viridis")
+    colorbar()
+    xlabel("Theta_x / 2pi")
+    ylabel("Theta_y / 2pi")
+    title("Magnitude of Gamma$(which_gamma)")
+end
+
+function plot_omega_fromsaveddata(lx::Int,ly::Int,N::Int; kwargs...)
+    intstren = get(kwargs,:interaction_strength,0.0)
+    hanis = get(kwargs,:hopping_anisotropy,1.0)
+    ref_twists = get(kwargs,:ref_twists,[0.33,0.67])
+    bin_count = get(kwargs,:bin_count,100)
+
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    params_dict = Dict([("Lx",lx),("Ly",ly),("N",N),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren),("hopping_anisotropy",hanis)])
+    files = find_data_file(params_dict,"ed",dataloc; output_level=0)
+
+    theta_xs::Vector{Float64} = []
+    theta_ys::Vector{Float64} = []
+    omegas_mag::Vector{Float64} = []
+    omegas_phase::Vector{Float64} = []
+    for f in files
+        filename_dict = get_params_dict_from_filename(f)
+        try
+            if filename_dict["twist_angle1"] in ref_twists || filename_dict["twist_angle2"] in ref_twists
+                continue
+            end
+        catch
+            continue
+        end
+
+        data,metadata = read_data_jld2(f,dataloc;output_level=0)
+        append!(theta_xs,filename_dict["twist_angle1"])
+        append!(theta_ys,filename_dict["twist_angle2"])
+        append!(omegas_mag,abs(metadata["omega"]))
+        append!(omegas_phase,angle(metadata["omega"])+pi)
+    end
+    
+    data_dict_mag = bin_values(omegas_mag,bin_count)
+    omag = [data_dict_mag[val] for val in omegas_mag]
+    min_omegas_mag, max_omegas_mag = minimum(omegas_mag), maximum(omegas_mag)
+    normalized_omag = [(val - minimum(omag)) / (maximum(omag) - minimum(omag)) * (max_omegas_mag - min_omegas_mag) + min_omegas_mag for val in omag]
+
+    fig = figure()
+    scatter(theta_xs, theta_ys, c=normalized_omag, cmap="viridis")
+    colorbar()
+    title("Magnitude of Omega")
+    xlabel("Theta_x / 2pi")
+    ylabel("Theta_y / 2pi")
+
+    data_dict_angle = bin_values(omegas_phase,bin_count)
+    oang = [data_dict_angle[val] for val in omegas_phase]
+    min_omegas_phase, max_omegas_phase = minimum(omegas_phase), maximum(omegas_phase)
+    normalized_oang = [(val - minimum(oang)) / (maximum(oang) - minimum(oang)) * (max_omegas_phase - min_omegas_phase) + min_omegas_phase for val in oang]
+
+    fig = figure()
+    scatter(theta_xs, theta_ys, c=normalized_oang, cmap="jet")
+    colorbar()
+    title("Phase of Omega")
+    xlabel("Theta_x / 2pi")
+    ylabel("Theta_y / 2pi")
+end
+
+#=plot_gamma_fromsaveddata(6,6,3,1)
+plot_gamma_fromsaveddata(6,6,3,2)
+plot_omega_fromsaveddata(6,6,3)=#
 
 
 

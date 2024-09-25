@@ -10,6 +10,19 @@ Depends on:
 ######################################################
 
 
+function make_new_reference_multiplets(Lx::Int64,Ly::Int64,particles::Int64; kwargs...)
+    tw1 = get(kwargs,:tw1,0.33)
+    tw2 = get(kwargs,:tw2,0.67)
+
+    params_dict1 = Dict([("Lx",Lx),("Ly",Ly),("N",particles),("tw1",tw1),("tw2",tw2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
+    params_dict2 = Dict([("Lx",Lx),("Ly",Ly),("N",particles),("tw1",tw2),("tw2",tw1),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
+
+    rez1 = run_normal_ed(params_dict1)
+    rez2 = run_normal_ed(params_dict2)
+
+    return rez1[end],rez2[end]
+end
+
 function get_reference_multiplets(Lx::Int64,Ly::Int64,particles::Int64; kwargs...)
     dataloc::String = get(kwargs,:dataloc,get_folder_location("cluster-data/exact-diag/torus"))
 
@@ -31,7 +44,7 @@ function get_reference_multiplets(Lx::Int64,Ly::Int64,particles::Int64; kwargs..
     return reference_multiplets,found_data1[2]["filename"],found_data2[2]["filename"]
 end
 
-function save_hatsugai_data(data_dict::Dict{String,ComplexF64},filepath::String,ref_multis_filenames::Vector{String})
+function save_hatsugai_data(data_dict::Dict{String,Any},filepath::String,ref_multis_filenames::Vector{String})
     # put in some checks on the filepath
     for (idx,rmf) in enumerate(ref_multis_filenames)
         data_dict["rm$(idx)_name"] = rmf
@@ -59,7 +72,7 @@ function get_gamma(gs1::Vector{ComplexF64},gs2::Vector{ComplexF64},reference_mul
 
     if if_save
         which_gamma::Int = kwargs[:which_gamma]
-        data_dict::Dict{String,ComplexF64} = Dict([("gamma$(which_gamma)",result)])
+        data_dict::Dict{String,Any} = Dict([("gamma$(which_gamma)",result)])
         filepath::String = kwargs[:filepath]
         save_hatsugai_data(data_dict,filepath,kwargs[:ref_multis_filename],which_gamma)
     end
@@ -80,7 +93,7 @@ function get_omega(gs1::Vector{ComplexF64},gs2::Vector{ComplexF64},reference_mul
     result = det(omega_mat)
 
     if if_save
-        data_dict::Dict{String,ComplexF64} = Dict([("omega",result)])
+        data_dict::Dict{String,Any} = Dict([("omega",result)])
         filepath::String = kwargs[:filepath]
         ref_multis_filenames::Vector{String} = kwargs[:ref_multis_filenames]
         save_hatsugai_data(data_dict,filepath,ref_multis_filenames)
@@ -97,7 +110,7 @@ function get_hatsugaifull(gs1::Vector{ComplexF64},gs2::Vector{ComplexF64},refere
     omega::ComplexF64 = get_omega(gs1,gs2,reference_multiplets; if_save=false)
 
     if if_save
-        data_dict::Dict{String,ComplexF64} = Dict([("gamma1",gamma1),("gamma2",gamma2),("omega",omega)])
+        data_dict::Dict{String,Any} = Dict([("gamma1",gamma1),("gamma2",gamma2),("omega",omega)])
         filepath::String = kwargs[:filepath]
         ref_multis_filenames::Vector{String} = kwargs[:ref_multis_filenames]
         save_hatsugai_data(data_dict,filepath,ref_multis_filenames)

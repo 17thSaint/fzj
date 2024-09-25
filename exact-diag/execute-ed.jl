@@ -187,7 +187,7 @@ function get_normal_model_params_ed(params_dict::Dict)
         flux_dir = "x"
     end
     if_check_fluxes::Bool = get(params_dict,"if_check_fluxes",true)
-    if_check_fluxes ? flux_dir = check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y,flux_dir) : nothing
+    if_check_fluxes ? flux_dir = check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y,flux_dir; output_level=opl) : nothing
 
     disorder_strength::Float64 = get(params_dict,"disorder_strength",0.0)
     hamilt_params::Dict{String,Any} = Dict("alpha"=>alpha,
@@ -200,7 +200,7 @@ function get_normal_model_params_ed(params_dict::Dict)
                         "which_dir"=>which_dir,
                         "interaction_cutoff"=>int_cutoff)
 
-    println("Finished Building Model")
+    opl > 0 && println("Finished Building Model")
     return lattice_params,hamilt_params,running_args
 
 end
@@ -272,10 +272,12 @@ function run_normal_ed(params_dict::Dict; kwargs...)
         end
     end
 
+    filepath = running_args.dataloc * "/" * filename
+
     if running_args.if_function
-        return states,nrgs,rhos,hh,filename
+        return states,nrgs,rhos,hh,filepath,if_exists
     else
-        return states,nrgs,rhos,filename
+        return states,nrgs,rhos,filepath,if_exists
     end
 
 end
@@ -312,60 +314,87 @@ if true
     #for lrd in [0,1]
 
     #args_dict = Dict([("which_twist_angle",1)])
-    lx,ly,n = 4,4,2
+    lx,ly,n = 6,5,3
 
-    # set number of open cores
+    #= set number of open cores
     open_cores = 5#get(params_dict, "open_cores", 5)
     if typeof(open_cores) != String
         BLAS.set_num_threads(open_cores)
         display(BLAS.get_config())
-    end
+    end=#
 
-    tws = range(0.0,1.0,length=10)
-    omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
-    gammas1::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
-    gammas2::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
+    #tws = range(0.0,1.0,length=41)
+    phis = range(0.0,2*pi,length=30)
+    center_thetas = [[0.5,0.5]]#[[0.765,0.2],[0.24,0.77]]
+    circle_radius = 0.2
+    #tws2 = range(0.7,0.8,length=11)
+    #omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
+    #gammas1::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
+    #gammas2::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
     ref_multiplets,rm1_name,rm2_name = get_reference_multiplets(lx,ly,n)
     #cps = zeros(Float64,length(tws))    tws[args_dict["which_twist_angle"]]
-    for (idx,tw1) in enumerate(tws)
-    for (idx2,tw2) in enumerate(tws)
+    #for (idx,tw1) in enumerate(tws)
+    #for (idx2,tw2) in enumerate(tws)
+    for (idx,phi) in enumerate(phis)
     #for tw1 in tws
     #for ii in 1:1
-        params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+        tw1 = center_thetas[1][1] + circle_radius * cos(phi)
+        tw2 = center_thetas[1][2] + circle_radius * sin(phi)
+        if tw1 == 0.0 && tw2 == 0.0
+            continue
+        end
+        #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
-        states,nrgs,rhos,filename = run_normal_ed(params_dict)
+        states,nrgs,rhos,filepath,if_found = run_normal_ed(params_dict; output_level=1)
 
-        #plot_spectrum(collect(tws),nrgs,idx,params_dict["nev"],"Theta / 2 pi",true)
+        #plot_spectrum(collect(tws),nrgs,idx,params_dict["nev"],"Theta / 2 pi",false)
 
-        gamma1,gamma2,omega = get_hatsugaifull(states[1],states[2],ref_multiplets; if_save=false)
-        
-        omegas[idx,idx2] = omega
-        gammas1[idx,idx2] = gamma1
-        gammas2[idx,idx2] = gamma2
+        #=if !if_found
+            gamma1,gamma2,omega = get_hatsugaifull(states[1],states[2],ref_multiplets; if_save=false,filepath=filepath,ref_multis_filenames=[rm1_name,rm2_name])
+        elseif if_found
+            d,m = read_data_jld2(filepath)
+            omega = m["omega"]
+            gamma1 = m["gamma1"]
+            gamma2 = m["gamma2"]
+        else
+            println("unclear finding")
+        end=#
+            
+        #omegas[idx,idx2] = omega
+        #gammas1[idx,idx2] = gamma1
+        #gammas2[idx,idx2] = gamma2
+
+        col = "b"
+        omega = get_omega(states[1],states[2],ref_multiplets)
+        scatter(phi,(angle(omega)+pi)/(2*pi),c=col)
+        xlabel("Phi")
+        title("Phase of Omega")
+        ylim([0,1])
 
     end
-    end
+    #end
 
-    fig = figure()
-    imshow(abs2.(omegas))
+    #=fig = figure()
+    imshow(abs.(omegas))
     colorbar()
     title("Omega Magnitude")
 
     fig = figure()
-    imshow(angle.(omegas))
+    imshow(angle.(omegas) .+ pi; cmap="jet")
     colorbar()
     title("Omega Phase")
 
     fig = figure()
-    imshow(abs2.(gammas1))
+    imshow(abs.(gammas1))
     colorbar()
     title("Gamma1 Magnitude")
 
     fig = figure()
-    imshow(abs2.(gammas2))
+    imshow(abs.(gammas2))
     colorbar()
-    title("Gamma2 Magnitude")
+    title("Gamma2 Magnitude")=#
 
 end
 
