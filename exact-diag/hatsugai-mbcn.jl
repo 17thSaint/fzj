@@ -77,7 +77,7 @@ function get_omega(gs1::Vector{ComplexF64},gs2::Vector{ComplexF64},reference_mul
         end
     end
 
-    results = det(omega_mat)
+    result = det(omega_mat)
 
     if if_save
         data_dict::Dict{String,ComplexF64} = Dict([("omega",result)])

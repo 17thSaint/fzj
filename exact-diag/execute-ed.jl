@@ -321,17 +321,17 @@ if true
         display(BLAS.get_config())
     end
 
-    tws = range(0.0,1.0,length=11)
-    #omegas = zeros(ComplexF64,length(tws),length(tws))
-    #gammas1::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
-    #gammas2::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
-    #ref_multiplets,rm1_name,rm2_name = get_reference_multiplets(lx,ly,n)
+    tws = range(0.0,1.0,length=10)
+    omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
+    gammas1::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
+    gammas2::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
+    ref_multiplets,rm1_name,rm2_name = get_reference_multiplets(lx,ly,n)
     #cps = zeros(Float64,length(tws))    tws[args_dict["which_twist_angle"]]
     for (idx,tw1) in enumerate(tws)
-    #for (idx2,tw2) in enumerate(tws)
+    for (idx2,tw2) in enumerate(tws)
     #for tw1 in tws
     #for ii in 1:1
-        params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",0.33),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
+        params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
         states,nrgs,rhos,filename = run_normal_ed(params_dict)
@@ -340,10 +340,32 @@ if true
 
         gamma1,gamma2,omega = get_hatsugaifull(states[1],states[2],ref_multiplets; if_save=false)
         
-
+        omegas[idx,idx2] = omega
+        gammas1[idx,idx2] = gamma1
+        gammas2[idx,idx2] = gamma2
 
     end
-    #end
+    end
+
+    fig = figure()
+    imshow(abs2.(omegas))
+    colorbar()
+    title("Omega Magnitude")
+
+    fig = figure()
+    imshow(angle.(omegas))
+    colorbar()
+    title("Omega Phase")
+
+    fig = figure()
+    imshow(abs2.(gammas1))
+    colorbar()
+    title("Gamma1 Magnitude")
+
+    fig = figure()
+    imshow(abs2.(gammas2))
+    colorbar()
+    title("Gamma2 Magnitude")
 
 end
 
