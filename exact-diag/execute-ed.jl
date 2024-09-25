@@ -8,11 +8,12 @@ Depends on:
     two-dimensions.jl
     observables.jl
     hatsugai-mbcn.jl
+    plottings.jl
 
 =#
 ######################################################
 
-include_other_files(["other-funcs/basic-2d-stuff.jl","two-dimensions.jl","observables.jl","hatsugai-mbcn.jl"])
+include_other_files(["other-funcs/basic-2d-stuff.jl","two-dimensions.jl","observables.jl","hatsugai-mbcn.jl","plottings.jl"])
 
 function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     if hamilt_params["U"][2] == 0.0
@@ -250,6 +251,72 @@ function run_normal_ed(params_dict::Dict; kwargs...)
 
 end
 
+
+# run data collection with for loops
+if true
+    #fig = figure()
+    #xlabel("Hopping Anisotropy")
+    #ylabel("Gap")
+    #lx = 6
+    #n = 3
+    #for (idx,n) in enumerate([2,3,4,5])
+    #intstrens = range(0.0,2.0,length=10)
+    #other_intstrens = range(2.0,10.0,length=37)
+    #intstrens = sort([intstrens; other_intstrens])
+    #change = 0.001
+    #real_alphas = [range(0.1,0.21,length=10); range(0.22,0.28,length=10); range(0.29,0.35,length=5)]
+    #howmany = length(real_alphas)
+    #alphas = [real_alphas; real_alphas .+ change]
+    #all_bds = zeros(Float64,length(alphas))
+    #thetas = range(0.01,0.5,length=50)
+    #all_nrgs = zeros(Float64,length(thetas))
+    #anises = range(1.0,5.0,length=20)
+    #nus = range(0.4,0.6,length=100)
+    #alphas = range(0.16,2*3/(6*5),length=30)
+    #for (idx,alpha) in enumerate(alphas)
+    #for (idx,ly) in enumerate(lys)
+    #for (idx,nu) in enumerate(nus)
+    #for (idx,anis) in enumerate(anises)
+    #sigmas = vcat([1/i for i in 1:5],[i for i in 2:5])#vcat(range(1.0,5.0,length=5),[100.0])
+    #for (idx,intstren) in enumerate(intstrens)
+    #for (idx2,sigma) in enumerate(sigmas)
+    #for lrd in [0,1]
+
+    #args_dict = Dict([("which_twist_angle",1)])
+    lx,ly,n = 4,4,2
+
+    tws = range(0.0,1.0,length=11)
+    #omegas = zeros(ComplexF64,length(tws),length(tws))
+    #gammas1::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
+    #gammas2::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
+    ref_multiplets,rm1_name,rm2_name = get_reference_multiplets(lx,ly,n)
+    #cps = zeros(Float64,length(tws))    tws[args_dict["which_twist_angle"]]
+    for (idx,tw1) in enumerate(tws)
+    for (idx2,tw2) in enumerate(tws)
+    #for tw1 in tws
+    #for ii in 1:1
+        params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
+        #params_dict = make_args_dict(ARGS)
+
+        # set number of open cores
+        open_cores = get(params_dict, "open_cores", 5)
+        if typeof(open_cores) != String
+            BLAS.set_num_threads(open_cores)
+            display(BLAS.get_config())
+        end
+
+        states,nrgs,rhos,filename = run_normal_ed(params_dict)
+
+        
+
+        gamma1,gamma2,omega = get_hatsugaifull(states[1],states[2],ref_multiplets; if_save=false)
+        
+
+
+    end
+    end
+
+end
 
 
 
