@@ -386,6 +386,8 @@ function plot_gamma_fromsaveddata(lx::Int,ly::Int,N::Int,which_gamma::Int; kwarg
     params_dict = Dict([("Lx",lx),("Ly",ly),("N",N),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren),("hopping_anisotropy",hanis)])
     files = find_data_file(params_dict,"ed",dataloc; output_level=0)
 
+    length(files) == 0 && error("No data found for given parameters")
+
     theta_xs::Vector{Float64} = []
     theta_ys::Vector{Float64} = []
     for f in files
@@ -444,6 +446,8 @@ function plot_omega_fromsaveddata(lx::Int,ly::Int,N::Int; kwargs...)
     params_dict = Dict([("Lx",lx),("Ly",ly),("N",N),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren),("hopping_anisotropy",hanis)])
     files = find_data_file(params_dict,"ed",dataloc; output_level=0)
 
+    length(files) == 0 && error("No data found for given parameters")
+
     theta_xs::Vector{Float64} = []
     theta_ys::Vector{Float64} = []
     for f in files
@@ -497,6 +501,36 @@ function plot_omega_fromsaveddata(lx::Int,ly::Int,N::Int; kwargs...)
     ylim([minimum(theta_ys),maximum(theta_ys)])
 
     #if_angle_diff ? count_chern_number(theta_xs,theta_ys,omegas_phase) : nothing
+end
+
+function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::Matrix{ComplexF64}; kwargs...)
+    plot_title::String = get(kwargs,:plot_title,"")
+
+    omegas_phase::Matrix{Float64} = zeros(Float64,length(theta_xs),length(theta_ys))
+    for i in 1:length(theta_xs)
+        for j in 1:length(theta_ys)
+            omegas_phase[i,j] = angle(omegas[i,j]) + pi
+        end
+    end
+    omegas_phase[1,1] = 0.0
+    reverse!(omegas_phase, dims=1)
+
+    fig = figure()
+    imshow(omegas_phase; cmap="hsv", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)])
+    colorbar()
+    reverse!(omegas_phase,dims=1)
+    diag_shift = 0.0 * maximum(theta_xs) / length(theta_xs)
+    xs = transpose(repeat(theta_xs,1,length(theta_ys))) .+ diag_shift
+    ys = repeat(theta_ys,1,length(theta_xs)) .+ diag_shift
+    us = cos.(omegas_phase)
+    vs = sin.(omegas_phase)
+    quiver(xs, ys, us, vs)
+    title("Phase of Omega"*plot_title)
+    xlabel("Theta_x / 2pi")
+    ylabel("Theta_y / 2pi")
+    xlim([minimum(theta_xs),maximum(theta_xs)])
+    ylim([minimum(theta_ys),maximum(theta_ys)])
+
 end
 
 
