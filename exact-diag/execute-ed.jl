@@ -284,7 +284,7 @@ end
 
 
 # run data collection with for loops
-if true
+if false
     #fig = figure()
     #xlabel("Hopping Anisotropy")
     #ylabel("Gap")
@@ -315,6 +315,7 @@ if true
 
     #args_dict = Dict([("which_twist_angle",1)])
     lx,ly,n = 6,5,3
+    intstren = 0.0
 
     #= set number of open cores
     open_cores = 5#get(params_dict, "open_cores", 5)
@@ -323,36 +324,30 @@ if true
         display(BLAS.get_config())
     end=#
 
-    #tws = range(0.0,1.0,length=41)
-    phis = range(0.0,2*pi,length=30)
-    center_thetas = [[0.5,0.5]]#[[0.765,0.2],[0.24,0.77]]
-    circle_radius = 0.2
+    tws = range(0.0,1.0,length=41)
     #tws2 = range(0.7,0.8,length=11)
     #omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
     #gammas1::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
     #gammas2::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
-    ref_multiplets,rm1_name,rm2_name = get_reference_multiplets(lx,ly,n)
+    #ref_multiplets,rm1_name,rm2_name = get_reference_multiplets(lx,ly,n; interaction_strength=intstren)
     #cps = zeros(Float64,length(tws))    tws[args_dict["which_twist_angle"]]
-    #for (idx,tw1) in enumerate(tws)
+    for (idx,tw1) in enumerate(tws)
     #for (idx2,tw2) in enumerate(tws)
-    for (idx,phi) in enumerate(phis)
     #for tw1 in tws
     #for ii in 1:1
-        tw1 = center_thetas[1][1] + circle_radius * cos(phi)
-        tw2 = center_thetas[1][2] + circle_radius * sin(phi)
-        if tw1 == 0.0 && tw2 == 0.0
-            continue
-        end
+        #if tw1 == 0.0 && tw2 == 0.0
+        #    continue
+        #end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",0.33),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",2),("if_find_data",false),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
         states,nrgs,rhos,filepath,if_found = run_normal_ed(params_dict; output_level=1)
 
-        #plot_spectrum(collect(tws),nrgs,idx,params_dict["nev"],"Theta / 2 pi",false)
+        plot_spectrum(collect(tws),nrgs,idx,params_dict["nev"],"Theta / 2 pi",false)
 
         #=if !if_found
-            gamma1,gamma2,omega = get_hatsugaifull(states[1],states[2],ref_multiplets; if_save=false,filepath=filepath,ref_multis_filenames=[rm1_name,rm2_name])
+            gamma1,gamma2,omega = get_hatsugaifull(states[1],states[2],ref_multiplets; if_save=true,filepath=filepath,ref_multis_filenames=[rm1_name,rm2_name])
         elseif if_found
             d,m = read_data_jld2(filepath)
             omega = m["omega"]
@@ -360,18 +355,11 @@ if true
             gamma2 = m["gamma2"]
         else
             println("unclear finding")
-        end=#
+        end
             
-        #omegas[idx,idx2] = omega
-        #gammas1[idx,idx2] = gamma1
-        #gammas2[idx,idx2] = gamma2
-
-        col = "b"
-        omega = get_omega(states[1],states[2],ref_multiplets)
-        scatter(phi,(angle(omega)+pi)/(2*pi),c=col)
-        xlabel("Phi")
-        title("Phase of Omega")
-        ylim([0,1])
+        omegas[idx,idx2] = omega
+        gammas1[idx,idx2] = gamma1
+        gammas2[idx,idx2] = gamma2=#
 
     end
     #end
@@ -397,6 +385,8 @@ if true
     title("Gamma2 Magnitude")=#
 
 end
+
+
 
 
 

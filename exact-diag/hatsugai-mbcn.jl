@@ -11,11 +11,15 @@ Depends on:
 
 
 function make_new_reference_multiplets(Lx::Int64,Ly::Int64,particles::Int64; kwargs...)
-    tw1 = get(kwargs,:tw1,0.33)
-    tw2 = get(kwargs,:tw2,0.67)
+    tw1::Float64 = get(kwargs,:tw1,0.33)
+    tw2::Float64 = get(kwargs,:tw2,0.67)
+    hanis::Float64 = get(kwargs,:hopping_anisotropy,1.0)
+    intstren::Float64 = get(kwargs,:interaction_strength,0.0)
+    lr_dist::Int = get(kwargs,:lr,0)
+    (intstren != 0.0 && lr_dist == 0) ? lr_dist = Ly-1 : nothing
 
-    params_dict1 = Dict([("Lx",Lx),("Ly",Ly),("N",particles),("tw1",tw1),("tw2",tw2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
-    params_dict2 = Dict([("Lx",Lx),("Ly",Ly),("N",particles),("tw1",tw2),("tw2",tw1),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
+    params_dict1 = Dict([("Lx",Lx),("Ly",Ly),("N",particles),("tw1",tw1),("tw2",tw2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis),("interaction_strength",intstren),("lr",lr_dist),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
+    params_dict2 = Dict([("Lx",Lx),("Ly",Ly),("N",particles),("tw1",tw2),("tw2",tw1),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis),("interaction_strength",intstren),("lr",lr_dist),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
 
     rez1 = run_normal_ed(params_dict1)
     rez2 = run_normal_ed(params_dict2)
@@ -25,11 +29,16 @@ end
 
 function get_reference_multiplets(Lx::Int64,Ly::Int64,particles::Int64; kwargs...)
     dataloc::String = get(kwargs,:dataloc,get_folder_location("cluster-data/exact-diag/torus"))
+    tw1::Float64 = get(kwargs,:tw1,0.33)
+    tw2::Float64 = get(kwargs,:tw2,0.67)
+    hanis::Float64 = get(kwargs,:hopping_anisotropy,1.0)
+    intstren::Float64 = get(kwargs,:interaction_strength,0.0)
+
 
     reference_multiplets::Vector{Vector{ComplexF64}} = [zeros(ComplexF64,2) for i in 1:4]
 
-    params_dict1::Dict{String,Any} = Dict([("Lx",Lx),("Ly",Ly),("N",particles),("if_periodic_x",true),("if_periodic_y",true),("twist_angle1",0.33),("twist_angle2",0.67),("interaction_strength",0.0)])
-    params_dict2::Dict{String,Any} = Dict([("Lx",Lx),("Ly",Ly),("N",particles),("if_periodic_x",true),("if_periodic_y",true),("twist_angle1",0.67),("twist_angle2",0.33),("interaction_strength",0.0)])
+    params_dict1::Dict{String,Any} = Dict([("Lx",Lx),("Ly",Ly),("N",particles),("if_periodic_x",true),("if_periodic_y",true),("twist_angle1",tw1),("twist_angle2",tw2),("interaction_strength",intstren),("hopping_anisotropy",hanis)])
+    params_dict2::Dict{String,Any} = Dict([("Lx",Lx),("Ly",Ly),("N",particles),("if_periodic_x",true),("if_periodic_y",true),("twist_angle1",tw2),("twist_angle2",tw1),("interaction_strength",intstren),("hopping_anisotropy",hanis)])
 
     if_exists1::Bool,found_data1::Union{Vector{Dict},Nothing} = check_data_exists(params_dict1,"ed"; location=dataloc,output_level=false)
     if_exists2::Bool,found_data2::Union{Vector{Dict},Nothing} = check_data_exists(params_dict2,"ed"; location=dataloc,output_level=false)
@@ -64,7 +73,7 @@ function get_gamma(gs1::Vector{ComplexF64},gs2::Vector{ComplexF64},reference_mul
     gamma_mat::Matrix{ComplexF64} = zeros(ComplexF64,2,2)
     for i in 1:2
         for j in 1:2
-            gamma_mat[i,j] = dot(conj(reference_multiplet[i]),gs1) * dot(conj(gs1),reference_multiplet[j]) + dot(conj(reference_multiplet[i]),gs2) * dot(conj(gs2),reference_multiplet[j])
+            gamma_mat[i,j] = (transpose(conj(reference_multiplet[i])) * gs1) * (transpose(conj(gs1)) * reference_multiplet[j]) + (transpose(conj(reference_multiplet[i])) * gs2) * (transpose(conj(gs2)) * reference_multiplet[j])
         end
     end
 
@@ -86,7 +95,7 @@ function get_omega(gs1::Vector{ComplexF64},gs2::Vector{ComplexF64},reference_mul
     omega_mat::Matrix{ComplexF64} = zeros(ComplexF64,2,2)
     for i in 1:2
         for j in 1:2
-            omega_mat[i,j] = dot(conj(reference_multiplets[i+2]),gs1) * dot(conj(gs1),reference_multiplets[j]) + dot(conj(reference_multiplets[i+2]),gs2) * dot(conj(gs2),reference_multiplets[j])
+            omega_mat[i,j] = (transpose(conj(reference_multiplets[i+2])) * gs1) * (transpose(conj(gs1)) * reference_multiplets[j]) + (transpose(conj(reference_multiplets[i+2])) * gs2) * (transpose(conj(gs2)) * reference_multiplets[j])
         end
     end
 

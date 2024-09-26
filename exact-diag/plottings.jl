@@ -221,7 +221,7 @@ function plot_spectrum(xxs::Vector,nrgs::Vector,idx::Int,nev::Int,xstring::Strin
     return
 end
 
-function plot_gamma_fromsaveddata(lx::Int,ly::Int,N::Int,which_gamma::Int; kwargs...)
+function plot_gamma_fromsaveddata_scatter(lx::Int,ly::Int,N::Int,which_gamma::Int; kwargs...)
     intstren = get(kwargs,:interaction_strength,0.0)
     hanis = get(kwargs,:hopping_anisotropy,1.0)
     ref_twists = get(kwargs,:ref_twists,[0.33,0.67])
@@ -265,11 +265,42 @@ function plot_gamma_fromsaveddata(lx::Int,ly::Int,N::Int,which_gamma::Int; kwarg
     title("Magnitude of Gamma$(which_gamma)")
 end
 
-function plot_omega_fromsaveddata(lx::Int,ly::Int,N::Int; kwargs...)
+function count_chern_number_scatter(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omega_phases::Vector{Float64}; kwargs...)
+    plot_title::String = get(kwargs,:plot_title,"")
+    
+    append!(theta_xs,0.0)
+    append!(theta_ys,0.0)
+    append!(omega_phases,0.0)
+    omega_phase_mat = reshape(omega_phases,Int(sqrt(length(theta_xs))),Int(sqrt(length(theta_xs))))
+
+    angle_diffs_x::Matrix{Float64} = zeros(Float64,size(omega_phase_mat))
+    angle_diffs_y::Matrix{Float64} = zeros(Float64,size(omega_phase_mat))
+    for i in 2:size(omega_phase_mat,1) - 1
+        for j in 2:size(omega_phase_mat,2) - 1
+            angle_diffs_x[i,j] += (omega_phase_mat[i+1,j] - omega_phase_mat[i-1,j]) / (2*pi)
+            angle_diffs_y[i,j] += (omega_phase_mat[i,j+1] - omega_phase_mat[i,j-1]) / (2*pi)
+        end
+    end
+    
+    fig = figure()
+    imshow(angle_diffs_x; cmap="jet")
+    colorbar()
+    title("Omega X Angle Difference"*plot_title)
+
+    fig = figure()
+    imshow(angle_diffs_y; cmap="jet")
+    colorbar()
+    title("Omega Y Angle Difference"*plot_title)
+end
+
+function plot_omega_fromsaveddata_scatter(lx::Int,ly::Int,N::Int; kwargs...)
     intstren = get(kwargs,:interaction_strength,0.0)
     hanis = get(kwargs,:hopping_anisotropy,1.0)
     ref_twists = get(kwargs,:ref_twists,[0.33,0.67])
     bin_count = get(kwargs,:bin_count,100)
+    plot_title = get(kwargs,:plot_title,"")
+    if_angle_diff = get(kwargs,:if_angle_diff,true)
+    if_omega_mag = get(kwargs,:if_omega_mag,false)
 
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     params_dict = Dict([("Lx",lx),("Ly",ly),("N",N),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren),("hopping_anisotropy",hanis)])
@@ -288,25 +319,26 @@ function plot_omega_fromsaveddata(lx::Int,ly::Int,N::Int; kwargs...)
         catch
             continue
         end
-
         data,metadata = read_data_jld2(f,dataloc;output_level=0)
         append!(theta_xs,filename_dict["twist_angle1"])
         append!(theta_ys,filename_dict["twist_angle2"])
         append!(omegas_mag,abs(metadata["omega"]))
-        append!(omegas_phase,angle(metadata["omega"])+pi)
+        append!(omegas_phase,angle(metadata["omega"]))
     end
-    
-    data_dict_mag = bin_values(omegas_mag,bin_count)
-    omag = [data_dict_mag[val] for val in omegas_mag]
-    min_omegas_mag, max_omegas_mag = minimum(omegas_mag), maximum(omegas_mag)
-    normalized_omag = [(val - minimum(omag)) / (maximum(omag) - minimum(omag)) * (max_omegas_mag - min_omegas_mag) + min_omegas_mag for val in omag]
 
-    fig = figure()
-    scatter(theta_xs, theta_ys, c=normalized_omag, cmap="viridis")
-    colorbar()
-    title("Magnitude of Omega")
-    xlabel("Theta_x / 2pi")
-    ylabel("Theta_y / 2pi")
+    if if_omega_mag
+        data_dict_mag = bin_values(omegas_mag,bin_count)
+        omag = [data_dict_mag[val] for val in omegas_mag]
+        min_omegas_mag, max_omegas_mag = minimum(omegas_mag), maximum(omegas_mag)
+        normalized_omag = [(val - minimum(omag)) / (maximum(omag) - minimum(omag)) * (max_omegas_mag - min_omegas_mag) + min_omegas_mag for val in omag]
+
+        fig = figure()
+        scatter(theta_xs, theta_ys, c=normalized_omag, cmap="viridis")
+        colorbar()
+        title("Magnitude of Omega"*plot_title)
+        xlabel("Theta_x / 2pi")
+        ylabel("Theta_y / 2pi")
+    end
 
     data_dict_angle = bin_values(omegas_phase,bin_count)
     oang = [data_dict_angle[val] for val in omegas_phase]
@@ -316,16 +348,156 @@ function plot_omega_fromsaveddata(lx::Int,ly::Int,N::Int; kwargs...)
     fig = figure()
     scatter(theta_xs, theta_ys, c=normalized_oang, cmap="jet")
     colorbar()
-    title("Phase of Omega")
+    title("Phase of Omega"*plot_title)
     xlabel("Theta_x / 2pi")
     ylabel("Theta_y / 2pi")
+
+    if_angle_diff && count_chern_number(theta_xs,theta_ys,omegas_phase)
 end
 
-#=plot_gamma_fromsaveddata(6,6,3,1)
-plot_gamma_fromsaveddata(6,6,3,2)
-plot_omega_fromsaveddata(6,6,3)=#
+function count_chern_number(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omega_phases::Matrix{Float64}; kwargs...)
+    plot_title::String = get(kwargs,:plot_title,"")
 
+    angle_diffs::Matrix{Float64} = zeros(Float64,size(omega_phases))
+    #angle_diffs_y::Matrix{Float64} = zeros(Float64,size(omega_phases))
+    for i in 2:size(omega_phases,1) - 1
+        for j in 2:size(omega_phases,2) - 1
+            for xshift in [1,-1]
+                for yshift in [1,-1]
+                    angle_diffs[i,j] += (omega_phases[i+xshift,j+yshift] - omega_phases[i,j]) / (2*pi)
+                end
+            end
+        end
+    end
+    
+    fig = figure()
+    imshow(transpose(angle_diffs); cmap="jet", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)])
+    colorbar()
+    title("Omega Angle Difference"*plot_title)
+end
 
+function plot_gamma_fromsaveddata(lx::Int,ly::Int,N::Int,which_gamma::Int; kwargs...)
+    intstren = get(kwargs,:interaction_strength,0.0)
+    hanis = get(kwargs,:hopping_anisotropy,1.0)
+    ref_twists = get(kwargs,:ref_twists,[0.33,0.67])
+    plot_title = get(kwargs,:plot_title,"")
+
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    params_dict = Dict([("Lx",lx),("Ly",ly),("N",N),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren),("hopping_anisotropy",hanis)])
+    files = find_data_file(params_dict,"ed",dataloc; output_level=0)
+
+    theta_xs::Vector{Float64} = []
+    theta_ys::Vector{Float64} = []
+    for f in files
+        filename_dict = get_params_dict_from_filename(f)
+        try
+            if filename_dict["twist_angle1"] in ref_twists || filename_dict["twist_angle2"] in ref_twists
+                continue
+            end
+        catch
+            continue
+        end
+        if !(filename_dict["twist_angle1"] in theta_xs)
+            append!(theta_xs,filename_dict["twist_angle1"])
+            sort!(theta_xs)
+        end
+        if !(filename_dict["twist_angle2"] in theta_ys)
+            append!(theta_ys,filename_dict["twist_angle2"])
+            sort!(theta_ys; rev=true)
+        end
+    end
+
+    gammas::Matrix{Float64} = zeros(Float64,length(theta_xs),length(theta_ys))
+    for f in files
+        filename_dict = get_params_dict_from_filename(f)
+        try
+            if filename_dict["twist_angle1"] in ref_twists || filename_dict["twist_angle2"] in ref_twists
+                continue
+            end
+        catch
+            continue
+        end
+        data,metadata = read_data_jld2(f,dataloc;output_level=0)
+        i = findfirst(x -> x == filename_dict["twist_angle1"],theta_xs)
+        j = findfirst(x -> x == filename_dict["twist_angle2"],theta_ys)
+        gammas[i,j] = abs(metadata["gamma$(which_gamma)"])
+    end
+   
+    fig = figure()
+    imshow(transpose(gammas); extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)])
+    colorbar()
+    xlabel("Theta_x / 2pi")
+    ylabel("Theta_y / 2pi")
+    title("Magnitude of Gamma$(which_gamma)"*plot_title)
+end
+
+function plot_omega_fromsaveddata(lx::Int,ly::Int,N::Int; kwargs...)
+    intstren = get(kwargs,:interaction_strength,0.0)
+    hanis = get(kwargs,:hopping_anisotropy,1.0)
+    ref_twists = get(kwargs,:ref_twists,[0.33,0.67])
+    bin_count = get(kwargs,:bin_count,100)
+    plot_title = get(kwargs,:plot_title,"")
+    if_angle_diff = get(kwargs,:if_angle_diff,true)
+    if_omega_mag = get(kwargs,:if_omega_mag,false)
+
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    params_dict = Dict([("Lx",lx),("Ly",ly),("N",N),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren),("hopping_anisotropy",hanis)])
+    files = find_data_file(params_dict,"ed",dataloc; output_level=0)
+
+    theta_xs::Vector{Float64} = []
+    theta_ys::Vector{Float64} = []
+    for f in files
+        filename_dict = get_params_dict_from_filename(f)
+        try
+            if filename_dict["twist_angle1"] in ref_twists || filename_dict["twist_angle2"] in ref_twists
+                continue
+            end
+        catch
+            continue
+        end
+        if !(filename_dict["twist_angle1"] in theta_xs)
+            append!(theta_xs,filename_dict["twist_angle1"])
+            sort!(theta_xs)
+        end
+        if !(filename_dict["twist_angle2"] in theta_ys)
+            append!(theta_ys,filename_dict["twist_angle2"])
+            sort!(theta_ys; rev=true)
+        end
+    end
+
+    omegas_phase::Matrix{Float64} = zeros(Float64,length(theta_xs),length(theta_ys))
+    for f in files
+        filename_dict = get_params_dict_from_filename(f)
+        try
+            if filename_dict["twist_angle1"] in ref_twists || filename_dict["twist_angle2"] in ref_twists
+                continue
+            end
+        catch
+            continue
+        end
+        data,metadata = read_data_jld2(f,dataloc;output_level=0)
+        i = findfirst(x -> x == filename_dict["twist_angle1"],theta_xs)
+        j = findfirst(x -> x == filename_dict["twist_angle2"],theta_ys)
+        omegas_phase[i,j] = angle(metadata["omega"]) + pi
+    end
+
+    fig = figure()
+    imshow(transpose(omegas_phase); cmap="hsv", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)])
+    colorbar()
+    diag_shift = 0.5 * maximum(theta_xs) / length(theta_xs)
+    xs = transpose(repeat(theta_xs,1,length(theta_ys))) .+ diag_shift
+    ys = repeat(theta_ys,1,length(theta_xs)) .+ diag_shift
+    us = cos.(transpose(omegas_phase))
+    vs = sin.(transpose(omegas_phase))
+    quiver(xs, ys, us, vs)
+    title("Phase of Omega"*plot_title)
+    xlabel("Theta_x / 2pi")
+    ylabel("Theta_y / 2pi")
+    xlim([minimum(theta_xs),maximum(theta_xs)])
+    ylim([minimum(theta_ys),maximum(theta_ys)])
+
+    #if_angle_diff ? count_chern_number(theta_xs,theta_ys,omegas_phase) : nothing
+end
 
 
 
