@@ -200,7 +200,7 @@ function quick_spectrum_closedopen(which_one::String="closed")
 end
 
 function plot_spectrum(xxs::Vector,nrgs::Vector,idx::Int,nev::Int,xstring::String="x",if_diff::Bool=true; kwargs...)
-    plot_title = get(kwargs,:title,"")
+    plot_title = get(kwargs,:plot_title,"")
 
     cols = ["b","g","r","m","c"]
     if nev > length(cols)
@@ -216,7 +216,7 @@ function plot_spectrum(xxs::Vector,nrgs::Vector,idx::Int,nev::Int,xstring::Strin
     xlabel(xstring)
     ystring = if_diff ? "NRG - E0" : "NRG"
     ylabel(ystring)
-    title(plot_title)
+    title("Energy Spectrum"*plot_title)
 
     return
 end

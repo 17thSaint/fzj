@@ -1631,7 +1631,7 @@ if false
 end
 
 # pfaffian plotting c2/c3 saved values
-if true
+if false
 	#params_dict = Dict([("particles",4),("layers",6),("if_periodic_phys",false),("if_periodic_synth",true)])
 	params_dict = Dict([("alpha",0.1429),("layers",6),("if_periodic_phys",false),("if_periodic_synth",true)])
 	data_loc = get_folder_location("cluster-data/pfaffian")

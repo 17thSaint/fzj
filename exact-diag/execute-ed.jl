@@ -285,21 +285,12 @@ end
 
 # run data collection with for loops
 if true
-    #fig = figure()
-    #xlabel("Hopping Anisotropy")
-    #ylabel("Gap")
-    #lx = 6
-    #n = 3
+    
+    lx,ly,n = 4,8,4
     #for (idx,n) in enumerate([2,3,4,5])
-    #intstrens = range(0.0,5.0,length=40)
+    #intstrens = range(0.0,2.0,length=21)
     #other_intstrens = range(2.0,10.0,length=37)
     #intstrens = sort([intstrens; other_intstrens])
-    #change = 0.001
-    #real_alphas = [range(0.1,0.21,length=10); range(0.22,0.28,length=10); range(0.29,0.35,length=5)]
-    #howmany = length(real_alphas)
-    #alphas = [real_alphas; real_alphas .+ change]
-    #all_bds = zeros(Float64,length(alphas))
-    #thetas = range(0.01,0.5,length=50)
     #all_nrgs = zeros(Float64,length(thetas))
     #anises = range(1.0,5.0,length=20)
     #nus = range(0.4,0.6,length=100)
@@ -308,12 +299,10 @@ if true
     #for (idx,ly) in enumerate(lys)
     #for (idx,nu) in enumerate(nus)
     #for (idx,anis) in enumerate(anises)
-    #sigmas = vcat([1/i for i in 1:5],[i for i in 2:5])#vcat(range(1.0,5.0,length=5),[100.0])
     #for (idx,intstren) in enumerate(intstrens)
     #for (idx2,sigma) in enumerate(sigmas)
     #for lrd in [0,1]
-    lx,ly,n = 6,5,3
-    intstren = 0.0
+    intstren = 0.5
 
     #= set number of open cores
     open_cores = 5#get(params_dict, "open_cores", 5)
@@ -337,15 +326,15 @@ if true
             continue
         end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr","all"),("filling",0.5),("nev",2),("if_find_data",true),("if_save_data",false)])
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
         #params_dict = make_args_dict(ARGS)
 
         states,nrgs,rhos,filepath,if_found = run_normal_ed(params_dict; output_level=1)
 
-        #plot_spectrum(collect(tws),nrgs,idx,params_dict["nev"],"Theta_x / 2pi",true)
+        #plot_spectrum(collect(intstrens),nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title=" $(lx)x$(ly) N=$(n) Alpha=$(round(2*n/(lx*ly),digits=3))")
 
         if !if_found
-            gamma1,gamma2,omega = get_hatsugaifull(states[1],states[2],ref_multiplets; if_save=false,filepath=filepath,ref_multis_filenames=[rm1_name,rm2_name])
+            gamma1,gamma2,omega = get_hatsugaifull(states[1],states[2],ref_multiplets; if_save=true,filepath=filepath,ref_multis_filenames=[rm1_name,rm2_name])
         elseif if_found
             d,m = read_data_jld2(filepath)
             omega = m["omega"]
