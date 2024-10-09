@@ -40,6 +40,7 @@ plot_spectrum(xxs::StepRangeLen,nrgs::Vector,idx::Int,nev::Int,xstring::String,i
 
 function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::Matrix{ComplexF64}; kwargs...)
     plot_title::String = get(kwargs,:plot_title,"")
+    if_mag::Bool = get(kwargs,:if_mag,false)
 
     omegas_phase::Matrix{Float64} = zeros(Float64,length(theta_xs),length(theta_ys))
     for i in 1:length(theta_xs)
@@ -66,6 +67,16 @@ function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::
     xlim([minimum(theta_xs),maximum(theta_xs)])
     ylim([minimum(theta_ys),maximum(theta_ys)])
 
+    if if_mag
+        fig = figure()
+        imshow(abs.(omegas); cmap="viridis", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)])
+        colorbar()
+        title("Magnitude of Omega"*plot_title)
+        xlabel("Theta_x / 2pi")
+        ylabel("Theta_y / 2pi")
+        xlim([minimum(theta_xs),maximum(theta_xs)])
+        ylim([minimum(theta_ys),maximum(theta_ys)])
+    end
 end
 plot_omega(theta_xs::StepRangeLen,theta_ys::StepRangeLen,omegas::Matrix{ComplexF64}; kwargs...) = plot_omega(collect(theta_xs),collect(theta_ys),omegas; kwargs...)
 

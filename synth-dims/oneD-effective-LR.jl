@@ -227,11 +227,11 @@ function run_normal_1deffmps(params_dict::Dict; kwargs...)
 		end
 	end
 
-	return psis,rhos,nrgs,model_paras[:name]
+	return psis,rhos,nrgs,model_paras
 end
 
 
-nev = 2
+nev = 3
 cols = ["b","g","r","m","c"]
 if nev > length(cols)
 	cols = repeat(cols,ceil(Int,nev/length(cols)))
@@ -274,32 +274,37 @@ end
 
 
 if true
-	lx,ly,n = 4,4,2
-	ref_multiplets,rm1_name,rm2_name = get_reference_multiplets(lx,ly,n)
-	tws = range(0.0,stop=1.0,length=10)
-	g1s = zeros(ComplexF64,length(tws),length(tws))
-	g2s = zeros(ComplexF64,length(tws),length(tws))
-	oms = zeros(ComplexF64,length(tws),length(tws))
-	for (idx,tw1) in enumerate(tws)
-	for (idx2,tw2) in enumerate(tws)
+	lx,ly,n = 6,6,6
+	#ref_multiplets,rm1_name,rm2_name = get_reference_multiplets(lx,ly,n)
+	#tws = range(0.0,stop=1.0,length=10)
+	#g1s = zeros(ComplexF64,length(tws),length(tws))
+	#g2s = zeros(ComplexF64,length(tws),length(tws))
+	#oms = zeros(ComplexF64,length(tws),length(tws))
+	#for (idx,tw1) in enumerate(tws)
+	#for (idx2,tw2) in enumerate(tws)
+	tw2 = 0.0
+	tw1 = 0.0
 		
-		params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("tw1",tw1),("tw2",tw2),("es_count",nev-1),("nrgtol",1e-6),("mdim",20),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
-		psis,rhos,nrgs,name = run_normal_1deffmps(params_dict)
+		params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("tw1",tw1),("tw2",tw2),("if_remapping",false),("es_count",nev-1),("nrgtol",1e-6),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
+		psis,rhos,nrgs,model_paras = run_normal_1deffmps(params_dict)
+
+		get_occupancy(psis[1]; plot_title=" E1 Lx = $lx, Ly = $ly, n = $n", remapping=model_paras[:remapping])
+		get_occupancy(psis[2]; plot_title=" E2 Lx = $lx, Ly = $ly, n = $n", remapping=model_paras[:remapping])
 
 		#plot_spectrum(tws,nrgs,idx,nev,"Theta_x / 2pi",false; plot_title=" Lx = $lx, Ly = $ly, n = $n, tw2 = $tw2")
 
-		g1,g2,om = get_hatsugaifull(psis[1],psis[2],ref_multiplets)
+		#=g1,g2,om = get_hatsugaifull(psis[1],psis[2],ref_multiplets)
 		g1s[idx,idx2] = g1
 		g2s[idx,idx2] = g2
-		oms[idx,idx2] = om
+		oms[idx,idx2] = om=#
 
 
-	end
-	end
+	#end
+	#end
 
-	plot_omega(tws,tws,oms; plot_title=" Lx = $lx, Ly = $ly, n = $n")
-	plot_gamma(tws,tws,g1s,1; plot_title=" Lx = $lx, Ly = $ly, n = $n")
-	plot_gamma(tws,tws,g2s,2; plot_title=" Lx = $lx, Ly = $ly, n = $n")
+	#plot_omega(tws,tws,oms; plot_title=" Lx = $lx, Ly = $ly, n = $n",if_mag=true)
+	#plot_gamma(tws,tws,g1s,1; plot_title=" Lx = $lx, Ly = $ly, n = $n")
+	#plot_gamma(tws,tws,g2s,2; plot_title=" Lx = $lx, Ly = $ly, n = $n")
 
 
 end
