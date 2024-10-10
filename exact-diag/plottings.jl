@@ -12,6 +12,13 @@ Depends on:
 =#
 ######################################################
 
+function get_colors(nev::Int)
+    cols = ["b","g","r","m","c"]
+    if nev > length(cols)
+        cols = repeat(cols,ceil(Int,nev/length(cols)))
+    end
+    return cols
+end
 
 # 2D phase diagram of hopping anisotropy vs interaction strength and energy gap
 # needs testing, not sure about the commented out stuff
@@ -199,8 +206,9 @@ function quick_spectrum_closedopen(which_one::String="closed")
 
 end
 
-function plot_spectrum(xxs::Vector,nrgs::Vector,idx::Int,nev::Int,xstring::String="x",if_diff::Bool=true; kwargs...)
+function plot_spectrum(xxs::Vector,nrgs::Vector,idx::Int,nev::Int,xstring::AbstractString="x",if_diff::Bool=true; kwargs...)
     plot_title = get(kwargs,:plot_title,"")
+    if_labels = get(kwargs,:if_labels,false)
 
     cols = ["b","g","r","m","c"]
     if nev > length(cols)
@@ -211,15 +219,17 @@ function plot_spectrum(xxs::Vector,nrgs::Vector,idx::Int,nev::Int,xstring::Strin
         change = abs(xxs[1] - xxs[2])
         xval = xxs[idx]
         shift = (i - nev/2) * ((0.1*change)/(nev/2))
-        scatter(xval + shift,nrgs[i] - if_diff*nrgs[1],c=cols[i])
+        idx == 1 && if_labels ? scatter(xval + shift,nrgs[i] - if_diff*nrgs[1],c=cols[i],label="E$(i-1)") : scatter(xval + shift,nrgs[i] - if_diff*nrgs[1],c=cols[i])
     end
     xlabel(xstring)
     ystring = if_diff ? "NRG - E0" : "NRG"
     ylabel(ystring)
     title("Energy Spectrum"*plot_title)
+    idx == 1 && if_labels ? legend() : nothing
 
     return
 end
+plot_spectrum(xxs::StepRangeLen,nrgs::Vector,idx::Int,nev::Int,xstring::AbstractString="x",if_diff::Bool=true; kwargs...) = plot_spectrum(collect(xxs),nrgs,idx,nev,xstring,if_diff; kwargs...)
 
 function plot_gamma_fromsaveddata_scatter(lx::Int,ly::Int,N::Int,which_gamma::Int; kwargs...)
     intstren = get(kwargs,:interaction_strength,0.0)
@@ -533,6 +543,72 @@ function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::
 
 end
 
+function plot3d_flow_with_levelcrossing_3x7n3()
+    tw2 = 0.0
+    amplification_factor = 12.0
+    nev = 6
+
+    cols = ["b","g","r","m","c"]
+    if nev > length(cols)
+        cols = repeat(cols,ceil(Int,nev/length(cols)))
+    end
+
+    intstrens = range(0.0,2.0,length=10)
+    tws = range(0.0,1.0,length=30)
+    these_nrgs = zeros(Float64,nev,length(tws))
+    for (idx2,intstren) in enumerate(intstrens)
+        where_fqh = 1
+        if intstren > 1.5
+            where_fqh += 2
+        end
+        if intstren > 2
+            where_fqh += 2
+        end
+        for (idx,tw1) in enumerate(tws)
+            params_dict = Dict([("Lx",3),("Ly",7),("N",3),("interaction_strength",intstren),("nev",nev),("if_save_data",false),("if_find_data",false),("if_periodic_x",true),("if_periodic_y",true),("tw1",tw1),("tw2",tw2)])
+            states,nrgs,rhos,filepath,if_found,latpara,hamiltpara = run_normal_ed(params_dict; output_level=1)
+            these_nrgs[:,idx] = nrgs
+        end
+
+        # this next section will amplify the flow by the given factor
+        plotting_nrgs = these_nrgs
+        max_fqh_nrg = maximum(plotting_nrgs[where_fqh,2:end-1])
+        min_fqh_nrg = minimum(plotting_nrgs[where_fqh,2:end-1])
+        middle_fqh_nrg = (max_fqh_nrg + min_fqh_nrg)/2
+        plotting_nrgs[where_fqh:where_fqh+1,:] = (plotting_nrgs[where_fqh:where_fqh+1,:] .- middle_fqh_nrg) .* amplification_factor .+ middle_fqh_nrg
+
+        botshift = where_fqh == 1 ? middle_fqh_nrg : minimum(plotting_nrgs)
+        for i in 1:nev
+            scatter3D(tws,intstren .* ones(length(tws)),plotting_nrgs[i,:] .- botshift,c=cols[i])
+        end
+        xlabel("Theta_x / 2pi")
+        ylabel("Interaction Strength")
+        zlabel("Energy")
+        #zlim([0.0,0.1])
+        title("Spectrum for Lx=3 Ly=7 N=3 ULR=$intstren")
+    end
+
+end
+
+# make nice figures for presentation for spectral flow twisting
+function pretty_plot_twisting(points_count::Int,if_gap::Bool=true,if_diff::Bool=false)
+    lx,ly,n = 6,5,3
+    tw2 = 0.0
+
+    cols = get_colors(3)
+
+    tws = range(0.0,1.0,length=points_count)
+    for (idx,tw1) in enumerate(tws)
+        params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",0.0),("nev",3),("if_save_data",false),("if_find_data",false),("if_periodic_x",true),("if_periodic_y",true),("tw1",tw1),("tw2",tw2)])
+        states,nrgs,rhos,filepath,if_found,latpara,hamiltpara = run_normal_ed(params_dict; output_level=1)
+        if if_gap
+            plot_spectrum(tws,nrgs,idx,3,L"\theta_{x} / 2 \pi ",if_diff; if_labels=true)
+        else
+            plot_spectrum(tws,nrgs,idx,2,L"\theta_{x} / 2 \pi ",if_diff; if_labels=true)
+        end
+    end
+
+end
 
 
 

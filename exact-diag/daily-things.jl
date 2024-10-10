@@ -85,6 +85,69 @@ if false
     end
 end
 
+# see what sizes are available for rho1D = 1.0 from ED
+if false
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    nev = 13
+    amplification_factor = 10.0
+
+    cols = ["b","g","r","m","c"]
+    if nev > length(cols)
+        cols = repeat(cols,ceil(Int,nev/length(cols)))
+    end
+
+    intstrens = range(0.0,100.0,length=30)
+    tws = range(0.0,1.0,length=50)
+    for (idx,intstren) in enumerate(intstrens)
+        #=where_fqh = 1
+        if intstren > 1.5
+            where_fqh += 2
+        end
+        if intstren > 2
+            where_fqh += 2
+        end=#
+    #these_nrgs = zeros(Float64,nev,length(tws))
+    #for (idx,tw1) in enumerate(tws)
+    #for (idx2,tw2) in enumerate(tws)
+        #intstren = 1.75
+        
+        tw2 = 0.5
+        tw1 = 0.0
+            params_dict = Dict([("Lx",3),("Ly",7),("N",3),("interaction_strength",intstren),("nev",nev),("if_save_data",false),("if_find_data",false),("if_periodic_x",true),("if_periodic_y",true),("tw1",tw1),("tw2",tw2)])
+            states,nrgs,rhos,filepath,if_found,latpara,hamiltpara = run_normal_ed(params_dict; output_level=1)
+            #get_occupancy(states[1],latpara; plot_title="ULR=$intstren tw2=$tw2 E=$(round(nrgs[1],digits=3))")
+            #get_occupancy(states[2],latpara; plot_title="ULR=$intstren tw2=$tw2 E=$(round(nrgs[2],digits=3))")
+            #=for i in 1:length(nrgs)
+                scatter3D(tw1,intstren,nrgs[i] - nrgs[1],c=cols[i])
+            end
+            xlabel("Theta_x / 2pi")
+            ylabel("ULR")=#
+            plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength"; plot_title=" $(params_dict["Lx"])x$(params_dict["Ly"]) N=$(params_dict["N"])")
+            #plot_spectrum(tws,nrgs,idx,params_dict["nev"],"Theta_x / 2pi",false; plot_title=" $(params_dict["Lx"])x$(params_dict["Ly"]) N=$(params_dict["N"]) ULR=$intstren")
+        end
+        #title("Spectrum for Lx=3 Ly=7 N=3 tw2=$tw2")
+    #end
+end
+
+if true
+    nev = 2
+    cols = ["b","g","r","m","c"]
+    if nev > length(cols)
+        cols = repeat(cols,ceil(Int,nev/length(cols)))
+    end
+    tws = range(0.0,1.0,length=10)
+    intstren = 0.0
+    for (idx,tw1) in enumerate(tws)
+        for (idx2,tw2) in enumerate(tws)
+            params_dict = Dict([("Lx",6),("Ly",5),("N",3),("interaction_strength",intstren),("nev",nev),("if_save_data",false),("if_find_data",false),("if_periodic_x",true),("if_periodic_y",true),("tw1",tw1),("tw2",tw2)])
+            states,nrgs,rhos,filepath,if_found,latpara,hamiltpara = run_normal_ed(params_dict; output_level=1)
+            for i in 1:length(nrgs)
+                scatter3D(tw1,tw2,nrgs[i],c=cols[i])
+            end
+        end
+    end
+end
+
 
 
 

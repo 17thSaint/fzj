@@ -275,16 +275,16 @@ function run_normal_ed(params_dict::Dict; kwargs...)
     filepath = running_args.dataloc * "/" * filename
 
     if running_args.if_function
-        return states,nrgs,rhos,hh,filepath,if_exists
+        return states,nrgs,rhos,hh,filepath,if_exists,lattice_params,hamilt_params
     else
-        return states,nrgs,rhos,filepath,if_exists
+        return states,nrgs,rhos,filepath,if_exists,lattice_params,hamilt_params
     end
 
 end
 
 
 # run data collection with for loops
-if true
+if false
     
     lx,ly,n = 4,8,4
     #for (idx,n) in enumerate([2,3,4,5])

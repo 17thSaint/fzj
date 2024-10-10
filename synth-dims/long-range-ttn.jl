@@ -1290,6 +1290,7 @@ function get_normal_model_params(params_dict::Dict)
 	nswps = get(params_dict, "num_sweeps", 100)
 	if_old_excited = get(params_dict, "if_old_excited", false)
 	if_memobs = get(params_dict, "if_memobs", false)
+	output_level = get(params_dict, "output_level", 1)
 
 
 	# Lattice/TTN Parameters
@@ -1360,7 +1361,7 @@ function get_normal_model_params(params_dict::Dict)
 		mag_off = alpha == 0.0
 	end
 	if_check_fluxes = get(params_dict, "if_check_fluxes", true)
-	if_check_fluxes ? check_fluxes(alpha,phys_edge_length,synth_edge_length,if_periodic_phys,if_periodic_synth,flux_direction) : nothing
+	if_check_fluxes ? check_fluxes(alpha,phys_edge_length,synth_edge_length,if_periodic_phys,if_periodic_synth,flux_direction; output_level=output_level) : nothing
 
 
 	# What to calculate
@@ -1411,6 +1412,7 @@ function get_normal_model_params(params_dict::Dict)
 						"if_pfaffian"=>if_pfaffian,
 						"twist_angle"=>twist_angle,
 						"if_continuous_saving"=>if_continuous_saving,
+						"output_level"=>output_level,
 						"nrgtol"=>nrgtol,
 						"if_densmat"=>if_densmat,
 						"if_redo"=>if_redo,
@@ -1711,7 +1713,7 @@ if false
 end
 
 #
-if false
+if true
 
 	cols = ["b","g","r"]
 	#nnst = 0.0
@@ -1738,7 +1740,7 @@ if false
 	#tws = range(0.0,1.0,length=10)
 	#for tw1 in tws
 	#for tw2 in tws
-		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",0),("particles",4),("layers",6),("mdim",20),("if_save_data",false),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",false),("if_periodic_synth",true)])
+		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",0),("particles",8),("layers",8),("mdim",400),("if_save_data",true),("filling",0.5),("onsite_strength",0.0),("lr",0),("if_periodic_phys",false),("if_periodic_synth",false)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		open_cores = get(params_dict, "open_cores", 5)
@@ -1754,7 +1756,7 @@ if false
 			scatter(tw1,all_results[3][i].nrg[end],c=cols[i])
 		end=#
 
-		occs = get_occupancy(all_results[1]; densmat=all_results[end])
+		#occs = get_occupancy(all_results[1]; densmat=all_results[end])
 		#=bothoccs = []
 		for i in 1:params_dict["es_count"]+1
 			append!(bothoccs,[get_occupancy(all_results[1][i]; densmat=all_results[end-1][i], plot_title="Level $(i-1) NRG=$(round(all_results[3][i].nrg[end],digits=4))")])
