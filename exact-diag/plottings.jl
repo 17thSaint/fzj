@@ -125,11 +125,11 @@ function timescaling_functional_ed()
 end
 
 # pretty plot of N=4 4x8 and 8x4 on torus for poster
-function pretty_spectrum_closedopen(which_one::String="closed")
+function pretty_spectrum_closedopen(which_one::String="closed",anis::Float64=1.0)
     if which_one == "closed"
-        params_dict = Dict([("Lx",4),("Ly",8),("N",4),("if_periodic_x",true),("if_periodic_y",true)])
+        params_dict = Dict([("Lx",4),("Ly",8),("N",4),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",anis)])
     elseif which_one == "open"
-        params_dict = Dict([("Lx",8),("Ly",4),("N",4),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+        params_dict = Dict([("Lx",8),("Ly",4),("N",4),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",anis)])
     else
         error("Invalid which_one")
     end
@@ -145,9 +145,12 @@ function pretty_spectrum_closedopen(which_one::String="closed")
     end
     
     for f in files
-        d,m = read_data_jld2(f,dataloc)
+        d,m = read_data_jld2(f,dataloc; output_level=0)
+        if m["twist_angle"] != [0.0,0.0]
+            continue
+        end
         intstren = m["U"][end]
-        if intstren > 2.0
+        if intstren > 2.0 && anis == 1.0
             continue
         end
         append!(nrgs["intstrens"],intstren)
@@ -165,11 +168,16 @@ function pretty_spectrum_closedopen(which_one::String="closed")
             scatter(nrgs["intstrens"],nrgs["E$(i-1)"],c=cols[i],label="E$(i-1)")
         end
     end
+
+    if which_one == "closed" && anis == 1.0
+        plot([1.0,1.0],[-0.1,0.5],c="k",linestyle="--")
+    end
+
     legend()
     ylim([-0.01,0.4])
     xlabel("Long Range Interaction Strength V/t")
     ylabel("E - E0")
-    title("Energy Spectrum N=4 $(params_dict["Lx"])x$(params_dict["Ly"])")
+    anis == 1.0 ? title("Energy Spectrum N=4 $(params_dict["Lx"])x$(params_dict["Ly"])") : title("Energy Spectrum N=4 $(params_dict["Lx"])x$(params_dict["Ly"]) Hopping Anisotropy=$(anis)")
 end
 
 # quick plot energies of N=4 4x8 and 8x4 on torus
@@ -436,11 +444,11 @@ function plot_gamma_fromsaveddata(lx::Int,ly::Int,N::Int,which_gamma::Int; kwarg
     end
    
     fig = figure()
-    imshow(transpose(gammas); extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)])
+    imshow(transpose(gammas); extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)], vmin=0.0, vmax=1.0)
     colorbar()
-    xlabel("Theta_x / 2pi")
-    ylabel("Theta_y / 2pi")
-    title("Magnitude of Gamma$(which_gamma)"*plot_title)
+    xlabel(L"\theta_x / 2\pi")
+    ylabel(L"\theta_y / 2\pi")
+    which_gamma == 1 ? title("Magnitude of "*L"\Lambda_1" *plot_title) : title("Magnitude of "*L"\Lambda_2" *plot_title)
 end
 
 function plot_omega_fromsaveddata(lx::Int,ly::Int,N::Int; kwargs...)
@@ -451,6 +459,7 @@ function plot_omega_fromsaveddata(lx::Int,ly::Int,N::Int; kwargs...)
     plot_title = get(kwargs,:plot_title,"")
     if_angle_diff = get(kwargs,:if_angle_diff,true)
     if_omega_mag = get(kwargs,:if_omega_mag,false)
+    if_save_fig = get(kwargs,:if_save_fig,false)
 
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     params_dict = Dict([("Lx",lx),("Ly",ly),("N",N),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren),("hopping_anisotropy",hanis)])
@@ -504,11 +513,13 @@ function plot_omega_fromsaveddata(lx::Int,ly::Int,N::Int; kwargs...)
     us = cos.(transpose(omegas_phase))
     vs = sin.(transpose(omegas_phase))
     quiver(xs, ys, us, vs)
-    title("Phase of Omega"*plot_title)
-    xlabel("Theta_x / 2pi")
-    ylabel("Theta_y / 2pi")
+    title("Phase of "*L"\Omega"*plot_title)
+    xlabel(L"\theta_x / 2\pi")
+    ylabel(L"\theta_y / 2\pi")
     xlim([minimum(theta_xs),maximum(theta_xs)])
     ylim([minimum(theta_ys),maximum(theta_ys)])
+
+    if_save_fig && fig.savefig("local-figs/omegaphase-mbcn1p0-6x5-n3-ulr0p0-arrowsheat-morepixels.png",dpi=300)
 
     #if_angle_diff ? count_chern_number(theta_xs,theta_ys,omegas_phase) : nothing
 end
@@ -610,6 +621,7 @@ function pretty_plot_twisting(points_count::Int,if_gap::Bool=true,if_diff::Bool=
 
 end
 
+pretty_spectrum_closedopen("closed",3.0)
 
 
 

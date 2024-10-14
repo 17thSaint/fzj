@@ -2,30 +2,7 @@ using Statistics
 using TTNKit
 using LsqFit
 
-function find_center()
-	all_folders = split(pwd(),"/")
-	if "fzj" in all_folders
-		return "fzj"
-	elseif "local" in all_folders
-		return all_folders[findfirst(x -> all_folders[x] == "local",1:length(all_folders))+1]
-	elseif "Local" in all_folders
-		return all_folders[findfirst(x -> all_folders[x] == "Local",1:length(all_folders))+1]
-	else
-		println("Not sure where the center is: $(pwd())")
-	end
-end
-
-function include_other_files(all_files,output_level=0)
-	center = find_center()
-	get_to_fzj = split(pwd(),center)[1]
-	if typeof(all_files) == String
-		all_files = [all_files]
-	end
-	for file in all_files
-		occursin("main-git",pwd()) ? include(get_to_fzj * center * "/main-git/" * file) : include(get_to_fzj * center * "/" * file)
-		output_level > 0 ? println("Included $file") : nothing
-	end
-end
+include("../other-funcs/include-other-files.jl")
 
 include_other_files(["review-practice-codes/parton-model-syms.jl","other-funcs/data-storage-funcs.jl"])
 
@@ -1766,33 +1743,6 @@ function get_2part_corr(ttn,particle_count; kwargs...)
 	return corr
 end
 
-function get_occupancy(ttn::TTNKit.TreeTensorNetwork; kwargs...)
-	densmat = get(kwargs, :densmat, nothing)
-
-	if isnothing(densmat)
-		exp_occ = abs.(TTNKit.expect(ttn,"N"))
-	else
-		lat = TTNKit.physical_lattice(TTNKit.network(ttn))
-		phys_length,virt_length = get_lattice_dims(ttn)
-		exp_occ = zeros(phys_length,virt_length)
-		for j in 1:phys_length
-			for s in 1:virt_length
-				linear_index = TTNKit.linear_ind(lat,(j,s))
-				exp_occ[j,s] = abs(densmat[linear_index,linear_index])
-			end
-		end
-	end
-	
-	if_save_data = get(kwargs, :if_save_data, false)
-	if_save_fig = get(kwargs, :if_save_fig, false)
-	if_plot = get(kwargs, :if_plot, true)
-	
-	if_save_data ? save_occupancy(exp_occ; kwargs...) : nothing
-	if_plot	|| if_save_fig ? plot_occupancy(exp_occ; kwargs...) : nothing
-		
-	return exp_occ
-end
-
 function get_occupancy(densmat::Matrix; kwargs...)
 	if isinteger(sqrt(size(densmat)[1]))
 		phys_length = Int(sqrt(size(densmat)[1]))
@@ -1827,59 +1777,6 @@ function get_occupancy(densmat::Matrix; kwargs...)
 	end
 
 	return exp_occ
-end
-
-function save_occupancy(exp_occ; kwargs...)
-	location = get(kwargs, :location, pwd())
-	filename = get(kwargs, :name, "occs")
-	metadata = get(kwargs, :metadata, nothing)
-	occs_data_dict = Dict([("vals",exp_occ)])
-	write_data_jld2(filename,occs_data_dict,location,metadata)
-	return
-end
-
-function plot_occupancy(exp_occ; kwargs...)
-	data_dict = get(kwargs, :data_dict, nothing)
-	if !isnothing(data_dict)
-		exp_occ = data_dict["vals"]
-	end
-	fig = figure()
-	imshow(exp_occ)#,vmin=0.0,vmax=maximum(exp_occ))
-	colorbar()
-	plot_title = get(kwargs, :plot_title, "")
-	title_string = "Occupancy, " * plot_title
-	title(title_string)
-	xlabel("Synthetic")
-	ylabel("Physical")
-	
-	if get(kwargs, :if_save_fig, false)
-		location = get(kwargs, :location, pwd())
-		fig_name = get(kwargs, :name, "occs")
-		fig_name = check_plot_label(fig_name,"occs")
-		save_figure(fig_name; kwargs...)
-	end
-	return
-end
-
-function plot_occupancy_3d(exp_occ; kwargs...)
-	m,n = size(exp_occ)
-
-	x = collect(1:m)  # x-coordinates (1 to m)
-	y = collect(1:n)  # y-coordinates (1 to n)
-
-	# Create the corresponding z-values from the matrix
-	z = exp_occ
-
-	# Now, we need to turn x, y, z into vectors for scatter3D
-	# Use the function `repeat` and `vec` to flatten them
-	x_flat = repeat(x, n)     # Repeat x n times
-	y_flat = repeat(y', m)    # Repeat each y m times
-	z_flat = vec(z)           # Flatten the matrix into a vector
-
-	# Create the 3D scatter plot
-	fig = figure()
-	scatter3D(x_flat, y_flat, z_flat)
-	return
 end
 
 function c2(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
