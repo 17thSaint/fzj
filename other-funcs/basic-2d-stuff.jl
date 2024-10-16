@@ -111,6 +111,18 @@ function check_fluxes(alpha::Float64,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_
     return flux_direction
 end
 
+# finds the linear index assuming jump snake mapping with site 1 at bottom left corner
+function linear_index(site::Tuple{Int64,Int64},Lx::Int64,Ly::Int64)
+    return (site[2] - 1)*Lx + site[1]
+end
+
+# finds the site assuming jump snake mapping with site 1 at bottom left corner
+function coordinate(site::Int64,Lx::Int64,Ly::Int64)
+    x = mod1(site,Lx)
+    y = Int((site - x) / Lx + 1)
+    return (x,y)
+end
+
 
 
 

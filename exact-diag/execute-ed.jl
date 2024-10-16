@@ -284,11 +284,11 @@ end
 
 
 # run data collection with for loops
-if false
+if true
     
     lx,ly,n = 4,8,4
     #for (idx,n) in enumerate([2,3,4,5])
-    #intstrens = range(0.0,2.0,length=21)
+    intstrens = range(0.0,2.0,length=10)
     #other_intstrens = range(2.0,10.0,length=37)
     #intstrens = sort([intstrens; other_intstrens])
     #all_nrgs = zeros(Float64,length(thetas))
@@ -299,10 +299,10 @@ if false
     #for (idx,ly) in enumerate(lys)
     #for (idx,nu) in enumerate(nus)
     #for (idx,anis) in enumerate(anises)
-    #for (idx,intstren) in enumerate(intstrens)
+    for (idx,intstren) in enumerate(intstrens)
     #for (idx2,sigma) in enumerate(sigmas)
     #for lrd in [0,1]
-    intstren = 0.5
+    #intstren = 0.0
 
     #= set number of open cores
     open_cores = 5#get(params_dict, "open_cores", 5)
@@ -311,29 +311,33 @@ if false
         display(BLAS.get_config())
     end=#
 
-    tws = range(0.0,1.0,length=11)
+    #intstren = 0.0
+    tw2 = 0.5
+    tw1 = 0.0
+    #tws = range(0.5,1.5,length=21)
     #tws2 = range(0.7,0.8,length=11)
-    omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
-    gammas1::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
-    gammas2::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
-    ref_multiplets,rm1_name,rm2_name = get_reference_multiplets(lx,ly,n; interaction_strength=intstren)
+    #omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
+    #gammas1::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
+    #gammas2::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
+    #ref_multiplets,rm1_name,rm2_name = get_reference_multiplets(lx,ly,n; interaction_strength=intstren)
     #cps = zeros(Float64,length(tws))    tws[args_dict["which_twist_angle"]]
-    for (idx,tw1) in enumerate(tws)
-    for (idx2,tw2) in enumerate(tws)
+    #for (idx,tw1) in enumerate(tws)
+    #for (idx2,tw2) in enumerate(tws)
     #for tw1 in tws
     #for ii in 1:1
-        if tw1 == 0.0 && tw2 == 0.0
-            continue
-        end
+        #if tw1 == 0.0 && tw2 == 0.0
+        #    continue
+        #end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
         states,nrgs,rhos,filepath,if_found = run_normal_ed(params_dict; output_level=1)
 
-        #plot_spectrum(collect(intstrens),nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title=" $(lx)x$(ly) N=$(n) Alpha=$(round(2*n/(lx*ly),digits=3))")
+        plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title="Theta_y = pi")
+        #plot_spectrum(tws,nrgs,idx,params_dict["nev"],"Theta_x / 2pi",false; plot_title=" V=$intstren")
 
-        if !if_found
+        #=if !if_found
             gamma1,gamma2,omega = get_hatsugaifull(states[1],states[2],ref_multiplets; if_save=true,filepath=filepath,ref_multis_filenames=[rm1_name,rm2_name])
         elseif if_found
             d,m = read_data_jld2(filepath)
@@ -346,12 +350,12 @@ if false
             
         omegas[idx,idx2] = omega
         gammas1[idx,idx2] = gamma1
-        gammas2[idx,idx2] = gamma2
+        gammas2[idx,idx2] = gamma2=#
 
-    end
+    #end
     end
 
-    plot_omega(collect(tws),collect(tws),omegas)
+    #plot_omega(collect(tws),collect(tws),omegas)
 
     #=fig = figure()
     imshow(abs.(omegas))

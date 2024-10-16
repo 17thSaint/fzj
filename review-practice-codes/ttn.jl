@@ -36,6 +36,19 @@ function get_site_number(x, y, side_length)
 end
 =#
 
+function get_lattice_dims_from_layers(layers::Int; kwargs...)
+	if_synth_rectangle = get(kwargs, :if_synth_rectangle, false)
+
+	if iseven(layers)
+		edge_length = Int(sqrt(2^layers))
+		return edge_length,edge_length
+	else
+		physical_edge_length = Int(sqrt(2^(layers+1)))
+		virt_edge_length = Int(physical_edge_length / 2)
+		result = if_synth_rectangle ? (virt_edge_length,physical_edge_length) : (physical_edge_length,virt_edge_length)
+		return result
+	end
+end
 
 function back2cpu(ttn::TTNKit.TreeTensorNetwork)
 	datagpu = deepcopy(ttn.data)
@@ -2316,162 +2329,6 @@ function calculate_energy(wavefunc::TTNKit.TreeTensorNetwork,ham_op)
 	sh = TTNKit.update!(sh,(1,1))
 	nrg = sh.current_energy
 	return nrg
-end
-
-function physical_current(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
-    if_plot = get(kwargs,:if_plot,true)
-	densmat = get(kwargs,:densmat,nothing)
-	if isnothing(densmat)
-		densmat = density_matrix(wavefunc)
-	end
-
-    lat = TTNKit.physical_lattice(TTNKit.network(wavefunc))
-	Lx,Ly = size(lat)
-
-    currents = Array{Float64,2}(undef,Lx,Ly)
-    for s in 1:Ly
-        for j in 1:Lx
-            site1 = TTNKit.linear_ind(lat,(j,s))
-            site2 = TTNKit.linear_ind(lat,(mod1(j+1,Lx),s))
-            current_val = imag(densmat[site1,site2] - densmat[site2,site1])
-            current_normalization = densmat[site1,site1] + densmat[site2,site2]
-            current_val /= current_normalization
-            currents[j,s] = real(current_val)
-        end
-    end
-
-    if_plot ? plot_physical_current(currents; kwargs...) : nothing
-
-    return currents
-end
-
-function synthetic_current(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
-    if_plot = get(kwargs,:if_plot,true)
-	densmat = get(kwargs,:densmat,nothing)
-	if isnothing(densmat)
-		densmat = density_matrix(wavefunc)
-	end
-
-	lat = TTNKit.physical_lattice(TTNKit.network(wavefunc))
-	Lx,Ly = size(lat)
-
-    currents = Array{Float64,2}(undef,Lx,Ly)
-    for j in 1:Lx
-        for s in 1:Lx
-            site1 = TTNKit.linear_ind(lat,(j,s))
-            site2 = TTNKit.linear_ind(lat,(j,mod1(s+1,Ly)))
-            current_val = imag(densmat[site1,site2] - densmat[site2,site1])
-            current_normalization = densmat[site1,site1] + densmat[site2,site2]
-            current_val /= current_normalization
-            currents[j,s] = real(current_val)
-        end
-    end
-
-    if_plot ? plot_synthetic_current(currents; kwargs...) : nothing
-
-    return currents
-end
-
-function plot_synthetic_current(currents::Array{Float64,2}; kwargs...)
-    plot_title = get(kwargs,:plot_title,"")
-    fig = figure()
-    for i in 1:size(currents)[2]
-        plot(1:size(currents)[1],currents[:,i],"-p",label="$i")
-    end
-    xlabel("Physical Site")
-    ylabel("Current")
-    title("Synthetic Current "*plot_title)
-    legend()
-    return nothing
-end
-
-function plot_physical_current(currents::Array{Float64,2}; kwargs...)
-    plot_title = get(kwargs,:plot_title,"")
-    fig = figure()
-    for i in 1:size(currents)[1]
-        plot(1:size(currents)[2],currents[i,:],"-p",label="$i")
-    end
-    xlabel("Synthetic Site")
-    ylabel("Current")
-    title("Physical Current "*plot_title)
-    legend()
-    return nothing
-end
-
-function physical_correlation(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
-    if_plot = get(kwargs,:if_plot,true)
-	densmat = get(kwargs,:densmat,nothing)
-	if isnothing(densmat)
-		densmat = density_matrix(wavefunc)
-	end
-
-	lat = TTNKit.physical_lattice(TTNKit.network(wavefunc))
-	Lx,Ly = size(lat)
-
-    phys_corrs = Array{Float64,2}(undef,Lx-1,Ly)
-    for j in 2:Lx
-        for s in 1:Ly
-            phys_corr = densmat[TTNKit.linear_ind(lat,(j,s)),TTNKit.linear_ind(lat,(1,s))]
-            phys_corr /= sqrt(densmat[TTNKit.linear_ind(lat,(j,s)),TTNKit.linear_ind(lat,(j,s))] * densmat[TTNKit.linear_ind(lat,(1,s)),TTNKit.linear_ind(lat,(1,s))])
-            phys_corrs[j-1,s] = abs(phys_corr)
-        end
-    end
-
-    if_plot ? plot_physical_correlation(phys_corrs; kwargs...) : nothing
-
-    return phys_corrs
-end
-
-function synthetic_correlation(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
-    if_plot = get(kwargs,:if_plot,true)
-	densmat = get(kwargs,:densmat,nothing)
-	if isnothing(densmat)
-		densmat = density_matrix(wavefunc)
-	end
-
-	lat = TTNKit.physical_lattice(TTNKit.network(wavefunc))
-	Lx,Ly = size(lat)
-
-    syn_corrs = Array{Float64,2}(undef,Lx,Ly-1)
-    for j in 1:Lx
-        for s in 2:Ly
-			syn_corr = densmat[TTNKit.linear_ind(lat,(j,s)),TTNKit.linear_ind(lat,(j,1))]
-			syn_corr /= sqrt(densmat[TTNKit.linear_ind(lat,(j,s)),TTNKit.linear_ind(lat,(j,s))] * densmat[TTNKit.linear_ind(lat,(j,1)),TTNKit.linear_ind(lat,(j,1))])
-			syn_corrs[j,s-1] = abs(syn_corr)
-        end
-    end
-
-    if_plot ? plot_synthetic_correlation(syn_corrs; kwargs...) : nothing
-
-    return syn_corrs
-end
-
-function plot_synthetic_correlation(syn_corrs::Array{Float64,2}; kwargs...)
-    plot_title = get(kwargs,:plot_title,"")
-    fig = figure()
-    for i in 1:size(syn_corrs)[1]
-        plot(1:size(syn_corrs)[2],syn_corrs[i,:],"-p",label="$i")
-    end
-    xlabel("Synthetic Distance")
-    ylabel("Correlation")
-    title("Synthetic Correlation "*plot_title)
-    legend()
-    yscale("log")
-    return nothing
-end
-
-function plot_physical_correlation(phys_corrs::Array{Float64,2}; kwargs...)
-    plot_title = get(kwargs,:plot_title,"")
-    fig = figure()
-    for i in 1:size(phys_corrs)[2]
-        plot(1:size(phys_corrs)[1],phys_corrs[:,i],"-p",label="$i")
-    end
-    xlabel("Physical Distance")
-    ylabel("Correlation")
-    title("Physical Correlation "*plot_title)
-    legend()
-    yscale("log")
-    return nothing
 end
 
 

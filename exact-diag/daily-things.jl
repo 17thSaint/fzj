@@ -111,6 +111,7 @@ if false
     #end
 end
 
+# 3d plot of twist angles for 6x5 n=3
 if false
     nev = 2
     cols = ["b","g","r","m","c"]
@@ -129,6 +130,82 @@ if false
         end
     end
 end
+
+# 4x8 n=4 look at twisting
+if true
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    nev = 2
+    intstren = 0.0
+    #tw2 = 0.1
+    params_dict = Dict([("Lx",4),("Ly",8),("N",4),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(params_dict,"ed",dataloc; output_level=0)
+
+    all_gs1 = []
+    all_gs2 = []
+    tw1s = [0.0]
+    tw2s = [0.0]
+    nrgs = Dict([("1",[]),("2",[]),("3",[])])
+    omegas = [0.0*im]
+    for f in all_files
+        filename_params = get_params_dict_from_filename(f)
+        if haskey(filename_params,"twist_angle2")
+            #if filename_params["twist_angle2"] != tw2
+            #    continue
+            #end
+            if filename_params["twist_angle2"] == 0.67 || filename_params["twist_angle2"] == 0.33
+                continue
+            end
+
+            if !isinteger(filename_params["twist_angle2"]*10)
+                continue
+            end
+
+            if !isinteger(filename_params["twist_angle1"]*10)
+                continue
+            end
+
+            if filename_params["twist_angle1"] > 1.0
+                continue
+            end
+        else
+            continue
+        end
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+        println(f)
+        #append!(all_gs1,[d["state"][1]])
+        #append!(all_gs2,[d["state"][2]])
+        append!(tw1s,[m["twist_angle"][1]])
+        append!(tw2s,[m["twist_angle"][2]])
+        for i in 1:nev
+            append!(nrgs[string(i)],d["nrg"][i])
+        end
+        append!(omegas,[m["omega"]])
+    end
+
+    matrix_omegas = reshape(omegas,11,11)
+    plot_omega(tw2s[1:11],tw2s[1:11],matrix_omegas)
+
+    #scatter(tw1s,nrgs["1"],label="1")
+    #scatter(tw1s,nrgs["2"] .- nrgs["1"],label="2")
+    #legend()
+
+
+    #=overlap_11 = abs2.([dot(all_gs1[1],all_gs1[i]) for i in 1:length(all_gs1)])
+    overlap_12 = abs2.([dot(all_gs1[1],all_gs2[i]) for i in 1:length(all_gs2)])
+    overlap_22 = abs2.([dot(all_gs2[1],all_gs2[i]) for i in 1:length(all_gs2)])
+    overlap_21 = abs2.([dot(all_gs2[1],all_gs1[i]) for i in 1:length(all_gs1)])
+
+    fig = figure()
+    plot(tws[1:end],overlap_11,"-p",label="11")
+    plot(tws[1:end],overlap_22,"-p",label="22")
+    legend()
+
+    fig = figure()
+    plot(tws[1:end],overlap_12,"-p",label="12")
+    plot(tws[1:end],overlap_21,"-p",label="21")
+    legend()=#
+end
+
 
 
 

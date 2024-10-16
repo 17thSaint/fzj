@@ -621,7 +621,7 @@ function pretty_plot_twisting(points_count::Int,if_gap::Bool=true,if_diff::Bool=
 
 end
 
-pretty_spectrum_closedopen("closed",3.0)
+#pretty_spectrum_closedopen("closed",3.0)
 
 
 
