@@ -68,15 +68,7 @@ end
 
 function get_lattice_dims(input_data)
 	num_layers = TTNKit.number_of_layers(input_data)
-	if num_layers % 2 != 0
-		physical_edge_length = Int(sqrt(2^(num_layers+1)))
-		virt_edge_length = Int(physical_edge_length / 2)
-		return physical_edge_length,virt_edge_length
-		
-	else
-		edge_length = Int(sqrt(2^num_layers))
-		return edge_length,edge_length
-	end
+	return get_lattice_dims_from_layers(num_layers)
 end
 
 function get_ydir_greenfunc(ttn; kwargs...)

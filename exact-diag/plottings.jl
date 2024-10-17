@@ -12,6 +12,8 @@ Depends on:
 =#
 ######################################################
 
+using PyPlot,LaTeXStrings
+
 function get_colors(nev::Int)
     cols = ["b","g","r","m","c"]
     if nev > length(cols)

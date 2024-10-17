@@ -10,6 +10,8 @@ Depends on:
 ######################################################
 
 include("execute-ed.jl")
+include("plottings.jl")
+include("../other-funcs/basic-2d-plottings.jl")
 
 
 # redo gamma/omega calcs for all files
@@ -70,7 +72,8 @@ end
 # see what sizes are available for rho1D = 1.0 from ED
 if false
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
-    nev = 13
+    nev = 2
+    lx,n = 6,3
     amplification_factor = 10.0
 
     cols = ["b","g","r","m","c"]
@@ -78,9 +81,10 @@ if false
         cols = repeat(cols,ceil(Int,nev/length(cols)))
     end
 
-    intstrens = range(0.0,100.0,length=30)
-    tws = range(0.0,1.0,length=50)
-    for (idx,intstren) in enumerate(intstrens)
+    intstrens = range(0.0,2.0,length=11)
+    intstren = 0.0
+    tws = range(0.0,1.0,length=21)
+    #for (idx,intstren) in enumerate(intstrens)
         #=where_fqh = 1
         if intstren > 1.5
             where_fqh += 2
@@ -89,26 +93,48 @@ if false
             where_fqh += 2
         end=#
     #these_nrgs = zeros(Float64,nev,length(tws))
-    #for (idx,tw1) in enumerate(tws)
+    for ly in [3,5,6]
+        fig = figure()
+    for (idx,tw1) in enumerate(tws)
     #for (idx2,tw2) in enumerate(tws)
-        #intstren = 1.75
         
-        tw2 = 0.5
-        tw1 = 0.0
-            params_dict = Dict([("Lx",3),("Ly",7),("N",3),("interaction_strength",intstren),("nev",nev),("if_save_data",false),("if_find_data",false),("if_periodic_x",true),("if_periodic_y",true),("tw1",tw1),("tw2",tw2)])
+        tw2 = 0.0
+        #tw1 = 0.0
+            params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("nev",nev),("if_save_data",false),("if_find_data",false),("if_periodic_x",true),("if_periodic_y",true),("tw1",tw1),("tw2",tw2)])
             states,nrgs,rhos,filepath,if_found,latpara,hamiltpara = run_normal_ed(params_dict; output_level=1)
             #get_occupancy(states[1],latpara; plot_title="ULR=$intstren tw2=$tw2 E=$(round(nrgs[1],digits=3))")
             #get_occupancy(states[2],latpara; plot_title="ULR=$intstren tw2=$tw2 E=$(round(nrgs[2],digits=3))")
             #=for i in 1:length(nrgs)
-                scatter3D(tw1,intstren,nrgs[i] - nrgs[1],c=cols[i])
+                scatter3D(tw1,tw2,nrgs[i] - nrgs[1],c=cols[i])
             end
-            xlabel("Theta_x / 2pi")
-            ylabel("ULR")=#
-            plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength"; plot_title=" $(params_dict["Lx"])x$(params_dict["Ly"]) N=$(params_dict["N"])")
-            #plot_spectrum(tws,nrgs,idx,params_dict["nev"],"Theta_x / 2pi",false; plot_title=" $(params_dict["Lx"])x$(params_dict["Ly"]) N=$(params_dict["N"]) ULR=$intstren")
+            xlabel(L"\theta_x / 2 \pi")
+            ylabel(L"\theta_y / 2 \pi")
+            title("Flux Direction = $(params_dict["flux_direction"])")=#
+            #plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title=" $(params_dict["Lx"])x$(params_dict["Ly"]) N=$(params_dict["N"])")
+            #plot_spectrum(tws,nrgs,idx2,params_dict["nev"],L"\theta_y / 2 \pi",false; plot_title=" $(params_dict["Lx"])x$(params_dict["Ly"]) N=$(params_dict["N"]) ULR=$intstren")
+            plot_spectrum(tws,nrgs,idx,params_dict["nev"],L"\theta_x / 2 \pi",true; plot_title=" $(params_dict["Lx"])x$(params_dict["Ly"]) N=$(params_dict["N"]) ULR=$intstren")
+    end
+
+    
+    fig = figure()
+        for (idx2,tw2) in enumerate(tws)
+            
+            tw1 = 0.5
+            #tw1 = 0.0
+                params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("nev",nev),("if_save_data",false),("if_find_data",false),("if_periodic_x",true),("if_periodic_y",true),("tw1",tw1),("tw2",tw2)])
+                states,nrgs,rhos,filepath,if_found,latpara,hamiltpara = run_normal_ed(params_dict; output_level=1)
+                #get_occupancy(states[1],latpara; plot_title="ULR=$intstren tw2=$tw2 E=$(round(nrgs[1],digits=3))")
+                #get_occupancy(states[2],latpara; plot_title="ULR=$intstren tw2=$tw2 E=$(round(nrgs[2],digits=3))")
+                #=for i in 1:length(nrgs)
+                    scatter3D(tw1,tw2,nrgs[i] - nrgs[1],c=cols[i])
+                end
+                xlabel(L"\theta_x / 2 \pi")
+                ylabel(L"\theta_y / 2 \pi")
+                title("Flux Direction = $(params_dict["flux_direction"])")=#
+                #plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title=" $(params_dict["Lx"])x$(params_dict["Ly"]) N=$(params_dict["N"])")
+                plot_spectrum(tws,nrgs,idx2,params_dict["nev"],L"\theta_y / 2 \pi",true; plot_title=" $(params_dict["Lx"])x$(params_dict["Ly"]) N=$(params_dict["N"]) ULR=$intstren")
         end
-        #title("Spectrum for Lx=3 Ly=7 N=3 tw2=$tw2")
-    #end
+    end
 end
 
 # 3d plot of twist angles for 6x5 n=3
@@ -132,7 +158,7 @@ if false
 end
 
 # 4x8 n=4 look at twisting
-if true
+if false
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     nev = 2
     intstren = 0.0
@@ -144,7 +170,7 @@ if true
     all_gs2 = []
     tw1s = [0.0]
     tw2s = [0.0]
-    nrgs = Dict([("1",[]),("2",[]),("3",[])])
+    nrgs = Dict([("1",[0.0]),("2",[0.0]),("3",[0.0])])
     omegas = [0.0*im]
     for f in all_files
         filename_params = get_params_dict_from_filename(f)
@@ -179,11 +205,11 @@ if true
         for i in 1:nev
             append!(nrgs[string(i)],d["nrg"][i])
         end
-        append!(omegas,[m["omega"]])
+        #append!(omegas,[m["omega"]])
     end
 
-    matrix_omegas = reshape(omegas,11,11)
-    plot_omega(tw2s[1:11],tw2s[1:11],matrix_omegas)
+    #matrix_omegas = reshape(omegas,11,11)
+    #plot_omega(tw2s[1:11],tw2s[1:11],matrix_omegas)
 
     #scatter(tw1s,nrgs["1"],label="1")
     #scatter(tw1s,nrgs["2"] .- nrgs["1"],label="2")
@@ -206,6 +232,34 @@ if true
     legend()=#
 end
 
+# look at cdw sf for 4x8 n=4
+if false
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    nev = 10
+
+    intstrens = range(0.0,5.0,length=41)
+    for intstren in intstrens
+        params_dict = Dict([("Lx",3),("Ly",7),("N",3),("nev",nev),("interaction_strength",intstren),("tw2",0.5),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("if_find_data",false),("if_save_data",false)])
+        states,nrgs,rhos,filepath,if_found,latpara,hamiltpara = run_normal_ed(params_dict; output_level=1)
+
+        #get_occupancy(states[1],latpara; plot_title="Intstren = $intstren",fix_colorbar=true)
+        denscorrs = make_density_correlations(states[1],latpara)
+        diagval = get_cdwsf([1.0,1.0],denscorrs)
+        scatter(intstren,diagval,c="b")
+    end
+
+    #=for f in all_files
+        filename_dict = get_params_dict_from_filename(f)
+        if haskey(filename_dict,"twist_angle2")
+            continue
+        end
+
+        println(f)
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+        latparas = get_lattice_params_from_metadata(m)
+        denscorrs = make_density_correlations(d["state"][1])
+    end=#
+end
 
 
 

@@ -241,6 +241,97 @@ function synthetic_current(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
     return currents
 end
 
+function check_nrg_convergence(metadata::Dict)
+    nrg_tol::Float64 = metadata["nrgtol"]
+
+    all_nrgs::Dict{String,Array{Float64,1}} = Dict()
+    all_nrgs["0"] = metadata["observer"].nrg
+
+    found_excited_nrg::Bool = haskey(metadata,"observer_1")
+    next_nrg_level::Int = 1
+    while found_excited_nrg
+        all_nrgs[string(next_nrg_level)] = metadata["observer_$(next_nrg_level)"].nrg
+        next_nrg_level += 1
+        found_excited_nrg = haskey(metadata,"observer_$(next_nrg_level)")
+    end
+
+    if_converged::Dict{String,Bool} = Dict()
+    for (k,v) in all_nrgs
+        if_converged[k] = abs(v[end] - v[end-1]) < nrg_tol
+    end
+
+    return all(values(if_converged)),if_converged
+end
+
+# find some way to speed this up
+function make_density_correlations(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+    Lphys::Int64,Lsynth::Int64 = get_lattice_dims(wavefunc)
+
+    density_correlations::Array{Float64,4} = zeros(Lphys,Lphys,Lsynth,Lsynth)
+
+    for s in 1:Lsynth
+        for j in 1:Lphys
+            for ss in 1:Lsynth
+                for jj in 1:Lphys
+                    corr_val::Float64 = real(TTNKit.correlation(wavefunc,"N","N",(j,s),(jj,ss)))
+                    density_correlations[j,jj,s,ss] = corr_val
+                end
+            end
+        end
+    end
+
+    return density_correlations
+end
+
+function get_cdwsf(qvec::Vector{Float64},dens_corr_mat::Array{Float64}; kwargs...)
+    Lphys::Int64,Lsynth::Int64 = size(dens_corr_mat)[1],size(dens_corr_mat)[3]
+
+    result::Union{Float64,ComplexF64} = 0.0
+    
+    for j in 1:Lphys
+        for s in 1:Lsynth
+            for jj in 1:Lphys
+                for ss in 1:Lsynth
+                    dist_vect::Vector{Int64} = [minimum([(j-jj),Lphys-(j-jj)]),minimum([(s-ss),Lsynth-(s-ss)])]
+                    dotprod::Float64 = dot(qvec,dist_vect)
+                    result += exp(-im*2*pi*dotprod)*dens_corr_mat[j,jj,s,ss]
+                    #println("Working on sites $(j) and $(jj) with synth indices $(s) and $(ss) with dotprod $(dotprod)")
+                end
+            end
+        end
+    end
+
+    return result / ((Lphys*Lsynth)^2)
+end
+
+function range_cdwsf_angles(points_count::Int64,dens_corr_mat::Array{Float64},radius::Int64=1.0; kwargs...)
+    if_plot::Bool = get(kwargs,:if_plot,true)
+    plot_title::String = get(kwargs,:plot_title,"")
+    if_multiple_lines::Bool = get(kwargs,:if_multiple_lines,false)
+    line_label::String = get(kwargs,:line_label,"")
+
+    angles = range(0.0,2*pi,length=points_count)
+    cdwsfs::Vector{ComplexF64} = zeros(ComplexF64,points_count)
+    for (idx,angle) in enumerate(angles)
+        qvec::Vector{Float64} = [radius*cos(angle),radius*sin(angle)]
+        cdwsfs[idx] = get_cdwsf(qvec,denscorrs)
+    end
+
+    if if_plot
+        if if_multiple_lines
+            plot(angles ./ (2*pi),abs.(cdwsfs),"-p",label=line_label)
+            legend()
+        else
+            plot(angles ./ (2*pi),abs.(cdwsfs),"-p")
+        end
+        xlabel("Angle")
+        ylabel("CDW Structure Factor")
+        title(plot_title)
+    end
+
+    return angles,cdwsfs
+end
+
 
 
 

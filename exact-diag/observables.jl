@@ -52,8 +52,9 @@ function get_occupancy(rho::Array{ComplexF64,2},lattice_params::Dict{String,Any}
 end
 
 function plot_occupancy(exp_occ; kwargs...)
+    fix_colorbar = get(kwargs,:fix_colorbar,false)
 	fig = figure()
-	imshow(exp_occ)
+	fix_colorbar ? imshow(exp_occ;vmin=0,vmax=maximum(exp_occ)) : imshow(exp_occ)
 	colorbar()
 	plot_title = get(kwargs, :plot_title, "")
 	title_string = "Occupancy, " * plot_title
@@ -263,120 +264,40 @@ end
 
 distance_correlation(x::Vector{ComplexF64},lattice_params::Dict,direction::String="x") = distance_correlation(density_matrix(x,lattice_params),lattice_params,direction)
 
-# Charge Density Wave structure factor as a function of direction given by qvec
-# needs testing
-function cdw_structure_factor(rho::Array{ComplexF64,2},qvec::Vector,psi::Vector{ComplexF64},lattice_params::Dict; kwargs...)
-    if_periodic_phys = lattice_params["if_periodic_x"]
-    if_periodic_synth = lattice_params["if_periodic_y"]
-    phys_len = lattice_params["Lx"]
-    synth_len = lattice_params["Ly"]
+function density_operator(lattice_params::Dict,which_site::Tuple{Int64,Int64})
+    full_basis = lattice_params["full_basis"]
+    linear_site = linear_index(which_site,lattice_params["Lx"],lattice_params["Ly"])
 
+    nhat = spzeros(Int64,size(full_basis)[2],size(full_basis)[2])
 
-	occs = get_occupancy(psi,lattice_params; if_plot=false,densmat=rho)
+    for i in 1:size(full_basis)[2]
+        linear_site in full_basis[:,i] ? nhat[i,i] += 1 : nothing
+    end
 
-	struc_fact = 0.0
-	for j in 1:phys_len
-		for s in 1:synth_len
-			p1 = (j,s)
-			p1_linear = linear_index(p1,phys_len,synth_len)
-			for jj in 1:phys_len
-				for ss in 1:synth_len
-					p2 = (jj,ss)
-					p2_linear = linear_index(p2,phys_len,synth_len)
-					dist = find_dist(p1, p2, (phys_len,synth_len), (if_periodic_phys,if_periodic_synth))[2]
-					struc_fact += occs[p1[1],p1[2]] * occs[p2[1],p2[2]] * exp(im * dot(qvec,dist))
-				end
-			end
-		end
-	end
-	return struc_fact / sum(occs)
+    return nhat
 end
 
-# needs testing
-function cdw_structure_factor(occs::Matrix,qvec::Vector,lattice_params::Dict)
-    if_periodic_phys = lattice_params["if_periodic_x"]
-    if_periodic_synth = lattice_params["if_periodic_y"]
-    phys_len = lattice_params["Lx"]
-    synth_len = lattice_params["Ly"]
+# make two site density correlations
+function make_density_correlations(wavefunc::Vector{ComplexF64},lattice_params::Dict; kwargs...)
+    Lphys::Int64,Lsynth::Int64 = lattice_params["Lx"],lattice_params["Ly"]
 
-    struc_fact = 0.0
-    for j in 1:phys_len
-        for s in 1:synth_len
-            p1 = (j,s)
-            #p1_linear = linear_index(p1,phys_len,synth_len)
-            for jj in 1:phys_len
-                for ss in 1:synth_len
-                    p2 = (jj,ss)
-                    #p2_linear = linear_index(p2,phys_len,synth_len)
-                    dist = find_dist(p1, p2, (phys_len,synth_len), (if_periodic_phys,if_periodic_synth))[2]
-                    struc_fact += occs[p1[2],p1[1]] * occs[p2[2],p2[1]] * exp(im * dot(qvec,dist))
+    density_correlations::Array{Float64,4} = zeros(Lphys,Lphys,Lsynth,Lsynth)
+
+    for s in 1:Lsynth
+        for j in 1:Lphys
+            nhat_first = density_operator(lattice_params,(j,s))
+            for ss in 1:Lsynth
+                for jj in 1:Lphys
+                    nhat_prime = density_operator(lattice_params,(jj,ss))
+                    corr_val::Float64 = real(conj(transpose(wavefunc)) * (nhat_first * (nhat_prime * wavefunc)))
+                    density_correlations[j,jj,s,ss] = corr_val
                 end
             end
         end
     end
-    return struc_fact / sum(occs)
+
+    return density_correlations
 end
-
-# needs testing
-function cdw_sf(rho::Array{ComplexF64,2},psi::Vector{ComplexF64},lattice_params::Dict,qend=(0.0,3.0),howmany=50; kwargs...)
-	if_plot = get(kwargs, :if_plot, true)
-
-    if qend[1] == 0.0
-        direction = 2
-        axis_dir = "Y"
-        qmax = qend[2]
-    elseif qend[2] == 0.0
-        direction = 1
-        axis_dir = "X"
-        qmax = qend[1]
-    else
-        direction = 3
-    end
-
-    if direction < 3
-        qvec = zeros(Float64,2)
-        qs = range(0.0,stop=qmax,length=howmany)
-        struct_factor = zeros(ComplexF64,howmany)
-        for (i,qx) in enumerate(qs)
-            qvec[direction] = qx
-            struct_factor[i] = cdw_structure_factor(rho,qvec,psi,lattice_params; kwargs...)
-        end
-
-        if if_plot
-            plot_title = get(kwargs, :plot_title, "")
-            plot_label = get(kwargs, :plot_label, nothing)
-            isnothing(plot_label) ? fig = figure() : nothing
-            isnothing(plot_label) ? plot(qs,abs.(struct_factor)) : plot(qs,abs.(struct_factor),label=plot_label)
-            xlabel("q"*axis_dir)
-            ylabel("Structure Factor")
-            title("CDW Structure Factor, " * plot_title)
-            legend()
-        end
-    else
-        struct_factor = zeros(ComplexF64,howmany,howmany)
-        qxs = range(-qend[1],stop=qend[1],length=howmany)
-        qys = range(-qend[2],stop=qend[2],length=howmany)
-        for (i,qx) in enumerate(qxs)
-            for (j,qy) in enumerate(qys)
-                qvec = [qx,qy]
-                struct_factor[i,j] = cdw_structure_factor(rho,qvec,psi,lattice_params; kwargs...)
-            end
-        end
-
-        if if_plot
-            plot_title = get(kwargs, :plot_title, "")
-            fig = figure()
-            imshow(abs.(struct_factor),extent=[qxs[1],qxs[end],qys[1],qys[end]])
-            colorbar()
-            xlabel("qx")
-            ylabel("qy")
-            title("CDW Structure Factor, " * plot_title)
-        end
-    end
-
-	return struct_factor
-end
-
 
 # Spin Stiffness as a function of twist angles theta
 # needs testing
