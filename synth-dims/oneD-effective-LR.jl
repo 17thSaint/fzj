@@ -1,7 +1,7 @@
 include("long-range-ttn.jl")
 include("fqh_effective.jl")
-include("plottings.jl")
 include("hatsugai-mbcn.jl")
+include("observables-oneDeff.jl")
 #using PyPlot
 
 function fix_filling(L,nflavors,nu)
@@ -273,7 +273,7 @@ if false
 end
 
 
-if true
+if false
 	lx,ly,n = 6,6,6
 	#ref_multiplets,rm1_name,rm2_name = get_reference_multiplets(lx,ly,n)
 	#tws = range(0.0,stop=1.0,length=10)

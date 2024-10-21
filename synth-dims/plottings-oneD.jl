@@ -12,10 +12,10 @@ Depends on:
 =#
 ######################################################
 
+using PyPlot,LaTeXStrings
 
 
-
-function plot_spectrum(xxs::Vector,nrgs::Vector,idx::Int,nev::Int,xstring::String="x",if_diff::Bool=true; kwargs...)
+function plot_spectrum(xxs::Vector,nrgs::Vector,idx::Int,nev::Int,xstring::AbstractString="x",if_diff::Bool=true; kwargs...)
     plot_title = get(kwargs,:plot_title,"")
 
     cols = ["b","g","r","m","c"]
@@ -36,7 +36,7 @@ function plot_spectrum(xxs::Vector,nrgs::Vector,idx::Int,nev::Int,xstring::Strin
 
     return
 end
-plot_spectrum(xxs::StepRangeLen,nrgs::Vector,idx::Int,nev::Int,xstring::String,if_diff::Bool; kwargs...) = plot_spectrum(collect(xxs),nrgs,idx,nev,xstring,if_diff; kwargs...)
+plot_spectrum(xxs::StepRangeLen,nrgs::Vector,idx::Int,nev::Int,xstring::AbstractString,if_diff::Bool; kwargs...) = plot_spectrum(collect(xxs),nrgs,idx,nev,xstring,if_diff; kwargs...)
 
 function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::Matrix{ComplexF64}; kwargs...)
     plot_title::String = get(kwargs,:plot_title,"")

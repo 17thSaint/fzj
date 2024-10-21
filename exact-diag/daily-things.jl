@@ -261,6 +261,47 @@ if false
     end=#
 end
 
+# try charge pumping
+if false
+    lx,ly,n = 6,6,3
+    nev = 10
+
+    intstren = 0.0
+    tws = [0.0,0.5]#range(0.0,1.0,length=21)
+
+    pumped_charge = 0.0
+    cppuls = zeros(Float64,length(tws))
+    for (idx,tw1) in enumerate(tws)
+        params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("nev",nev),("tw1",tw1),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("if_find_data",false),("if_save_data",false)])
+        states,nrgs,rhos,filepath,if_found,latpara,hamiltpara = run_normal_ed(params_dict; output_level=1)
+
+        occs = get_occupancy(states[1],latpara; if_plot=false)
+        cppuls[idx] = sum([sum(occs[i,:] .* i) for i in 1:ly])
+        #=if idx == 1
+            global pumped_charge += cppul
+        else
+            global pumped_charge -= cppul
+        end=#
+        #plot_spectrum(tws,nrgs,idx,params_dict["nev"],L"\theta_x / 2 \pi",true; plot_title=" $(params_dict["Lx"])x$(params_dict["Ly"]) N=$(params_dict["N"]) ULR=$intstren")
+    end
+    #fig = figure()
+    #scatter(tws,cppuls,c="b")
+    #xlabel(L"\theta_x / 2 \pi")
+    #ylabel("Charge Polarization per Unit Length")
+    println("Pumped charge Q = $(round(cppuls[end] - cppuls[1],digits=3))")
+
+end
+
+# compare twisting for ED/1DeffMPS 4x4 n=2
+if true
+    tws = range(0.0,1.0,length=21)
+    for (idx,tw1) in enumerate(tws)
+        params_dict = Dict([("Lx",4),("Ly",4),("N",2),("nev",10),("tw2",tw1),("interaction_strength",10000000.0),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("if_find_data",false),("if_save_data",false)])
+        states,nrgs,rhos,filepath,if_found,latpara,hamiltpara = run_normal_ed(params_dict; output_level=1)
+        plot_spectrum(tws,nrgs,idx,params_dict["nev"],L"\theta_y / 2 \pi",false; plot_title=" $(params_dict["Lx"])x$(params_dict["Ly"]) N=$(params_dict["N"]) ULR=10000.0")
+    end
+end
+
 
 
 

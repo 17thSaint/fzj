@@ -27,11 +27,6 @@ end
 
 
 
-denscorrs = make_density_correlations(psis[1])
-rez = range_cdwsf_radii(100,denscorrs)
-
-
-
 
 
 
