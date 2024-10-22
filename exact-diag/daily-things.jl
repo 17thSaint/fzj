@@ -294,12 +294,28 @@ end
 
 # compare twisting for ED/1DeffMPS 4x4 n=2
 if true
-    tws = range(0.0,1.0,length=21)
-    for (idx,tw1) in enumerate(tws)
-        params_dict = Dict([("Lx",4),("Ly",4),("N",2),("nev",10),("tw2",tw1),("interaction_strength",10000000.0),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("if_find_data",false),("if_save_data",false)])
+    nev = 20
+    intstrens = range(0.0,4.0,length=21)
+    #tws = range(0.0,1.0,length=11)
+    #for (idx,tw1) in enumerate(tws)
+    prev_next_fqh = [[],[]]
+    for (idx,intstren) in enumerate(intstrens)
+        params_dict = Dict([("Lx",3),("Ly",7),("N",3),("nev",nev),("tw2",0.0),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("if_find_data",false),("if_save_data",false)])
         states,nrgs,rhos,filepath,if_found,latpara,hamiltpara = run_normal_ed(params_dict; output_level=1)
-        plot_spectrum(tws,nrgs,idx,params_dict["nev"],L"\theta_y / 2 \pi",false; plot_title=" $(params_dict["Lx"])x$(params_dict["Ly"]) N=$(params_dict["N"]) ULR=10000.0")
+        #plot_spectrum(tws,nrgs,idx,params_dict["nev"],L"\theta_y / 2 \pi",false; plot_title=" $(params_dict["Lx"])x$(params_dict["Ly"]) N=$(params_dict["N"]) ULR=10000.0")
+        plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title=" $(params_dict["Lx"])x$(params_dict["Ly"]) N=$(params_dict["N"]) Theta_y=$(params_dict["tw2"])")
+        if idx == 1
+            prev_next_fqh[2] = states[2]
+            append!(prev_next_fqh[1],[2.0])
+        else
+            overlaps_vals = [abs2(transpose(conj.(prev_next_fqh[2])) * states[i]) for i in 1:length(states)]
+            append!(prev_next_fqh[1],[float(findfirst(x -> overlaps_vals[x] == maximum(overlaps_vals),1:length(overlaps_vals)))])
+            prev_next_fqh[2] = states[Int(prev_next_fqh[1][end])]
+        end
+        scatter(intstren,nrgs[Int(prev_next_fqh[1][end])] - nrgs[1],c="k")
     end
+
+
 end
 
 

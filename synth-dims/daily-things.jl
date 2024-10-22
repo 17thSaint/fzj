@@ -71,9 +71,9 @@ end
 # 1Deff hatsugai
 if true
 
-    tws = range(0.0,1.0,length=11)
+    tws = range(-0.1,0.1,length=11)
     for (idx,tw1) in enumerate(tws)
-        params_dict = Dict([("Lphys",4),("Lsynth",4),("particles",2),("tw2",tw1),("if_remapping",false),("es_count",2),("nrgtol",1e-6),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
+        params_dict = Dict([("Lphys",3),("Lsynth",7),("particles",3),("tw2",tw1),("if_remapping",false),("es_count",2),("nrgtol",1e-6),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
 		psis,rhos,nrgs,model_paras = run_normal_1deffmps(params_dict)
         plot_spectrum(tws,nrgs,idx,3,L"\theta_y / 2 \pi",false; plot_title=" $(params_dict["Lphys"])x$(params_dict["Lsynth"]) N=$(params_dict["particles"])")
     end
