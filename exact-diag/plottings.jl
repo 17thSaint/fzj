@@ -555,6 +555,7 @@ function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::
     ylim([minimum(theta_ys),maximum(theta_ys)])
 
 end
+plot_omega(theta_xs::StepRangeLen,theta_ys::StepRangeLen,omegas::Matrix{ComplexF64}; kwargs...) = plot_omega(collect(theta_xs),collect(theta_ys),omegas; kwargs...)
 
 function plot3d_flow_with_levelcrossing_3x7n3()
     tw2 = 0.0
