@@ -95,7 +95,39 @@ function plot_gamma(theta_xs::Vector{Float64},theta_ys::Vector{Float64},gammas::
 end
 plot_gamma(theta_xs::StepRangeLen,theta_ys::StepRangeLen,gammas::Matrix{ComplexF64},which_gamma::Int; kwargs...) = plot_gamma(collect(theta_xs),collect(theta_ys),gammas,which_gamma; kwargs...)
 
-
+function plot_greenfunc(all_greens,hopping_direction; kwargs...)
+	virt_edge_length,phys_edge_length = size(all_greens)
+	title_string = "$hopping_direction Greens Function " * get(kwargs, :plot_title, "")
+	if_lines = get(kwargs, :if_lines, false)
+	fig = figure()
+	if if_lines
+		if hopping_direction == "virt"
+			for i in 1:phys_edge_length
+				plot(1:virt_edge_length,all_greens[:,i],"-p",label="$i")
+			end
+			xlabel("Synthetic")
+		else
+			for i in 1:virt_edge_length
+				plot(1:phys_edge_length,all_greens[i,:],"-p",label="$i")
+			end
+			xlabel("Physical")
+		end
+	else
+		imshow(abs.(all_greens), vmin=0.0, vmax=1.0)
+		colorbar()
+		xlabel("Physical")
+		ylabel("Synthetic")
+	end
+	title(title_string)
+	
+	#=if_save_fig = get(kwargs, :if_save_fig, false)
+	if if_save_fig
+		location = get(kwargs, :location, pwd())
+		filename = get(kwargs, :name, "$hopping_direction-dir-GF")
+		filename = check_plot_label(filename,"$hopping_direction-dir-GF")
+	end
+	if_save_fig ? save_figure(filename; location=location) : nothing=#
+end
 
 
 

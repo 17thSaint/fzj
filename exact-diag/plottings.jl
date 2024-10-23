@@ -539,7 +539,7 @@ function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::
     reverse!(omegas_phase, dims=1)
 
     fig = figure()
-    imshow(omegas_phase; cmap="hsv", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)])
+    imshow(omegas_phase; cmap="hsv", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)], vmax=2*pi, vmin=0.0)
     colorbar()
     reverse!(omegas_phase,dims=1)
     diag_shift = 0.0 * maximum(theta_xs) / length(theta_xs)

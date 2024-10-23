@@ -120,9 +120,9 @@ end
 
 
 # look at finite size scaling of commensurate filling interaction strength spectrum
-if true
-    plot_nrg_vs_intstren_fromdata_ttn(6; particles=4)
-    plot_nrg_vs_intstren_fromdata_ed(8,8; particles=4)
+if false
+    plot_nrg_vs_intstren_fromdata_ttn(6; particles=8)
+    #plot_nrg_vs_intstren_fromdata_ed(8,8; particles=8)
 end
 
 

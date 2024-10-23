@@ -2,6 +2,7 @@ include("long-range-ttn.jl")
 include("fqh_effective.jl")
 include("hatsugai-mbcn.jl")
 include("observables-oneDeff.jl")
+include("dmrg-observers-oneDeff.jl")
 #using PyPlot
 
 function fix_filling(L,nflavors,nu)
@@ -231,17 +232,7 @@ function run_normal_1deffmps(params_dict::Dict; kwargs...)
 end
 
 
-nev = 3
-cols = ["b","g","r","m","c"]
-if nev > length(cols)
-	cols = repeat(cols,ceil(Int,nev/length(cols)))
-end
 
-open_cores = 5
-if typeof(open_cores) != String
-	BLAS.set_num_threads(open_cores)
-	display(BLAS.get_config())
-end
 
 if false
 	cd("../cluster-data/synth-dims/excited-states")
@@ -274,6 +265,13 @@ end
 
 
 if false
+
+	open_cores = 5
+	if typeof(open_cores) != String
+		BLAS.set_num_threads(open_cores)
+		display(BLAS.get_config())
+	end
+	
 	lx,ly,n = 6,6,6
 	#ref_multiplets,rm1_name,rm2_name = get_reference_multiplets(lx,ly,n)
 	#tws = range(0.0,stop=1.0,length=10)

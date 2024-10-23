@@ -7,12 +7,13 @@ Depends on:
     synth-dims/long-range-ttn.jl
     review-practice-codes/observables.jl
     review-practice-codes/plottings.jl
+    synth-dims/hatsugai-mbcn.jl
 
 =#
 ######################################################
 
 include("../other-funcs/include-other-files.jl")
-include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","review-practice-codes/plottings.jl"])
+include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","review-practice-codes/plottings.jl","synth-dims/hatsugai-mbcn.jl"])
 include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
 
 
@@ -70,13 +71,34 @@ end
 
 # 1Deff hatsugai
 if true
+    lx,ly,n = 4,4,2
 
-    tws = range(-0.1,0.1,length=11)
+    tws = range(0.0,1.0,length=21)
+    tws2 = tws
+
+    lambda1s::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
+    lambda2s::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
+    omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
+    ref_multis,rm1,rm2 = get_reference_multiplets(lx,ly,n)
     for (idx,tw1) in enumerate(tws)
-        params_dict = Dict([("Lphys",3),("Lsynth",7),("particles",3),("tw2",tw1),("if_remapping",false),("es_count",2),("nrgtol",1e-6),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
-		psis,rhos,nrgs,model_paras = run_normal_1deffmps(params_dict)
-        plot_spectrum(tws,nrgs,idx,3,L"\theta_y / 2 \pi",false; plot_title=" $(params_dict["Lphys"])x$(params_dict["Lsynth"]) N=$(params_dict["particles"])")
+        for (idx2,tw2) in enumerate(tws2)
+            params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("tw2",tw2),("tw1",tw1),("if_remapping",false),("es_count",2),("nrgtol",1e-6),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",true),("if_save_data",true)])
+            psis,rhos,nrgs,model_paras = run_normal_1deffmps(params_dict)
+            
+            scatter3D(tw1,tw2,nrgs[1],c="b")
+            scatter3D(tw1,tw2,nrgs[2],c="g")
+            scatter3D(tw1,tw2,nrgs[3],c="r")
+
+            lambda1s[idx,idx2], lambda2s[idx,idx2], omegas[idx,idx2] = get_hatsugaifull(psis[1],psis[2],ref_multis; if_save=true,filepath=model_paras[:location]*"/"*model_paras[:name],ref_multis_filenames=[rm1,rm2])
+        end
     end
+    xlabel(L"\theta_x / 2\pi")
+    ylabel(L"\theta_y / 2\pi")
+    zlabel("Energy")
+
+    plot_omega(tws,tws2,omegas)
+    plot_gamma(tws,tws2,lambda1s,1)
+    plot_gamma(tws,tws2,lambda2s,2)
 end
 
 

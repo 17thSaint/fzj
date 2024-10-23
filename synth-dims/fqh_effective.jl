@@ -194,7 +194,7 @@ md"
 
 # ╔═╡ fa55709d-a20c-47ee-9802-8ea750588c63
 
-function find_center()
+#=function find_center()
 	all_folders = split(pwd(),"/")
 	if "fzj" in all_folders
 		return "fzj"
@@ -205,7 +205,7 @@ function find_center()
 	else
 		println("Not sure where the center is: $(pwd())")
 	end
-end
+end=#
 
 function make_states(L::Int64,nbosons::Int64,nflavors::Int64)
 	states = fill("0", L)
@@ -405,42 +405,6 @@ function run_again(filename; kwargs...)
 
 	new_gs,new_densmat = execute_mps(nothing,nothing,metadata["chi"],metadata["L"],metadata["nflavors"],metadata["nbosons"]; dict_to_symbols(new_metadata)...,if_densmat=if_densmat,metadata=new_metadata,mdim=maximum(metadata["mdim"]),running_again=true)
 	println("Energy Variance = ",energy_variance(new_gs,metadata["ham"]))
-end
-
-function get_occupancy(wavefunc::MPS; kwargs...)
-	L,nflavors = get_mps_dims(wavefunc)
-	if_squared = get(kwargs, :if_squared, false)
-	remapping = kwargs[:remapping]
-	
-	if_plot = get(kwargs, :if_plot, true)
-	if_3d = get(kwargs, :if_3d, false)
-	if_save_data = get(kwargs, :if_save_data, false)
-	if if_save_data
-		location = get(kwargs, :location, pwd())
-		filename = get(kwargs, :name, "occs")
-		filename = check_plot_label(filename,"occs")
-		metadata = get(kwargs, :metadata, nothing)
-	end
-		
-	occ_mat = zeros(L,nflavors)
-	for s in 1:nflavors
-		loc_op = "Ns$(s)"
-		if if_squared
-			loc_op = "Ns$(s) * Ns$(s)"
-		end
-		occ_mat[:, s] = expect(wavefunc, loc_op)[remapping]
-	end
-	if if_plot
-		if if_3d
-			mps_plot_occupancy_3d(occ_mat; kwargs...)
-		else
-			mps_plot_occupancy(occ_mat,L,nflavors; kwargs...)
-		end
-	end
-	data_dict = Dict([("vals",occ_mat)])
-	if_save_data ? write_data_jld2(filename,data_dict,location,metadata) : nothing
-	
-	return occ_mat
 end
 
 function execute_mps(phi,L,nflavors,nbosons; kwargs...)
@@ -674,130 +638,10 @@ function run_mps_new_variable(seed_wavefunc,seed_params_dict,new_params_dict,loc
 	end
 end
 
-function varied_alpha_wavefuncs(seed_wavefunc,seed_params_dict,change=0.001)
-	og_alpha = seed_params_dict["phi"] / (2*pi)
-	plus_psi = run_mps_new_variable(seed_wavefunc,seed_params_dict,Dict([("phi",2*pi*(og_alpha+change)),("psi_guess",seed_wavefunc)]))
-	minus_psi = run_mps_new_variable(seed_wavefunc,seed_params_dict,Dict([("phi",2*pi*(og_alpha-change)),("psi_guess",seed_wavefunc)]))
-	return minus_psi,plus_psi
-end
-
 function get_mps_dims(wavefunc::MPS)
 	L = length(wavefunc)
 	nflavors = dim(siteind(wavefunc,1)) - 1
 	return L,nflavors
-end
-
-function occupancy_variance(wavefunc::MPS; kwargs...)
-	L,nflavors = get_mps_dims(wavefunc)
-	fo_occ = get_occupancy(wavefunc; if_plot=false)
-	occ_var = sqrt.(abs.(fo_occ.^2 .- get_occupancy(wavefunc; if_plot=false,if_squared=true)))
-	if_plot = get(kwargs, :if_plot, true)
-	if_plot ? mps_plot_occupancy(occ_var,L,nflavors; kwargs...) : nothing
-	
-	return occ_var
-end
-
-function mps_plot_occupancy(occ_mat,L,nflavors; kwargs...)
-	title_string = "Occupancy, " * get(kwargs, :plot_title, "")
-	fig = figure()
-	#plot_surface(1:nflavors,1:L,occ_mat)
-	imshow(occ_mat)
-	xlabel("Virtual Dim")
-	ylabel("Physical Dim")
-	colorbar()
-	title(title_string)
-	
-	if_save_fig = get(kwargs, :if_save_fig, false)
-	if if_save_fig
-		location = get(kwargs, :location, pwd())
-		filename = get(kwargs, :name, "occs")
-		filename = check_plot_label(filename,"occs")
-	end
-	if_save_fig ? save_figure(filename; location=location) : nothing
-	return
-end
-
-function mps_plot_occupancy_3d(exp_occ; kwargs...)
-	m,n = size(exp_occ)
-
-	x = collect(1:m)  # x-coordinates (1 to m)
-	y = collect(1:n)  # y-coordinates (1 to n)
-
-	# Create the corresponding z-values from the matrix
-	z = exp_occ
-
-	# Now, we need to turn x, y, z into vectors for scatter3D
-	# Use the function `repeat` and `vec` to flatten them
-	x_flat = repeat(x, n)     # Repeat x n times
-	y_flat = sort(repeat(y, m))    # Repeat each y m times
-	z_flat = vec(z)           # Flatten the matrix into a vector
-
-	# Create the 3D scatter plot
-	title_string = "Occupancy, " * get(kwargs, :plot_title, "")
-	fig = figure()
-	scatter3D(x_flat, y_flat, z_flat)
-	ylabel("Virtual Dim")
-	xlabel("Physical Dim")
-	title(title_string)
-	return
-end
-
-function log_sum(all_values)
-	if length(all_values) < 2
-		return all_values[1]
-	else
-		consecutive = [all_values[1],all_values[2]]
-		for i in 3:length(all_values) + 1
-			added_value = log_add(consecutive[1],consecutive[2])
-			consecutive[1] = added_value
-			consecutive[2] = i <= length(all_values) ? all_values[i] : 0.0
-		end
-		return consecutive[1]
-	end
-end
-
-function entanglement_spectrum(psi::MPS, bond::Int)
-    # Split the MPS at the bond using svd
-    l, s, r = svd(psi[bond], linkind(psi, bond))
-
-    # Form the reduced density matrix of the left part
-    rho = l * s * dag(l)
-
-    # Diagonalize the reduced density matrix to get the eigenvalues
-    evals = eigvals(matrix(rho))
-
-    # The entanglement spectrum is given by the negative logarithm of these eigenvalues
-    spectrum = evals
-
-    return spectrum
-end
-
-function entanglement_entropy(psi::MPS)
-	# Get the entanglement spectrum
-	spectrum = entanglement_spectrum(psi, Int(floor(length(psi)/2)))
-
-	# Form the entanglement entropy by summing the spectrum
-	entropy = -sum(spectrum .* log.(spectrum))
-
-	return abs.(entropy)
-end
-
-function density_matrix(wavefunc::MPS; kwargs...)
-	L,nflavors = get_mps_dims(wavefunc)
-	densmat = zeros(L*nflavors,L*nflavors) .* im
-	for s in 1:nflavors
-		for sp in 1:nflavors
-			#println(s,", ",sp)
-			local_mat = correlation_matrix(wavefunc,"Cr$(s)","Anh$(sp)")
-			densmat[L*(s-1)+1:L*s,L*(sp-1)+1:L*sp] = local_mat
-			#=fig = figure()
-			imshow(abs.(densmat))
-			colorbar()
-			title("s=$s, s'=$sp")
-			=#
-		end
-	end
-	return densmat
 end
 
 function momentum_occupation(wavefunc::MPS,p_count::Int,p_end::Real,direction="phys"; kwargs...)
@@ -893,7 +737,7 @@ function plot_momentum_occupation(momenta::Matrix,mom_occ::Matrix; kwargs...)
 	ylabel("Physical Momenta / pi")
 end
 
-function find_dist(p1::Tuple{Int,Int}, p2::Tuple{Int,Int}, size::Tuple{Int,Int}, periodic::Tuple{Bool,Bool}=(false, false))
+#=function find_dist(p1::Tuple{Int,Int}, p2::Tuple{Int,Int}, size::Tuple{Int,Int}, periodic::Tuple{Bool,Bool}=(false, false))
     dx = abs(p1[1] - p2[1])
     dy = abs(p1[2] - p2[2])
 
@@ -906,7 +750,7 @@ function find_dist(p1::Tuple{Int,Int}, p2::Tuple{Int,Int}, size::Tuple{Int,Int},
     end
 
     return sqrt(dx^2 + dy^2),(dx,dy)
-end
+end=#
 
 function physical_distance_correlation(psi::MPS; kwargs...)
 	if_plot = get(kwargs, :if_plot, true)
@@ -994,34 +838,6 @@ function plot_distance_correlation(dists,corrs,corr_errors; kwargs...)
 	title(title_string)
 end
 
-function e_entropy(M::MPS, l::Int)
-        
-	# get length of MPS
-	L = length(M)
-	
-	# catch errors where the cut is "outside of the system"
-	if l < 1 || l >= L
-		return 0.0
-	end
-	
-	# shifting the center of orthogonality to site l
-	ITensors.orthogonalize!(M, l)
-	
-	# perform a singular value decomposition / Schmidt decomposition
-	U,S,V = svd(M[l], (linkind(M, l)))#, siteind(M, l)))
-	
-	# set entropy to zero
-	res = 0.0
-	
-	# loop over all diagonal elements of S
-	for i in 1:size(S, 1)
-		res += -2.0 * S[i,i]^2 * log(S[i,i]) # = - S² * log(S²)
-	end
-
-	return res
-end
-
-
 function cdw_structure_factor(qvec::Tuple,psi::MPS,phys_len::Int,synth_len::Int; kwargs...)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, true)
 	if_periodic_synth = get(kwargs, :if_periodic_synth, true)
@@ -1089,99 +905,6 @@ function central_charge(M::MPS; kwargs...)
 	return fit.param[1],fit.param[2],ee
 end
 
-
-function normalize_densmat(dens_mat::Matrix,part_count::Int; kwargs...)
-	if_log = get(kwargs, :if_log, false)
-	L = size(dens_mat)[1]
-	current_trace = if_log ? log_sum(diag(dens_mat)) : tr(dens_mat)
-	if if_log
-		shift_mat = Diagonal([log(part_count) - current_trace for i in 1:L])
-		norm_densmat = dens_mat + shift_mat
-	else
-		shift_mat = ones(L,L)
-		for i in 1:L
-			shift_mat[i,i] = part_count/current_trace
-		end
-		norm_densmat = dens_mat .* shift_mat
-	end
-	return norm_densmat
-end
-
-function get_greenfunc(wavefunc::MPS,hopping_direction="virt"; kwargs...)
-	if_backward = get(kwargs, :rev, false)
-
-	phys_edge_length,virt_edge_length = get_mps_dims(wavefunc)
-	start_point = 1
-	if if_backward
-		start_point = hopping_direction == "virt" ? virt_edge_length : phys_edge_length
-	end
-	
-	all_greens = zeros(virt_edge_length,phys_edge_length).*im
-	for s in 1:virt_edge_length
-		all_greens[s,:] = hopping_direction == "virt" ? diag(ITensors.correlation_matrix(wavefunc,"Cr$(start_point)","Anh$(s)")) : ITensors.correlation_matrix(wavefunc,"Cr$(s)","Anh$(s)")[start_point,:]
-	end
-	
-	start_norm = hopping_direction == "virt" ? ITensors.expect(wavefunc,"Ns$(start_point)") : [ITensors.expect(wavefunc,"Ns$(i)";sites=start_point) for i in 1:virt_edge_length]
-	all_norms = zeros(virt_edge_length,phys_edge_length)
-	for s in 1:virt_edge_length
-		const_part = hopping_direction == "virt" ? start_norm : [start_norm[s] for i in 1:phys_edge_length]
-		all_norms[s,:] = ITensors.expect(wavefunc,"Ns$(s)") .* const_part
-	end
-	all_greens ./= sqrt.(all_norms)
-	all_greens = abs.(all_greens)
-	
-	if_plot = get(kwargs, :if_plot, true)
-	if_plot ? plot_greenfunc(all_greens,hopping_direction; kwargs...) : nothing
-	
-	if_save_data = get(kwargs, :if_save_data, false)
-	if if_save_data
-		location = get(kwargs, :location, pwd())
-		filename = get(kwargs, :name, "$hopping_direction-dir-GF")
-		filename = check_plot_label(filename,"$hopping_direction-dir-GF")
-		metadata = get(kwargs, :metadata, nothing)
-		data_dict = Dict([("vals",all_greens)])
-	end
-	if_save_data ? write_data_jld2(filename,data_dict,location,metadata) : nothing
-	
-	
-	return all_greens
-end
-
-function plot_greenfunc(all_greens,hopping_direction; kwargs...)
-	virt_edge_length,phys_edge_length = size(all_greens)
-	title_string = "$hopping_direction Greens Function, " * get(kwargs, :plot_title, "")
-	if_lines = get(kwargs, :if_lines, false)
-	if_backward = get(kwargs, :rev, false)
-	fig = figure()
-	if if_lines
-		if hopping_direction == "virt"
-			for i in 1:phys_edge_length
-				plot(1:virt_edge_length,all_greens[:,i],"-p",label="$i")
-			end
-			xlabel("Virtual Dimension")
-		else
-			for i in 1:virt_edge_length
-				plot(1:phys_edge_length,all_greens[i,:],"-p",label="$i")
-			end
-			xlabel("Physical Dimension")
-		end
-	else
-		imshow(all_greens)
-		colorbar()
-		xlabel("Physical Dim")
-		ylabel("Virtual Dim")
-	end
-	title(title_string)
-	
-	if_save_fig = get(kwargs, :if_save_fig, false)
-	if if_save_fig
-		location = get(kwargs, :location, pwd())
-		filename = get(kwargs, :name, "$hopping_direction-dir-GF")
-		filename = check_plot_label(filename,"$hopping_direction-dir-GF")
-	end
-	if_save_fig ? save_figure(filename; location=location) : nothing
-end
-
 function get_current_phys(wavefunc::MPS; kwargs...)
 	if_exp_part = get(kwargs,:if_exp_part,true)
 	alpha = get(kwargs,:alpha,0.0)
@@ -1228,41 +951,6 @@ function get_current(all_psis::Vector{MPS},dir="phys"; kwargs...)
 		return [get_current_synth(psi; kwargs...)[1] for psi in all_psis]
 	end
 end
-#=
-function momentum_occupation(wavefunc::MPS,part_count::Int,p_count::Int64,p_end=8.0,p_start=0.0; kwargs...)
-	num_sites = length(siteinds(wavefunc))
-	dimension = dim(siteinds(wavefunc)[1])
-	momenta = [p_start + (i-1)*(p_end - p_start)/(p_count-1) for i in 1:p_count]#[pi*i/(num_sites+1) for i in 1:p_count]
-	mom_occ = zeros(p_count)*im
-	for i in 1:p_count
-		println(round(100*i/p_count,digits=1),"%")
-		momentum = momenta[i]
-		exp_vect = zeros(num_sites,num_sites) .* im
-		pos_occ = zeros(num_sites,num_sites) .* im
-		for j in 1:num_sites
-			#exp_vect[:,j] = [-1 * cos(momentum*(l+j)) + cos(momentum*(j-l)) for l in 1:num_sites]
-			exp_vect[:,j] = [exp(im*momentum*(j-l)) for l in 1:num_sites]
-		end
-		pos_occ = correlation_matrix(wavefunc,"FullDag","FullHat")
-		mom_occ[i] = sum(exp_vect .* pos_occ) / (num_sites*(dimension-1))
-	end
-	
-	if_plot = get(kwargs, :if_plot, true)
-	if_plot ? plot_momentum_occupation(momenta,real.(mom_occ),part_count; kwargs...) : nothing
-	
-	if_save_data = get(kwargs, :if_save_data, false)
-	if if_save_data
-		location = get(kwargs, :location, pwd())
-		filename = get(kwargs, :name, "momdist")
-		filename = check_plot_label(filename,"momdist")
-		metadata = get(kwargs, :metadata, nothing)
-		data_dict = Dict([("vals",mom_occ),("moms",momenta)])
-	end
-	if_save_data ? write_data_jld2(filename,data_dict,location,metadata) : nothing
-	
-	return momenta,mom_occ
-end
-=#
 
 function bulk_density(wavefunc::MPS,bulk_width_phys=1,bulk_width_virt=1; kwargs...)
 	if isnothing(wavefunc)
@@ -1425,110 +1113,6 @@ function ITensors.measure!(o::SavingNRGVarObserver; kwargs...)
     end
 end=#
 
-
-mutable struct NRGObserver <: AbstractObserver
-    nrg_tol::Float64
-    local_ham
-    nrg::Vector{Float64}
- 
-    NRGObserver(nrg_tol=0.0,local_ham=10.0) = new(nrg_tol,local_ham,[1000.0])
-end
-
-function ITensors.checkdone!(o::NRGObserver;kwargs...)
-	if abs(o.nrg[end] - o.nrg[end-1]) < o.nrg_tol && length(o.nrg) > 10
-	  #println("Stopping DMRG after sweep $sw")
-	  return true
-	end
-	return false
-end
-  
-function ITensors.measure!(o::NRGObserver; kwargs...)
-	  #display(kwargs)
-	  half_sweep = kwargs[:half_sweep]
-	  bond = kwargs[:bond]
-	  outputlevel = kwargs[:outputlevel]
-
-	  psi = kwargs[:psi]
-	  ham = o.local_ham
-	
-	  if bond == 1 && half_sweep == 2
-		# Update last_energy and keep going
-		append!(o.nrg,[calculate_energy(psi,ham)])
-		if outputlevel > 0
-			println("The energy change is $(round(abs(o.nrg[end] - o.nrg[end-1]),digits=7)) for tolerance $(o.nrg_tol)")
-		end
-	  end
-end
-
-mutable struct LinkDimObserver <: AbstractObserver
-    mlds::Vector{Int64}
- 
-    LinkDimObserver() = new([10000])
-end
-
-function ITensors.checkdone!(o::LinkDimObserver;kwargs...)
-	if length(o.mlds) > 10
-		if all(o.mlds[end-5:end] .== o.mlds[end])
-			return true
-		end
-	end
-	return false
-end
-  
-function ITensors.measure!(o::LinkDimObserver; kwargs...)
-	  #display(kwargs)
-	  half_sweep = kwargs[:half_sweep]
-	  bond = kwargs[:bond]
-	  outputlevel = kwargs[:outputlevel]
-
-	  psi = kwargs[:psi]
-	
-	  if bond == 1 && half_sweep == 2
-		# Update max link dim
-		append!(o.mlds,[maxlinkdim(psi)])
-		if outputlevel > 0 && length(o.mlds) > 5
-			println("Current Percent Change = ",round(100*std(o.mlds[end-5:end])/mean(o.mlds[end-5:end]),digits=2))
-		end
-	  end
-end
-
-
-mutable struct NRGErrorObserver <: AbstractObserver
-	var_tol::Float64
-	local_ham
-	nrgs::Vector{Float64}
-    nrg_var::Vector{Float64}
- 
-    NRGErrorObserver(var_tol=0.0,local_ham=10.0) = new(var_tol,local_ham,[10000.0,1000.0],[0.0])
- end
-
-function ITensors.checkdone!(o::NRGErrorObserver;kwargs...)
-	sw = kwargs[:sweep]
-	#psi = kwargs[:psi]
-	#ham = o.local_ham
-	if o.nrg_var[end] < o.var_tol && abs(o.nrgs[end] - o.nrgs[end-1]) < o.nrg_var[end]
-	  return true
-	end
-	#o.nrgs[1] = o.nrgs[2]
-	return false
-end
-  
-function ITensors.measure!(o::NRGErrorObserver; kwargs...)
-	  half_sweep = kwargs[:half_sweep]
-	  bond = kwargs[:bond]
-	  outputlevel = kwargs[:outputlevel]
-	
-	  if bond == 1 && half_sweep == 2 && outputlevel > 0
-		psi = kwargs[:psi]
-	    ham = o.local_ham
-	    append!(o.nrg_var,[energy_variance(psi,ham)])
-	    append!(o.nrgs,[real(calculate_energy(psi,ham))])
-		if outputlevel > 0
-			println("The energy variance is $(round(o.nrg_var[end],digits=10)) with energy change $(round(abs(o.nrgs[end] - o.nrgs[end-1]),digits=10))")
-		end
-	end
-end
-
 #virt_link = ind(vac[1],2)
 #cr_site1 = creation_physical(siteind(vac,1),nflavors)
 #M = [I matrix(cr_site1)]
@@ -1538,7 +1122,7 @@ end
 
 # ╔═╡ 12309987-d529-4820-bf06-5c3407a977b3
 begin
-if false
+#=if false
 	L = 16
 	nflavors = 8
 	nbosons = 8
@@ -1576,7 +1160,7 @@ if false
 	ψ₀ = randomMPS(sidx, states)
 
 	E, ψ = dmrg(H, ψ₀; maxdim = [25,25,50,50, 100], nsweeps = 10, noise = [1E-2, 1E-2, 1E-2, 1E-2, 1E-2,0])
-end
+end=#
 end
 
 # ╔═╡ 07470842-1097-44af-8a07-4dcff45115bc
@@ -1584,7 +1168,7 @@ end
 
 # ╔═╡ e501cd1e-82f3-4d65-a5ce-a87743f1d6fd
 let
-if false
+#=if false
 	occ_mat = zeros(L, nflavors)
 
 	for s in 1:nflavors
@@ -1594,7 +1178,7 @@ if false
 	plot_surface(1:nflavors,1:L,occ_mat)
 	
 	#plot(occ_mat[6,:], legend = false)
-end
+end=#
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
