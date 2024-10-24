@@ -153,27 +153,36 @@ function count_chern_number(theta_xs::Vector{Float64},theta_ys::Vector{Float64},
     plot_title::String = get(kwargs,:plot_title,"")
     if_plot::Bool = get(kwargs,:if_plot,true)
 
+    reverse!(theta_ys)
+
     vortex_counting::Matrix{Float64} = zeros(Float64,length(theta_xs),length(theta_ys))
-    for i in [1]#1:length(theta_xs)
-        leftsite = i == length(theta_xs) ? 1 : i + 1
-        rightsite = i == 1 ? length(theta_xs) : i - 1
-        for j in 1:length(theta_ys)
-            upsite = j == length(theta_ys) ? 1 : j + 1
-            downsite = j == 1 ? length(theta_ys) : j - 1
-            loop_count_topright = plotting_omega[upsite,j] - plotting_omega[i,rightsite]
-            loop_count_bottomright = plotting_omega[i,rightsite] - plotting_omega[downsite,j]
-            loop_count_bottomleft = plotting_omega[downsite,j] - plotting_omega[i,leftsite]
-            loop_count_topleft = plotting_omega[i,leftsite] - plotting_omega[upsite,j]
-            loop_count = loop_count_topright + loop_count_bottomright + loop_count_bottomleft + loop_count_topleft
-            println("At twist angle $(round(theta_xs[i],digits=4)) $(round(theta_ys[j],digits=4)) all angles are $(round(plotting_omega[upsite,j]/pi,digits=4)) $(round(plotting_omega[downsite,j]/pi,digits=4)) ")#$(round(plotting_omega[i,rightsite]/pi,digits=4)) $(round(plotting_omega[i,leftsite]/pi,digits=4))")
-            vortex_counting[i,j] = loop_count
+    for i in 2:length(theta_xs)-1
+        topsite = i + 1
+        downsite = i - 1
+        for j in 2:length(theta_ys)-1
+            rightsite = j + 1
+            leftsite = j - 1
+            alldiffs = Matrix{Float64}(undef,2,2)
+            alldiffs[1,1] = plotting_omega[i,leftsite] - plotting_omega[topsite,j]
+            alldiffs[2,1] = plotting_omega[topsite,j] - plotting_omega[i,rightsite]
+            alldiffs[2,2] = plotting_omega[i,rightsite] - plotting_omega[downsite,j]
+            alldiffs[1,2] = plotting_omega[downsite,j] - plotting_omega[i,leftsite]
+            for ii in 1:2
+                for jj in 1:2
+                    if abs(alldiffs[ii,jj]) > pi
+                        alldiffs[ii,jj] -= sign(alldiffs[ii,jj]) * 2 * pi
+                    end
+                end
+            end
+            display(round.(alldiffs ./ pi,digits=3))
+            vortex_counting[i,j] = sum(alldiffs)
         end
     end
     
 
     if if_plot
         fig = figure()
-        imshow(vortex_counting ./ (2*pi); cmap="viridis", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)], vmax=1.0, vmin=-1.0)
+        imshow(vortex_counting ./ (1*pi); cmap="viridis", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)], vmax=1.0, vmin=-1.0)
         colorbar()
         title(L"\sum \Omega"*plot_title)
         xlabel(L"\theta_x / 2\pi")
