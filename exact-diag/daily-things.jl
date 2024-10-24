@@ -320,7 +320,7 @@ if false
 end
 
 # hatsugai for 3x7 n=3 which includes non-degenerate groundstates
-if true
+if false
     lx,ly,n = 3,7,3
     nev = 3
     intstren = 0.0

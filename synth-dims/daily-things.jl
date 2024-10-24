@@ -70,7 +70,7 @@ if false
 end
 
 # 1Deff hatsugai
-if false
+if true
     lx,ly,n = 4,4,2
 
     #=tws2 = range(0.1,0.3,length=11)
@@ -107,8 +107,10 @@ if false
     pdict = Dict([("Lphys",lx),("Lsynth",ly),("nbosons",n),("if_periodic_phys",true),("if_periodic_synth",true)])
     all_files = find_data_file(pdict,"mps",dataloc)
 
-    tw1s = sort(unique(vcat(range(0.1,0.3,length=11),range(0.7,0.9,length=11),range(0.0,1.0,length=21))))
-    tw2s = sort(unique(vcat(range(0.7,0.9,length=11),range(0.1,0.3,length=11),range(0.0,1.0,length=21))))
+    #tw1s = sort(unique(vcat(range(0.1,0.3,length=11),range(0.7,0.9,length=11),range(0.0,1.0,length=21))))
+    #tw2s = sort(unique(vcat(range(0.7,0.9,length=11),range(0.1,0.3,length=11),range(0.0,1.0,length=21))))
+    tw1s = range(0.0,1.0,length=21)
+    tw2s = range(0.0,1.0,length=21)
 
     lambda1s::Matrix{ComplexF64} = zeros(ComplexF64,length(tw1s),length(tw2s))
     lambda2s::Matrix{ComplexF64} = zeros(ComplexF64,length(tw1s),length(tw2s))
@@ -119,6 +121,11 @@ if false
         if tw1 in [0.33,0.67] || tw2 in [0.33,0.67]
             continue
         end
+        if !(tw1 in tw1s) && !(tw2 in tw2s)
+            continue
+        end
+        println(f)
+        display(keys(m))
         idx = findfirst(x->tw1s[x]==tw1,1:length(tw1s))
         idx2 = findfirst(x->tw2s[x]==tw2,1:length(tw2s))
         lambda1s[idx,idx2] = m["gamma1"]
