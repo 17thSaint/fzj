@@ -37,7 +37,7 @@ function plot_nrg_vs_intstren_fromdata_ttn(layers::Int64,which_strens::Union{Str
     intstrens = []
     for f in all_files
         d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
-        if_done,all_checks = check_nrg_convergence(m)
+        if_done,all_checks = check_nrg_convergence(m,false)
         if if_check && !(m["onsite_strength"] in which_strens)
             continue
         end

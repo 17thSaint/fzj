@@ -133,68 +133,6 @@ end
 
 
 
-######### see if non-degenerate hatsugai makes sense
-
-function get_reference_multiplets_single(Lx::Int64,Ly::Int64,particles::Int64; kwargs...)
-    dataloc::String = get(kwargs,:dataloc,get_folder_location("cluster-data/exact-diag/torus"))
-    tw1::Float64 = get(kwargs,:tw1,0.33)
-    tw2::Float64 = get(kwargs,:tw2,0.67)
-    hanis::Float64 = get(kwargs,:hopping_anisotropy,1.0)
-    intstren::Float64 = get(kwargs,:interaction_strength,0.0)
-
-
-    reference_multiplets::Vector{Vector{ComplexF64}} = [zeros(ComplexF64,2) for i in 1:2]
-
-    params_dict1::Dict{String,Any} = Dict([("Lx",Lx),("Ly",Ly),("N",particles),("if_periodic_x",true),("if_periodic_y",true),("twist_angle1",tw1),("twist_angle2",tw2),("interaction_strength",intstren),("hopping_anisotropy",hanis)])
-    params_dict2::Dict{String,Any} = Dict([("Lx",Lx),("Ly",Ly),("N",particles),("if_periodic_x",true),("if_periodic_y",true),("twist_angle1",tw2),("twist_angle2",tw1),("interaction_strength",intstren),("hopping_anisotropy",hanis)])
-
-    if_exists1::Bool,found_data1::Union{Vector{Dict},Nothing} = check_data_exists(params_dict1,"ed"; location=dataloc,output_level=false)
-    if_exists2::Bool,found_data2::Union{Vector{Dict},Nothing} = check_data_exists(params_dict2,"ed"; location=dataloc,output_level=false)
-
-    if if_exists1 && if_exists2
-        reference_multiplets[1] = found_data1[1]["state"][1]
-        reference_multiplets[2] = found_data2[1]["state"][1]
-    else
-        error("Data does not exist for reference multiplets")
-    end
-
-    return reference_multiplets,found_data1[2]["filename"],found_data2[2]["filename"]
-end
-
-# this is the lambda calculation for a single non-degenerate ground state
-function get_gamma(gs1::Vector{ComplexF64},reference_multiplet::Vector{ComplexF64}; kwargs...)
-    if_save = get(kwargs,:if_save,false)
-
-    gamma = (transpose(conj(reference_multiplet)) * gs1) * (transpose(conj(gs1)) * reference_multiplet)
-
-    if if_save
-        which_gamma::Int = kwargs[:which_gamma]
-        data_dict::Dict{String,Any} = Dict([("gamma$(which_gamma)",gamma)])
-        filepath::String = kwargs[:filepath]
-        save_hatsugai_data(data_dict,filepath,kwargs[:ref_multis_filename],which_gamma)
-    end
-
-    return gamma
-end
-
-# this is the omega calculation for a single non-degenerate ground state
-function get_omega(gs1::Vector{ComplexF64},reference_multiplets::Vector{Vector{ComplexF64}}; kwargs...)
-    if_save = get(kwargs,:if_save,false)
-
-    omega = (transpose(conj(reference_multiplets[2])) * gs1) * (transpose(conj(gs1)) * reference_multiplets[1])
-
-    if if_save
-        data_dict::Dict{String,Any} = Dict([("omega",omega)])
-        filepath::String = kwargs[:filepath]
-        ref_multis_filenames::Vector{String} = kwargs[:ref_multis_filenames]
-        save_hatsugai_data(data_dict,filepath,ref_multis_filenames)
-    end
-
-    return omega
-end
-
-
-
 
 
 

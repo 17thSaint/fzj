@@ -215,7 +215,11 @@ function run_normal_1deffmps(params_dict::Dict; kwargs...)
 			psis,rhos,nrgs = execute_mps(model_paras[:phi],model_paras[:L],model_paras[:nflavors],model_paras[:nbosons]; model_paras...,metadata=named_tuple_to_dict(model_paras))
 		end
 	else
-		psis = Vector{MPS}(undef,found_data[2]["es_count"]+1)
+		if "mps" in keys(found_data[1])
+			psis = Vector{MPS}(undef,found_data[2]["es_count"]+1)
+		else
+			psis = Vector{Nothing}(undef,found_data[2]["es_count"]+1)
+		end
 		rhos = Vector{Array}(undef,found_data[2]["es_count"]+1)
 		nrgs = Vector{Float64}(undef,found_data[2]["es_count"]+1)
 		psis[1] = "mps" in keys(found_data[1]) ? found_data[1]["mps"] : nothing
@@ -228,7 +232,7 @@ function run_normal_1deffmps(params_dict::Dict; kwargs...)
 		end
 	end
 
-	return psis,rhos,nrgs,model_paras
+	return psis,rhos,nrgs,model_paras,!isnothing(found_data)
 end
 
 

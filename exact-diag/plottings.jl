@@ -216,7 +216,7 @@ function quick_spectrum_closedopen(which_one::String="closed")
 
 end
 
-function plot_spectrum(xxs::Vector,nrgs::Vector,idx::Int,nev::Int,xstring::AbstractString="x",if_diff::Bool=true; kwargs...)
+#=function plot_spectrum(xxs::Vector,nrgs::Vector,idx::Int,nev::Int,xstring::AbstractString="x",if_diff::Bool=true; kwargs...)
     plot_title = get(kwargs,:plot_title,"")
     if_labels = get(kwargs,:if_labels,false)
 
@@ -239,7 +239,7 @@ function plot_spectrum(xxs::Vector,nrgs::Vector,idx::Int,nev::Int,xstring::Abstr
 
     return
 end
-plot_spectrum(xxs::StepRangeLen,nrgs::Vector,idx::Int,nev::Int,xstring::AbstractString="x",if_diff::Bool=true; kwargs...) = plot_spectrum(collect(xxs),nrgs,idx,nev,xstring,if_diff; kwargs...)
+plot_spectrum(xxs::StepRangeLen,nrgs::Vector,idx::Int,nev::Int,xstring::AbstractString="x",if_diff::Bool=true; kwargs...) = plot_spectrum(collect(xxs),nrgs,idx,nev,xstring,if_diff; kwargs...)=#
 
 function plot_gamma_fromsaveddata_scatter(lx::Int,ly::Int,N::Int,which_gamma::Int; kwargs...)
     intstren = get(kwargs,:interaction_strength,0.0)
@@ -375,27 +375,6 @@ function plot_omega_fromsaveddata_scatter(lx::Int,ly::Int,N::Int; kwargs...)
     if_angle_diff && count_chern_number(theta_xs,theta_ys,omegas_phase)
 end
 
-function count_chern_number(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omega_phases::Matrix{Float64}; kwargs...)
-    plot_title::String = get(kwargs,:plot_title,"")
-
-    angle_diffs::Matrix{Float64} = zeros(Float64,size(omega_phases))
-    #angle_diffs_y::Matrix{Float64} = zeros(Float64,size(omega_phases))
-    for i in 2:size(omega_phases,1) - 1
-        for j in 2:size(omega_phases,2) - 1
-            for xshift in [1,-1]
-                for yshift in [1,-1]
-                    angle_diffs[i,j] += (omega_phases[i+xshift,j+yshift] - omega_phases[i,j]) / (2*pi)
-                end
-            end
-        end
-    end
-    
-    fig = figure()
-    imshow(transpose(angle_diffs); cmap="jet", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)])
-    colorbar()
-    title("Omega Angle Difference"*plot_title)
-end
-
 function plot_gamma_fromsaveddata(lx::Int,ly::Int,N::Int,which_gamma::Int; kwargs...)
     intstren = get(kwargs,:interaction_strength,0.0)
     hanis = get(kwargs,:hopping_anisotropy,1.0)
@@ -526,7 +505,7 @@ function plot_omega_fromsaveddata(lx::Int,ly::Int,N::Int; kwargs...)
     #if_angle_diff ? count_chern_number(theta_xs,theta_ys,omegas_phase) : nothing
 end
 
-function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::Matrix{ComplexF64}; kwargs...)
+#=function plot_omega_ed(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::Matrix{ComplexF64}; kwargs...)
     plot_title::String = get(kwargs,:plot_title,"")
 
     omegas_phase::Matrix{Float64} = zeros(Float64,length(theta_xs),length(theta_ys))
@@ -548,14 +527,14 @@ function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::
     us = cos.(omegas_phase)
     vs = sin.(omegas_phase)
     quiver(xs, ys, us, vs)
-    title("Phase of Omega"*plot_title)
-    xlabel("Theta_x / 2pi")
-    ylabel("Theta_y / 2pi")
+    title("Phase of "*L"\Omega"*plot_title)
+    xlabel(L"\theta_x / 2\pi")
+    ylabel(L"\theta_y / 2\pi")
     xlim([minimum(theta_xs),maximum(theta_xs)])
     ylim([minimum(theta_ys),maximum(theta_ys)])
 
 end
-plot_omega(theta_xs::StepRangeLen,theta_ys::StepRangeLen,omegas::Matrix{ComplexF64}; kwargs...) = plot_omega(collect(theta_xs),collect(theta_ys),omegas; kwargs...)
+plot_omega_ed(theta_xs::StepRangeLen,theta_ys::StepRangeLen,omegas::Matrix{ComplexF64}; kwargs...) = plot_omega(collect(theta_xs),collect(theta_ys),omegas; kwargs...)=#
 
 function plot3d_flow_with_levelcrossing_3x7n3()
     tw2 = 0.0

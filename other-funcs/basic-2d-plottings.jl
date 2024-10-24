@@ -66,6 +66,124 @@ function range_cdwsf_radii(points_count::Int64,dens_corr_mat::Array{ComplexF64};
     return radii,cdwsfs
 end
 
+function plot_spectrum(xxs::Vector,nrgs::Vector,idx::Int,nev::Int,xstring::AbstractString="x",if_diff::Bool=true; kwargs...)
+    plot_title = get(kwargs,:plot_title,"")
+
+    cols = ["b","g","r","m","c"]
+    if nev > length(cols)
+        cols = repeat(cols,ceil(Int,nev/length(cols)))
+    end
+
+    for i in 1:nev
+        change = abs(xxs[1] - xxs[2])
+        xval = xxs[idx]
+        shift = (i - nev/2) * ((0.1*change)/(nev/2))
+        scatter(xval + shift,nrgs[i] - if_diff*nrgs[1],c=cols[i])
+    end
+    xlabel(xstring)
+    ystring = if_diff ? "NRG - E0" : "NRG"
+    ylabel(ystring)
+    title("Energy Spectrum"*plot_title)
+
+    return
+end
+plot_spectrum(xxs::StepRangeLen,nrgs::Vector,idx::Int,nev::Int,xstring::AbstractString,if_diff::Bool; kwargs...) = plot_spectrum(collect(xxs),nrgs,idx,nev,xstring,if_diff; kwargs...)
+
+function plot_gamma(theta_xs::Vector{Float64},theta_ys::Vector{Float64},gammas::Matrix{ComplexF64},which_gamma::Int; kwargs...)
+    plot_title = get(kwargs,:plot_title,"")
+
+    plotting_gamma = reverse(transpose(abs.(gammas)),dims=1)
+
+    fig = figure()
+    imshow(plotting_gamma; cmap="viridis", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)])
+    colorbar()
+    which_gamma == 1 ? title("Magnitude of "*L"\Lambda_1 "*plot_title) : title("Magnitude of "*L"\Lambda_2 "*plot_title)
+    ylabel(L"\theta_y / 2\pi")
+    xlabel(L"\theta_x / 2\pi")
+end
+plot_gamma(theta_xs::StepRangeLen,theta_ys::StepRangeLen,gammas::Matrix{ComplexF64},which_gamma::Int; kwargs...) = plot_gamma(collect(theta_xs),collect(theta_ys),gammas,which_gamma; kwargs...)
+
+function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::Matrix{ComplexF64}; kwargs...)
+    plot_title::String = get(kwargs,:plot_title,"")
+    if_mag::Bool = get(kwargs,:if_mag,false)
+    if_perfect_grid::Bool = get(kwargs,:if_perfect_grid,true)
+    if_count_chern::Bool = get(kwargs,:if_count_chern,true)
+
+    omegas_phase::Matrix{Float64} = zeros(Float64,length(theta_xs),length(theta_ys))
+    for i in 1:length(theta_xs)
+        for j in 1:length(theta_ys)
+            omegas_phase[i,j] = angle(omegas[i,j]) + pi
+        end
+    end
+    omegas_phase[1,1] = 0.0
+
+    plotting_omega = reverse(transpose(omegas_phase),dims=1)
+    fig = figure()
+    if if_perfect_grid
+        imshow(plotting_omega; cmap="hsv", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)], vmax=2*pi, vmin=0)
+        colorbar()
+    end
+    xs = transpose(repeat(theta_xs,1,length(theta_ys)))
+    ys = reverse(repeat(theta_ys,1,length(theta_xs)),dims=1)
+    us = cos.(plotting_omega)
+    vs = sin.(plotting_omega)
+    quiver(xs, ys, us, vs)
+    title("Phase of "*L"\Omega"*plot_title)
+    xlabel(L"\theta_x / 2\pi")
+    ylabel(L"\theta_y / 2\pi")
+    #xlim([minimum(theta_xs),maximum(theta_xs)])
+    #ylim([minimum(theta_ys),maximum(theta_ys)])
+
+    if if_mag
+        fig = figure()
+        imshow(abs.(omegas); cmap="viridis", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)])
+        colorbar()
+        title("Magnitude of Omega"*plot_title)
+        xlabel("Theta_x / 2pi")
+        ylabel("Theta_y / 2pi")
+        xlim([minimum(theta_xs),maximum(theta_xs)])
+        ylim([minimum(theta_ys),maximum(theta_ys)])
+    end
+
+    if_count_chern ? count_chern_number(theta_xs,theta_ys,plotting_omega; kwargs...) : nothing
+end
+plot_omega(theta_xs::StepRangeLen,theta_ys::StepRangeLen,omegas::Matrix{ComplexF64}; kwargs...) = plot_omega(collect(theta_xs),collect(theta_ys),omegas; kwargs...)
+
+function count_chern_number(theta_xs::Vector{Float64},theta_ys::Vector{Float64},plotting_omega::Matrix{Float64}; kwargs...)
+    plot_title::String = get(kwargs,:plot_title,"")
+    if_plot::Bool = get(kwargs,:if_plot,true)
+
+    vortex_counting::Matrix{Float64} = zeros(Float64,length(theta_xs),length(theta_ys))
+    for i in [1]#1:length(theta_xs)
+        leftsite = i == length(theta_xs) ? 1 : i + 1
+        rightsite = i == 1 ? length(theta_xs) : i - 1
+        for j in 1:length(theta_ys)
+            upsite = j == length(theta_ys) ? 1 : j + 1
+            downsite = j == 1 ? length(theta_ys) : j - 1
+            loop_count_topright = plotting_omega[upsite,j] - plotting_omega[i,rightsite]
+            loop_count_bottomright = plotting_omega[i,rightsite] - plotting_omega[downsite,j]
+            loop_count_bottomleft = plotting_omega[downsite,j] - plotting_omega[i,leftsite]
+            loop_count_topleft = plotting_omega[i,leftsite] - plotting_omega[upsite,j]
+            loop_count = loop_count_topright + loop_count_bottomright + loop_count_bottomleft + loop_count_topleft
+            println("At twist angle $(round(theta_xs[i],digits=4)) $(round(theta_ys[j],digits=4)) all angles are $(round(plotting_omega[upsite,j]/pi,digits=4)) $(round(plotting_omega[downsite,j]/pi,digits=4)) ")#$(round(plotting_omega[i,rightsite]/pi,digits=4)) $(round(plotting_omega[i,leftsite]/pi,digits=4))")
+            vortex_counting[i,j] = loop_count
+        end
+    end
+    
+
+    if if_plot
+        fig = figure()
+        imshow(vortex_counting ./ (2*pi); cmap="viridis", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)], vmax=1.0, vmin=-1.0)
+        colorbar()
+        title(L"\sum \Omega"*plot_title)
+        xlabel(L"\theta_x / 2\pi")
+        ylabel(L"\theta_y / 2\pi")
+    end
+
+    return sum(vortex_counting) / (2*pi)
+end
+
+
 
 
 

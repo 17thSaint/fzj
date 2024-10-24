@@ -323,17 +323,16 @@ end
 if true
     lx,ly,n = 3,7,3
     nev = 3
-    intstren = 100000.0
+    intstren = 0.0
     #tws = range(-0.5,0.5,length=11)
     #tws2 = range(-0.75,-0.25,length=11)
     tws = range(0.0,1.0,length=20)
-    tws2 = range(0.0,1.0,length=20)
+    tws2 = range(-0.5,0.5,length=20)
 
-    lambda1s::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
+    #=lambda1s::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
     lambda2s::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
     omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
-    ref_multis,rm1,rm2 = get_reference_multiplets_single(lx,ly,n; interaction_strength=intstren, tw1=0.033, tw2=0.067)
-    #ref_multis,rm1,rm2 = get_reference_multiplets(lx,ly,n; tw1=0.033, tw2=0.067)
+    ref_multis,rm1,rm2 = get_reference_multiplets(lx,ly,n; interaction_strength=intstren)
     for (idx,tw1) in enumerate(tws)
         for (idx2,tw2) in enumerate(tws2)
             params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("nev",nev),("tw2",tw2),("tw1",tw1),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("if_find_data",false),("if_save_data",false)])
@@ -343,33 +342,17 @@ if true
             #scatter3D(tw1,tw2,nrgs[2],c="g")
             #scatter3D(tw1,tw2,nrgs[3],c="r")
 
-            #lambda1s[idx,idx2],lambda2s[idx,idx2],omegas[idx,idx2] = get_hatsugaifull(states[1],states[2],ref_multis)
-
-            lambda1s[idx,idx2] = get_gamma(states[1],ref_multis[1])
-            lambda2s[idx,idx2] = get_gamma(states[1],ref_multis[2])
-            omegas[idx,idx2] = get_omega(states[1],ref_multis)
+            lambda1s[idx,idx2],lambda2s[idx,idx2],omegas[idx,idx2] = get_hatsugaifull(states[1],states[2],ref_multis)
         end
-    end
+    end=#
     #xlabel(L"\theta_x / 2 \pi")
     #ylabel(L"\theta_y / 2 \pi")
     #zlabel("Energy")
     #title("Energy Spectrum $(lx)x$(ly) N=$(n) ULR=$intstren")
 
     plot_omega(tws,tws2,omegas; plot_title=" $(lx)x$(ly) N=$(n) ULR=$intstren")
-
-    fig = figure()
-    imshow(abs.(lambda1s))
-    colorbar()
-    ylabel(L"\theta_x / 2 \pi")
-    xlabel(L"\theta_y / 2 \pi")
-    title(L"\Lambda_1")
-
-    fig = figure()
-    imshow(abs.(lambda2s))
-    colorbar()
-    ylabel(L"\theta_x / 2 \pi")
-    xlabel(L"\theta_y / 2 \pi")
-    title(L"\Lambda_2")
+    #plot_gamma(tws,tws2,lambda1s,1; plot_title=" $(lx)x$(ly) N=$(n) ULR=$intstren")
+    #plot_gamma(tws,tws2,lambda2s,2; plot_title=" $(lx)x$(ly) N=$(n) ULR=$intstren")
 
 end
 

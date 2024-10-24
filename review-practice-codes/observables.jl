@@ -241,8 +241,10 @@ function synthetic_current(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
     return currents
 end
 
-function check_nrg_convergence(metadata::Dict)
+function check_nrg_convergence(metadata::Dict,if_perfect::Bool=true)
     nrg_tol::Float64 = metadata["nrgtol"]
+
+    if_perfect ? nothing : nrg_tol *= 10
 
     all_nrgs::Dict{String,Array{Float64,1}} = Dict()
     all_nrgs["0"] = metadata["observer"].nrg

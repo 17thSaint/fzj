@@ -41,6 +41,7 @@ plot_spectrum(xxs::StepRangeLen,nrgs::Vector,idx::Int,nev::Int,xstring::Abstract
 function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::Matrix{ComplexF64}; kwargs...)
     plot_title::String = get(kwargs,:plot_title,"")
     if_mag::Bool = get(kwargs,:if_mag,false)
+    if_perfect_grid::Bool = get(kwargs,:if_perfect_grid,true)
 
     omegas_phase::Matrix{Float64} = zeros(Float64,length(theta_xs),length(theta_ys))
     for i in 1:length(theta_xs)
@@ -49,23 +50,24 @@ function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::
         end
     end
     omegas_phase[1,1] = 0.0
-    reverse!(omegas_phase, dims=1)
+
+    plotting_omega = reverse(transpose(omegas_phase),dims=1)
 
     fig = figure()
-    imshow(omegas_phase; cmap="hsv", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)])
-    colorbar()
-    reverse!(omegas_phase,dims=1)
-    diag_shift = 0.0 * maximum(theta_xs) / length(theta_xs)
-    xs = transpose(repeat(theta_xs,1,length(theta_ys))) .+ diag_shift
-    ys = repeat(theta_ys,1,length(theta_xs)) .+ diag_shift
-    us = cos.(omegas_phase)
-    vs = sin.(omegas_phase)
+    if if_perfect_grid
+        imshow(plotting_omega; cmap="hsv", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)])
+        colorbar()
+    end
+    xs = transpose(repeat(theta_xs,1,length(theta_ys)))
+    ys = reverse(repeat(theta_ys,1,length(theta_xs)),dims=1)
+    us = cos.(plotting_omega)
+    vs = sin.(plotting_omega)
     quiver(xs, ys, us, vs)
-    title("Phase of Omega"*plot_title)
-    xlabel("Theta_x / 2pi")
-    ylabel("Theta_y / 2pi")
-    xlim([minimum(theta_xs),maximum(theta_xs)])
-    ylim([minimum(theta_ys),maximum(theta_ys)])
+    title("Phase of "*L"\Omega"*plot_title)
+    xlabel(L"\theta_x / 2\pi")
+    ylabel(L"\theta_y / 2\pi")
+    #xlim([minimum(theta_xs),maximum(theta_xs)])
+    #ylim([minimum(theta_ys),maximum(theta_ys)])
 
     if if_mag
         fig = figure()
@@ -83,15 +85,14 @@ plot_omega(theta_xs::StepRangeLen,theta_ys::StepRangeLen,omegas::Matrix{ComplexF
 function plot_gamma(theta_xs::Vector{Float64},theta_ys::Vector{Float64},gammas::Matrix{ComplexF64},which_gamma::Int; kwargs...)
     plot_title = get(kwargs,:plot_title,"")
 
-    fig = figure()
-    imshow(abs.(gammas); cmap="viridis", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)])
-    colorbar()
-    title("Magnitude of Gamma$which_gamma "*plot_title)
-    xlabel("Theta_x / 2pi")
-    ylabel("Theta_y / 2pi")
-    xlim([minimum(theta_xs),maximum(theta_xs)])
-    ylim([minimum(theta_ys),maximum(theta_ys)])
+    plotting_gamma = reverse(transpose(abs.(gammas)),dims=1)
 
+    fig = figure()
+    imshow(plotting_gamma; cmap="viridis", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)])
+    colorbar()
+    which_gamma == 1 ? title("Magnitude of "*L"\Lambda_1 "*plot_title) : title("Magnitude of "*L"\Lambda_2 "*plot_title)
+    ylabel(L"\theta_y / 2\pi")
+    xlabel(L"\theta_x / 2\pi")
 end
 plot_gamma(theta_xs::StepRangeLen,theta_ys::StepRangeLen,gammas::Matrix{ComplexF64},which_gamma::Int; kwargs...) = plot_gamma(collect(theta_xs),collect(theta_ys),gammas,which_gamma; kwargs...)
 
