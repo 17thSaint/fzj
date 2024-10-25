@@ -38,7 +38,7 @@ function plot_spectrum(xxs::Vector,nrgs::Vector,idx::Int,nev::Int,xstring::Abstr
 end
 plot_spectrum(xxs::StepRangeLen,nrgs::Vector,idx::Int,nev::Int,xstring::AbstractString,if_diff::Bool; kwargs...) = plot_spectrum(collect(xxs),nrgs,idx,nev,xstring,if_diff; kwargs...)
 
-function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::Matrix{ComplexF64}; kwargs...)
+#=function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::Matrix{ComplexF64}; kwargs...)
     plot_title::String = get(kwargs,:plot_title,"")
     if_mag::Bool = get(kwargs,:if_mag,false)
     if_perfect_grid::Bool = get(kwargs,:if_perfect_grid,true)
@@ -94,7 +94,7 @@ function plot_gamma(theta_xs::Vector{Float64},theta_ys::Vector{Float64},gammas::
     ylabel(L"\theta_y / 2\pi")
     xlabel(L"\theta_x / 2\pi")
 end
-plot_gamma(theta_xs::StepRangeLen,theta_ys::StepRangeLen,gammas::Matrix{ComplexF64},which_gamma::Int; kwargs...) = plot_gamma(collect(theta_xs),collect(theta_ys),gammas,which_gamma; kwargs...)
+plot_gamma(theta_xs::StepRangeLen,theta_ys::StepRangeLen,gammas::Matrix{ComplexF64},which_gamma::Int; kwargs...) = plot_gamma(collect(theta_xs),collect(theta_ys),gammas,which_gamma; kwargs...)=#
 
 function plot_greenfunc(all_greens,hopping_direction; kwargs...)
 	virt_edge_length,phys_edge_length = size(all_greens)

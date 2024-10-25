@@ -13,7 +13,7 @@ Depends on:
 ######################################################
 
 include("../other-funcs/include-other-files.jl")
-include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","review-practice-codes/plottings.jl","synth-dims/hatsugai-mbcn.jl"])
+include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","review-practice-codes/plottings.jl","synth-dims/hatsugai-mbcn.jl","other-funcs/basic-2d-plottings.jl"])
 include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
 
 
@@ -115,27 +115,41 @@ if true
     lambda1s::Matrix{ComplexF64} = zeros(ComplexF64,length(tw1s),length(tw2s))
     lambda2s::Matrix{ComplexF64} = zeros(ComplexF64,length(tw1s),length(tw2s))
     omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tw1s),length(tw2s))
+    nrgs::Dict{String,Matrix{Float64}} = Dict([("1",zeros(Float64,length(tw1s),length(tw2s))),("2",zeros(Float64,length(tw1s),length(tw2s))),("3",zeros(Float64,length(tw1s),length(tw2s)))])
     for f in all_files
         d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
         tw1,tw2 = m["twist_angle"]
         if tw1 in [0.33,0.67] || tw2 in [0.33,0.67]
             continue
         end
-        if !(tw1 in tw1s) && !(tw2 in tw2s)
+        if !(tw1 in tw1s) || !(tw2 in tw2s)
             continue
         end
-        println(f)
-        display(keys(m))
+        println("Twist1 is ",tw1," and Twist2 is ",tw2)
         idx = findfirst(x->tw1s[x]==tw1,1:length(tw1s))
         idx2 = findfirst(x->tw2s[x]==tw2,1:length(tw2s))
         lambda1s[idx,idx2] = m["gamma1"]
         lambda2s[idx,idx2] = m["gamma2"]
         omegas[idx,idx2] = m["omega"]
+        #=nrgs["1"][idx,idx2] = m["observer"].energies[end]
+        for i in 2:3
+            nrgs[string(i)][idx,idx2] = m["observer_$(i-1)"].energies[end]
+        end=#
     end
 
-    plot_omega(tw1s,tw2s,omegas; if_perfect_grid=false)
+    plot_omega(tw1s,tw2s,omegas; if_perfect_grid=true)
     plot_gamma(tw1s,tw2s,lambda1s,1)
     plot_gamma(tw1s,tw2s,lambda2s,2)
+    
+    #=cs = ["b","g","r"]
+    fig = figure()
+    for i in 1:3
+        for ii in 1:length(tw1s)
+            for jj in 1:length(tw2s)
+                scatter3D(tw1s[ii],tw2s[jj],nrgs[string(i)][ii,jj],c=cs[i])
+            end
+        end
+    end=#
 end
 
 

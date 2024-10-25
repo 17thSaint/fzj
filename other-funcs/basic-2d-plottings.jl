@@ -174,7 +174,7 @@ function count_chern_number(theta_xs::Vector{Float64},theta_ys::Vector{Float64},
                     end
                 end
             end
-            display(round.(alldiffs ./ pi,digits=3))
+            #display(round.(alldiffs ./ pi,digits=3))
             vortex_counting[i,j] = sum(alldiffs)
         end
     end
