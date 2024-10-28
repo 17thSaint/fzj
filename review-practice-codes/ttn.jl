@@ -2285,6 +2285,7 @@ function density_matrix(ttn; kwargs...)
 	creation = if_fermion ? "Cdag" : "Adag"
 	annihilation = if_fermion ? "C" : "A"
 	output_level = get(kwargs, :output_level, false)
+	if_synth_rectangle = get(kwargs, :if_synth_rectangle, false)
 	
 	lat = TTNKit.physical_lattice(TTNKit.network(ttn))
 	num_sites = prod(size(lat))

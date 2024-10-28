@@ -20,6 +20,7 @@ include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/obser
 
 function plot_nrg_vs_intstren_fromdata_ttn(layers::Int64,which_strens::Union{String,Vector{Float64}}="all"; kwargs...)
     hanis = get(kwargs, :hopping_anisotropy, 1.0)
+    if_gap = get(kwargs, :if_gap, true)
     levels_count = get(kwargs, :levels_count, 3)
     dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
     lx,ly = get_lattice_dims_from_layers(layers)
@@ -55,15 +56,16 @@ function plot_nrg_vs_intstren_fromdata_ttn(layers::Int64,which_strens::Union{Str
         end
     end
 
+    shift_nrg = if_gap ? nrgs["1"] : zeros(length(nrgs["1"]))
     cols = ["b","r","k"]
     fig = figure()
     for i in 1:levels_count
-        scatter(intstrens,nrgs[string(i)] .- nrgs["1"],c=cols[i],label="E$(i-1)")
+        scatter(intstrens,nrgs[string(i)] .- shift_nrg,c=cols[i],label="E$(i-1)")
     end
     xlabel("Interaction Strength")
     ylabel("Energy Difference")
     legend()
-    ylim([-0.1,0.7])
+    if_gap && ylim([-0.1,0.7])
 
     title("Energy Spectrum for "*L"\rho_{1D}=1.0"*" TTNs $(lx)x$ly lattice")
 
@@ -71,6 +73,7 @@ end
 
 function plot_nrg_vs_intstren_fromdata_ed(lx::Int64,ly::Int64,which_strens::Union{String,Vector{Float64}}="all"; kwargs...)
     hanis = get(kwargs, :hopping_anisotropy, 1.0)
+    if_gap = get(kwargs, :if_gap, true)
     levels_count = get(kwargs, :levels_count, 5)
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     n = get(kwargs, :particles, lx)
@@ -104,15 +107,16 @@ function plot_nrg_vs_intstren_fromdata_ed(lx::Int64,ly::Int64,which_strens::Unio
         end
     end
 
+    shift_nrg = if_gap ? nrgs["1"] : zeros(length(nrgs["1"]))
     cols = ["b","r","k","k","k"]
     fig = figure()
     for i in 1:levels_count
-        scatter(intstrens,nrgs[string(i)] .- nrgs["1"],c=cols[i],label="E$(i-1)")
+        scatter(intstrens,nrgs[string(i)] .- shift_nrg,c=cols[i],label="E$(i-1)")
     end
     xlabel("Interaction Strength")
     ylabel("Energy Difference")
     legend()
-    ylim([-0.1,0.7])
+    if_gap && ylim([-0.1,0.7])
 
     title("Energy Spectrum for "*L"\rho_{1D}=1.0"*" ED $(lx)x$ly lattice")
 
@@ -121,8 +125,9 @@ end
 
 # look at finite size scaling of commensurate filling interaction strength spectrum
 if true
-    plot_nrg_vs_intstren_fromdata_ttn(6; particles=8)
-    plot_nrg_vs_intstren_fromdata_ed(4,8; particles=4)
+    #plot_nrg_vs_intstren_fromdata_ttn(6; particles=8, if_gap=true)
+    plot_nrg_vs_intstren_fromdata_ed(4,8; particles=4, if_gap=false)
+    plot_nrg_vs_intstren_fromdata_ttn(5; particles=4, if_gap=false)
 end
 
 

@@ -471,7 +471,7 @@ function long_range_HH_ham_synthrect(net,t_strength,phi; kwargs...)
 	#hopping_anisotropy = get(kwargs, :hopping_anisotropy, 1.0) t_phys / t_synth = anisotropy
 	if_pfaffian = kwargs[:if_pfaffian]
 	
-	interaction_axis_length = which_dir == "virt" ? virt_edge_length : phys_edge_length
+	interaction_axis_length = virt_edge_length
 	long_range_strengths = long_range_scaling(scaling_distance,interaction_axis_length,onsite_strength; kwargs...)
 	display(long_range_strengths)
 	if_interaction = !all(long_range_strengths.==0)
@@ -541,18 +541,17 @@ function long_range_HH_ham_synthrect(net,t_strength,phi; kwargs...)
 				else
 					for j in TTNKit.eachindex(lat)
 						s_coord = TTNKit.coordinate(lat,j)
-						if s_coord[1] > restricted_size[1] || s_coord[2] > restricted_size[2]
+						if s_coord[1] > restricted_size[2] || s_coord[2] > restricted_size[1]
 							continue
 						end
 						interaction_sites = get_interaction_coords_synthrect(s_coord,idx-1,lat,(if_periodic_virt,if_periodic_phys),which_dir)
 						#println("Interacting Sites for position $s_coord at distance $(idx-1) in direction $which_dir are ",interaction_sites)
-						
 						for k in interaction_sites
-							if k[1] > restricted_size[1] || k[2] > restricted_size[2]
+							if k[1] > restricted_size[2] || k[2] > restricted_size[1]
 								continue
 							end
 							#println("Interacting between ",s_coord," and ",k," with strength ",stren/2)
-							interaction += (stren/2,"Adag * A",reverse(s_coord),"Adag * A",Tuple(reverse(k)))
+							interaction += (stren/2,"Adag * A",s_coord,"Adag * A",Tuple(k))
 						end
 					end
 				end
@@ -562,7 +561,7 @@ function long_range_HH_ham_synthrect(net,t_strength,phi; kwargs...)
 	end
 	
 	# has not been checked from synth rectangle methods
-	if restricted_size != [virt_edge_length,phys_edge_length]
+	#=if restricted_size != [virt_edge_length,phys_edge_length]
 		restrict_size = TTNKit.OpSum()
 		for i in restricted_size[1]+1:virt_edge_length
 			for j in 1:phys_edge_length
@@ -592,7 +591,7 @@ function long_range_HH_ham_synthrect(net,t_strength,phi; kwargs...)
 	    		pinning_pot += (Vj[p[1],p[2]], "N", p)
 		end
 		append!(resulting_ham,[pinning_pot])
-	end
+	end=#
 	
 	if length(resulting_ham) > 1
 		return sum(resulting_ham)
@@ -1433,6 +1432,7 @@ function make_synthdims_filename(model_parameters::Dict)
 	if_periodic_synth = model_parameters["if_periodic_synth"]
 	onsite_strength = model_parameters["onsite_strength"]
 	anis = model_parameters["hopping_anisotropy"]
+	if_synth_rectangle = model_parameters["if_synth_rectangle"]
 	
 	filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_phys",if_periodic_phys),("if_periodic_synth",if_periodic_synth),("onsite_strength",onsite_strength),("hopping_anisotropy",anis)])
 
@@ -1447,6 +1447,10 @@ function make_synthdims_filename(model_parameters::Dict)
 	if model_parameters["twist_angle"] != [0.0,0.0]
 		filename_dict["twist_angle1"] = model_parameters["twist_angle"][1]
 		filename_dict["twist_angle2"] = model_parameters["twist_angle"][2]
+	end
+
+	if model_parameters["if_synth_rectangle"]
+		filename_dict["if_synth_rectangle"] = true
 	end
 
 	return make_parameters_filename(filename_dict)
@@ -1698,6 +1702,7 @@ function run_synth_dims_generic(params_dict::Dict)
 		starting = time()
 		net = build_HH_net(model_paras)
 		ham = long_range_HH_ham(net,model_paras[:ts],model_paras[:alpha]; model_paras...)
+		display(ham)
 		metadata_dict["ham"] = ham
 		metadata_dict["net"] = net
 		if es_count > 0
@@ -1923,16 +1928,16 @@ if false
 	#anises = [0.01,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.6,0.8,0.9,1.1,1.3,1.5,1.7,1.9,2.0,2.5,3.0,3.5,4.0,6.0,8.0,9.0,10.0,15.0,20.0,25.0,30.0,40.0,50.0,70.0,90.0,100.0,1000.0,10000.0]
 	#anises = range(1.0,5.0,length=10)
 	strens = range(0.0,2.0,length=11)
-	args_dict = make_args_dict(ARGS)
-	which_ones = args_dict["which_one"]
+	#args_dict = make_args_dict(ARGS)
+	#which_one = args_dict["which_one"]
 	#alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
 	#strens = [0.0,0.5,1.0,1.5,2.0]#range(0.1,0.5,length=3)
 	#for (idx,anis) in enumerate(anises)
-	#for (idx,stren) in enumerate(strens)
+	for (idx,stren) in enumerate(strens)
 	#tws = range(0.0,1.0,length=10)
 	#for tw1 in tws
 	#for tw2 in tws
-		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",2),("particles",8),("layers",6),("mdim",300),("if_save_data",true),("filling",0.5),("onsite_strength",strens[which_one]),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",2),("if_synth_rectangle",true),("if_check_fluxes",false),("particles",2),("layers",3),("mdim",300),("if_save_data",false),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		open_cores = get(params_dict, "open_cores", 5)
@@ -1943,6 +1948,8 @@ if false
 
 
 		all_results = run_synth_dims_generic(params_dict)
+		#nrgs = [all_results[3][i].nrg[end] for i in 1:params_dict["es_count"]+1]
+		#plot_spectrum(strens,nrgs,idx,params_dict["es_count"]+1,"Interaction Strength",true; plot_title=" Synth Rectangle TTN")
 
 		#=for i in 1:params_dict["es_count"]+1
 			scatter(tw1,all_results[3][i].nrg[end],c=cols[i])
@@ -2034,7 +2041,7 @@ if false
 			fig = figure()
 			scatter(collect(1:mdim),-log.(specs))
 			=#
-	#end
+	end
 #end
 end
 
