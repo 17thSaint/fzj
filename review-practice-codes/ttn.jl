@@ -66,9 +66,9 @@ function get_site_count(ttn)
 	return 2^layers
 end
 
-function get_lattice_dims(input_data)
+function get_lattice_dims(input_data; kwargs...)
 	num_layers = TTNKit.number_of_layers(input_data)
-	return get_lattice_dims_from_layers(num_layers)
+	return get_lattice_dims_from_layers(num_layers; kwargs...)
 end
 
 function get_ydir_greenfunc(ttn; kwargs...)
@@ -402,8 +402,6 @@ function get_xy_coeffs(x,y,edge_length,t_strength,phi,thetax=thetax_1,thetay=the
 end
 
 function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwargs...) 
-	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
-	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
 	hopping_anisotropy = get(kwargs, :hopping_anisotropy, 1.0)
 	#t_strength_phys = t_strength * hopping_anisotropy
 	flux_direction = get(kwargs,:flux_direction,"phys")
@@ -421,16 +419,45 @@ function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwarg
 	end
 	
 	if s1[1] == s2[1] # Synthetic Dimension Hopping
-		thetay = get(kwargs, :thetay, thetay_2)
 
 		stren = -t_strength_synth
 		flux_direction == "synth" ? stren *= exp(im*2*pi*(phi*s1[1])) : nothing
 		return round(stren,digits=10)
 	elseif s1[2] == s2[2] # Physical Dimension Hopping
-		thetax = get(kwargs, :thetax, thetax_2)
 
 		stren = -t_strength_phys
 		flux_direction == "phys" ? stren *= exp(im*2*pi*(phi*s1[2])) : nothing
+		return round(stren,digits=10)
+	else
+		return 0.0
+	end
+
+end
+
+function get_inter_coeff_synthrect(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwargs...) 
+	hopping_anisotropy = kwargs[:hopping_anisotropy]
+	#t_strength_phys = t_strength * hopping_anisotropy
+	flux_direction = kwargs[:flux_direction]
+	
+	if hopping_anisotropy < 1.0
+		t_strength_synth = t_strength / hopping_anisotropy
+		t_strength_phys = t_strength
+	else
+		t_strength_phys = t_strength * hopping_anisotropy
+		t_strength_synth = t_strength
+	end
+	
+	if get(kwargs, :no_magF, false)
+		phi = 0.0
+	end
+	
+	if s1[1] == s2[1] # Physical Dimension Hopping
+		stren = -t_strength_phys
+		flux_direction == "phys" ? stren *= exp(im*2*pi*(phi*s1[1])) : nothing
+		return round(stren,digits=10)
+	elseif s1[2] == s2[2] # Synthetic Dimension Hopping
+		stren = -t_strength_synth
+		flux_direction == "synth" ? stren *= exp(im*2*pi*(phi*s1[2])) : nothing
 		return round(stren,digits=10)
 	else
 		return 0.0

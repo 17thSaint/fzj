@@ -748,43 +748,6 @@ function n_particle_basis(lattice_params::Dict; kwargs...)
     return n_particle_basis(N,Lx,Ly; kwargs...)
 end
 
-function long_range_scaling(x_final::Int64,virt_edge_length::Int64,initial_strength::Float64; kwargs...)
-
-	trunc = get(kwargs, :trunc_digits, 5)
-	scaling_func = get(kwargs, :scaling, "flat")
-	
-	strengths = zeros(virt_edge_length)
-
-    if x_final == 0.0 || initial_strength == 0.0
-        strengths[1] = initial_strength != 0.0 ? initial_strength : 1.0
-        return strengths
-    end
-	
-	if scaling_func == "flat"
-		strengths[1:x_final+1] .= initial_strength
-    elseif scaling_func == "gaussian"
-        sigma = get(kwargs, :sigma, 1.0)
-        strengths = map(0:virt_edge_length-1) do x
-            #(initial_strength/(sqrt(2*pi)*sigma)) * exp(-x^2/(2*sigma^2))
-            initial_strength * exp(-x^2/(2*sigma^2))
-        end
-	elseif scaling_func == "exp"
-        corr_length = get(kwargs, :corr_length, virt_edge_length)
-		strengths = map(1:virt_edge_length) do x
-			initial_strength * exp(-(x-1)/corr_length)	
-		end
-	elseif scaling_func == "rydberg"
-		blockade_radius = get(kwargs, :blockade_radius, 1.0)
-		strengths = map(0:virt_edge_length-1) do x
-			initial_strength * (blockade_radius^6) / (blockade_radius^6 + x^6)
-		end
-	end
-	
-	strengths = round.(strengths,digits=trunc)
-
-	return strengths
-end
-
 function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
     
     output_states = Array{Int64,1}(undef,0)

@@ -282,11 +282,10 @@ function run_normal_ed(params_dict::Dict; kwargs...)
 
 end
 
-
 # run data collection with for loops
 if false
     
-    lx,ly,n = 4,8,4
+    lx,ly,n = 2,4,2
     #for (idx,n) in enumerate([2,3,4,5])
     intstrens = range(0.0,2.0,length=10)
     #other_intstrens = range(2.0,10.0,length=37)
@@ -312,7 +311,7 @@ if false
     end=#
 
     #intstren = 0.0
-    tw2 = 0.5
+    tw2 = 0.0
     tw1 = 0.0
     #tws = range(0.5,1.5,length=21)
     #tws2 = range(0.7,0.8,length=11)
@@ -329,7 +328,7 @@ if false
         #    continue
         #end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+        params_dict = Dict([("output_level",1),("if_check_fluxes",false),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
         states,nrgs,rhos,filepath,if_found = run_normal_ed(params_dict; output_level=1)

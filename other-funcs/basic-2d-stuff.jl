@@ -123,6 +123,107 @@ function coordinate(site::Int64,Lx::Int64,Ly::Int64)
     return (x,y)
 end
 
+# find how many Binary TTN layers need for given lattice size
+function get_layers_from_latticesize(Lx::Int64,Ly::Int64)
+    if Lx == Ly || Lx == 2*Ly || Ly == 2*Lx
+        layers = log(2,Lx*Ly)
+        if isinteger(layers)
+            return Int(layers)
+        else
+            error("Lattice size does not fit in Binary Tree")
+        end
+    else
+        error("Lattice size does not fit in Binary Tree")
+    end
+end
+
+# old version from TTN code
+#=function long_range_scaling(x_final,virt_edge_length,initial_strength; kwargs...)
+	if_plot = get(kwargs, :if_plot, false)
+	if_save_data = get(kwargs, :if_save_data, false)
+	if_save_fig = get(kwargs, :if_save_fig, false)
+	if_hard_cutoff = get(kwargs, :cliff, false)
+	if_rounding = get(kwargs, :rounding, true)
+	if if_hard_cutoff
+		if_rounding = false
+	end
+	final_minimum = get(kwargs, :limit, 10^-3)
+	trunc_minimum = get(kwargs, :trunc_min, 10^-6)
+	trunc = get(kwargs, :trunc, trunc_minimum*initial_strength)
+	scaling_func = get(kwargs, :scaling, "flat")
+	
+	strengths = zeros(virt_edge_length)
+	
+	if scaling_func == "flat"
+		strengths[1:x_final+1] .= initial_strength
+	elseif scaling_func == "exp"
+		strengths = map(1:virt_edge_length) do x
+			initial_strength * exp(-log(1/final_minimum)*(x-1)/x_final)	
+		end
+		strengths[1] = initial_strength
+	elseif scaling_func == "lr_flat"
+		strengths[1] = initial_strength
+		strengths[2:x_final+1] .= final_minimum
+	elseif scaling_func == "rydberg"
+		blockade_radius = initial_strength
+		strengths = map(0:virt_edge_length-1) do x
+			1.0 * (blockade_radius^6) / (blockade_radius^6 + x^6)
+		end
+		x_final < length(strengths) ? strengths[x_final+2:end] .= 0.0 : nothing
+	end
+	
+	if if_hard_cutoff
+		strengths[x_final + 2:end] .= 0.0
+	elseif if_rounding
+		final_index = findfirst(x -> abs(x) .<= trunc,strengths)
+		if !isnothing(final_index)
+			strengths[final_index:end] .= 0.0
+		end
+	end
+	
+	if_plot || if_save_fig ? plot_long_range_scaling(strengths,virt_edge_length; kwargs...) : nothing
+	#if_save_data ? save_long_range_scaling(strengths,virt_edge_length; kwargs...) : nothing
+
+	return strengths
+end=#
+
+function long_range_scaling(x_final::Int64,virt_edge_length::Int64,initial_strength::Float64; kwargs...)
+
+	trunc = get(kwargs, :trunc_digits, 5)
+	scaling_func = get(kwargs, :scaling, "flat")
+	
+	strengths = zeros(virt_edge_length)
+
+    if x_final == 0.0 || initial_strength == 0.0
+        strengths[1] = initial_strength != 0.0 ? initial_strength : 1.0
+        return strengths
+    end
+	
+	if scaling_func == "flat"
+		strengths[1:x_final+1] .= initial_strength
+    elseif scaling_func == "gaussian"
+        sigma = get(kwargs, :sigma, 1.0)
+        strengths = map(0:virt_edge_length-1) do x
+            #(initial_strength/(sqrt(2*pi)*sigma)) * exp(-x^2/(2*sigma^2))
+            initial_strength * exp(-x^2/(2*sigma^2))
+        end
+	elseif scaling_func == "exp"
+        corr_length = get(kwargs, :corr_length, virt_edge_length)
+		strengths = map(1:virt_edge_length) do x
+			initial_strength * exp(-(x-1)/corr_length)	
+		end
+	elseif scaling_func == "rydberg"
+		blockade_radius = get(kwargs, :blockade_radius, 1.0)
+		strengths = map(0:virt_edge_length-1) do x
+			initial_strength * (blockade_radius^6) / (blockade_radius^6 + x^6)
+		end
+	end
+	
+	strengths = round.(strengths,digits=trunc)
+
+	return strengths
+end
+
 
 
 

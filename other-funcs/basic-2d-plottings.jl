@@ -95,7 +95,7 @@ function plot_gamma(theta_xs::Vector{Float64},theta_ys::Vector{Float64},gammas::
     plotting_gamma = reverse(transpose(abs.(gammas)),dims=1)
 
     fig = figure()
-    imshow(plotting_gamma; cmap="viridis", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)])
+    imshow(plotting_gamma; cmap="viridis", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)], vmin=0.0)
     colorbar()
     which_gamma == 1 ? title("Magnitude of "*L"\Lambda_1 "*plot_title) : title("Magnitude of "*L"\Lambda_2 "*plot_title)
     ylabel(L"\theta_y / 2\pi")

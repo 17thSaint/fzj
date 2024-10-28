@@ -70,26 +70,32 @@ if false
 end
 
 # 1Deff hatsugai
-if true
+if false
     lx,ly,n = 4,4,2
 
-    #=tws2 = range(0.1,0.3,length=11)
-    tws = range(0.7,0.9,length=11)
+    #tws2 = range(0.1,0.3,length=11)
+    #tws = range(0.7,0.9,length=11)
+    tw1 = 0.33
+    tw2 = 0.67
 
-    lambda1s::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
-    lambda2s::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
-    omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
-    ref_multis,rm1,rm2 = get_reference_multiplets(lx,ly,n)
-    for (idx,tw1) in enumerate(tws)
-        for (idx2,tw2) in enumerate(tws2)
-            params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("tw2",tw2),("tw1",tw1),("if_remapping",false),("es_count",2),("nrgtol",1e-6),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",true),("if_save_data",true)])
+    #lambda1s::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
+    #lambda2s::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
+    #omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
+    #ref_multis,rm1,rm2 = get_reference_multiplets(lx,ly,n)
+    #for (idx,tw1) in enumerate(tws)
+        #for (idx2,tw2) in enumerate(tws2)
+            params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("tw2",tw2),("tw1",tw1),("if_remapping",false),("es_count",2),("nrgtol",1e-6),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
             psis,rhos,nrgs,model_paras,if_found_data = run_normal_1deffmps(params_dict)
+
+            params_dict["tw1"] = tw2
+            params_dict["tw2"] = tw1
+            psis2,rhos2,nrgs2,model_paras2,if_found_data2 = run_normal_1deffmps(params_dict)
             
             #scatter3D(tw1,tw2,nrgs[1],c="b")
             #scatter3D(tw1,tw2,nrgs[2],c="g")
             #scatter3D(tw1,tw2,nrgs[3],c="r")
 
-            if if_found_data
+            #=if if_found_data
                 d,m = read_data_jld2(model_paras[:location]*"/"*model_paras[:name]*".jld2"; output_level=0)
                 lambda1s[idx,idx2] = m["gamma1"]
                 lambda2s[idx,idx2] = m["gamma2"]
@@ -112,13 +118,20 @@ if true
     tw1s = range(0.0,1.0,length=21)
     tw2s = range(0.0,1.0,length=21)
 
+
+
     lambda1s::Matrix{ComplexF64} = zeros(ComplexF64,length(tw1s),length(tw2s))
     lambda2s::Matrix{ComplexF64} = zeros(ComplexF64,length(tw1s),length(tw2s))
-    omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tw1s),length(tw2s))
-    nrgs::Dict{String,Matrix{Float64}} = Dict([("1",zeros(Float64,length(tw1s),length(tw2s))),("2",zeros(Float64,length(tw1s),length(tw2s))),("3",zeros(Float64,length(tw1s),length(tw2s)))])
+    #omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tw1s),length(tw2s))
+    #nrgs::Dict{String,Matrix{Float64}} = Dict([("1",zeros(Float64,length(tw1s),length(tw2s))),("2",zeros(Float64,length(tw1s),length(tw2s))),("3",zeros(Float64,length(tw1s),length(tw2s)))])
     for f in all_files
-        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
-        tw1,tw2 = m["twist_angle"]
+        filename_dict = get_params_from_filename(f)
+        d,m = read_data_jld2(dataloc * "/wavefunc" * f; output_level=0)
+        try
+            tw1,tw2 = filename_dict["tw1"],filename_dict["tw2"]
+        catch
+            continue
+        end
         if tw1 in [0.33,0.67] || tw2 in [0.33,0.67]
             continue
         end
@@ -128,16 +141,20 @@ if true
         println("Twist1 is ",tw1," and Twist2 is ",tw2)
         idx = findfirst(x->tw1s[x]==tw1,1:length(tw1s))
         idx2 = findfirst(x->tw2s[x]==tw2,1:length(tw2s))
-        lambda1s[idx,idx2] = m["gamma1"]
-        lambda2s[idx,idx2] = m["gamma2"]
-        omegas[idx,idx2] = m["omega"]
+
+        lambda1s[idx,idx2] = get_gamma(d["mps"],d["mps_1"],psis[1:2])
+        lambda2s[idx,idx2] = get_gamma(d["mps"],d["mps_1"],psis2[1:2])
+
+        #lambda1s[idx,idx2] = m["gamma1"]
+        #lambda2s[idx,idx2] = m["gamma2"]
+        #omegas[idx,idx2] = m["omega"]
         #=nrgs["1"][idx,idx2] = m["observer"].energies[end]
         for i in 2:3
             nrgs[string(i)][idx,idx2] = m["observer_$(i-1)"].energies[end]
         end=#
     end
 
-    plot_omega(tw1s,tw2s,omegas; if_perfect_grid=true)
+    #plot_omega(tw1s,tw2s,omegas; if_perfect_grid=true)
     plot_gamma(tw1s,tw2s,lambda1s,1)
     plot_gamma(tw1s,tw2s,lambda2s,2)
     

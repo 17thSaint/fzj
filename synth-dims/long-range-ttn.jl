@@ -69,56 +69,9 @@ function plot_magnetization(mags,sites,direction; kwargs...)
 	title(title_string)
 end
 
-function long_range_scaling(x_final,virt_edge_length,initial_strength; kwargs...)
-	if_plot = get(kwargs, :if_plot, false)
-	if_save_data = get(kwargs, :if_save_data, false)
-	if_save_fig = get(kwargs, :if_save_fig, false)
-	if_hard_cutoff = get(kwargs, :cliff, false)
-	if_rounding = get(kwargs, :rounding, true)
-	if if_hard_cutoff
-		if_rounding = false
-	end
-	final_minimum = get(kwargs, :limit, 10^-3)
-	trunc_minimum = get(kwargs, :trunc_min, 10^-6)
-	trunc = get(kwargs, :trunc, trunc_minimum*initial_strength)
-	scaling_func = get(kwargs, :scaling, "flat")
-	
-	strengths = zeros(virt_edge_length)
-	
-	if scaling_func == "flat"
-		strengths[1:x_final+1] .= initial_strength
-	elseif scaling_func == "exp"
-		strengths = map(1:virt_edge_length) do x
-			initial_strength * exp(-log(1/final_minimum)*(x-1)/x_final)	
-		end
-		strengths[1] = initial_strength
-	elseif scaling_func == "lr_flat"
-		strengths[1] = initial_strength
-		strengths[2:x_final+1] .= final_minimum
-	elseif scaling_func == "rydberg"
-		blockade_radius = initial_strength
-		strengths = map(0:virt_edge_length-1) do x
-			1.0 * (blockade_radius^6) / (blockade_radius^6 + x^6)
-		end
-		x_final < length(strengths) ? strengths[x_final+2:end] .= 0.0 : nothing
-	end
-	
-	if if_hard_cutoff
-		strengths[x_final + 2:end] .= 0.0
-	elseif if_rounding
-		final_index = findfirst(x -> abs(x) .<= trunc,strengths)
-		if !isnothing(final_index)
-			strengths[final_index:end] .= 0.0
-		end
-	end
-	
-	if_plot || if_save_fig ? plot_long_range_scaling(strengths,virt_edge_length; kwargs...) : nothing
-	#if_save_data ? save_long_range_scaling(strengths,virt_edge_length; kwargs...) : nothing
 
-	return strengths
-end
 
-function save_long_range_scaling(strengths,virt_edge_length; kwargs...)
+#=function save_long_range_scaling(strengths,virt_edge_length; kwargs...)
 	filename = get(kwargs, :name, "scaling-strength")
 	location = get(kwargs, :location, pwd())
 	xcoord = [i for i in 0:virt_edge_length-1]
@@ -140,7 +93,7 @@ function plot_long_range_scaling(strengths,virt_edge_length; kwargs...)
 		save_figure(filename; kwargs...)
 	end
 	return
-end
+end=#
 
 function build_HH_net(num_layers::Int64; kwargs...)
 	conserve_qns = get(kwargs, :syms, true)
@@ -218,9 +171,69 @@ function get_interaction_coords(given_site,inter_dist,lat,if_per,which_dir) # wr
 	return unique(coordinates)
 end
 
+function get_interaction_coords_synthrect(given_site,inter_dist,lat,if_per,which_dir) # written by ChatGPT 12.06.2023 then vastly edited 13.06.2023 by me
+	#virtual, physical = given_site
+	virtual, physical = given_site
+	coordinates = []
+	if_periodic_virt,if_periodic_phys = if_per
+    
+	virt_edge_length, phys_edge_length = size(lat)
+
+	if which_dir == "virt" || which_dir == "both" 
+		for shift in [-inter_dist % virt_edge_length,inter_dist % virt_edge_length] 
+			new_virtual = virtual + shift
+					
+			# Apply periodic boundary conditions along the virtual-axis
+			#=if if_periodic_virt
+				if new_virtual < 1
+					new_virtual += virt_edge_length
+				elseif new_virtual > virt_edge_length
+					new_virtual -= virt_edge_length
+				end
+			end=#
+
+			# Check if new coordinates are within lattice dimensions
+			if 1 <= new_virtual <= virt_edge_length && new_virtual != virtual
+				append!(coordinates, [[new_virtual,physical]])
+				#append!(coordinates, [[new_virtual,physical]])
+			#else
+				#println("Still Outside Lattice")
+			end
+
+		end
+	end
+
+	if which_dir == "phys" || which_dir == "both"
+		for shift in [-inter_dist % phys_edge_length,inter_dist % phys_edge_length]
+			new_physical = physical + shift
+			#=if if_periodic_phys
+				if new_physical < 1
+					new_physical += phys_edge_length
+				elseif new_physical > phys_edge_length
+					new_physical -= phys_edge_length
+				end
+			end=#
+
+			#physical == phys_edge_length -1 && inter_dist == 1 ? println("New Physical = ",new_physical,", Old Physical = ",physical,", Inter Dist = ",inter_dist,", Phys Edge = ",phys_edge_length) : nothing
+
+			if 1 <= new_physical <= phys_edge_length && new_physical != physical
+				append!(coordinates, [[virtual,new_physical]])
+				#append!(coordinates, [[virtual,new_physical]])
+			end
+		end
+	end
+
+	return unique(coordinates)
+end
+
 function long_range_HH_ham(net,t_strength,phi; kwargs...)
+
+	if kwargs[:if_synth_rectangle]
+		return long_range_HH_ham_synthrect(net,t_strength,phi; kwargs...)
+	end
+
 	resulting_ham = []
-	phys_edge_length,virt_edge_length = get_lattice_dims(net)
+	phys_edge_length,virt_edge_length = get_lattice_dims(net; kwargs...)
 	println("Phys = ",phys_edge_length,", Virt = ",virt_edge_length)
 	
 	scaling_distance = get(kwargs, :lr, 0)
@@ -307,7 +320,6 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 
 		append!(resulting_ham,[hopping])
 	else
-
 	#if if_hopping
 		hopping = TTNKit.OpSum()
 		for s_phys in 1:restricted_size[1]
@@ -430,12 +442,176 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	end
 end
 
+function long_range_HH_ham_synthrect(net,t_strength,phi; kwargs...)
+	resulting_ham = []
+	phys_edge_length,virt_edge_length = get_lattice_dims(net; kwargs...)
+	println("Phys = ",phys_edge_length,", Virt = ",virt_edge_length)
+	
+	scaling_distance = get(kwargs, :lr, 0)
+	
+	which_dir = kwargs[:which_dir]
+	flux_direction = kwargs[:flux_direction]
+	restricted_size = reverse(kwargs[:restricted_size])
+	if_periodic_virt = kwargs[:if_periodic_synth]
+	if_periodic_phys = kwargs[:if_periodic_phys]
+	
+	scaling_distance = get(kwargs, :lr, 0)
+	
+	#println("Checking periodicity $if_periodic_phys and $if_periodic_virt")
+	if_per = reverse([if_periodic_phys,if_periodic_virt])
+	if_hopping = get(kwargs, :if_hopping, true)
+	if_nn_int = get(kwargs, :if_nn_int, false)
+	onsite_strength = kwargs[:onsite_strength]
+	if_pinning_pot = get(kwargs, :if_pinning_pot, false)
+	vpinning = get(kwargs, :vpinning, 2.5)
+	no_magF = get(kwargs, :no_magF, false)
+	chem_strength = get(kwargs, :chem_strength, 0.0)
+	centralflux_strength = get(kwargs, :centralflux_strength, 0.0)
+	twist_angle = reverse(kwargs[:twist_angle])
+	#hopping_anisotropy = get(kwargs, :hopping_anisotropy, 1.0) t_phys / t_synth = anisotropy
+	if_pfaffian = kwargs[:if_pfaffian]
+	
+	interaction_axis_length = which_dir == "virt" ? virt_edge_length : phys_edge_length
+	long_range_strengths = long_range_scaling(scaling_distance,interaction_axis_length,onsite_strength; kwargs...)
+	display(long_range_strengths)
+	if_interaction = !all(long_range_strengths.==0)
+	
+	lat = TTNKit.physical_lattice(net)
+
+	if if_hopping
+		hopping = TTNKit.OpSum()
+		for s_phys in 1:restricted_size[2]
+			for s_synth in 1:restricted_size[1]
+				starting_site = [s_synth,s_phys]
+				twist = 0
+				for which_axis in [1,2]
+						ending_site = starting_site .+ ((which_axis == 1,which_axis == 2))
+
+						# enforce boundary conditions
+						if ending_site[which_axis] > restricted_size[which_axis]
+							if if_per[which_axis]
+								ending_site[which_axis] = 1
+								twist = 1
+							else
+								continue
+							end
+						end
+
+						if ending_site[which_axis] < 1
+							if if_per[which_axis]
+								ending_site[which_axis] = restricted_size[which_axis]
+								twist = 2
+							else
+								continue
+							end
+						end
+
+						coeff = get_inter_coeff_synthrect(starting_site,ending_site,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
+						twist == 1 ? coeff *= exp(im*twist_angle[which_axis]*2*pi) : nothing
+						twist == 2 ? coeff *= exp(-im*twist_angle[which_axis]*2*pi) : nothing
+						coeff = round(coeff,digits=8)
+						hopping += (coeff,"Adag",Tuple(reverse(starting_site)),"A",Tuple(reverse(ending_site)))
+						hopping += (conj(coeff),"Adag",Tuple(reverse(ending_site)),"A",Tuple(reverse(starting_site)))
+						twist = 0
+				end
+			end
+		end
+		append!(resulting_ham,[hopping])
+	end
+	
+	if if_interaction
+		if kwargs[:scaling] == "rydberg"
+			which_dir = "both"
+		end
+		interaction = TTNKit.OpSum()
+		for (idx,stren) in enumerate(long_range_strengths)
+			if stren == 0.0
+				continue
+			else
+				if idx == 1 && if_pfaffian
+					for j in TTNKit.eachindex(lat)
+						s_coord = TTNKit.coordinate(lat,j)
+						if s_coord[1] > restricted_size[1] || s_coord[2] > restricted_size[2]
+							continue
+						end
+						interaction += (stren,"N * N",s_coord)
+						interaction -= (stren,"N",s_coord)
+					end
+					continue
+				else
+					for j in TTNKit.eachindex(lat)
+						s_coord = TTNKit.coordinate(lat,j)
+						if s_coord[1] > restricted_size[1] || s_coord[2] > restricted_size[2]
+							continue
+						end
+						interaction_sites = get_interaction_coords_synthrect(s_coord,idx-1,lat,(if_periodic_virt,if_periodic_phys),which_dir)
+						#println("Interacting Sites for position $s_coord at distance $(idx-1) in direction $which_dir are ",interaction_sites)
+						
+						for k in interaction_sites
+							if k[1] > restricted_size[1] || k[2] > restricted_size[2]
+								continue
+							end
+							#println("Interacting between ",s_coord," and ",k," with strength ",stren/2)
+							interaction += (stren/2,"Adag * A",reverse(s_coord),"Adag * A",Tuple(reverse(k)))
+						end
+					end
+				end
+			end
+		end
+		append!(resulting_ham,[interaction])
+	end
+	
+	# has not been checked from synth rectangle methods
+	if restricted_size != [virt_edge_length,phys_edge_length]
+		restrict_size = TTNKit.OpSum()
+		for i in restricted_size[1]+1:virt_edge_length
+			for j in 1:phys_edge_length
+				restrict_size += (1e10,"N",(i,j))
+			end
+		end
+		for i in restricted_size[2]+1:phys_edge_length
+			for j in 1:restricted_size[1]
+				restrict_size += (1e10,"N",(j,i))
+			end
+		end
+		append!(resulting_ham,[restrict_size])
+	end
+
+	if chem_strength != 0.0
+		chem = TTNKit.OpSum()
+		for i in TTNKit.eachindex(lat)
+			chem -= (chem_strength,"N",TTNKit.coordinate(lat,i))
+		end
+		append!(resulting_ham,[chem])
+	end
+	
+	if if_pinning_pot
+		Vj = v_central(size(lat), vpinning)
+		pinning_pot = TTNKit.OpSum()
+		for p in TTNKit.coordinates(lat)
+	    		pinning_pot += (Vj[p[1],p[2]], "N", p)
+		end
+		append!(resulting_ham,[pinning_pot])
+	end
+	
+	if length(resulting_ham) > 1
+		return sum(resulting_ham)
+	else
+		return resulting_ham[1]
+	end
+end
+
 function long_range_HH_ham(metadata::Dict)
 	net = metadata["net"]
 	t_strength = "t_strength" in keys(metadata) ? metadata["t_strength"] : metadata["ts"]
 	phi = metadata["phi"]
+	if_synth_rectangle = metadata["if_synth_rectangle"]
 	model_paras = dict_to_symbols(metadata)
-	return long_range_HH_ham(net,t_strength,phi; model_paras...)
+	if if_synth_rectangle
+		return long_range_HH_ham_synthrect(net,t_strength,phi; model_paras...)
+	else
+		return long_range_HH_ham(net,t_strength,phi; model_paras...)
+	end
 end
 
 function get_densdens_corrs(ttn::TTNKit.TreeTensorNetwork,distances; kwargs...)
@@ -1335,14 +1511,15 @@ function get_normal_model_params(params_dict::Dict)
 	trunc = get(params_dict,"trunc",1e-3)
 	sc_type = get(params_dict,"scaling","flat")
 	which_dir = get(params_dict, "which_dir", "virt") # which axis does the anisotropic interaction act along
-	if_synth_rectangle ? which_dir = "phys" : nothing
 	longrange_dist = get(params_dict, "lr", 0)
-	if longrange_dist == "all"
+	if longrange_dist == "all" && !if_synth_rectangle
 		if which_dir == "phys"
 			longrange_dist = phys_edge_length-1
 		else
 			longrange_dist = synth_edge_length-1
 		end
+	elseif if_synth_rectangle
+		longrange_dist = phys_edge_length - 1
 	end
 
 	mu = get(params_dict, "chem_strength", 0.0)

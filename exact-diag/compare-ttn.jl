@@ -4,7 +4,7 @@ using Test
 
 include("../other-funcs/include-other-files.jl")
 
-include_other_files(["other-funcs/data-storage-funcs.jl","synth-dims/long-range-ttn.jl","exact-diag/two-dimensions.jl","synth-dims/old-long-range-ttn.jl"])
+include_other_files(["synth-dims/long-range-ttn.jl","exact-diag/execute-ed.jl"])
 
 if_all = false
 if_plot = false
@@ -470,22 +470,17 @@ end
 
 function get_lattice_params_from_ttn_modelparas(model_params::Dict)
 	layer_count = model_params[:layers]
-	if layer_count % 2 != 0
-		Lx = Int(sqrt(2^(layer_count+1)))
-		Ly = Int(sqrt(2^(layer_count-1)))
-	else
-		Lx = Int(sqrt(2^layer_count))
-		Ly = Int(sqrt(2^layer_count))
-	end
-	if model_params[:restricted_size] != [Lx,Ly]
+	Lx,Ly = get_lattice_dims_from_layers(layer_count; if_synth_rectangle=model_params[:if_synth_rectangle])
+	if model_params[:restricted_size] != [Lx,Ly] && model_params[:restricted_size] != [Ly,Lx]
 		Lx,Ly = model_params[:restricted_size]
 	end
 
 	N = model_params[:particles]
 	if_periodic_phys = model_params[:if_periodic_phys]
 	if_periodic_virt = model_params[:if_periodic_synth]
-	full_basis = n_particle_basis(N,Lx,Lx; output_level=1)
-	lattice_params = Dict([("Lx",Lx),("Ly",Ly),("N",N),("if_periodic_x",if_periodic_phys),("if_periodic_y",if_periodic_virt),("twist_angle",0.0),("full_basis",full_basis)])
+	if_synth_rectangle = model_params[:if_synth_rectangle]
+	full_basis = n_particle_basis(N,Lx,Ly; output_level=1)
+	lattice_params = Dict([("Lx",Lx),("Ly",Ly),("N",N),("if_periodic_x",if_periodic_phys),("if_periodic_y",if_periodic_virt),("twist_angle",0.0),("full_basis",full_basis),("if_synth_rectangle",if_synth_rectangle)])
 	return lattice_params
 end
 
@@ -790,6 +785,32 @@ if false
 
 end
 
+# verifying synth rectangle hamiltonian for TTN
+if true
+	lx,ly,n = 2,4,2
+	layers = get_layers_from_latticesize(lx,ly)
+	if_periodic = [true,true]
+	hanis = 1.0
+	intstren = 10.0
+	if_synth_rect = true
+
+	params_dict_ttn = Dict([("if_synth_rectangle",if_synth_rect),("hopping_anisotropy",hanis),("if_check_fluxes",false),("es_count",2),("particles",n),("layers",layers),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",intstren),("lr",intstren == 0.0 ? 0 : "all"),("if_periodic_phys",if_periodic[1]),("if_periodic_synth",if_periodic[2])])
+	#all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict_ttn)
+	ttn_full_params = named_tuple_to_dict(get_normal_model_params(params_dict_ttn))
+	net_ttn = build_HH_net(layers)
+	ttn_full_params["net"] = net_ttn
+	ttn_ham = long_range_HH_ham(ttn_full_params)
+	latparas_ttn = get_lattice_params_from_ttn_modelparas(dict_to_symbols(ttn_full_params))
+	remade_ttn_ham = rebuild_ed_ham(ttn_ham,latparas_ttn)
+
+	params_dict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("if_check_fluxes",false),("if_periodic_x",if_periodic[1]),("if_periodic_y",if_periodic[2]),("hopping_anisotropy",hanis),("interaction_strength",intstren),("lr",intstren == 0.0 ? 0 : "all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+	#states,nrgs,rhos,filepath,if_found = run_normal_ed(params_dict_ed; output_level=0)
+	latparas,hamparas,running_paras = get_normal_model_params_ed(params_dict_ed)
+	latparas["full_basis"] = latparas_ttn["full_basis"]
+	ed_ham = buildHam(latparas,hamparas; output_level=0)
+
+	println("If the ED/TTN hamiltonians match: ",remade_ttn_ham == ed_ham)
+end
 
 
 
