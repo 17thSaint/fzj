@@ -13,6 +13,33 @@ include("execute-ed.jl")
 include("plottings.jl")
 include("../other-funcs/basic-2d-plottings.jl")
 
+function datacollection_flatness(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
+    hanis::Float64 = get(kwargs,:hopping_anisotropy,1.0)
+
+    intstren_count::Int64 = get(kwargs,:intstren_count,11)
+    intstren_start::Float64 = get(kwargs,:intstren_start,0.0)
+    intstren_end::Float64 = get(kwargs,:intstren_end,2.0)
+    intstrens::Vector{Float64} = range(intstren_start,intstren_end,length=intstren_count)
+
+    tws_count::Int64 = get(kwargs,:tws_count,10)
+    tws_start::Float64 = get(kwargs,:tws_start,0.0)
+    tws_end::Float64 = get(kwargs,:tws_end,1.0)
+    tws::Vector{Float64} = range(tws_start,tws_end,length=tws_count)
+
+    println("Starting Flatness Data Collection for $(Lx)x$(Ly) N=$(N) from Intstrengths $(intstren_start) - $(intstren_end) and Twists $(tws_start) - $(tws_end)")
+    sleep(1.0)
+
+    nev = 10
+    for (idx,intstren) in enumerate(intstrens)
+        for (idx2,tw1) in enumerate(tws)
+            for (idx3,tw2) in enumerate(tws)
+                params_dict = Dict([("output_level",1),("Lx",Lx),("Ly",Ly),("N",N),("tw1",tw1),("tw2",tw2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",nev),("if_find_data",true),("if_save_data",true)])
+                states,nrgs,rhos,filepath,if_found = run_normal_ed(params_dict; output_level=1)
+            end
+        end
+    end
+end
+
 
 # redo gamma/omega calcs for all files
 if false
@@ -232,35 +259,6 @@ if false
     legend()=#
 end
 
-# look at cdw sf for 4x8 n=4
-if false
-    dataloc = get_folder_location("cluster-data/exact-diag/torus")
-    nev = 10
-
-    intstrens = range(0.0,5.0,length=41)
-    for intstren in intstrens
-        params_dict = Dict([("Lx",3),("Ly",7),("N",3),("nev",nev),("interaction_strength",intstren),("tw2",0.5),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("if_find_data",false),("if_save_data",false)])
-        states,nrgs,rhos,filepath,if_found,latpara,hamiltpara = run_normal_ed(params_dict; output_level=1)
-
-        #get_occupancy(states[1],latpara; plot_title="Intstren = $intstren",fix_colorbar=true)
-        denscorrs = make_density_correlations(states[1],latpara)
-        diagval = get_cdwsf([1.0,1.0],denscorrs)
-        scatter(intstren,diagval,c="b")
-    end
-
-    #=for f in all_files
-        filename_dict = get_params_dict_from_filename(f)
-        if haskey(filename_dict,"twist_angle2")
-            continue
-        end
-
-        println(f)
-        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
-        latparas = get_lattice_params_from_metadata(m)
-        denscorrs = make_density_correlations(d["state"][1])
-    end=#
-end
-
 # try charge pumping
 if false
     lx,ly,n = 6,6,3
@@ -319,41 +317,60 @@ if false
 
 end
 
-# hatsugai for 3x7 n=3 which includes non-degenerate groundstates
+# hatsugai for 3x7 n=3 data collection
 if false
     lx,ly,n = 3,7,3
     nev = 3
-    intstren = 0.0
     #tws = range(-0.5,0.5,length=11)
     #tws2 = range(-0.75,-0.25,length=11)
-    tws = range(0.0,1.0,length=20)
-    tws2 = range(-0.5,0.5,length=20)
+    tws = range(0.0,1.0,length=10)
+    tws2 = tws
+    intstrens = range(0.0,2.0,length=11)
 
-    #=lambda1s::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
-    lambda2s::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
-    omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
-    ref_multis,rm1,rm2 = get_reference_multiplets(lx,ly,n; interaction_strength=intstren)
-    for (idx,tw1) in enumerate(tws)
-        for (idx2,tw2) in enumerate(tws2)
-            params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("nev",nev),("tw2",tw2),("tw1",tw1),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("if_find_data",false),("if_save_data",false)])
-            states,nrgs,rhos,filepath,if_found,latpara,hamiltpara = run_normal_ed(params_dict; output_level=1)
+    for intstren in intstrens
+        #lambda1s::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
+        #lambda2s::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
+        #omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
+        #ref_multis,rm1,rm2 = get_reference_multiplets(lx,ly,n; interaction_strength=intstren)
+        for (idx,tw1) in enumerate(tws)
+            for (idx2,tw2) in enumerate(tws2)
+                params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("nev",nev),("tw2",tw2),("tw1",tw1),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("if_find_data",true),("if_save_data",true)])
+                states,nrgs,rhos,filepath,if_found,latpara,hamiltpara = run_normal_ed(params_dict; output_level=1)
 
-            #scatter3D(tw1,tw2,nrgs[1],c="b")
-            #scatter3D(tw1,tw2,nrgs[2],c="g")
-            #scatter3D(tw1,tw2,nrgs[3],c="r")
+                #scatter3D(tw1,tw2,nrgs[1],c="b")
+                #scatter3D(tw1,tw2,nrgs[2],c="g")
+                #scatter3D(tw1,tw2,nrgs[3],c="r")
 
-            lambda1s[idx,idx2],lambda2s[idx,idx2],omegas[idx,idx2] = get_hatsugaifull(states[1],states[2],ref_multis)
+                #lambda1s[idx,idx2],lambda2s[idx,idx2],omegas[idx,idx2] = get_hatsugaifull(states[1],states[2],ref_multis; if_save=true,filepath=filepath,ref_multis_filenames=[rm1,rm2])
+            end
         end
-    end=#
-    #xlabel(L"\theta_x / 2 \pi")
-    #ylabel(L"\theta_y / 2 \pi")
-    #zlabel("Energy")
-    #title("Energy Spectrum $(lx)x$(ly) N=$(n) ULR=$intstren")
+        #xlabel(L"\theta_x / 2 \pi")
+        #ylabel(L"\theta_y / 2 \pi")
+        #zlabel("Energy")
+        #title("Energy Spectrum $(lx)x$(ly) N=$(n) ULR=$intstren")
 
-    plot_omega(tws,tws2,omegas; plot_title=" $(lx)x$(ly) N=$(n) ULR=$intstren")
-    #plot_gamma(tws,tws2,lambda1s,1; plot_title=" $(lx)x$(ly) N=$(n) ULR=$intstren")
-    #plot_gamma(tws,tws2,lambda2s,2; plot_title=" $(lx)x$(ly) N=$(n) ULR=$intstren")
+        #plot_omega(tws,tws2,omegas; plot_title=" $(lx)x$(ly) N=$(n) ULR=$intstren")
+        #plot_gamma(tws,tws2,lambda1s,1; plot_title=" $(lx)x$(ly) N=$(n) ULR=$intstren")
+        #plot_gamma(tws,tws2,lambda2s,2; plot_title=" $(lx)x$(ly) N=$(n) ULR=$intstren")
+    end
 
+end
+
+function get_closing_strength(intstrens,flatnesses::Vector{Float64})
+    if length(intstrens) < 4
+        which_y = 2
+    else
+        which_y = findfirst(i -> (flatnesses[i+1] - flatnesses[i]) / (flatnesses[i] - flatnesses[i-1]) < 1e-2,2:length(flatnesses)-1)
+    end
+    #scatter(intstrens[which_y],flatnesses[which_y],c="r")
+    return (1.0 - flatnesses[findfirst(x -> x == 0.0,intstrens)]) / ((flatnesses[which_y] - flatnesses[findfirst(x -> x == 0.0,intstrens)]) / intstrens[which_y]),which_y
+end
+
+# finite size scaling of flatness
+if true
+    xs,ys = plot_twistflatness_vs_intstren_ed(8,3,3)#; intstrens=[0.0,0.5,1.25])    
+    closing_stren,which_y = get_closing_strength(xs,ys)
+    scatter(closing_stren,1.0,c="r",label="Guess")
 end
 
 

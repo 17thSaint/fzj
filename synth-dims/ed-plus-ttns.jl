@@ -22,6 +22,7 @@ function plot_nrg_vs_intstren_fromdata_ttn(layers::Int64,which_strens::Union{Str
     hanis = get(kwargs, :hopping_anisotropy, 1.0)
     if_gap = get(kwargs, :if_gap, true)
     levels_count = get(kwargs, :levels_count, 3)
+    if_plot = get(kwargs, :if_plot, true)
     dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
     lx,ly = get_lattice_dims_from_layers(layers)
     n = get(kwargs, :particles, lx)
@@ -56,25 +57,29 @@ function plot_nrg_vs_intstren_fromdata_ttn(layers::Int64,which_strens::Union{Str
         end
     end
 
-    shift_nrg = if_gap ? nrgs["1"] : zeros(length(nrgs["1"]))
-    cols = ["b","r","k"]
-    fig = figure()
-    for i in 1:levels_count
-        scatter(intstrens,nrgs[string(i)] .- shift_nrg,c=cols[i],label="E$(i-1)")
+    if if_plot
+        shift_nrg = if_gap ? nrgs["1"] : zeros(length(nrgs["1"]))
+        cols = ["b","r","k"]
+        fig = figure()
+        for i in 1:levels_count
+            scatter(intstrens,nrgs[string(i)] .- shift_nrg,c=cols[i],label="E$(i-1)")
+        end
+        xlabel("Interaction Strength")
+        ylabel("Energy Difference")
+        legend()
+        if_gap && ylim([-0.1,0.7])
+
+        title("Energy Spectrum for "*L"\rho_{1D}=1.0"*" TTNs $(lx)x$ly lattice")
     end
-    xlabel("Interaction Strength")
-    ylabel("Energy Difference")
-    legend()
-    if_gap && ylim([-0.1,0.7])
 
-    title("Energy Spectrum for "*L"\rho_{1D}=1.0"*" TTNs $(lx)x$ly lattice")
-
+    return intstrens,nrgs
 end
 
 function plot_nrg_vs_intstren_fromdata_ed(lx::Int64,ly::Int64,which_strens::Union{String,Vector{Float64}}="all"; kwargs...)
     hanis = get(kwargs, :hopping_anisotropy, 1.0)
     if_gap = get(kwargs, :if_gap, true)
     levels_count = get(kwargs, :levels_count, 5)
+    if_plot = get(kwargs, :if_plot, true)
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     n = get(kwargs, :particles, lx)
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("hopping_anisotropy",hanis),("if_periodic_x",true),("if_periodic_y",true)])
@@ -107,27 +112,45 @@ function plot_nrg_vs_intstren_fromdata_ed(lx::Int64,ly::Int64,which_strens::Unio
         end
     end
 
-    shift_nrg = if_gap ? nrgs["1"] : zeros(length(nrgs["1"]))
-    cols = ["b","r","k","k","k"]
-    fig = figure()
-    for i in 1:levels_count
-        scatter(intstrens,nrgs[string(i)] .- shift_nrg,c=cols[i],label="E$(i-1)")
+    if if_plot
+        shift_nrg = if_gap ? nrgs["1"] : zeros(length(nrgs["1"]))
+        cols = ["b","r","k","k","k"]
+        fig = figure()
+        for i in 1:levels_count
+            scatter(intstrens,nrgs[string(i)] .- shift_nrg,c=cols[i],label="E$(i-1)")
+        end
+        xlabel("Interaction Strength")
+        ylabel("Energy Difference")
+        legend()
+        if_gap && ylim([-0.1,0.7])
+
+        title("Energy Spectrum for "*L"\rho_{1D}=1.0"*" ED $(lx)x$ly lattice")
     end
-    xlabel("Interaction Strength")
-    ylabel("Energy Difference")
-    legend()
-    if_gap && ylim([-0.1,0.7])
-
-    title("Energy Spectrum for "*L"\rho_{1D}=1.0"*" ED $(lx)x$ly lattice")
-
+    
+    return intstrens,nrgs
 end
 
 
 # look at finite size scaling of commensurate filling interaction strength spectrum
 if true
-    #plot_nrg_vs_intstren_fromdata_ttn(6; particles=8, if_gap=true)
-    plot_nrg_vs_intstren_fromdata_ed(4,8; particles=4, if_gap=false)
-    plot_nrg_vs_intstren_fromdata_ttn(5; particles=4, if_gap=false)
+    plot_nrg_vs_intstren_fromdata_ttn(6; particles=8, if_gap=true)
+    plot_nrg_vs_intstren_fromdata_ed(4,8; particles=4, if_gap=true)
+end
+
+# check the NRGs of synth-rectangle TTNs vs ED
+if false
+    ttn_intstrens,ttn_nrgs = plot_nrg_vs_intstren_fromdata_ttn(5; particles=4, if_plot=false)
+    ed_intstrens,ed_nrgs = plot_nrg_vs_intstren_fromdata_ed(4,8; particles=4, if_plot=false)
+    
+    for level in 1:length(keys(ttn_nrgs))
+        fig = figure()
+        plot(ed_intstrens,ed_nrgs[string(level)],c="r",label="ED")
+        scatter(ttn_intstrens,ttn_nrgs[string(level)],c="b",label="TTN")
+        xlabel("Interaction Strength")
+        ylabel("Energy Difference")
+        legend()
+        title("Energy Spectrum for "*L"\rho_{1D}=1.0"*" E$(level-1)")
+    end
 end
 
 

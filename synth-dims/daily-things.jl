@@ -154,7 +154,7 @@ if false
         end=#
     end
 
-    #plot_omega(tw1s,tw2s,omegas; if_perfect_grid=true)
+    plot_omega(tw1s,tw2s,omegas; if_perfect_grid=true)
     plot_gamma(tw1s,tw2s,lambda1s,1)
     plot_gamma(tw1s,tw2s,lambda2s,2)
     

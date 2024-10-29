@@ -603,7 +603,90 @@ function pretty_plot_twisting(points_count::Int,if_gap::Bool=true,if_diff::Bool=
 
 end
 
-#pretty_spectrum_closedopen("closed",3.0)
+# plotting the minimum amount the GSs go into the excited states as a function of interaction strength
+function plot_twistflatness_vs_intstren_ed(lx,ly,n; kwargs...)
+    intstrens = get(kwargs,:intstrens, range(0.0,2.0,length=11))
+    hanis = get(kwargs,:hanis,1.0)
+    if_plot = get(kwargs,:if_plot,true)
+    if_plot_flatness = get(kwargs,:if_plot_flatness,false)
+    plot_title = get(kwargs,:plot_title,"")
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    
+    flatnesses = zeros(Float64,length(intstrens))
+
+    for (idx,intstren) in enumerate(intstrens)
+        params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis)])
+        all_files = find_data_file(params_dict,"ed",dataloc; output_level=0)
+
+        tw1s = Float64[]
+        tw2s = Float64[]
+        nrgs = Dict([("1",Float64[]),("2",Float64[]),("3",Float64[])])
+        for f in all_files
+            d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+            append!(tw1s,m["twist_angle"][1])
+            append!(tw2s,m["twist_angle"][2])
+            for i in 1:3
+                append!(nrgs[string(i)],d["nrg"][i])
+            end
+        end
+
+        all_flatnesses = (nrgs["2"] .- nrgs["1"]) ./ (nrgs["3"] .- nrgs["1"])
+        flatnesses[idx] = maximum(all_flatnesses)
+
+        if if_plot_flatness
+            fig = figure()
+            scatter3D(tw1s,tw2s,all_flatnesses,c="b")
+            #scatter3D(tw1s,tw2s,nrgs["1"],c="b")
+            #scatter3D(tw1s,tw2s,nrgs["2"],c="g")
+            #scatter3D(tw1s,tw2s,nrgs["3"],c="r")
+            xlabel(L"\theta_x / 2\pi")
+            ylabel(L"\theta_y / 2\pi")
+            title("Flatness for $(lx)x$(ly) N=$n ULR=$intstren ")
+        end
+    end
+
+    if if_plot
+        fig = figure()
+        scatter(intstrens,flatnesses,c="b")
+        xlabel("Interaction Strength")
+        ylabel("Minimum Twist Flatness")
+        ylim(-0.02,1.05)
+        title("Flatness for $(lx)x$(ly) N=$n "*plot_title)
+    end
+
+    return intstrens,flatnesses
+end
+
+# plots the spectrum as a function of interaction strength for all available data at zero twist angle
+function plot_intstren_spectrum(lx::Int64,ly::Int64,n::Int64; kwargs...)
+    hanis = get(kwargs,:hanis,1.0)    
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
+
+    intstrens = []
+    nrgs = Dict()
+    for i in 1:20
+        nrgs[string(i)] = []
+    end
+    for f in all_files
+        filename_dict = get_params_dict_from_filename(f)
+        if haskey(filename_dict,"twist_angle1")
+            continue
+        end
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+        for i in 1:20
+            if i > length(d["nrg"])
+                append!(nrgs[string(i)],1000.0)
+            else
+                append!(nrgs[string(i)],d["nrg"][i])
+            end
+        end
+        append!(intstrens,filename_dict["interaction_strength"])
+    end
+    plot_fullspectrum(intstrens,nrgs,"Interaction Strength",true; plot_title=" $(lx)x$(ly) N=$(n)")
+
+end
 
 
 

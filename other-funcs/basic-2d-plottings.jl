@@ -89,6 +89,15 @@ function plot_spectrum(xxs::Vector,nrgs::Vector,idx::Int,nev::Int,xstring::Abstr
 end
 plot_spectrum(xxs::StepRangeLen,nrgs::Vector,idx::Int,nev::Int,xstring::AbstractString,if_diff::Bool; kwargs...) = plot_spectrum(collect(xxs),nrgs,idx,nev,xstring,if_diff; kwargs...)
 
+function plot_fullspectrum(xs::Vector,nrgs::Dict,xstring::AbstractString="x",if_diff::Bool=true; kwargs...)
+    fig = figure()
+    for (idx,x) in enumerate(xs)
+        local_nrgs = filter(x->x<1000.0,[nrgs[string(i)][idx] for i in 1:length(nrgs)])
+        plot_spectrum(xs,local_nrgs,idx,length(local_nrgs),xstring,if_diff; kwargs...)
+    end
+    return
+end
+
 function plot_gamma(theta_xs::Vector{Float64},theta_ys::Vector{Float64},gammas::Matrix{ComplexF64},which_gamma::Int; kwargs...)
     plot_title = get(kwargs,:plot_title,"")
 
