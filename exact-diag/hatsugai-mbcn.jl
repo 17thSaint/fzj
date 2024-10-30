@@ -24,12 +24,11 @@ function make_new_reference_multiplets(Lx::Int64,Ly::Int64,particles::Int64; kwa
     rez1 = run_normal_ed(params_dict1)
     rez2 = run_normal_ed(params_dict2)
 
-    return rez1[end],rez2[end]
+    return [rez1[1][1],rez1[1][2],rez2[1][1],rez2[1][2]],rez1[4],rez2[4]
 end
 
 function get_reference_multiplets(Lx::Int64,Ly::Int64,particles::Int64; kwargs...)
-    if_single_gs::Bool = get(kwargs,:if_single_gs,false)
-    if_single_gs && return get_reference_multiplets_single(Lx,Ly,particles; kwargs...)
+    if_make_new::Bool = get(kwargs,:if_make_new,true)
 
     dataloc::String = get(kwargs,:dataloc,get_folder_location("cluster-data/exact-diag/torus"))
     tw1::Float64 = get(kwargs,:tw1,0.33)
@@ -50,7 +49,12 @@ function get_reference_multiplets(Lx::Int64,Ly::Int64,particles::Int64; kwargs..
         reference_multiplets[1:2] = found_data1[1]["state"][1:2]
         reference_multiplets[3:4] = found_data2[1]["state"][1:2]
     else
-        error("Data does not exist for reference multiplets")
+        if if_make_new
+            println("Need to make new Hatsugai reference multiplets")
+            return make_new_reference_multiplets(Lx,Ly,particles; tw1=tw1,tw2=tw2,hopping_anisotropy=hanis,interaction_strength=intstren)
+        else
+            error("Reference multiplets not found and if_make_new is false")
+        end
     end
 
     return reference_multiplets,found_data1[2]["filename"],found_data2[2]["filename"]

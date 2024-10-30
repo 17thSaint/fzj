@@ -15,26 +15,44 @@ include("../other-funcs/basic-2d-plottings.jl")
 
 function datacollection_flatness(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
     hanis::Float64 = get(kwargs,:hopping_anisotropy,1.0)
+    if_hatsugai::Bool = get(kwargs,:if_hatsugai,true)
 
-    intstren_count::Int64 = get(kwargs,:intstren_count,11)
-    intstren_start::Float64 = get(kwargs,:intstren_start,0.0)
-    intstren_end::Float64 = get(kwargs,:intstren_end,2.0)
-    intstrens::Vector{Float64} = range(intstren_start,intstren_end,length=intstren_count)
+    intstrens = get(kwargs,:intstrens,nothing)
+    if isnothing(intstrens)
+        intstren_count::Int64 = get(kwargs,:intstren_count,11)
+        intstren_start::Float64 = get(kwargs,:intstren_start,0.0)
+        intstren_end::Float64 = get(kwargs,:intstren_end,2.0)
+        intstrens = range(intstren_start,intstren_end,length=intstren_count)
+    end
 
     tws_count::Int64 = get(kwargs,:tws_count,10)
     tws_start::Float64 = get(kwargs,:tws_start,0.0)
     tws_end::Float64 = get(kwargs,:tws_end,1.0)
     tws::Vector{Float64} = range(tws_start,tws_end,length=tws_count)
 
-    println("Starting Flatness Data Collection for $(Lx)x$(Ly) N=$(N) from Intstrengths $(intstren_start) - $(intstren_end) and Twists $(tws_start) - $(tws_end)")
+    println("Starting Flatness Data Collection for $(Lx)x$(Ly) N=$(N) from Intstrengths $(intstrens[1]) - $(intstrens[end]) and Twists $(tws_start) - $(tws_end)")
     sleep(1.0)
 
     nev = 10
     for (idx,intstren) in enumerate(intstrens)
+        if if_hatsugai
+            ref_multis,rm1,rm2 = get_reference_multiplets(Lx,Ly,N; interaction_strength=intstren,hopping_anisotropy=hanis,if_make_new=true)
+        end
         for (idx2,tw1) in enumerate(tws)
             for (idx3,tw2) in enumerate(tws)
                 params_dict = Dict([("output_level",1),("Lx",Lx),("Ly",Ly),("N",N),("tw1",tw1),("tw2",tw2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",nev),("if_find_data",true),("if_save_data",true)])
                 states,nrgs,rhos,filepath,if_found = run_normal_ed(params_dict; output_level=1)
+
+                if if_hatsugai
+                    if if_found
+                        d,m = read_data_jld2(filepath; output_level=0)
+                        if !haskey(m,"omega")
+                            lambda1,lambda2,omega = get_hatsugaifull(states[1],states[2],ref_multis; if_save=true,filepath=filepath,ref_multis_filenames=[rm1,rm2])
+                        end
+                    else
+                        lambda1,lambda2,omega = get_hatsugaifull(states[1],states[2],ref_multis; if_save=true,filepath=filepath,ref_multis_filenames=[rm1,rm2])
+                    end
+                end
             end
         end
     end
@@ -367,10 +385,42 @@ function get_closing_strength(intstrens,flatnesses::Vector{Float64})
 end
 
 # finite size scaling of flatness
-if true
-    xs,ys = plot_twistflatness_vs_intstren_ed(8,3,3)#; intstrens=[0.0,0.5,1.25])    
+if false
+    # ones we have (3,8,3),(4,8,4)
+    # ED ones we want (5,8,5)
+    # TTN ones we want (8,8,8)
+    xs,ys = plot_twistflatness_vs_intstren_ed(4,8,4; intstrens=[0.0,0.5,1.25])    
     closing_stren,which_y = get_closing_strength(xs,ys)
     scatter(closing_stren,1.0,c="r",label="Guess")
+end
+
+# hatsugai data collection for (8,3,3)
+if false
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    lx,ly,n = 8,3,3
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
+
+    for (idx,f) in enumerate(all_files)
+        filename_dict = get_params_dict_from_filename(f)
+        if haskey(filename_dict,"twist_angle1") && (filename_dict["twist_angle1"] == 0.33 || filename_dict["twist_angle2"] == 0.67 || filename_dict["twist_angle1"] == 0.67 || filename_dict["twist_angle2"] == 0.33)
+            continue
+        end
+        println(round(100*idx/length(all_files),digits=3),"% done")
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+        if !haskey(m,"omega")
+            println("Does not have Hatsugai data")
+            ref_multis,rm1,rm2 = get_reference_multiplets(lx,ly,n; interaction_strength=filename_dict["interaction_strength"],if_make_new=true)
+            lambda1,lambda2,omega = get_hatsugaifull(d["state"][1],d["state"][2],ref_multis; if_save=true,filepath=dataloc * "/" * f,ref_multis_filenames=[rm1,rm2])
+        end
+    end
+end
+
+# phase diagram using flatness ULR vs rho1D
+if false
+    # ones we want (8,4,4),(8,5,5)
+    configs = [(3,8,3),(8,3,3)]
+    plot_phasediag_ulrrho1d_flatness(configs)
 end
 
 

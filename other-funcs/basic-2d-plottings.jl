@@ -124,7 +124,7 @@ function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::
             omegas_phase[i,j] = angle(omegas[i,j]) + pi
         end
     end
-    omegas_phase[1,1] = 0.0
+    #omegas_phase[1,1] = 0.0
 
     plotting_omega = reverse(transpose(omegas_phase),dims=1)
     fig = figure()
