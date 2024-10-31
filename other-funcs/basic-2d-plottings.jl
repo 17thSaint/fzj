@@ -201,6 +201,34 @@ function count_chern_number(theta_xs::Vector{Float64},theta_ys::Vector{Float64},
     return sum(vortex_counting) / (2*pi)
 end
 
+# plotting the minimum amount the GSs go into the excited states as a function of interaction strength
+function plot_twistflatness_vs_intstren_ed(intstrens,flatnesses; kwargs...)
+    plot_title = get(kwargs,:plot_title,"")
+
+    fig = figure()
+    scatter(intstrens,flatnesses,c="b")
+    xlabel("Interaction Strength")
+    ylabel("Minimum Twist Flatness")
+    ylim(-0.02,1.05)
+    title("Flatness for $(lx)x$(ly) N=$n "*plot_title)
+
+end
+
+# plot spectrum under twisting
+function plot_twisting_spectrum(tw1s::Vector{Float64},tw2s::Vector{Float64},nrgs::Dict{String,Vector{Float64}}; kwargs...)
+    plot_title::String = get(kwargs,:plot_title,"")
+    if_gap::Bool = get(kwargs,:if_gap,true)
+
+    fig = figure()
+    scatter3D(tw1s,tw2s,nrgs["1"] .- nrgs["1"].*if_gap,c="b")
+    scatter3D(tw1s,tw2s,nrgs["2"].- nrgs["1"].*if_gap,c="g")
+    scatter3D(tw1s,tw2s,nrgs["3"].- nrgs["1"].*if_gap,c="r")
+    xlabel(L"\theta_x / 2\pi")
+    ylabel(L"\theta_y / 2\pi")
+    zlabel("Energy")
+    title("Spectrum "*plot_title)
+end
+
 
 
 

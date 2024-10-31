@@ -406,13 +406,8 @@ function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwarg
 	#t_strength_phys = t_strength * hopping_anisotropy
 	flux_direction = get(kwargs,:flux_direction,"phys")
 	
-	if hopping_anisotropy < 1.0
-		t_strength_synth = t_strength / hopping_anisotropy
-		t_strength_phys = t_strength
-	else
-		t_strength_phys = t_strength * hopping_anisotropy
-		t_strength_synth = t_strength
-	end
+
+	t_strength_phys,t_strength_synth = get_hopping_strengths(t_strength,hopping_anisotropy)
 	
 	if get(kwargs, :no_magF, false)
 		phi = 0.0

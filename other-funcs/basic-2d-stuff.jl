@@ -224,6 +224,18 @@ function long_range_scaling(x_final::Int64,virt_edge_length::Int64,initial_stren
 	return strengths
 end
 
+function get_hopping_strengths(t_strength::Float64,hopping_anisotropy::Float64)
+	if hopping_anisotropy < 1.0
+		t_strength_synth::Float64 = t_strength / hopping_anisotropy
+		t_strength_phys::Float64 = t_strength
+	else
+		t_strength_phys = t_strength * hopping_anisotropy
+		t_strength_synth = t_strength
+	end
+
+	return t_strength_phys,t_strength_synth
+end
+
 
 
 

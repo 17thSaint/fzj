@@ -302,6 +302,10 @@ function hamiltonian(t_strength::Float64, phi::Float64, U1::Float64, U2::Float64
 	#current_strength = get(kwargs, :current_strength, 0.0)
 	twist_angle = kwargs[:twist_angle]
 	remapping = kwargs[:remapping]
+
+	t_phys,t_synth = get_hopping_strengths(t_strength,kwargs[:hopping_anisotropy])
+	U1_actual = 4*(t_phys^2)/U1
+	U2_actual = 2*(t_phys^2)/U2
 	
 	ampo = OpSum()
 	for j in 1:L
@@ -338,7 +342,7 @@ function hamiltonian(t_strength::Float64, phi::Float64, U1::Float64, U2::Float64
 			end
 			for s in nflavors
 				for k in nflavors
-					ampo += (-U1/2, "Ns$(s)", j, "Ns$(k)", next_site)
+					ampo += (-U1_actual, "Ns$(s)", j, "Ns$(k)", next_site)
 				end
 			end
 		end
@@ -348,8 +352,8 @@ function hamiltonian(t_strength::Float64, phi::Float64, U1::Float64, U2::Float64
 		for j in 1:L-2
 			for s in nflavors
 				for k in nflavors
-					ampo += (-U2, "Cr$(k)", j, "Ns$(s)", j+1, "Anh$(k)", j+2)
-					ampo += (-U2, "Anh$(k)", j, "Ns$(s)", j+1, "Cr$(k)", j+2)
+					ampo += (-U2_actual, "Cr$(k)", j, "Ns$(s)", j+1, "Anh$(k)", j+2)
+					ampo += (-U2_actual, "Anh$(k)", j, "Ns$(s)", j+1, "Cr$(k)", j+2)
 				end
 			end
 		end

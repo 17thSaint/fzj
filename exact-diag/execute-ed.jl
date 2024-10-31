@@ -285,9 +285,9 @@ end
 # run data collection with for loops
 if false
     
-    lx,ly,n = 2,4,2
+    lx,ly,n = 8,3,3
     #for (idx,n) in enumerate([2,3,4,5])
-    intstrens = range(0.0,2.0,length=10)
+    intstrens = range(100.0,1000.0,length=10)
     #other_intstrens = range(2.0,10.0,length=37)
     #intstrens = sort([intstrens; other_intstrens])
     #all_nrgs = zeros(Float64,length(thetas))

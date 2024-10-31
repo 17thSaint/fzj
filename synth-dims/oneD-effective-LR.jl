@@ -20,8 +20,7 @@ end
 
 function make_1deff_filenamedict(model_paras)
 	fdict = Dict([("Lphys",model_paras[:L]),("Lsynth",model_paras[:nflavors]),("nbosons",model_paras[:nbosons]),("alpha",model_paras[:alpha]),("hopping_anisotropy",model_paras[:hopping_anisotropy]),("if_periodic_phys",model_paras[:if_periodic_phys]),("if_periodic_synth",model_paras[:if_periodic_synth])])
-	model_paras[:if_2ord_pert] ? fdict["U2"] = model_paras[:U2] : nothing
-	model_paras[:if_nn_int] ? fdict["U1"] = model_paras[:U1] : nothing
+	model_paras[:U1] != 0.0 ? fdict["interaction_strength"] = model_paras[:U1] : nothing
 	model_paras[:twist_angle] != [0.0,0.0] ? fdict["tw1"] = model_paras[:twist_angle][1] : nothing
 	model_paras[:twist_angle] != [0.0,0.0] ? fdict["tw2"] = model_paras[:twist_angle][2] : nothing
 	return fdict
@@ -63,10 +62,11 @@ function get_1deff_model_params(params_dict::Dict)
 	hopping_amplitude = get(params_dict, "ts", 1.0)
 	anis = get(params_dict, "hopping_anisotropy", 1.0)
 
-	if_2ord_pert = get(params_dict, "if_2ord_pert", false)
-	if_NN = get(params_dict, "if_nn_int", false)
-	if_NN ? U1 = get(params_dict, "U1", 1.0) : U1 = 0.0
-	if_2ord_pert ? U2 = get(params_dict, "U2", 1.0) : U2 = 0.0
+	interaction_strength::Float64 = get(params_dict, "interaction_strength", 0.0)
+	if_2ord_pert::Bool = interaction_strength != 0.0
+	if_NN::Bool = interaction_strength != 0.0
+	U1::Float64 = interaction_strength
+	U2::Float64 = interaction_strength
 
 	mag_off = get(params_dict, "mag_off", false)
 	centralflux_strength = get(params_dict, "centralflux_strength", 0.0)
@@ -241,9 +241,6 @@ function run_normal_1deffmps(params_dict::Dict; kwargs...)
 
 	return psis,rhos,nrgs,model_paras,!isnothing(found_data)
 end
-
-
-
 
 if false
 	cd("../cluster-data/synth-dims/excited-states")

@@ -338,6 +338,52 @@ function bulk_density(psi::Vector{ComplexF64},lattice_params::Dict,bulk_width_ph
 	return bulk_density
 end
 
+# measures the flatness parameter which is max E2 - E1 / E3 - E1
+function twist_flatness_ed(lx::Int,ly::Int,n::Int; kwargs...)
+    hanis = get(kwargs,:hanis,1.0)
+    if_plot = get(kwargs,:if_plot,true)
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    max_intstren::Float64 = get(kwargs,:max_intstren,2.0)
+    
+    all_flatnesses = Dict()
+    tw1s = Dict()
+    tw2s = Dict()
+    intstrens = Float64[]
+
+    params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis)])
+    all_files = find_data_file(params_dict,"ed",dataloc; output_level=0)
+    for f in all_files
+
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+
+        intstren = m["U"][end]
+        if intstren > max_intstren
+            continue
+        end
+        if !haskey(all_flatnesses,string(intstren))
+            all_flatnesses[string(intstren)] = []
+            tw1s[string(intstren)] = []
+            tw2s[string(intstren)] = []
+        end
+
+        append!(tw1s[string(intstren)],m["twist_angle"][1])
+        append!(tw2s[string(intstren)],m["twist_angle"][2])
+
+        flatness = (d["nrg"][2] - d["nrg"][1]) / (d["nrg"][3] - d["nrg"][1])
+        append!(all_flatnesses[string(intstren)],[flatness])
+    end
+
+    flatnesses = Float64[]
+    for (k,v) in all_flatnesses
+        append!(flatnesses,[maximum(v)])
+        append!(intstrens,parse(Float64,k))
+    end
+
+    if_plot ? plot_twistflatness_vs_intstren_ed(intstrens,flatnesses; kwargs...) : nothing
+
+    return intstrens,flatnesses
+end
+
 
 # functions for two- and four-point correlators
 # needs testing

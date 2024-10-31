@@ -56,8 +56,6 @@ function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
     end
 end
 
-datacollection_flatness_1deff(8,4,4)
-
 # look at finite size scaling of commensurate filling interaction strength spectrum
 if false
     dataloc = get_folder_location("cluster-data/synth-dims/excited-states")

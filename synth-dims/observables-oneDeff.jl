@@ -194,6 +194,48 @@ function hopping_correlation(densmat::Matrix{ComplexF64}, hopping_direction::Str
     error("Not implemented yet")
 end
 
+# measures the flatness parameter which is max E2 - E1 / E3 - E1
+function twist_flatness_1deff(lx::Int,ly::Int,n::Int; kwargs...)
+    hanis = get(kwargs,:hanis,1.0)
+	if_plot_spectrum::Bool = get(kwargs,:if_plot_spectrum,false)
+    dataloc = get_folder_location("cluster-data/synth-dims/twists")
+    
+    all_flatnesses = []
+
+    params_dict = Dict([("Lphys",lx),("Lsynth",ly),("nbosons",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",hanis)])
+    all_files = find_data_file(params_dict,"mps",dataloc; output_level=0)
+
+	tw1s = Float64[]
+	tw2s = Float64[]
+	all_nrgs = Dict([("1",Float64[]),("2",Float64[]),("3",Float64[])])
+
+    for f in all_files
+
+		filename_dict = get_params_dict_from_filename(f)
+		if haskey(filename_dict,"tw1") && (filename_dict["tw1"] == 0.67 || filename_dict["tw1"] == 0.33 || filename_dict["tw2"] == 0.67 || filename_dict["tw2"] == 0.33)
+			continue
+		end
+
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+
+		if haskey(m,"observer") && haskey(m,"observer_1") && haskey(m,"observer_2")
+			flatness = (m["observer_1"].energies[end] - m["observer"].energies[end]) / (m["observer_2"].energies[end] - m["observer"].energies[end])
+			append!(all_flatnesses,[flatness])
+			append!(tw1s,[filename_dict["tw1"]])
+			append!(tw2s,[filename_dict["tw2"]])
+			append!(all_nrgs["1"],m["observer"].energies[end])
+			append!(all_nrgs["2"],m["observer_1"].energies[end])
+			append!(all_nrgs["3"],m["observer_2"].energies[end])
+		else
+			println("File $f doesn't have all states")
+			display(keys(m))
+		end
+    end
+
+	if_plot_spectrum ? plot_twisting_spectrum(tw1s,tw2s,all_nrgs; kwargs...) : nothing
+
+    return maximum(all_flatnesses)
+end
     
 
 
