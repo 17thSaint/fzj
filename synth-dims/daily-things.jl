@@ -16,6 +16,47 @@ include("../other-funcs/include-other-files.jl")
 include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","review-practice-codes/plottings.jl","synth-dims/hatsugai-mbcn.jl","other-funcs/basic-2d-plottings.jl"])
 include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
 
+function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
+    hanis::Float64 = get(kwargs,:hopping_anisotropy,1.0)
+    if_hatsugai::Bool = get(kwargs,:if_hatsugai,true)
+
+    tws_count::Int64 = get(kwargs,:tws_count,10)
+    tws_start::Float64 = get(kwargs,:tws_start,0.0)
+    tws_end::Float64 = get(kwargs,:tws_end,1.0)
+    tws::Vector{Float64} = range(tws_start,tws_end,length=tws_count)
+
+    println("Starting Flatness Data Collection for 1D effective $(Lx)x$(Ly) N=$(N) from Twists $(tws_start) - $(tws_end)")
+    sleep(1.0)
+
+    if if_hatsugai
+        ref_multis,rm1,rm2 = get_reference_multiplets(Lx,Ly,N; hopping_anisotropy=hanis,if_make_new=true)
+    end
+    for (idx2,tw1) in enumerate(tws)
+        for (idx3,tw2) in enumerate(tws)
+
+            params_dict = Dict([("Lphys",Lx),("Lsynth",Ly),("particles",N),("tw2",tw2),("tw1",tw1),("if_remapping",false),("es_count",2),("nrgtol",1e-6),("mdim",300),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",true),("if_save_data",true)])
+            psis,rhos,nrgs,model_paras,if_found = run_normal_1deffmps(params_dict)
+            filepath = model_paras[:location]*"/"*model_paras[:name]*".jld2"
+
+            if isnothing(psis[1])
+                continue
+            end
+
+            if if_hatsugai
+                if if_found
+                    d,m = read_data_jld2(filepath; output_level=0)
+                    if !haskey(m,"omega")
+                        lambda1,lambda2,omega = get_hatsugaifull(psis[1],psis[2],ref_multis; if_save=true,filepath=filepath,ref_multis_filenames=[rm1,rm2])
+                    end
+                else
+                    lambda1,lambda2,omega = get_hatsugaifull(psis[1],psis[2],ref_multis; if_save=true,filepath=filepath,ref_multis_filenames=[rm1,rm2])
+                end
+            end
+        end
+    end
+end
+
+datacollection_flatness_1deff(8,4,4)
 
 # look at finite size scaling of commensurate filling interaction strength spectrum
 if false

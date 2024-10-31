@@ -15,25 +15,24 @@ function make_new_reference_multiplets(Lx::Int64,Ly::Int64,particles::Int64; kwa
     tw1::Float64 = get(kwargs,:tw1,0.33)
     tw2::Float64 = get(kwargs,:tw2,0.67)
     hanis::Float64 = get(kwargs,:hopping_anisotropy,1.0)
-    intstren::Float64 = get(kwargs,:interaction_strength,0.0)
 
-    params_dict1 = Dict([("es_count",1),("L",Lx),("nflavors",Ly),("nbosons",particles),("tw1",tw1),("tw2",tw2),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",hanis),("filling",0.5),("nev",4),("if_find_data",true),("if_save_data",true)])
-    params_dict2 = Dict([("es_count",1),("L",Lx),("nflavors",Ly),("nbosons",particles),("tw1",tw2),("tw2",tw1),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",hanis),("filling",0.5),("nev",4),("if_find_data",true),("if_save_data",true)])
+    println("Making new reference multiplets for $(Lx)x$(Ly) N=$(particles) with Twists $(tw1) and $(tw2)")
+    params_dict1 = Dict([("es_count",1),("Lphys",Lx),("Lsynth",Ly),("nbosons",particles),("tw1",tw1),("tw2",tw2),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",hanis),("filling",0.5),("nev",4),("if_find_data",true),("if_save_data",true),("output_level",0)])
+    params_dict2 = Dict([("es_count",1),("Lphys",Lx),("Lsynth",Ly),("nbosons",particles),("tw1",tw2),("tw2",tw1),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",hanis),("filling",0.5),("nev",4),("if_find_data",true),("if_save_data",true),("output_level",0)])
 
     # make this for mps
     rez1 = run_normal_1deffmps(params_dict1)
     rez2 = run_normal_1deffmps(params_dict2)
 
-    return rez1[end],rez2[end]
+    return [rez1[1][1],rez1[1][2],rez2[1][1],rez2[1][2]],rez1[4][:name],rez2[4][:name]
 end
 
 function get_reference_multiplets(Lx::Int64,Ly::Int64,particles::Int64; kwargs...)
+    if_make_new::Bool = get(kwargs,:if_make_new,false)
     dataloc::String = get(kwargs,:dataloc,get_folder_location("cluster-data/synth-dims/twists"))
     tw1::Float64 = get(kwargs,:tw1,0.33)
     tw2::Float64 = get(kwargs,:tw2,0.67)
     hanis::Float64 = get(kwargs,:hopping_anisotropy,1.0)
-    intstren::Float64 = get(kwargs,:interaction_strength,0.0)
-
 
     reference_multiplets = Vector{MPS}(undef,4)
 
@@ -51,6 +50,8 @@ function get_reference_multiplets(Lx::Int64,Ly::Int64,particles::Int64; kwargs..
         found_data2::Dict{String,Any} = read_data_jld2("wavefunc"*metadata2[2]["name"],dataloc; output_level=0)
         reference_multiplets[3] = found_data2["mps"]
         reference_multiplets[4] = found_data2["mps_1"]
+    elseif if_make_new
+        return make_new_reference_multiplets(Lx,Ly,particles; tw1=tw1,tw2=tw2,hopping_anisotropy=hanis)
     else
         error("Data does not exist for reference multiplets")
     end

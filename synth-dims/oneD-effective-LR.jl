@@ -40,7 +40,6 @@ function get_1deff_model_params(params_dict::Dict)
 	es_count = get(params_dict, "es_count", 0)
 	output_level = get(params_dict, "output_level", 1)
 
-
 	# Lattice/TTN Parameters
 	Lphys = get(params_dict, "Lphys", 4)
 	Lsynth = get(params_dict, "Lsynth", 4)
@@ -158,8 +157,16 @@ function get_1deff_model_params(params_dict::Dict)
 	filename = join(["mps",make_parameters_filename(make_1deff_filenamedict(dict_to_symbols(model_paras_dict)))],"-")
 	filename = check_plot_label(filename,"mps")
 	model_paras_dict["name"] = filename
+
 	if_find_data = get(params_dict, "if_find_data", true)
 	if_exists, found_data = if_find_data ? check_data_exists(get_params_dict_from_filename(filename),"mps"; location=model_paras_dict["location"],output_level=false) : (false,nothing)
+	if_wavefunc_exists, found_wavefunc_data = if_find_data && if_exists ? check_data_exists(get_params_dict_from_filename(filename),"wavefuncmps"; location=model_paras_dict["location"],output_level=false) : (false,nothing)
+	if if_wavefunc_exists
+		for (k,v) in found_wavefunc_data
+			found_data[1][k] = v
+		end
+	end
+
 	return dict_to_symbols(model_paras_dict),found_data
 end
 
@@ -220,15 +227,15 @@ function run_normal_1deffmps(params_dict::Dict; kwargs...)
 		else
 			psis = Vector{Nothing}(undef,found_data[2]["es_count"]+1)
 		end
-		rhos = Vector{Array}(undef,found_data[2]["es_count"]+1)
-		nrgs = Vector{Float64}(undef,found_data[2]["es_count"]+1)
+		rhos = Vector{Any}(undef,found_data[2]["es_count"]+1)
+		nrgs = Vector{Any}(undef,found_data[2]["es_count"]+1)
 		psis[1] = "mps" in keys(found_data[1]) ? found_data[1]["mps"] : nothing
-		rhos[1] = found_data[1]["densmat"]
+		rhos[1] = "densmat" in keys(found_data[1]) ? found_data[1]["densmat"] : nothing
 		nrgs[1] = found_data[2]["observer"].energies[end]
 		for i in 1:found_data[2]["es_count"]
-			psis[i+1] = "mps_$i" in keys(found_data[1]) ? found_data[1]["mps_$(i)"] : nothing
-			rhos[i+1] = found_data[1]["densmat_$(i)"]
-			nrgs[i+1] = found_data[2]["observer_$(i)"].energies[end]
+			"mps_$i" in keys(found_data[1]) ? psis[i+1] = found_data[1]["mps_$(i)"] : nothing
+			"densmat_$i" in keys(found_data[1]) ? rhos[i+1] = found_data[1]["densmat_$(i)"] : nothing
+			"observer_$i" in keys(found_data[2]) ? nrgs[i+1] = found_data[2]["observer_$(i)"].energies[end] : nothing
 		end
 	end
 

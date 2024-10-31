@@ -341,44 +341,41 @@ end
 
 # plotting the minimum amount the GSs go into the excited states as a function of interaction strength
 function plot_twistflatness_vs_intstren_ed(lx,ly,n; kwargs...)
-    intstrens = get(kwargs,:intstrens, range(0.0,2.0,length=11))
     hanis = get(kwargs,:hanis,1.0)
     if_plot = get(kwargs,:if_plot,true)
     if_plot_flatness = get(kwargs,:if_plot_flatness,false)
     plot_title = get(kwargs,:plot_title,"")
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     
-    flatnesses = zeros(Float64,length(intstrens))
+    all_flatnesses = Dict()
+    tw1s = Dict()
+    tw2s = Dict()
+    intstrens = Float64[]
 
-    for (idx,intstren) in enumerate(intstrens)
-        params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis)])
-        all_files = find_data_file(params_dict,"ed",dataloc; output_level=0)
+    params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis)])
+    all_files = find_data_file(params_dict,"ed",dataloc; output_level=0)
+    for f in all_files
 
-        tw1s = Float64[]
-        tw2s = Float64[]
-        nrgs = Dict([("1",Float64[]),("2",Float64[]),("3",Float64[])])
-        for f in all_files
-            d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
-            append!(tw1s,m["twist_angle"][1])
-            append!(tw2s,m["twist_angle"][2])
-            for i in 1:3
-                append!(nrgs[string(i)],d["nrg"][i])
-            end
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+
+        intstren = m["U"][end]
+        if !haskey(all_flatnesses,string(intstren))
+            all_flatnesses[string(intstren)] = []
+            tw1s[string(intstren)] = []
+            tw2s[string(intstren)] = []
         end
 
-        all_flatnesses = (nrgs["2"] .- nrgs["1"]) ./ (nrgs["3"] .- nrgs["1"])
-        flatnesses[idx] = maximum(all_flatnesses)
+        append!(tw1s[string(intstren)],m["twist_angle"][1])
+        append!(tw2s[string(intstren)],m["twist_angle"][2])
 
-        if if_plot_flatness
-            fig = figure()
-            scatter3D(tw1s,tw2s,all_flatnesses,c="b")
-            #scatter3D(tw1s,tw2s,nrgs["1"],c="b")
-            #scatter3D(tw1s,tw2s,nrgs["2"],c="g")
-            #scatter3D(tw1s,tw2s,nrgs["3"],c="r")
-            xlabel(L"\theta_x / 2\pi")
-            ylabel(L"\theta_y / 2\pi")
-            title("Flatness for $(lx)x$(ly) N=$n ULR=$intstren ")
-        end
+        flatness = (d["nrg"][2] - d["nrg"][1]) / (d["nrg"][3] - d["nrg"][1])
+        append!(all_flatnesses[string(intstren)],[flatness])
+    end
+
+    flatnesses = Float64[]
+    for (k,v) in all_flatnesses
+        append!(flatnesses,[maximum(v)])
+        append!(intstrens,parse(Float64,k))
     end
 
     if if_plot
@@ -425,18 +422,14 @@ function plot_intstren_spectrum(lx::Int64,ly::Int64,n::Int64; kwargs...)
 end
 
 # plot phase diagram ULR vs rho1D using flatness
-function plot_phasediag_ulrrho1d_flatness(configs=[(3,8,3),(8,3,3),(6,8,3)]; kwargs...)
+function plot_phasediag_ulrrho1d_flatness(configs=[(3,8,3),(8,3,3),(4,6,3),(8,4,4)]; kwargs...)
 
     ulrs::Vector{Float64} = Float64[]
     flatnesses::Vector{Float64} = Float64[]
     oneDrhos::Vector{Float64} = Float64[]
 
     for (lx,ly,n) in configs
-        if (lx,ly,n) == (6,8,3)
-            local_strens,local_flats = plot_twistflatness_vs_intstren_ed(lx,ly,n; if_plot=false,intstrens=[0.0,0.5,1.0,1.5,2.0])
-        else
-            local_strens,local_flats = plot_twistflatness_vs_intstren_ed(lx,ly,n; if_plot=false)
-        end
+        local_strens,local_flats = plot_twistflatness_vs_intstren_ed(lx,ly,n; if_plot=false)
         append!(ulrs,local_strens)
         append!(flatnesses,local_flats)
         append!(oneDrhos,ones(Float64,length(local_strens)) .* (n / lx))
@@ -454,7 +447,7 @@ function plot_phasediag_ulrrho1d_flatness(configs=[(3,8,3),(8,3,3),(6,8,3)]; kwa
     xlabel(L"\rho_{1D}")
     ylabel("ULR")
     title("Flatness Phase Diagram")
-
+    ylim([-0.05,2.05])
 end
 
 function plot_hatsugai_fromsaveddata(lx::Int64,ly::Int64,N::Int64; kwargs...)
