@@ -156,19 +156,19 @@ end
 
 # build phase diagram for ULR vs rho1D at finite and infinite ULR
 if false
-    configs = [(8,3,3),(4,6,3),(8,4,4),(3,8,3)]
+    configs = [(8,3,3),(4,6,3),(8,4,4),(3,8,3),(8,5,5)]
 
     ulrs::Vector{Float64} = Float64[]
     flatnesses::Vector{Float64} = Float64[]
     oneDrhos::Vector{Float64} = Float64[]
 
-    infinite_flatnesses::Vector{Float64} = zeros(Float64,length(configs)-1)
+    #=infinite_flatnesses::Vector{Float64} = zeros(Float64,length(configs)-1)
     for (idx,config) in enumerate(configs)
         lx,ly,n = config
         append!(flatnesses,[twist_flatness_1deff(lx,ly,n)])
         append!(ulrs,[4.0])
         append!(oneDrhos,[n/lx])
-    end
+    end=#
 
     for (lx,ly,n) in configs
         local_strens,local_flats = twist_flatness_ed(lx,ly,n; if_plot=false)
@@ -191,6 +191,7 @@ if false
     title("Flatness Phase Diagram")
     ylim([-0.1,4.1])
 
+    plot_phasediag_ulrrho1d_flatness(oneDrhos,ulrs,normalized_bv,500.0)
 
 end
 
@@ -224,35 +225,35 @@ if false
 end
 
 # checking ED vs full infinite limit 1Deff
-if true
-    lx,ly,n = 3,8,3
+if false
+    lx,ly,n = 4,6,3
 
     cols = get_colors(3)
-    intstrens = range(100.0,10000.0,length=41)
+    intstrens = range(100.0,10000.0,length=21)
 
-    pdict_mps = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("if_remapping",false),("es_count",2),("nrgtol",1e-6),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
+    pdict_mps = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("if_remapping",false),("if_check_fluxes",true),("flux_direction","phys"),("es_count",2),("nrgtol",1e-6),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
     psis_mps,rhos_mps,nrgs_mps,mparas_mps,if_found_mps = run_normal_1deffmps(pdict_mps)
     for i in 1:3
-        scatter(intstrens[end],nrgs_mps[i],c=cols[i])
+        plot([1/intstrens[end],1/intstrens[1]],[nrgs_mps[i],nrgs_mps[i]],c=cols[i])
     end
 
-    for (idx,intstren) in enumerate(intstrens)
+    #=for (idx,intstren) in enumerate(intstrens)
         pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
         psi_ed,nrgs_ed,rhos_ed,filepath_ed,if_exists_ed,latparas,hamparas = run_normal_ed(pdict_ed)
 
         for i in 1:3
             if idx == 1
-                scatter(intstren,nrgs_ed[i],c=cols[i],label="E$i")
+                scatter(1/intstren,nrgs_ed[i],c=cols[i],label="E$i")
                 legend()
             else
-                scatter(intstren,nrgs_ed[i],c=cols[i])
+                scatter(1/intstren,nrgs_ed[i],c=cols[i])
             end
         end
         xscale("log")
     end
-    xlabel("Interaction Strength")
+    xlabel("1 / Interaction Strength")
     ylabel("Energy")
-    title("Energy $(lx)x$(ly) N=$n")
+    title("Energy $(lx)x$(ly) N=$n")=#
 end
 
 

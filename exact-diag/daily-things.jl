@@ -418,9 +418,10 @@ end
 
 # phase diagram using flatness ULR vs rho1D
 if false
-    # ones we want (8,4,4),(8,5,5)
-    configs = [(3,8,3),(8,3,3)]
-    plot_phasediag_ulrrho1d_flatness(configs)
+    # ones we want (8,5,5)
+    configs = [(3,8,3),(8,3,3),(4,6,3),(8,4,4),(8,5,5)]
+    #rez = make_phasediag_ulrrho1d_flatness(configs; max_intstren=500.0, if_plot=false)
+    plot_phasediag_ulrrho1d_flatness(rez...)
 end
 
 

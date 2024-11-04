@@ -90,7 +90,6 @@ function get_1deff_model_params(params_dict::Dict)
 	if_check_fluxes = get(params_dict, "if_check_fluxes", true)
 	if_check_fluxes ? flux_dir = check_fluxes(alpha,Lphys,Lsynth,if_periodic_phys,if_periodic_synth,flux_dir; output_level=output_level,if_ed=false) : nothing
 
-
 	# What to calculate
 	if_densmat = get(params_dict, :if_densmat, true)
 	save_data = get(params_dict, "if_save_data", true)
@@ -140,7 +139,7 @@ function get_1deff_model_params(params_dict::Dict)
 						"U1"=>U1,
 						"U2"=>U2,
 						"alpha"=>alpha,
-						"flux_direction"=>flux_direction,
+						"flux_direction"=>flux_dir,
 						"no_magF"=>mag_off,
 						"if_gpu"=>if_gpu,
 						"if_save_data"=>save_data,
@@ -279,23 +278,32 @@ if false
 		BLAS.set_num_threads(open_cores)
 		display(BLAS.get_config())
 	end
+
+	nev = 3
 	
-	lx,ly,n = 6,6,6
+	lx,ly,n = 8,3,3
 	#ref_multiplets,rm1_name,rm2_name = get_reference_multiplets(lx,ly,n)
-	#tws = range(0.0,stop=1.0,length=10)
+	tws = range(0.0,stop=1.0,length=10)
 	#g1s = zeros(ComplexF64,length(tws),length(tws))
 	#g2s = zeros(ComplexF64,length(tws),length(tws))
 	#oms = zeros(ComplexF64,length(tws),length(tws))
-	#for (idx,tw1) in enumerate(tws)
-	#for (idx2,tw2) in enumerate(tws)
-	tw2 = 0.0
-	tw1 = 0.0
+	for (idx,tw1) in enumerate(tws)
+	for (idx2,tw2) in enumerate(tws)
+	#tw2 = 0.0
+	#tw1 = 0.0
 		
-		params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("tw1",tw1),("tw2",tw2),("if_remapping",false),("es_count",nev-1),("nrgtol",1e-6),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
-		psis,rhos,nrgs,model_paras = run_normal_1deffmps(params_dict)
+		params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("flux_direction","synth"),("if_check_fluxes",false),("tw1",tw1),("tw2",tw2),("if_remapping",false),("es_count",nev-1),("nrgtol",1e-6),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
+		psis,rhos,nrgs,model_paras,if_found = run_normal_1deffmps(params_dict)
 
-		get_occupancy(psis[1]; plot_title=" E1 Lx = $lx, Ly = $ly, n = $n", remapping=model_paras[:remapping])
-		get_occupancy(psis[2]; plot_title=" E2 Lx = $lx, Ly = $ly, n = $n", remapping=model_paras[:remapping])
+		scatter3D(tw1,tw2,nrgs[1],c="g")
+		scatter3D(tw1,tw2,nrgs[2],c="b")
+		scatter3D(tw1,tw2,nrgs[3],c="r")
+		xlabel(L"\theta_x \ 2\pi")
+		ylabel(L"\thetay \ 2\pi")
+		title("Spectrum Lx = $lx, Ly = $ly, n = $n")
+
+		#get_occupancy(psis[1]; plot_title=" E1 Lx = $lx, Ly = $ly, n = $n", remapping=model_paras[:remapping])
+		#get_occupancy(psis[2]; plot_title=" E2 Lx = $lx, Ly = $ly, n = $n", remapping=model_paras[:remapping])
 
 		#plot_spectrum(tws,nrgs,idx,nev,"Theta_x / 2pi",false; plot_title=" Lx = $lx, Ly = $ly, n = $n, tw2 = $tw2")
 
@@ -305,8 +313,8 @@ if false
 		oms[idx,idx2] = om=#
 
 
-	#end
-	#end
+	end
+	end
 
 	#plot_omega(tws,tws,oms; plot_title=" Lx = $lx, Ly = $ly, n = $n",if_mag=true)
 	#plot_gamma(tws,tws,g1s,1; plot_title=" Lx = $lx, Ly = $ly, n = $n")

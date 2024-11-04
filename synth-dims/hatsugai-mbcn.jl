@@ -17,8 +17,8 @@ function make_new_reference_multiplets(Lx::Int64,Ly::Int64,particles::Int64; kwa
     hanis::Float64 = get(kwargs,:hopping_anisotropy,1.0)
 
     println("Making new reference multiplets for $(Lx)x$(Ly) N=$(particles) with Twists $(tw1) and $(tw2)")
-    params_dict1 = Dict([("es_count",1),("Lphys",Lx),("Lsynth",Ly),("particles",particles),("tw1",tw1),("tw2",tw2),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",hanis),("filling",0.5),("nev",4),("if_find_data",true),("if_save_data",true),("output_level",0)])
-    params_dict2 = Dict([("es_count",1),("Lphys",Lx),("Lsynth",Ly),("particles",particles),("tw1",tw2),("tw2",tw1),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",hanis),("filling",0.5),("nev",4),("if_find_data",true),("if_save_data",true),("output_level",0)])
+    params_dict1 = Dict([("es_count",1),("if_remapping",false),("Lphys",Lx),("Lsynth",Ly),("particles",particles),("tw1",tw1),("tw2",tw2),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",hanis),("filling",0.5),("nev",4),("if_find_data",true),("if_save_data",true),("output_level",0)])
+    params_dict2 = Dict([("es_count",1),("if_remapping",false),("Lphys",Lx),("Lsynth",Ly),("particles",particles),("tw1",tw2),("tw2",tw1),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",hanis),("filling",0.5),("nev",4),("if_find_data",true),("if_save_data",true),("output_level",0)])
 
     # make this for mps
     rez1 = run_normal_1deffmps(params_dict1)

@@ -371,14 +371,16 @@ function plot_intstren_spectrum(lx::Int64,ly::Int64,n::Int64; kwargs...)
 end
 
 # plot phase diagram ULR vs rho1D using flatness
-function plot_phasediag_ulrrho1d_flatness(configs=[(3,8,3),(8,3,3),(4,6,3),(8,4,4)]; kwargs...)
+function make_phasediag_ulrrho1d_flatness(configs=[(3,8,3),(8,3,3),(4,6,3),(8,4,4)]; kwargs...)
+    max_intstren::Float64 = get(kwargs,:max_intstren,2.0)
+    if_plot::Bool = get(kwargs,:if_plot,true)
 
     ulrs::Vector{Float64} = Float64[]
     flatnesses::Vector{Float64} = Float64[]
     oneDrhos::Vector{Float64} = Float64[]
 
     for (lx,ly,n) in configs
-        local_strens,local_flats = twist_flatness(lx,ly,n; if_plot=false)
+        local_strens,local_flats = twist_flatness_ed(lx,ly,n; if_plot=false, max_intstren=max_intstren)
         append!(ulrs,local_strens)
         append!(flatnesses,local_flats)
         append!(oneDrhos,ones(Float64,length(local_strens)) .* (n / lx))
@@ -390,15 +392,52 @@ function plot_phasediag_ulrrho1d_flatness(configs=[(3,8,3),(8,3,3),(4,6,3),(8,4,
     min_nrgs2, max_nrgs2 = 0.0,1.0
     normalized_bv = [(val - minimum(bv)) / (maximum(bv) - minimum(bv)) * (max_nrgs2 - min_nrgs2) + min_nrgs2 for val in bv]
 
-    fig = figure()
+    #=fig = figure()
     scatter(oneDrhos, ulrs, c=normalized_bv, cmap="viridis")
     colorbar()
     xlabel(L"\rho_{1D}")
     ylabel("ULR")
     title("Flatness Phase Diagram")
-    ylim([-0.05,2.05])
+    ylim([-0.05,max_intstren + 0.05])=#
 
-    return normalized_bv
+    if_plot ? plot_phasediag_ulrrho1d_flatness(oneDrhos,ulrs,normalized_bv,max_intstren) : nothing
+
+    return oneDrhos,ulrs,normalized_bv,max_intstren
+end
+
+function plot_phasediag_ulrrho1d_flatness(rho1Ds::Vector{Float64},ulrs::Vector{Float64},normalized_bv,max_intstren::Float64)
+    
+    linear_range = (0,2.05)
+    log_range = (2.05,max_intstren)
+    # Create a figure with two subplot axes
+    fig = figure(figsize=(8,6))
+    
+    # Create two axes with specified height ratios
+    gs = plt.GridSpec(2, 1, height_ratios=[1, 1], hspace=0.05)
+    ax1 = fig.add_subplot(gs[0])  # upper subplot
+    ax2 = fig.add_subplot(gs[1])  # lower subplot
+    
+    # Plot data on both axes
+    ax1.scatter(rho1Ds, ulrs, c=normalized_bv, cmap="viridis")
+    ax2.scatter(rho1Ds, ulrs, c=normalized_bv, cmap="viridis")
+    
+    # Set the ranges for each axis
+    ax1.set_ylim(linear_range)  # log scale portion
+    ax2.set_ylim(log_range)  # linear scale portion
+    
+    # Set scale for each axis
+    ax1.set_yscale("linear")
+    ax2.set_yscale("log")
+    
+    # Hide the appropriate tick marks
+    ax2.spines["bottom"].set_visible(false)
+    ax1.spines["top"].set_visible(false)
+    ax2.xaxis.set_visible(false)
+
+    ylabel("ULR")
+    xlabel(L"\rho_{1D}")
+    title("Flatness Phase Diagram")
+
 end
 
 function plot_hatsugai_fromsaveddata(lx::Int64,ly::Int64,N::Int64; kwargs...)
