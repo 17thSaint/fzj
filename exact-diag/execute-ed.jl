@@ -64,7 +64,7 @@ end
 function get_lattice_params_from_metadata(metadata::Dict)
     lat_paras = Dict([("Lx",metadata["Lx"]),("Ly",metadata["Ly"]),("N",metadata["N"]),("if_periodic_x",metadata["if_periodic_x"]),("if_periodic_y",metadata["if_periodic_y"]),("full_basis",metadata["full_basis"]),("twist_angle",metadata["twist_angle"])])
     if isnothing(lat_paras["full_basis"])
-        lat_paras["full_basis"] = n_particle_basis(lat_paras)
+        lat_paras["full_basis"] = n_particle_basis(lat_paras; output_level=0)
     end
     return lat_paras
 end

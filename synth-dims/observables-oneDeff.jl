@@ -216,6 +216,18 @@ function twist_flatness_1deff(lx::Int,ly::Int,n::Int; kwargs...)
 			continue
 		end
 
+		if (lx,ly,n) == (8,3,3) && (filename_dict["tw2"] == 0.0 || filename_dict["tw2"] == 1.0)
+			continue
+		end
+
+		if (lx,ly,n) == (4,6,3) && (filename_dict["tw2"] == 0.0 || filename_dict["tw2"] == 1.0)
+            continue
+        end
+
+		if (lx,ly,n) == (8,5,5) && (filename_dict["tw2"] == 0.0 || filename_dict["tw2"] == 1.0)
+            continue
+        end
+
         d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
 
 		if haskey(m,"observer") && haskey(m,"observer_1") && haskey(m,"observer_2")
@@ -228,15 +240,16 @@ function twist_flatness_1deff(lx::Int,ly::Int,n::Int; kwargs...)
 			append!(all_nrgs["3"],m["observer_2"].energies[end])
 		else
 			println("File $f doesn't have all states")
-			display(keys(m))
+			#display(keys(m))
 		end
     end
 
 	if_plot_spectrum ? plot_twisting_spectrum(tw1s,tw2s,all_nrgs; kwargs...) : nothing
 
+	filter!(x->x >= 0.0 && x <= 1.0,all_flatnesses)
+
     return maximum(all_flatnesses)
 end
-    
 
 
 

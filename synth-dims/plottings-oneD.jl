@@ -130,6 +130,45 @@ function plot_greenfunc(all_greens,hopping_direction; kwargs...)
 	if_save_fig ? save_figure(filename; location=location) : nothing=#
 end
 
+function plot_fulltwist_spectrum(lx::Int64,ly::Int64,n::Int64; kwargs...)
+
+    pdict = Dict([("Lphys",lx),("Lsynth",ly),("nbosons",n),("if_periodic_phys",true),("if_periodic_synth",true)])
+    dataloc = get_folder_location("cluster-data/synth-dims/twists")
+    all_files = find_data_file(pdict,"mps",dataloc; output_level=0)
+
+    display(all_files)
+
+    all_nrgs = Dict([("1",Float64[]),("2",Float64[]),("3",Float64[])])
+    tw1s = Float64[]
+    tw2s = Float64[]
+
+    for f in all_files
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+
+        if !haskey(m,"observer_1") || !haskey(m,"observer_2")
+            println("File $f doesn't have all states")
+            display(keys(m))
+            continue
+        end
+
+        if m["twist_angle"][2] == 0.0 || m["twist_angle"][2] == 1.0
+            continue
+        end
+
+        append!(tw1s,m["twist_angle"][1])
+        append!(tw2s,m["twist_angle"][2])
+
+        local_nrgs = sort([m["observer"].energies[end],m["observer_1"].energies[end],m["observer_2"].energies[end]])
+        append!(all_nrgs["1"],local_nrgs[1])
+        append!(all_nrgs["2"],local_nrgs[2])
+        append!(all_nrgs["3"],local_nrgs[3])
+    end
+
+    plot_twisting_spectrum(tw1s,tw2s,all_nrgs; kwargs...)
+
+    return tw1s,tw2s,all_nrgs
+end
+
 
 
 

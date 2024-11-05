@@ -407,8 +407,8 @@ end
 
 function plot_phasediag_ulrrho1d_flatness(rho1Ds::Vector{Float64},ulrs::Vector{Float64},normalized_bv,max_intstren::Float64)
     
-    linear_range = (0,2.05)
-    log_range = (2.05,max_intstren)
+    linear_range = (-0.05,2.5)
+    log_range = (2.5,max_intstren)
     # Create a figure with two subplot axes
     fig = figure(figsize=(8,6))
     
@@ -420,6 +420,7 @@ function plot_phasediag_ulrrho1d_flatness(rho1Ds::Vector{Float64},ulrs::Vector{F
     # Plot data on both axes
     ax1.scatter(rho1Ds, ulrs, c=normalized_bv, cmap="viridis")
     ax2.scatter(rho1Ds, ulrs, c=normalized_bv, cmap="viridis")
+    ax2.plot([minimum(rho1Ds),maximum(rho1Ds)],[400,400],c="r",linestyle="--",label=L"\infty")
     
     # Set the ranges for each axis
     ax1.set_ylim(linear_range)  # log scale portion
@@ -437,6 +438,7 @@ function plot_phasediag_ulrrho1d_flatness(rho1Ds::Vector{Float64},ulrs::Vector{F
     ylabel("ULR")
     xlabel(L"\rho_{1D}")
     title("Flatness Phase Diagram")
+    legend()
 
 end
 

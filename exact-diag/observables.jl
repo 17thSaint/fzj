@@ -279,6 +279,7 @@ end
 
 # make two site density correlations
 function make_density_correlations(wavefunc::Vector{ComplexF64},lattice_params::Dict; kwargs...)
+    if_zero_shift::Bool = get(kwargs,:if_zero_shift,true)
     Lphys::Int64,Lsynth::Int64 = lattice_params["Lx"],lattice_params["Ly"]
 
     density_correlations::Array{Float64,4} = zeros(Lphys,Lphys,Lsynth,Lsynth)
@@ -290,6 +291,9 @@ function make_density_correlations(wavefunc::Vector{ComplexF64},lattice_params::
                 for jj in 1:Lphys
                     nhat_prime = density_operator(lattice_params,(jj,ss))
                     corr_val::Float64 = real(conj(transpose(wavefunc)) * (nhat_first * (nhat_prime * wavefunc)))
+                    if if_zero_shift
+                        corr_val -= real(conj(transpose(wavefunc)) * nhat_first * wavefunc) * real(conj(transpose(wavefunc)) * nhat_prime * wavefunc)
+                    end
                     density_correlations[j,jj,s,ss] = corr_val
                 end
             end
@@ -298,6 +302,29 @@ function make_density_correlations(wavefunc::Vector{ComplexF64},lattice_params::
 
     return density_correlations
 end
+
+function ft_densitydensity_correlation(momentum_angle::Float64,wavefunc::Vector{ComplexF64},lattice_params::Dict; kwargs...)
+    denscorrs = get(kwargs,:denscorrs,nothing)
+    if isnothing(denscorrs)
+        denscorrs = make_density_correlations(wavefunc,lattice_params; kwargs...)
+    end
+
+    momentum = [cos(momentum_angle),sin(momentum_angle)]
+
+    all_distances::Array{Float64,4} = zeros(Float64,size(denscorrs))
+    for j in 1:size(denscorrs)[1]
+        for jj in 1:size(denscorrs)[2]
+            for s in 1:size(denscorrs)[3]
+                for ss in 1:size(denscorrs)[4]
+                    all_distances[j,jj,s,ss] = dot(momentum,[j-jj,s-ss])
+                end
+            end
+        end
+    end
+
+    return sum(denscorrs .* exp.(im .* all_distances)) / (lattice_params["Lx"] * lattice_params["Ly"])
+end
+    
 
 # Spin Stiffness as a function of twist angles theta
 # needs testing
@@ -354,17 +381,25 @@ function twist_flatness_ed(lx::Int,ly::Int,n::Int; kwargs...)
     all_files = find_data_file(params_dict,"ed",dataloc; output_level=0)
     for f in all_files
 
+        filename_dict = get_params_dict_from_filename(f)
+        if !haskey(filename_dict,"twist_angle1")
+            continue
+        end
+
         d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
 
         intstren = m["U"][end]
         if intstren > max_intstren
             continue
         end
+
         if !haskey(all_flatnesses,string(intstren))
             all_flatnesses[string(intstren)] = []
             tw1s[string(intstren)] = []
             tw2s[string(intstren)] = []
         end
+
+        #display(f)
 
         append!(tw1s[string(intstren)],m["twist_angle"][1])
         append!(tw2s[string(intstren)],m["twist_angle"][2])
@@ -375,15 +410,15 @@ function twist_flatness_ed(lx::Int,ly::Int,n::Int; kwargs...)
 
     flatnesses = Float64[]
     for (k,v) in all_flatnesses
+        filter!(x->x >= 0.0 && x <= 1.0,v)
         append!(flatnesses,[maximum(v)])
         append!(intstrens,parse(Float64,k))
     end
 
-    if_plot ? plot_twistflatness_vs_intstren_ed(intstrens,flatnesses; kwargs...) : nothing
+    if_plot ? plot_twistflatness_vs_intstren(intstrens,flatnesses; kwargs...) : nothing
 
     return intstrens,flatnesses
 end
-
 
 # functions for two- and four-point correlators
 # needs testing

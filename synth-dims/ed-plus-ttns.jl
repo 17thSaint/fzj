@@ -18,6 +18,7 @@ Depends on:
 include("../other-funcs/include-other-files.jl")
 include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","review-practice-codes/plottings.jl","exact-diag/execute-ed.jl","exact-diag/observables.jl","exact-diag/plottings.jl"])
 include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
+include_other_files(["other-funcs/basic-2d-plottings.jl"])
 
 function plot_nrg_vs_intstren_fromdata_ttn(layers::Int64,which_strens::Union{String,Vector{Float64}}="all"; kwargs...)
     hanis = get(kwargs, :hopping_anisotropy, 1.0)
@@ -124,6 +125,7 @@ function plot_nrg_vs_intstren_fromdata_ed(lx::Int64,ly::Int64,which_strens::Unio
         ylabel("Energy Difference")
         legend()
         if_gap && ylim([-0.1,0.7])
+        xlim([-0.1,2.1])
 
         title("Energy Spectrum for "*L"\rho_{1D}=1.0"*" ED $(lx)x$ly lattice")
     end
@@ -134,8 +136,13 @@ end
 
 # look at finite size scaling of commensurate filling interaction strength spectrum
 if false
-    plot_nrg_vs_intstren_fromdata_ttn(6; particles=8, if_gap=true)
+    eight_xs, eight_ys = plot_nrg_vs_intstren_fromdata_ttn(6; particles=8, if_gap=true)
     plot_nrg_vs_intstren_fromdata_ed(4,8; particles=4, if_gap=true)
+    plot_nrg_vs_intstren_fromdata_ed(3,8; particles=3, if_gap=true)
+    plot_nrg_vs_intstren_fromdata_ed(5,8; particles=5, if_gap=true)
+    #twist_flatness_ed(3,8,3; if_plot=true)
+    #twist_flatness_ed(4,8,4; if_plot=true)
+    #twist_flatness_ed(5,8,5; if_plot=true)
 end
 
 # check the NRGs of synth-rectangle TTNs vs ED
@@ -155,27 +162,33 @@ if false
 end
 
 # build phase diagram for ULR vs rho1D at finite and infinite ULR
-if false
-    configs = [(8,3,3),(4,6,3),(8,4,4),(3,8,3),(8,5,5)]
+if true
+    println("here")
+    configs = [(8,3,3),(8,4,4),(4,6,3),(3,8,3),(8,5,5)]
 
     ulrs::Vector{Float64} = Float64[]
     flatnesses::Vector{Float64} = Float64[]
     oneDrhos::Vector{Float64} = Float64[]
 
-    #=infinite_flatnesses::Vector{Float64} = zeros(Float64,length(configs)-1)
+    println("here")
+
     for (idx,config) in enumerate(configs)
+        println("Doing 1D stuff")
         lx,ly,n = config
-        append!(flatnesses,[twist_flatness_1deff(lx,ly,n)])
-        append!(ulrs,[4.0])
+        append!(flatnesses,[twist_flatness_1deff(lx,ly,n; if_plot_spectrum=false,plot_title=" $(lx)x$ly N=$n")])
+        append!(ulrs,[400.0])
         append!(oneDrhos,[n/lx])
-    end=#
+    end
 
     for (lx,ly,n) in configs
-        local_strens,local_flats = twist_flatness_ed(lx,ly,n; if_plot=false)
+        println("Doing ED stuff")
+        local_strens,local_flats = twist_flatness_ed(lx,ly,n; if_plot=false, max_intstren=500.0)
         append!(ulrs,local_strens)
         append!(flatnesses,local_flats)
         append!(oneDrhos,ones(Float64,length(local_strens)) .* (n / lx))
     end
+
+    println("Making the plot")
 
     bin_count = 100
     data_dict = bin_values(flatnesses,bin_count)
@@ -191,7 +204,9 @@ if false
     title("Flatness Phase Diagram")
     ylim([-0.1,4.1])
 
-    plot_phasediag_ulrrho1d_flatness(oneDrhos,ulrs,normalized_bv,500.0)
+    #plot_phasediag_ulrrho1d_flatness(oneDrhos,ulrs,bv,500.0)
+
+    println("done")
 
 end
 

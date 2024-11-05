@@ -202,15 +202,15 @@ function count_chern_number(theta_xs::Vector{Float64},theta_ys::Vector{Float64},
 end
 
 # plotting the minimum amount the GSs go into the excited states as a function of interaction strength
-function plot_twistflatness_vs_intstren_ed(intstrens,flatnesses; kwargs...)
+function plot_twistflatness_vs_intstren(intstrens,flatnesses; kwargs...)
     plot_title = get(kwargs,:plot_title,"")
 
     fig = figure()
     scatter(intstrens,flatnesses,c="b")
     xlabel("Interaction Strength")
-    ylabel("Minimum Twist Flatness")
+    ylabel("Maximum Twist Flatness")
     ylim(-0.02,1.05)
-    title("Flatness for $(lx)x$(ly) N=$n "*plot_title)
+    title(plot_title)
 
 end
 

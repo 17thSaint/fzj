@@ -389,7 +389,7 @@ if false
     # ones we have (3,8,3),(4,8,4)
     # ED ones we want (5,8,5)
     # TTN ones we want (8,8,8)
-    xs,ys = plot_twistflatness_vs_intstren_ed(4,8,4; intstrens=[0.0,0.5,1.25])    
+    xs,ys = twist_flatness_ed(4,8,4)
     closing_stren,which_y = get_closing_strength(xs,ys)
     scatter(closing_stren,1.0,c="r",label="Guess")
 end
@@ -423,6 +423,42 @@ if false
     #rez = make_phasediag_ulrrho1d_flatness(configs; max_intstren=500.0, if_plot=false)
     plot_phasediag_ulrrho1d_flatness(rez...)
 end
+
+# playing with fourier transform of density-density correlation
+if true
+    lx,ly,n = 8,3,3
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
+    
+    filter!(x -> !occursin("twist_angle1",x),all_files)
+    filter!(x -> !occursin("mk",x),all_files)
+
+    intstrens = Float64[]
+    results = Float64[]
+    for f in all_files
+
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+
+        push!(intstrens,m["U"][end])
+
+        println("Working on Interaction Strength: $(m["U"][end])")
+
+        latparas = get_lattice_params_from_metadata(m)
+
+        append!(results,[abs(ft_densitydensity_correlation(pi/2,d["state"][1],latparas))])
+
+    end
+
+    fig = figure()
+    scatter(intstrens,results,c="b")
+    xlabel("Interaction Strength")
+    title("FT DD-Corr at "*L"\pi/2"*" for $(lx)x$(ly) N=$(n)")
+    
+end
+
+
+
 
 
 
