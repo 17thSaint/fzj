@@ -208,6 +208,25 @@ if false
     end=#
 end
 
+# making ft_dd data
+if false
+    lx,ly,n = 8,4,4
+    pdict = Dict([("Lphys",lx),("Lsynth",ly),("nbosons",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
+    all_files = find_data_file(pdict,"wavefuncmps",dataloc; output_level=0)
+    
+    filter!(x -> !occursin("twist_angle1",x),all_files)
+    filter!(x -> !occursin("mk",x),all_files)
+
+    display(all_files)
+
+    d = read_data_jld2(dataloc * "/" * all_files[1]; output_level=0)
+
+    results = abs(ft_densitydensity_correlation(pi/2,d["mps"]; if_save=false))
+
+    println("Final FT-DD values is ",results)
+end
+
 
 
 

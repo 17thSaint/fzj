@@ -308,6 +308,7 @@ function ft_densitydensity_correlation(momentum_angle::Float64,wavefunc::Vector{
     if isnothing(denscorrs)
         denscorrs = make_density_correlations(wavefunc,lattice_params; kwargs...)
     end
+    if_save::Bool = get(kwargs,:if_save,false)
 
     momentum = [cos(momentum_angle),sin(momentum_angle)]
 
@@ -322,7 +323,60 @@ function ft_densitydensity_correlation(momentum_angle::Float64,wavefunc::Vector{
         end
     end
 
-    return sum(denscorrs .* exp.(im .* all_distances)) / (lattice_params["Lx"] * lattice_params["Ly"])
+    result::ComplexF64 = sum(denscorrs .* exp.(im .* all_distances)) / (lattice_params["Lx"] * lattice_params["Ly"])
+
+    if if_save
+        filepath = kwargs[:filepath]
+        save_ft_dd(result,round(momentum_angle/pi,digits=3),filepath)
+    end
+
+    return result
+end
+
+function save_ft_dd(ft_dd_val::ComplexF64,angle::Float64,filepath::String)
+    data_dict = Dict([("ft_dd_$angle",ft_dd_val)])
+    modify_data_jld2(data_dict,filepath,"metadata"; output_level=1)
+end
+
+function findall_ft_dd(lx::Int64,ly::Int64,n::Int64,which_angle::Float64=0.5; kwargs...)
+    hanis::Float64 = get(kwargs,:hanis,1.0)
+    if_plot::Bool = get(kwargs,:if_plot,false)
+
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis)])
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
+    
+    filter!(x -> !occursin("twist_angle1",x),all_files)
+    filter!(x -> !occursin("mk",x),all_files)
+
+    intstrens = Float64[]
+    results = Float64[]
+    for f in all_files
+
+        filepath = dataloc * "/" * f
+        d,m = read_data_jld2(filepath; output_level=0)
+
+        if !haskey(m,"ft_dd_$which_angle")
+            continue
+        end
+
+        push!(intstrens,m["U"][end])
+
+        println("Working on Interaction Strength $(m["U"][end])")
+
+        append!(results,[abs(m["ft_dd_$which_angle"])])
+
+    end
+
+    if if_plot
+        fig = figure()
+        scatter(intstrens,results)
+        xlabel("Interaction Strength")
+        ylabel("Fourier Transform Density-Density Correlation")
+        title("FT-DD at $which_angle for $(lx)x$(ly) N=$n")
+    end
+    
+    return intstrens,results
 end
     
 

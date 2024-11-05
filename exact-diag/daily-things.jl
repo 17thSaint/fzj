@@ -426,7 +426,7 @@ end
 
 # playing with fourier transform of density-density correlation
 if true
-    lx,ly,n = 8,3,3
+    lx,ly,n = 4,6,3
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
@@ -438,15 +438,19 @@ if true
     results = Float64[]
     for f in all_files
 
-        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+        filepath = dataloc * "/" * f
+        d,m = read_data_jld2(filepath; output_level=0)
 
         push!(intstrens,m["U"][end])
 
-        println("Working on Interaction Strength: $(m["U"][end])")
+        if !haskey(m,"ft_dd_0.5")
 
-        latparas = get_lattice_params_from_metadata(m)
+            println("Working on Interaction Strength: $(m["U"][end])")
 
-        append!(results,[abs(ft_densitydensity_correlation(pi/2,d["state"][1],latparas))])
+            latparas = get_lattice_params_from_metadata(m)
+
+            append!(results,[abs(ft_densitydensity_correlation(pi/2,d["state"][1],latparas; if_save=true,filepath=filepath))])
+        end
 
     end
 

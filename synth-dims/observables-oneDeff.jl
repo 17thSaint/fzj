@@ -25,6 +25,36 @@ function make_density_correlations(wavefunc::MPS; kwargs...)
     
 end
 
+function ft_densitydensity_correlation(momentum_angle::Float64,wavefunc::MPS; kwargs...)
+    denscorrs = get(kwargs,:denscorrs,nothing)
+    if isnothing(denscorrs)
+        denscorrs = make_density_correlations(wavefunc; kwargs...)
+    end
+    if_save::Bool = get(kwargs,:if_save,false)
+
+    momentum = [cos(momentum_angle),sin(momentum_angle)]
+
+    all_distances::Array{Float64,4} = zeros(Float64,size(denscorrs))
+    for j in 1:size(denscorrs)[1]
+        for jj in 1:size(denscorrs)[2]
+            for s in 1:size(denscorrs)[3]
+                for ss in 1:size(denscorrs)[4]
+                    all_distances[j,jj,s,ss] = dot(momentum,[j-jj,s-ss])
+                end
+            end
+        end
+    end
+
+    result::ComplexF64 = sum(denscorrs .* exp.(im .* all_distances)) / (size(denscorrs,1) * size(denscorrs,3))
+
+    if if_save
+        filepath = kwargs[:filepath]
+        save_ft_dd(result,round(momentum_angle/pi,digits=3),filepath)
+    end
+
+    return result
+end
+
 function get_occupancy(wavefunc::MPS; kwargs...)
 	L,nflavors = get_mps_dims(wavefunc)
 	if_squared = get(kwargs, :if_squared, false)

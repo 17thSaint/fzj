@@ -31,6 +31,11 @@ function get_cdwsf(angle::Float64,dens_corr_mat::Array{Float64},radius::Int64=1;
     return get_cdwsf(qvec,dens_corr_mat; kwargs...)
 end
 
+function save_ft_dd(ft_dd_val::ComplexF64,angle::Float64,filepath::String)
+    data_dict = Dict([("ft_dd_$angle",ft_dd_val)])
+    modify_data_jld2(data_dict,filepath,"metadata"; output_level=1)
+end
+
 
 
 

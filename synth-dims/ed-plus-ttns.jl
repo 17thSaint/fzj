@@ -161,19 +161,15 @@ if false
     end
 end
 
-# build phase diagram for ULR vs rho1D at finite and infinite ULR
-if true
-    println("here")
+# build phase diagram for ULR vs rho1D at finite and infinite ULR from flatness
+function build_phase_diagram_ulr_rho1d_flatness()
     configs = [(8,3,3),(8,4,4),(4,6,3),(3,8,3),(8,5,5)]
 
     ulrs::Vector{Float64} = Float64[]
     flatnesses::Vector{Float64} = Float64[]
     oneDrhos::Vector{Float64} = Float64[]
 
-    println("here")
-
     for (idx,config) in enumerate(configs)
-        println("Doing 1D stuff")
         lx,ly,n = config
         append!(flatnesses,[twist_flatness_1deff(lx,ly,n; if_plot_spectrum=false,plot_title=" $(lx)x$ly N=$n")])
         append!(ulrs,[400.0])
@@ -181,14 +177,11 @@ if true
     end
 
     for (lx,ly,n) in configs
-        println("Doing ED stuff")
         local_strens,local_flats = twist_flatness_ed(lx,ly,n; if_plot=false, max_intstren=500.0)
         append!(ulrs,local_strens)
         append!(flatnesses,local_flats)
         append!(oneDrhos,ones(Float64,length(local_strens)) .* (n / lx))
     end
-
-    println("Making the plot")
 
     bin_count = 100
     data_dict = bin_values(flatnesses,bin_count)
@@ -196,55 +189,88 @@ if true
     min_nrgs2, max_nrgs2 = 0.0,1.0
     normalized_bv = [(val - minimum(bv)) / (maximum(bv) - minimum(bv)) * (max_nrgs2 - min_nrgs2) + min_nrgs2 for val in bv]
 
-    fig = figure()
+    #=fig = figure()
     scatter(oneDrhos, ulrs, c=normalized_bv, cmap="viridis")
     colorbar()
     xlabel(L"\rho_{1D}")
     ylabel("ULR")
     title("Flatness Phase Diagram")
-    ylim([-0.1,4.1])
+    ylim([-0.1,4.1])=#
+
+    plot_phasediag_ulrrho1d_flatness(oneDrhos,ulrs,bv,500.0)
+
+end
+
+# build_phase_diagram_ulr_rho1d for ft dd pi/2
+if true
+    configs = [(8,3,3),(8,4,4),(4,6,3),(3,8,3)]#,(8,5,5)]
+
+    ulrs::Vector{Float64} = Float64[]
+    ftdds::Vector{Float64} = Float64[]
+    oneDrhos::Vector{Float64} = Float64[]
+
+    #=for (idx,config) in enumerate(configs)
+        lx,ly,n = config
+        append!(flatnesses,[twist_flatness_1deff(lx,ly,n; if_plot_spectrum=false,plot_title=" $(lx)x$ly N=$n")])
+        append!(ulrs,[400.0])
+        append!(oneDrhos,[n/lx])
+    end=#
+
+    for (lx,ly,n) in configs
+        local_strens,local_ftdd = findall_ft_dd(lx,ly,n,0.50)
+        append!(ulrs,local_strens)
+        append!(ftdds,local_ftdd ./ minimum(local_ftdd))
+        append!(oneDrhos,ones(Float64,length(local_strens)) .* (n / lx))
+    end
+
+    bin_count = 100
+    data_dict = bin_values(ftdds,bin_count)
+    bv = [data_dict[val] for val in ftdds]
+    min_nrgs2, max_nrgs2 = minimum(ftdds),maximum(ftdds)
+    normalized_bv = [(val - minimum(bv)) / (maximum(bv) - minimum(bv)) * (max_nrgs2 - min_nrgs2) + min_nrgs2 for val in bv]
+
+    fig = figure()
+    scatter(oneDrhos, ulrs, c=normalized_bv, cmap="plasma")
+    colorbar()
+    xlabel(L"\rho_{1D}")
+    ylabel("ULR")
+    title("Flatness Phase Diagram")
 
     #plot_phasediag_ulrrho1d_flatness(oneDrhos,ulrs,bv,500.0)
-
-    println("done")
-
+    #title("FT DD Phase Diagram")
 end
 
 # check perturbative 1Deff against ED # it seems this only works for rho1D = 1/2 and 1.0
 if false
-    lx,ly,n = 4,6,3
+    lx,ly,n = 8,3,3
 
-    #intstrens = range(100.0,2000.0,length=41)
-    intstrens = range(100.0,10000.0,length=41)
+    intstrens = vcat(range(1000.0,10000.0,length=21),range(0.0,100.0,length=21))
     cols = get_colors(3)
     for (idx,intstren) in enumerate(intstrens)
-        pdict_mps = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("interaction_strength",intstren),("if_remapping",false),("es_count",2),("nrgtol",1e-6),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
-        psis_mps,rhos_mps,nrgs_mps,mparas_mps,if_found_mps = run_normal_1deffmps(pdict_mps)
-
-        pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
-        psi_ed,nrgs_ed,rhos_ed,filepath_ed,if_exists_ed,latparas,hamparas = run_normal_ed(pdict_ed)
-
-        for i in 1:3
-            if idx == 1
-                scatter(intstren,abs(nrgs_ed[i] - nrgs_mps[i]),c=cols[i],label="E$i")
-            else
-                scatter(intstren,abs(nrgs_ed[i] - nrgs_mps[i]),c=cols[i])
-            end
+        if intstren > 100.0
+            pdict_mps = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("interaction_strength",intstren),("if_remapping",false),("es_count",2),("nrgtol",1e-6),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
+            psis,rhos,nrgs,mparas,if_found = run_normal_1deffmps(pdict_mps)
+            result = ft_densitydensity_correlation(pi/2,psis[1])
+        else
+            pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+            psis,nrgs,rhos,filepath_ed,if_exists_ed,latparas,hamparas = run_normal_ed(pdict_ed)
+            result = ft_densitydensity_correlation(pi/2,psis[1],latparas)
         end
+
+        scatter(intstren,result,c="b")
         xscale("log")
-        yscale("log")
+        xlabel("Interaction Strength")
+        ylabel("FT-DD pi/2")
+
     end
-    xlabel("Interaction Strength")
-    ylabel(L"E_{pert} - E_{ED}")
-    title("Energy Error for Perturbative Expansion $(lx)x$(ly) N=$n")
 end
 
 # checking ED vs full infinite limit 1Deff
 if false
-    lx,ly,n = 4,6,3
+    lx,ly,n = 8,3,3
 
-    cols = get_colors(3)
-    intstrens = range(100.0,10000.0,length=21)
+    cols = get_colors(10)
+    intstrens = range(100.0,10000.0,length=11)
 
     pdict_mps = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("if_remapping",false),("if_check_fluxes",true),("flux_direction","phys"),("es_count",2),("nrgtol",1e-6),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
     psis_mps,rhos_mps,nrgs_mps,mparas_mps,if_found_mps = run_normal_1deffmps(pdict_mps)
@@ -252,11 +278,11 @@ if false
         plot([1/intstrens[end],1/intstrens[1]],[nrgs_mps[i],nrgs_mps[i]],c=cols[i])
     end
 
-    #=for (idx,intstren) in enumerate(intstrens)
+    for (idx,intstren) in enumerate(intstrens)
         pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
         psi_ed,nrgs_ed,rhos_ed,filepath_ed,if_exists_ed,latparas,hamparas = run_normal_ed(pdict_ed)
 
-        for i in 1:3
+        for i in 1:10
             if idx == 1
                 scatter(1/intstren,nrgs_ed[i],c=cols[i],label="E$i")
                 legend()
@@ -268,7 +294,7 @@ if false
     end
     xlabel("1 / Interaction Strength")
     ylabel("Energy")
-    title("Energy $(lx)x$(ly) N=$n")=#
+    title("Energy $(lx)x$(ly) N=$n")
 end
 
 
