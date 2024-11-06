@@ -201,9 +201,10 @@ function build_phase_diagram_ulr_rho1d_flatness()
 
 end
 
-# build_phase_diagram_ulr_rho1d for ft dd pi/2
+# build_phase_diagram_ulr_rho1d for ft dd
 if false
-    configs = [(8,3,3),(8,4,4),(4,6,3),(3,8,3)]#,(8,5,5)]
+    which_angle = 0.0
+    configs = [(8,3,3),(4,6,3),(3,8,3),(8,4,4)]#,(8,5,5)]
 
     ulrs::Vector{Float64} = Float64[]
     ftdds::Vector{Float64} = Float64[]
@@ -217,9 +218,9 @@ if false
     end=#
 
     for (lx,ly,n) in configs
-        local_strens,local_ftdd = findall_ft_dd(lx,ly,n,0.50)
+        local_strens,local_ftdd = findall_ft_dd(lx,ly,n,0.0)
         append!(ulrs,local_strens)
-        append!(ftdds,local_ftdd) #./ minimum(local_ftdd))
+        append!(ftdds,local_ftdd ./ (lx*ly))#./ minimum(local_ftdd))
         append!(oneDrhos,ones(Float64,length(local_strens)) .* (n / lx))
     end
 
@@ -267,7 +268,7 @@ if false
 end
 
 # checking ED vs full infinite limit 1Deff # need larger intstren for (8,5,5)
-if true
+if false
     cols = get_colors(3)
     configs = [(8,3,3),(8,4,4),(4,6,3),(3,8,3),(8,5,5)]
     for (lx,ly,n) in configs

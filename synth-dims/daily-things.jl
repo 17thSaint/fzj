@@ -59,16 +59,6 @@ function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
     end
 end
 
-function get_local_nrgs(metadata::Dict)
-    number_levels::Int64 = length(filter(x -> occursin("observer",x),keys(metadata)))
-    local_nrgs::Vector{Float64} = zeros(Float64,number_levels)
-    for i in 1:number_levels
-        obs_string::String = i == 1 ? "observer" : "observer_$(i-1)"
-        local_nrgs[i] = metadata[obs_string].energies[end]
-    end
-    return local_nrgs
-end
-
 # look at finite size scaling of commensurate filling interaction strength spectrum
 if false
     dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
@@ -222,8 +212,8 @@ if false
 end
 
 # making ft_dd data
-if true
-    configs = [(8,3,3),(4,6,3),(3,8,3),(8,4,4)]
+if false
+    configs = [(8,3,3),(4,6,3),(3,8,3),(8,4,4),(8,5,5)]
     for (lx,ly,n) in configs
     #lx,ly,n = 8,3,3
         pdict = Dict([("Lphys",lx),("Lsynth",ly),("nbosons",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
@@ -235,10 +225,12 @@ if true
 
         display(all_files)
 
-        d,m = read_data_jld2(dataloc * "/" * all_files[1]; output_level=0)
+        filepath = dataloc * "/" * all_files[1]
+
+        d,m = read_data_jld2(filepath; output_level=0)
 
         local_nrgs = get_local_nrgs(m)
-        if local_nrgs != sort(local_nrgs)
+        if local_nrgs[1] != sort(local_nrgs)[1]
             println("Levels are not sorted")
             which_level_gs = findfirst(x -> minimum(local_nrgs) == local_nrgs[x],1:length(local_nrgs))
             wavefunc_string = "mps_$(which_level_gs-1)"
@@ -249,7 +241,9 @@ if true
 
         d_wavefunc = read_data_jld2(dataloc * "/wavefunc" * all_files[1]; output_level=0)
 
-        results = abs(ft_densitydensity_correlation(pi/2,d_wavefunc[wavefunc_string]; if_save=false))
+        results = zeros(Float64,2)
+        results[1] = abs(ft_densitydensity_correlation(pi/2,d_wavefunc[wavefunc_string]; if_save=true,filepath=filepath))
+        results[2] = abs(ft_densitydensity_correlation(0.0,d_wavefunc[wavefunc_string]; if_save=true,filepath=filepath))
 
         println("Final FT-DD value for $(lx)x$(ly) n=$n is ",results)
     end

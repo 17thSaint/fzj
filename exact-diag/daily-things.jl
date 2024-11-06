@@ -424,34 +424,37 @@ if false
     plot_phasediag_ulrrho1d_flatness(rez...)
 end
 
-# playing with fourier transform of density-density correlation
+# getting fourier transform of density-density correlation at given angle for all phase diag configurations
 if false
-    lx,ly,n = 8,5,5
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
-    dataloc = get_folder_location("cluster-data/exact-diag/torus")
-    all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
-    
-    filter!(x -> !occursin("twist_angle1",x),all_files)
-    filter!(x -> !occursin("mk",x),all_files)
+    mom_angle = 0.0
+    configs = [(8,3,3),(4,6,3),(3,8,3),(8,4,4)]
+    for (lx,ly,n) in configs
+        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+        dataloc = get_folder_location("cluster-data/exact-diag/torus")
+        all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
+        
+        filter!(x -> !occursin("twist_angle1",x),all_files)
+        filter!(x -> !occursin("mk",x),all_files)
 
-    intstrens = Float64[]
-    results = Float64[]
-    for f in all_files
+        intstrens = Float64[]
+        results = Float64[]
+        for f in all_files
 
-        filepath = dataloc * "/" * f
-        d,m = read_data_jld2(filepath; output_level=0)
+            filepath = dataloc * "/" * f
+            d,m = read_data_jld2(filepath; output_level=0)
 
-        push!(intstrens,m["U"][end])
+            push!(intstrens,m["U"][end])
 
-        if !haskey(m,"ft_dd_0.5")
+            if !haskey(m,"ft_dd_$mom_angle")
 
-            println("Working on Interaction Strength: $(m["U"][end])")
+                println("Working on Interaction Strength: $(m["U"][end])")
 
-            latparas = get_lattice_params_from_metadata(m)
+                latparas = get_lattice_params_from_metadata(m)
 
-            append!(results,[abs(ft_densitydensity_correlation(pi/2,d["state"][1],latparas; if_save=false,filepath=filepath))])
+                append!(results,[abs(ft_densitydensity_correlation(pi*mom_angle,d["state"][1],latparas; if_save=true,filepath=filepath))])
+            end
+
         end
-
     end
 
     #=fig = figure()
@@ -460,6 +463,65 @@ if false
     title("FT DD-Corr at "*L"\pi/2"*" for $(lx)x$(ly) N=$(n)")=#
     
 end
+
+# phase diag with ft-dd ratio
+if true
+    configs = [(8,4,4)]#[(8,3,3),(4,6,3),(3,8,3)]#,(8,4,4)]#,(8,5,5)]
+
+    ulrs::Vector{Float64} = Float64[]
+    ftdds::Vector{Float64} = Float64[]
+    oneDrhos::Vector{Float64} = Float64[]
+
+    #=for (idx,config) in enumerate(configs)
+        lx,ly,n = config
+        append!(flatnesses,[twist_flatness_1deff(lx,ly,n; if_plot_spectrum=false,plot_title=" $(lx)x$ly N=$n")])
+        append!(ulrs,[400.0])
+        append!(oneDrhos,[n/lx])
+    end=#
+
+    for (lx,ly,n) in configs
+        local_strens,local_ftdd = get_ftdd_ratio(lx,ly,n)
+        append!(ulrs,local_strens)
+        append!(ftdds,local_ftdd ./ (lx*ly))#./ minimum(local_ftdd))
+        append!(oneDrhos,ones(Float64,length(local_strens)) .* (n / lx))
+    end
+
+    bin_count = 100
+    data_dict = bin_values(ftdds,bin_count)
+    bv = [data_dict[val] for val in ftdds]
+    min_nrgs2, max_nrgs2 = minimum(ftdds),maximum(ftdds)
+    normalized_bv = [(val - minimum(bv)) / (maximum(bv) - minimum(bv)) * (max_nrgs2 - min_nrgs2) + min_nrgs2 for val in bv]
+
+    fig = figure()
+    scatter(oneDrhos, ulrs, c=normalized_bv, cmap="plasma")
+    colorbar()
+    xlabel(L"\rho_{1D}")
+    ylabel("ULR")
+    title("FT-DD Ratio Phase Diagram")
+    #yscale("log")
+
+end
+
+# generic size playing with FT-DD rectangle/square
+if false
+    mom_angles = range(0.0,2*pi,length=100)
+    intstren = 0.0
+    lx,ly,n = 6,6,3
+    params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+
+    denscorr = make_density_correlations(states[1],lattice_params)
+    ft_vals = abs.([ft_densitydensity_correlation(k,states[1],lattice_params; denscorrs=denscorr) for k in mom_angles])
+    fig = figure()
+    plot(mom_angles ./ pi,ft_vals,"-p")
+    xlabel("Momentum Angle / pi")
+    title("FT-DD vs Mom Angle at $(lx)x$(ly) n=$n")
+end
+
+
+
+
+
 
 
 

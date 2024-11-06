@@ -323,7 +323,7 @@ function ft_densitydensity_correlation(momentum_angle::Float64,wavefunc::Vector{
         end
     end
 
-    result::ComplexF64 = sum(denscorrs .* exp.(im .* all_distances)) / (lattice_params["Lx"] * lattice_params["Ly"])
+    result::ComplexF64 = sum(denscorrs .* exp.(im .* all_distances)) / ((lattice_params["Lx"] * lattice_params["Ly"])^2)
 
     if if_save
         filepath = kwargs[:filepath]
@@ -331,11 +331,6 @@ function ft_densitydensity_correlation(momentum_angle::Float64,wavefunc::Vector{
     end
 
     return result
-end
-
-function save_ft_dd(ft_dd_val::ComplexF64,angle::Float64,filepath::String)
-    data_dict = Dict([("ft_dd_$angle",ft_dd_val)])
-    modify_data_jld2(data_dict,filepath,"metadata"; output_level=1)
 end
 
 function findall_ft_dd(lx::Int64,ly::Int64,n::Int64,which_angle::Float64=0.5; kwargs...)
@@ -378,7 +373,51 @@ function findall_ft_dd(lx::Int64,ly::Int64,n::Int64,which_angle::Float64=0.5; kw
     
     return intstrens,results
 end
-    
+
+# find or calculate ftdd ratio for all existing data of intstrens
+function get_ftdd_ratio(lx::Int64,ly::Int64,n::Int64; kwargs...)
+    if_plot::Bool = get(kwargs,:if_plot,false)
+
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
+
+    filter!(x -> !occursin("twist_angle1",x),all_files)
+    filter!(x -> !occursin("mk",x),all_files)
+
+    intstrens = Float64[]
+    ft_ratios = Float64[]
+    for f in all_files
+        filepath = dataloc * "/" * f
+        d,m = read_data_jld2(filepath; output_level=0)
+
+        #if !haskey(m,"ft_dd_0.0") || !haskey(m,"ft_dd_0.5")
+            latparas = get_lattice_params_from_metadata(m)
+            denscorr = make_density_correlations(d["state"][1],latparas)
+            ft_vals = [ft_densitydensity_correlation(k,d["state"][1],latparas; denscorrs=denscorr) for k in [0.0,pi/2]]
+            save_ft_dd(ft_vals[1],0.0,filepath)
+            save_ft_dd(ft_vals[2],0.5,filepath)
+            ft_vals = abs.(ft_vals)
+        #else
+        #    ft_vals = m["ft_dd_0.0"],m["ft_dd_0.5"]
+        #end
+        append!(intstrens,[m["U"][end]])
+        println("Finished Interaction Strength $(intstrens[end])")
+        append!(ft_ratios,[ft_vals[1] / ft_vals[2]])
+    end
+
+    zero_intstren_index = findfirst(x -> intstrens[x] == 0.0, 1:length(intstrens))
+    result = ft_ratios ./ ft_ratios[zero_intstren_index]
+
+    if if_plot
+        scatter(intstrens,result)
+        xlabel("Interaction Strength")
+        ylabel("Normalized Ratio FT-DD 0pi / pi/2")
+        title("Results for $(lx)x$(ly) n=$n")
+    end
+
+    return intstrens,result
+end 
 
 # Spin Stiffness as a function of twist angles theta
 # needs testing
