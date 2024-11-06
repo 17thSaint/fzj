@@ -19,6 +19,9 @@ include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-one
 function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
     hanis::Float64 = get(kwargs,:hopping_anisotropy,1.0)
     if_hatsugai::Bool = get(kwargs,:if_hatsugai,true)
+    cutoff::Float64 = get(kwargs,:cutoff,1e-8)
+    nrgtol::Float64 = get(kwargs,:nrgtol,1e-6)
+
 
     tws_count::Int64 = get(kwargs,:tws_count,10)
     tws_start::Float64 = get(kwargs,:tws_start,0.0)
@@ -34,7 +37,7 @@ function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
     for (idx2,tw1) in enumerate(tws)
         for (idx3,tw2) in enumerate(tws)
 
-            params_dict = Dict([("Lphys",Lx),("Lsynth",Ly),("particles",N),("tw2",tw2),("tw1",tw1),("if_remapping",false),("es_count",2),("nrgtol",1e-6),("mdim",300),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",true),("if_save_data",true)])
+            params_dict = Dict([("Lphys",Lx),("Lsynth",Ly),("particles",N),("tw2",tw2),("tw1",tw1),("if_remapping",false),("es_count",2),("nrgtol",nrgtol),("cutoff",cutoff),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",true),("if_save_data",true)])
             psis,rhos,nrgs,model_paras,if_found = run_normal_1deffmps(params_dict)
             filepath = model_paras[:location]*"/"*model_paras[:name]*".jld2"
 
@@ -54,6 +57,16 @@ function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
             end
         end
     end
+end
+
+function get_local_nrgs(metadata::Dict)
+    number_levels::Int64 = length(filter(x -> occursin("observer",x),keys(metadata)))
+    local_nrgs::Vector{Float64} = zeros(Float64,number_levels)
+    for i in 1:number_levels
+        obs_string::String = i == 1 ? "observer" : "observer_$(i-1)"
+        local_nrgs[i] = metadata[obs_string].energies[end]
+    end
+    return local_nrgs
 end
 
 # look at finite size scaling of commensurate filling interaction strength spectrum
@@ -209,22 +222,37 @@ if false
 end
 
 # making ft_dd data
-if false
-    lx,ly,n = 8,4,4
-    pdict = Dict([("Lphys",lx),("Lsynth",ly),("nbosons",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
-    dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
-    all_files = find_data_file(pdict,"wavefuncmps",dataloc; output_level=0)
-    
-    filter!(x -> !occursin("twist_angle1",x),all_files)
-    filter!(x -> !occursin("mk",x),all_files)
+if true
+    configs = [(8,3,3),(4,6,3),(3,8,3),(8,4,4)]
+    for (lx,ly,n) in configs
+    #lx,ly,n = 8,3,3
+        pdict = Dict([("Lphys",lx),("Lsynth",ly),("nbosons",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+        dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
+        all_files = find_data_file(pdict,"mps",dataloc; output_level=0)
+        
+        filter!(x -> !occursin("twist_angle1",x),all_files)
+        filter!(x -> !occursin("mk",x),all_files)
 
-    display(all_files)
+        display(all_files)
 
-    d = read_data_jld2(dataloc * "/" * all_files[1]; output_level=0)
+        d,m = read_data_jld2(dataloc * "/" * all_files[1]; output_level=0)
 
-    results = abs(ft_densitydensity_correlation(pi/2,d["mps"]; if_save=false))
+        local_nrgs = get_local_nrgs(m)
+        if local_nrgs != sort(local_nrgs)
+            println("Levels are not sorted")
+            which_level_gs = findfirst(x -> minimum(local_nrgs) == local_nrgs[x],1:length(local_nrgs))
+            wavefunc_string = "mps_$(which_level_gs-1)"
+        else
+            which_level_gs = 1
+            wavefunc_string = "mps"
+        end
 
-    println("Final FT-DD values is ",results)
+        d_wavefunc = read_data_jld2(dataloc * "/wavefunc" * all_files[1]; output_level=0)
+
+        results = abs(ft_densitydensity_correlation(pi/2,d_wavefunc[wavefunc_string]; if_save=false))
+
+        println("Final FT-DD value for $(lx)x$(ly) n=$n is ",results)
+    end
 end
 
 

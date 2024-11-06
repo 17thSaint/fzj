@@ -171,7 +171,7 @@ function build_phase_diagram_ulr_rho1d_flatness()
 
     for (idx,config) in enumerate(configs)
         lx,ly,n = config
-        append!(flatnesses,[twist_flatness_1deff(lx,ly,n; if_plot_spectrum=false,plot_title=" $(lx)x$ly N=$n")])
+        append!(flatnesses,[twist_flatness_1deff(lx,ly,n; if_plot_spectrum=true,plot_title=" $(lx)x$ly N=$n")])
         append!(ulrs,[400.0])
         append!(oneDrhos,[n/lx])
     end
@@ -202,7 +202,7 @@ function build_phase_diagram_ulr_rho1d_flatness()
 end
 
 # build_phase_diagram_ulr_rho1d for ft dd pi/2
-if true
+if false
     configs = [(8,3,3),(8,4,4),(4,6,3),(3,8,3)]#,(8,5,5)]
 
     ulrs::Vector{Float64} = Float64[]
@@ -219,7 +219,7 @@ if true
     for (lx,ly,n) in configs
         local_strens,local_ftdd = findall_ft_dd(lx,ly,n,0.50)
         append!(ulrs,local_strens)
-        append!(ftdds,local_ftdd ./ minimum(local_ftdd))
+        append!(ftdds,local_ftdd) #./ minimum(local_ftdd))
         append!(oneDrhos,ones(Float64,length(local_strens)) .* (n / lx))
     end
 
@@ -234,7 +234,8 @@ if true
     colorbar()
     xlabel(L"\rho_{1D}")
     ylabel("ULR")
-    title("Flatness Phase Diagram")
+    title("FT-DD "*L"\pi/2"*" Phase Diagram")
+    yscale("log")
 
     #plot_phasediag_ulrrho1d_flatness(oneDrhos,ulrs,bv,500.0)
     #title("FT DD Phase Diagram")
@@ -265,36 +266,47 @@ if false
     end
 end
 
-# checking ED vs full infinite limit 1Deff
-if false
-    lx,ly,n = 8,3,3
-
-    cols = get_colors(10)
-    intstrens = range(100.0,10000.0,length=11)
-
-    pdict_mps = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("if_remapping",false),("if_check_fluxes",true),("flux_direction","phys"),("es_count",2),("nrgtol",1e-6),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
-    psis_mps,rhos_mps,nrgs_mps,mparas_mps,if_found_mps = run_normal_1deffmps(pdict_mps)
-    for i in 1:3
-        plot([1/intstrens[end],1/intstrens[1]],[nrgs_mps[i],nrgs_mps[i]],c=cols[i])
-    end
-
-    for (idx,intstren) in enumerate(intstrens)
-        pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
-        psi_ed,nrgs_ed,rhos_ed,filepath_ed,if_exists_ed,latparas,hamparas = run_normal_ed(pdict_ed)
-
-        for i in 1:10
-            if idx == 1
-                scatter(1/intstren,nrgs_ed[i],c=cols[i],label="E$i")
-                legend()
-            else
-                scatter(1/intstren,nrgs_ed[i],c=cols[i])
+# checking ED vs full infinite limit 1Deff # need larger intstren for (8,5,5)
+if true
+    cols = get_colors(3)
+    configs = [(8,3,3),(8,4,4),(4,6,3),(3,8,3),(8,5,5)]
+    for (lx,ly,n) in configs
+        #lx,ly,n = 8,3,3
+        pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+        all_files_ed = find_data_file(pdict_ed,"ed",get_folder_location("cluster-data/exact-diag/torus"))
+        filter!(x -> !occursin("twist",x),all_files_ed)
+        fig = figure()
+        intstrens_ed = Float64[]
+        for f in all_files_ed
+            d,m = read_data_jld2(get_folder_location("cluster-data/exact-diag/torus") * "/" * f; output_level=0)
+            nrgs_ed = d["nrg"]
+            append!(intstrens_ed,[m["U"][end]])
+            for i in 1:3
+                scatter(m["U"][end],nrgs_ed[i],c=cols[i])
             end
         end
-        xscale("log")
+
+        pdict_mps = Dict([("Lphys",lx),("Lsynth",ly),("nbosons",n),("if_periodic_phys",true),("if_periodic_synth",true)])
+        all_files = find_data_file(pdict_mps,"mps",get_folder_location("cluster-data/synth-dims/excited-states"))
+        d,m = read_data_jld2(get_folder_location("cluster-data/synth-dims/excited-states") * "/" * all_files[1]; output_level=0)
+        nrgs_mps = zeros(Float64,3)
+        for i in 1:3
+            obs_string = i == 1 ? "observer" : "observer_$(i-1)"
+            nrgs_mps[i] = m[obs_string].energies[end]
+        end
+        sort!(nrgs_mps)
+        for i in 1:3
+            plot([0.0,maximum(intstrens_ed)],[nrgs_mps[i],nrgs_mps[i]],c=cols[i],label="E$i")
+        end
+        legend()
+
+        xlabel("Interaction Strength")
+        ylabel("Energy")
+        title("ED (scatter) vs 1Deff (line) for $(lx)x$ly N=$n")
     end
-    xlabel("1 / Interaction Strength")
-    ylabel("Energy")
-    title("Energy $(lx)x$(ly) N=$n")
+
+    
+    
 end
 
 

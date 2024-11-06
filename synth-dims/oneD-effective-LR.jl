@@ -281,26 +281,28 @@ if false
 
 	nev = 3
 	
-	lx,ly,n = 8,3,3
+	lx,ly,n = 4,6,3
 	#ref_multiplets,rm1_name,rm2_name = get_reference_multiplets(lx,ly,n)
-	tws = range(0.0,stop=1.0,length=10)
+	#tws = range(0.0,stop=1.0,length=10)
 	#g1s = zeros(ComplexF64,length(tws),length(tws))
 	#g2s = zeros(ComplexF64,length(tws),length(tws))
 	#oms = zeros(ComplexF64,length(tws),length(tws))
-	for (idx,tw1) in enumerate(tws)
-	for (idx2,tw2) in enumerate(tws)
+	#for (idx,tw1) in enumerate(tws)
+	#for (idx2,tw2) in enumerate(tws)
 	#tw2 = 0.0
 	#tw1 = 0.0
 		
-		params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("flux_direction","synth"),("if_check_fluxes",false),("tw1",tw1),("tw2",tw2),("if_remapping",false),("es_count",nev-1),("nrgtol",1e-6),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
+		params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("tw1",tw1),("tw2",tw2),("if_remapping",false),("es_count",nev-1),("nrgtol",1e-8),("cutoff",0.0),("mdim",100),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
 		psis,rhos,nrgs,model_paras,if_found = run_normal_1deffmps(params_dict)
 
-		scatter3D(tw1,tw2,nrgs[1],c="g")
+		println("Energies of states are ",nrgs)
+
+		#=scatter3D(tw1,tw2,nrgs[1],c="g")
 		scatter3D(tw1,tw2,nrgs[2],c="b")
 		scatter3D(tw1,tw2,nrgs[3],c="r")
 		xlabel(L"\theta_x \ 2\pi")
 		ylabel(L"\thetay \ 2\pi")
-		title("Spectrum Lx = $lx, Ly = $ly, n = $n")
+		title("Spectrum Lx = $lx, Ly = $ly, n = $n")=#
 
 		#get_occupancy(psis[1]; plot_title=" E1 Lx = $lx, Ly = $ly, n = $n", remapping=model_paras[:remapping])
 		#get_occupancy(psis[2]; plot_title=" E2 Lx = $lx, Ly = $ly, n = $n", remapping=model_paras[:remapping])
@@ -313,8 +315,8 @@ if false
 		oms[idx,idx2] = om=#
 
 
-	end
-	end
+	#end
+	#end
 
 	#plot_omega(tws,tws,oms; plot_title=" Lx = $lx, Ly = $ly, n = $n",if_mag=true)
 	#plot_gamma(tws,tws,g1s,1; plot_title=" Lx = $lx, Ly = $ly, n = $n")

@@ -283,11 +283,12 @@ function run_normal_ed(params_dict::Dict; kwargs...)
 end
 
 # run data collection with for loops
-if false
+if true
     
-    lx,ly,n = 4,6,3
+    lx,ly,n = 8,4,4
     #for (idx,n) in enumerate([2,3,4,5])
     intstrens = [3,4,5,6,7,8,9,20,30,40,70,150,200,300,400]
+    intstren = 0.0
     #other_intstrens = range(2.0,10.0,length=37)
     #intstrens = sort([intstrens; other_intstrens])
     #all_nrgs = zeros(Float64,length(thetas))
@@ -298,7 +299,7 @@ if false
     #for (idx,ly) in enumerate(lys)
     #for (idx,nu) in enumerate(nus)
     #for (idx,anis) in enumerate(anises)
-    for (idx,intstren) in enumerate(intstrens)
+    #for (idx,intstren) in enumerate(intstrens)
     #for (idx2,sigma) in enumerate(sigmas)
     #for lrd in [0,1]
     #intstren = 0.0
@@ -328,10 +329,10 @@ if false
         #    continue
         #end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
-        states,nrgs,rhos,filepath,if_found = run_normal_ed(params_dict; output_level=1)
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
 
         plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title="")
         #plot_spectrum(tws,nrgs,idx,params_dict["nev"],"Theta_x / 2pi",false; plot_title=" V=$intstren")
@@ -352,7 +353,7 @@ if false
         gammas2[idx,idx2] = gamma2=#
 
     #end
-    end
+    #end
 
     #plot_omega(collect(tws),collect(tws),omegas)
 

@@ -246,9 +246,9 @@ function twist_flatness_1deff(lx::Int,ly::Int,n::Int; kwargs...)
 			continue
 		end
 
-		if (lx,ly,n) == (8,3,3) && (filename_dict["tw2"] == 0.0 || filename_dict["tw2"] == 1.0)
+		#=if (lx,ly,n) == (8,3,3) && (filename_dict["tw2"] == 0.0 || filename_dict["tw2"] == 1.0)
 			continue
-		end
+		end=#
 
 		if (lx,ly,n) == (4,6,3) && (filename_dict["tw2"] == 0.0 || filename_dict["tw2"] == 1.0)
             continue
@@ -265,9 +265,15 @@ function twist_flatness_1deff(lx::Int,ly::Int,n::Int; kwargs...)
 			append!(all_flatnesses,[flatness])
 			append!(tw1s,[filename_dict["tw1"]])
 			append!(tw2s,[filename_dict["tw2"]])
-			append!(all_nrgs["1"],m["observer"].energies[end])
-			append!(all_nrgs["2"],m["observer_1"].energies[end])
-			append!(all_nrgs["3"],m["observer_2"].energies[end])
+			local_nrgs = zeros(Float64,3)
+			for i in 1:3
+				obs_string = i == 1 ? "observer" : "observer_$(i-1)"
+				local_nrgs[i] = m[obs_string].energies[end]
+			end
+			sort!(local_nrgs)
+			for i in 1:3
+				append!(all_nrgs[string(i)],[local_nrgs[i]])
+			end
 		else
 			println("File $f doesn't have all states")
 			#display(keys(m))

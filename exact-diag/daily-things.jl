@@ -10,8 +10,8 @@ Depends on:
 ######################################################
 
 include("execute-ed.jl")
-include("plottings.jl")
-include("../other-funcs/basic-2d-plottings.jl")
+#include("plottings.jl")
+#include("../other-funcs/basic-2d-plottings.jl")
 
 function datacollection_flatness(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
     hanis::Float64 = get(kwargs,:hopping_anisotropy,1.0)
@@ -425,8 +425,8 @@ if false
 end
 
 # playing with fourier transform of density-density correlation
-if true
-    lx,ly,n = 4,6,3
+if false
+    lx,ly,n = 8,5,5
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
@@ -449,15 +449,15 @@ if true
 
             latparas = get_lattice_params_from_metadata(m)
 
-            append!(results,[abs(ft_densitydensity_correlation(pi/2,d["state"][1],latparas; if_save=true,filepath=filepath))])
+            append!(results,[abs(ft_densitydensity_correlation(pi/2,d["state"][1],latparas; if_save=false,filepath=filepath))])
         end
 
     end
 
-    fig = figure()
+    #=fig = figure()
     scatter(intstrens,results,c="b")
     xlabel("Interaction Strength")
-    title("FT DD-Corr at "*L"\pi/2"*" for $(lx)x$(ly) N=$(n)")
+    title("FT DD-Corr at "*L"\pi/2"*" for $(lx)x$(ly) N=$(n)")=#
     
 end
 
