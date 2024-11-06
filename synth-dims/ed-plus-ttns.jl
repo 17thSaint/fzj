@@ -202,44 +202,47 @@ function build_phase_diagram_ulr_rho1d_flatness()
 end
 
 # build_phase_diagram_ulr_rho1d for ft dd
-if false
+if true
     which_angle = 0.0
-    configs = [(8,3,3),(4,6,3),(3,8,3),(8,4,4)]#,(8,5,5)]
+    configs = [(8,3,3),(4,6,3),(3,8,3)]#,(8,4,4),(8,5,5)]
 
     ulrs::Vector{Float64} = Float64[]
     ftdds::Vector{Float64} = Float64[]
+    zeroint_ratios::Dict{String,Float64} = Dict()
     oneDrhos::Vector{Float64} = Float64[]
 
-    #=for (idx,config) in enumerate(configs)
-        lx,ly,n = config
-        append!(flatnesses,[twist_flatness_1deff(lx,ly,n; if_plot_spectrum=false,plot_title=" $(lx)x$ly N=$n")])
-        append!(ulrs,[400.0])
-        append!(oneDrhos,[n/lx])
-    end=#
-
     for (lx,ly,n) in configs
-        local_strens,local_ftdd = findall_ft_dd(lx,ly,n,0.0)
+        local_strens,local_ftdd,local_start_ratio = get_ftdd_ratio(lx,ly,n)
+        zeroint_ratios[string(round(n/lx,digits=3))] = local_start_ratio
         append!(ulrs,local_strens)
-        append!(ftdds,local_ftdd ./ (lx*ly))#./ minimum(local_ftdd))
+        append!(ftdds,local_ftdd .* local_start_ratio)
         append!(oneDrhos,ones(Float64,length(local_strens)) .* (n / lx))
+    end
+
+    for (idx,config) in enumerate(configs)
+        lx,ly,n = config
+        local_start_ratio = zeroint_ratios[string(round(n/lx,digits=3))]
+        append!(ftdds,[get_ftdd_ratio_1deff(lx,ly,n)])
+        append!(ulrs,[900.0])
+        append!(oneDrhos,[n/lx])
     end
 
     bin_count = 100
     data_dict = bin_values(ftdds,bin_count)
     bv = [data_dict[val] for val in ftdds]
     min_nrgs2, max_nrgs2 = minimum(ftdds),maximum(ftdds)
-    normalized_bv = [(val - minimum(bv)) / (maximum(bv) - minimum(bv)) * (max_nrgs2 - min_nrgs2) + min_nrgs2 for val in bv]
+    #normalized_bv = [(val - minimum(bv)) / (maximum(bv) - minimum(bv)) * (max_nrgs2 - min_nrgs2) + min_nrgs2 for val in bv]
 
-    fig = figure()
-    scatter(oneDrhos, ulrs, c=normalized_bv, cmap="plasma")
+    #=fig = figure()
+    scatter(oneDrhos, ulrs, c=bv, cmap="plasma")
     colorbar()
     xlabel(L"\rho_{1D}")
     ylabel("ULR")
-    title("FT-DD "*L"\pi/2"*" Phase Diagram")
-    yscale("log")
+    title("FT-DD Ratio Phase Diagram")
+    yscale("log")=#
 
-    #plot_phasediag_ulrrho1d_flatness(oneDrhos,ulrs,bv,500.0)
-    #title("FT DD Phase Diagram")
+    plot_phasediag_ulrrho1d_flatness(oneDrhos,ulrs,bv,1000.0)
+    title("FT DD Ratio Phase Diagram")
 end
 
 # check perturbative 1Deff against ED # it seems this only works for rho1D = 1/2 and 1.0

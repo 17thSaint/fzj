@@ -79,7 +79,7 @@ function ft_densitydensity_correlation(momentum_angle::Float64,wavefunc::MPS; kw
 end
 
 # find or calculate ftdd ratio for all existing data of intstrens
-function get_ftdd_ratio_1deff(lx::Int64,ly::Int64,n::Int64)
+function get_ftdd_ratio_1deff(lx::Int64,ly::Int64,n::Int64; kwargs...)
     if_plot::Bool = get(kwargs,:if_plot,false)
 
     pdict = Dict([("Lphys",lx),("Lsynth",ly),("nbosons",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
@@ -89,7 +89,11 @@ function get_ftdd_ratio_1deff(lx::Int64,ly::Int64,n::Int64)
     filter!(x -> !occursin("twist_angle1",x),all_files)
     filter!(x -> !occursin("mk",x),all_files)
 
-    filepath = dataloc * "/" * f
+	if length(all_files) != 1
+		error("Either too many files or none")
+	end
+
+    filepath = dataloc * "/" * all_files[1]
     d,m = read_data_jld2(filepath; output_level=0)
 
 	if !haskey(m,"ft_dd_0.0") || !haskey(m,"ft_dd_0.5")
@@ -102,7 +106,7 @@ function get_ftdd_ratio_1deff(lx::Int64,ly::Int64,n::Int64)
 		#save_ft_dd(ft_vals[2],0.5,filepath)
 		ft_vals = abs.(ft_vals)
 	else
-		ft_vals = m["ft_dd_0.0"],m["ft_dd_0.5"]
+		ft_vals = abs.([m["ft_dd_0.0"],m["ft_dd_0.5"]])
 	end
     result = ft_vals[1] / ft_vals[2]
 

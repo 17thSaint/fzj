@@ -391,23 +391,24 @@ function get_ftdd_ratio(lx::Int64,ly::Int64,n::Int64; kwargs...)
         filepath = dataloc * "/" * f
         d,m = read_data_jld2(filepath; output_level=0)
 
-        #if !haskey(m,"ft_dd_0.0") || !haskey(m,"ft_dd_0.5")
+        if !haskey(m,"ft_dd_0.0") || !haskey(m,"ft_dd_0.5")
             latparas = get_lattice_params_from_metadata(m)
             denscorr = make_density_correlations(d["state"][1],latparas)
             ft_vals = [ft_densitydensity_correlation(k,d["state"][1],latparas; denscorrs=denscorr) for k in [0.0,pi/2]]
             save_ft_dd(ft_vals[1],0.0,filepath)
             save_ft_dd(ft_vals[2],0.5,filepath)
             ft_vals = abs.(ft_vals)
-        #else
-        #    ft_vals = m["ft_dd_0.0"],m["ft_dd_0.5"]
-        #end
+        else
+            ft_vals = abs.([m["ft_dd_0.0"],m["ft_dd_0.5"]])
+        end
         append!(intstrens,[m["U"][end]])
         println("Finished Interaction Strength $(intstrens[end])")
         append!(ft_ratios,[ft_vals[1] / ft_vals[2]])
     end
 
     zero_intstren_index = findfirst(x -> intstrens[x] == 0.0, 1:length(intstrens))
-    result = ft_ratios ./ ft_ratios[zero_intstren_index]
+    starting_ratio = ft_ratios[zero_intstren_index]
+    result = ft_ratios ./ starting_ratio
 
     if if_plot
         scatter(intstrens,result)
@@ -416,7 +417,7 @@ function get_ftdd_ratio(lx::Int64,ly::Int64,n::Int64; kwargs...)
         title("Results for $(lx)x$(ly) n=$n")
     end
 
-    return intstrens,result
+    return intstrens,result,starting_ratio
 end 
 
 # Spin Stiffness as a function of twist angles theta
