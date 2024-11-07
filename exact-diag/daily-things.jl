@@ -549,7 +549,7 @@ if true
     latparas = get_lattice_params_from_metadata(m)
     denscorrs = m["dens_corr_mat"]
 
-    ftdds = zeros(Float64,length(ks),length(ks))
+    ftdd_results = zeros(Float64,length(ks),length(ks))
     for (idx,kx) in enumerate(ks)
         for (idx2,ky) in enumerate(ks)
             ftdd = ft_densitydensity_correlation([kx,ky],nothing,latparas; denscorrs=denscorrs,if_save=false,filepath=filepath)

@@ -95,12 +95,17 @@ function ft_densitydensity_correlation(momentum_angle::Float64,momentum_radius::
 end
 
 function ft_densitydensity_correlation(momentum::Vector{Float64},wavefunc::Union{Nothing,MPS}; kwargs...)
-    return ft_densitydensity_correlation(atan(momentum[2]/momentum[1]),sqrt(momentum[1]^2 + momentum[2]^2),wavefunc; kwargs...)
+	if momentum == [0.0,0.0]
+		return ft_densitydensity_correlation(0.0,0.0,wavefunc; kwargs...)
+	else
+    	return ft_densitydensity_correlation(atan(momentum[2]/momentum[1]),sqrt(momentum[1]^2 + momentum[2]^2),wavefunc; kwargs...)
+	end
 end
 
-# find or calculate ftdd ratio for all existing data of intstrens
-function get_ftdd_ratio_1deff(lx::Int64,ly::Int64,n::Int64; kwargs...)
-    if_plot::Bool = get(kwargs,:if_plot,false)
+function findall_ft_dd_1deff(lx::Int64,ly::Int64,n::Int64; kwargs...)
+    hanis::Float64 = get(kwargs,:hanis,1.0)
+
+	ks = range(0,stop=2*pi,length=50)
 
     pdict = Dict([("Lphys",lx),("Lsynth",ly),("nbosons",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
@@ -113,25 +118,30 @@ function get_ftdd_ratio_1deff(lx::Int64,ly::Int64,n::Int64; kwargs...)
 		error("Either too many files or none")
 	end
 
-    filepath = dataloc * "/" * all_files[1]
-    d,m = read_data_jld2(filepath; output_level=0)
+	f = all_files[1]
 
-	if !haskey(m,"ft_dd_0.0") || !haskey(m,"ft_dd_0.5")
-		d_wavefunc = read_data_jld2(dataloc * "/wavefunc" * f; output_level=0)
-		gs_state = d_wavefunc[get_correct_gs_mpsstring(m)]
+	filepath = dataloc * "/" * f
+	d,m = read_data_jld2(filepath; output_level=0)
 
-		denscorr = make_density_correlations(gs_state)
-		ft_vals = [ft_densitydensity_correlation(k,gs_state; denscorrs=denscorr) for k in [0.0,pi/2]]
-		#save_ft_dd(ft_vals[1],0.0,filepath)
-		#save_ft_dd(ft_vals[2],0.5,filepath)
-		ft_vals = abs.(ft_vals)
-	else
-		ft_vals = abs.([m["ft_dd_0.0"],m["ft_dd_0.5"]])
+	if !haskey(m,"dens_corr_mat")
+		error("No density correlation matrix found")
 	end
-    result = ft_vals[1] / ft_vals[2]
+
+	println("Working on $(lx)x$(ly) n=$(n)")
+
+	all_ft_vals::Matrix{Float64} = zeros(Float64,length(ks),length(ks))
+	for (idx,kx) in enumerate(ks)
+		for (idx2,ky) in enumerate(ks)
+			all_ft_vals[idx,idx2] = abs(ft_densitydensity_correlation([kx,ky],nothing; denscorrs=m["dens_corr_mat"]))
+		end
+	end
+
+	normalization_factor::Float64 = integrate_2d_matrix(all_ft_vals)
+
+	result = maximum(all_ft_vals) / normalization_factor
 
     return result
-end 
+end
 
 function get_occupancy(wavefunc::MPS; kwargs...)
 	L,nflavors = get_mps_dims(wavefunc)

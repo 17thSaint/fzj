@@ -309,10 +309,13 @@ function make_density_correlations(wavefunc::Vector{ComplexF64},lattice_params::
     return density_correlations
 end
 
-function ft_densitydensity_correlation(momentum_angle::Float64,momentum_radius::Float64,wavefunc::Union{Nothing,Vector{ComplexF64}},lattice_params::Dict; kwargs...)
+function ft_densitydensity_correlation(momentum_angle::Float64,momentum_radius::Float64,wavefunc::Union{Nothing,Vector{ComplexF64}},lattice_params::Union{Dict,Nothing}; kwargs...)
     denscorrs = get(kwargs,:denscorrs,nothing)
     if isnothing(denscorrs)
         denscorrs = make_density_correlations(wavefunc,lattice_params; kwargs...)
+        lx,ly = lattice_params["Lx"],lattice_params["Ly"]
+    else
+        lx,ly = size(denscorrs)[1],size(denscorrs)[3]
     end
     if_save::Bool = get(kwargs,:if_save,false)
 
@@ -329,7 +332,7 @@ function ft_densitydensity_correlation(momentum_angle::Float64,momentum_radius::
         end
     end
 
-    result::ComplexF64 = sum(denscorrs .* exp.(im .* all_distances)) / ((lattice_params["Lx"] * lattice_params["Ly"])^2)
+    result::ComplexF64 = sum(denscorrs .* exp.(im .* all_distances)) / ((lx * ly)^2)
 
     if if_save
         filepath = kwargs[:filepath]
@@ -339,13 +342,19 @@ function ft_densitydensity_correlation(momentum_angle::Float64,momentum_radius::
     return result
 end
 
-function ft_densitydensity_correlation(momentum::Vector{Float64},wavefunc::Union{Nothing,Vector{ComplexF64}},lattice_params::Dict; kwargs...)
-    return ft_densitydensity_correlation(atan(momentum[2]/momentum[1]),sqrt(momentum[1]^2 + momentum[2]^2),wavefunc,lattice_params; kwargs...)
+function ft_densitydensity_correlation(momentum::Vector{Float64},wavefunc::Union{Nothing,Vector{ComplexF64}},lattice_params::Union{Dict,Nothing}; kwargs...)
+    if momentum == [0.0,0.0]
+        return ft_densitydensity_correlation(0.0,0.0,wavefunc,lattice_params; kwargs...)
+    else
+        return ft_densitydensity_correlation(atan(momentum[2]/momentum[1]),sqrt(momentum[1]^2 + momentum[2]^2),wavefunc,lattice_params; kwargs...)
+    end
 end
 
-function findall_ft_dd(lx::Int64,ly::Int64,n::Int64,which_angle::Float64=0.5; kwargs...)
+function findall_ft_dd(lx::Int64,ly::Int64,n::Int64; kwargs...)
     hanis::Float64 = get(kwargs,:hanis,1.0)
     if_plot::Bool = get(kwargs,:if_plot,false)
+
+    ks = range(0.0,2*pi,length=50)
 
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis)])
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
@@ -355,81 +364,44 @@ function findall_ft_dd(lx::Int64,ly::Int64,n::Int64,which_angle::Float64=0.5; kw
     filter!(x -> !occursin("mk",x),all_files)
 
     intstrens = Float64[]
-    results = Float64[]
+    max_results = Float64[]
+    location_results = []
     for f in all_files
 
         filepath = dataloc * "/" * f
         d,m = read_data_jld2(filepath; output_level=0)
 
-        if !haskey(m,"ft_dd_$which_angle")
+        if !haskey(m,"dens_corr_mat")
             continue
         end
 
         push!(intstrens,m["U"][end])
 
-        println("Working on Interaction Strength $(m["U"][end])")
+        println("Working on $(lx)x$(ly) n=$n at Interaction Strength $(m["U"][end])")
 
-        append!(results,[abs(m["ft_dd_$which_angle"])])
+        all_ft_vals::Matrix{Float64} = zeros(Float64,length(ks),length(ks))
+        for (idx,kx) in enumerate(ks)
+            for (idx2,ky) in enumerate(ks)
+                all_ft_vals[idx,idx2] = abs(ft_densitydensity_correlation([kx,ky],nothing,nothing; denscorrs=m["dens_corr_mat"]))
+            end
+        end
 
+        normalization_factor::Float64 = integrate_2d_matrix(all_ft_vals)
+
+        append!(max_results,[maximum(all_ft_vals) / normalization_factor])
+        append!(location_results,[argmax(all_ft_vals)])
     end
 
     if if_plot
         fig = figure()
-        scatter(intstrens,results)
+        scatter(intstrens,max_results)
         xlabel("Interaction Strength")
         ylabel("Fourier Transform Density-Density Correlation")
-        title("FT-DD at $which_angle for $(lx)x$(ly) N=$n")
+        title("FT-DD Maximum for $(lx)x$(ly) N=$n")
     end
     
-    return intstrens,results
+    return intstrens,max_results,location_results
 end
-
-# find or calculate ftdd ratio for all existing data of intstrens
-function get_ftdd_ratio(lx::Int64,ly::Int64,n::Int64; kwargs...)
-    if_plot::Bool = get(kwargs,:if_plot,false)
-
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
-    dataloc = get_folder_location("cluster-data/exact-diag/torus")
-    all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
-
-    filter!(x -> !occursin("twist_angle1",x),all_files)
-    filter!(x -> !occursin("mk",x),all_files)
-
-    intstrens = Float64[]
-    ft_ratios = Float64[]
-    for f in all_files
-        filepath = dataloc * "/" * f
-        d,m = read_data_jld2(filepath; output_level=0)
-
-        append!(intstrens,[m["U"][end]])
-        println("Working on $(lx)x$(ly) n=$n at Interaction Strength $(intstrens[end])")
-        #=if !haskey(m,"ft_dd_0.0") || !haskey(m,"ft_dd_0.5")
-            latparas = get_lattice_params_from_metadata(m)
-            denscorr = make_density_correlations(d["state"][1],latparas)
-            ft_vals = [ft_densitydensity_correlation(k,d["state"][1],latparas; denscorrs=denscorr) for k in [0.0,pi/2]]
-            save_ft_dd(ft_vals[1],0.0,filepath)
-            save_ft_dd(ft_vals[2],0.5,filepath)
-            ft_vals = abs.(ft_vals)
-        else=#
-            ft_vals = abs.([m["ft_dd_0.0"],m["ft_dd_0.5"]])
-        #end
-
-        append!(ft_ratios,[ft_vals[1] / ft_vals[2]])
-    end
-
-    zero_intstren_index = findfirst(x -> intstrens[x] == 0.0, 1:length(intstrens))
-    starting_ratio = ft_ratios[zero_intstren_index]
-    result = ft_ratios
-
-    if if_plot
-        scatter(intstrens,result ./ starting_ratio)
-        xlabel("Interaction Strength")
-        ylabel("Normalized Ratio FT-DD 0pi / pi/2")
-        title("Results for $(lx)x$(ly) n=$n")
-    end
-
-    return intstrens,result,starting_ratio
-end 
 
 # Spin Stiffness as a function of twist angles theta
 # needs testing

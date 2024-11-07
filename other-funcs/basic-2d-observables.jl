@@ -41,6 +41,38 @@ function save_dd_correlation(dens_corr_mat::Array{Float64},filepath::String)
     modify_data_jld2(data_dict,filepath,"metadata"; output_level=1)
 end
 
+function integrate_2d_matrix(matrix::Matrix{Float64})
+    """
+    Performs 2D integration over the values in a 2D matrix.
+    
+    Parameters:
+    matrix (Array{Float64, 2}): The 2D matrix to integrate over.
+    
+    Returns:
+    Float64: The result of the 2D integration.
+    """
+    
+    # Assuming the matrix has dimensions m x n
+    m::Int64, n::Int64 = size(matrix)
+    
+    # Initialize the integral
+    integral::Float64 = 0.0
+    
+    # Perform the 2D integration using trapezoidal rule
+    for i in 1:(m-1)
+        for j in 1:(n-1)
+            integral += (matrix[i,j] + matrix[i,j+1] + matrix[i+1,j] + matrix[i+1,j+1]) / 4
+        end
+    end
+    
+    # Account for the step sizes in the x and y directions
+    dx::Float64 = 1 / (m - 1)
+    dy::Float64 = 1 / (n - 1)
+    integral *= dx * dy
+    
+    return integral
+end
+
 
 
 

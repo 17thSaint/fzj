@@ -205,30 +205,27 @@ function build_phase_diagram_ulr_rho1d_flatness()
 end
 
 # build_phase_diagram_ulr_rho1d for ft dd
-if false
+if true
     which_angle = 0.0
     configs = [(8,3,3),(4,6,3),(3,8,3),(8,4,4),(8,5,5)]
 
     ulrs::Vector{Float64} = Float64[]
     ftdds::Vector{Float64} = Float64[]
-    zeroint_ratios::Dict{String,Float64} = Dict()
     oneDrhos::Vector{Float64} = Float64[]
 
     for (lx,ly,n) in configs
         if (lx,ly,n) == (8,5,5)
             continue
         end
-        local_strens,local_ftdd,local_start_ratio = get_ftdd_ratio(lx,ly,n)
-        zeroint_ratios[string(round(n/lx,digits=3))] = local_start_ratio
+        local_strens,local_ftdd,local_ftmax_locs = findall_ft_dd(lx,ly,n; if_plot=false)
         append!(ulrs,local_strens)
-        append!(ftdds,local_ftdd) #./ local_start_ratio)
+        append!(ftdds,local_ftdd)
         append!(oneDrhos,ones(Float64,length(local_strens)) .* (n / lx))
     end
 
     for (idx,config) in enumerate(configs)
         lx,ly,n = config
-        #local_start_ratio = zeroint_ratios[string(round(n/lx,digits=3))]
-        append!(ftdds,[get_ftdd_ratio_1deff(lx,ly,n)]) #/ local_start_ratio])
+        append!(ftdds,[findall_ft_dd_1deff(lx,ly,n)])
         append!(ulrs,[900.0])
         append!(oneDrhos,[n/lx])
     end
