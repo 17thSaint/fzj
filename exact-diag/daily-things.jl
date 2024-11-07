@@ -454,8 +454,8 @@ if false
 
 end
 
-# getting fourier transform of density-density correlation at given angle for all phase diag configurations
-function datacollection_ftdd(mom_angle::Float64,configs::Vector{Tuple{Int64,Int64,Int64}}=[(8,3,3),(4,6,3),(3,8,3),(8,4,4),(8,5,5)]; kwargs...)
+# getting density-density correlation matrix at given angle for all phase diag configurations
+function datacollection_dd(mom_angle::Float64,configs::Vector{Tuple{Int64,Int64,Int64}}=[(8,3,3),(4,6,3),(3,8,3),(8,4,4),(8,5,5)]; kwargs...)
     hanis::Float64 = get(kwargs,:hopping_anisotropy,1.0)
     if_redo::Bool = get(kwargs,:if_redo,false)
     if_plot::Bool = get(kwargs,:if_plot,false)
@@ -477,30 +477,16 @@ function datacollection_ftdd(mom_angle::Float64,configs::Vector{Tuple{Int64,Int6
 
             push!(intstrens,m["U"][end])
 
-            if if_redo || !haskey(m,"ft_dd_$mom_angle")
+            println("Working on $(lx)x$(ly) n=$n at Interaction Strength: $(m["U"][end])")
 
-                println("Working on $(lx)x$(ly) n=$n at Interaction Strength: $(m["U"][end])")
+            latparas = get_lattice_params_from_metadata(m)
 
-                latparas = get_lattice_params_from_metadata(m)
-
-                if !haskey(m,"dens_corr_mat")
-                    denscorrs = make_density_correlations(d["state"][1],latparas; if_save=true,filepath=filepath)
-                else
-                    denscorrs = m["dens_corr_mat"]
-                end
-
-                append!(results,[abs(ft_densitydensity_correlation(pi*mom_angle,d["state"][1],latparas; denscorrs=denscorrs,if_save=true,filepath=filepath))])
+            if !haskey(m,"dens_corr_mat")
+                denscorrs = make_density_correlations(d["state"][1],latparas; if_save=true,filepath=filepath)
             else
-                append!(results,[abs(m["ft_dd_$mom_angle"])])
+                denscorrs = m["dens_corr_mat"]
             end
 
-        end
-
-        if if_plot
-            fig = figure()
-            scatter(intstrens,results,c="b")
-            xlabel("Interaction Strength")
-            title("FT DD-Corr at $mom_angle"*L"\pi"*" for $(lx)x$(ly) N=$(n)")
         end
     end
     
@@ -545,19 +531,37 @@ if false
 end
 
 # generic size playing with FT-DD rectangle/square
-if false
-    mom_angles = range(0.0,2*pi,length=100)
-    intstren = 0.0
-    lx,ly,n = 6,6,3
-    params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
-    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+if true
+    ks = range(0.0,2*pi,length=100)
+    intstren = 100.0
+    lx,ly,n = 3,8,3
+    params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren)])
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    all_files = find_data_file(params_dict,"ed",dataloc; output_level=0)
 
-    denscorr = make_density_correlations(states[1],lattice_params)
-    ft_vals = abs.([ft_densitydensity_correlation(k,states[1],lattice_params; denscorrs=denscorr) for k in mom_angles])
+    filter!(x -> !occursin("twist_angle1",x),all_files)
+    filter!(x -> !occursin("mk",x),all_files)
+
+    f = all_files[1]
+    filepath = dataloc * "/" * f
+    d,m = read_data_jld2(filepath; output_level=0)
+
+    latparas = get_lattice_params_from_metadata(m)
+    denscorrs = m["dens_corr_mat"]
+
+    ftdds = zeros(Float64,length(ks),length(ks))
+    for (idx,kx) in enumerate(ks)
+        for (idx2,ky) in enumerate(ks)
+            ftdd = ft_densitydensity_correlation([kx,ky],nothing,latparas; denscorrs=denscorrs,if_save=false,filepath=filepath)
+            ftdds[idx,idx2] = abs(ftdd)
+        end
+    end
     fig = figure()
-    plot(mom_angles ./ pi,ft_vals,"-p")
-    xlabel("Momentum Angle / pi")
-    title("FT-DD vs Mom Angle at $(lx)x$(ly) n=$n")
+    imshow(reverse(ftdds,dims=1),extent=(0,2*pi,0,2*pi),origin="lower")
+    xlabel(L"k_x")
+    ylabel(L"k_y")
+    colorbar()
+    title("FT-DD for $(lx)x$(ly) N=$(n) ULR=$intstren")
 end
 
 

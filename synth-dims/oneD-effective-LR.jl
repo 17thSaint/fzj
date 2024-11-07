@@ -281,7 +281,7 @@ if false
 
 	nev = 3
 	
-	lx,ly,n = 4,6,3
+	lx,ly,n = 8,7,7
 	#ref_multiplets,rm1_name,rm2_name = get_reference_multiplets(lx,ly,n)
 	#tws = range(0.0,stop=1.0,length=10)
 	#g1s = zeros(ComplexF64,length(tws),length(tws))
@@ -292,7 +292,7 @@ if false
 	#tw2 = 0.0
 	#tw1 = 0.0
 		
-		params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("tw1",tw1),("tw2",tw2),("if_remapping",false),("es_count",nev-1),("nrgtol",1e-8),("cutoff",0.0),("mdim",100),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
+		params_dict = Dict([("Lphys",lx),("Lsynth",ly),("particles",n),("tw1",tw1),("tw2",tw2),("if_remapping",false),("es_count",nev-1),("nrgtol",1e-7),("cutoff",1e-11),("mdim",300),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",false),("if_save_data",false)])
 		psis,rhos,nrgs,model_paras,if_found = run_normal_1deffmps(params_dict)
 
 		println("Energies of states are ",nrgs)

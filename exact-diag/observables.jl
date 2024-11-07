@@ -309,14 +309,14 @@ function make_density_correlations(wavefunc::Vector{ComplexF64},lattice_params::
     return density_correlations
 end
 
-function ft_densitydensity_correlation(momentum_angle::Float64,wavefunc::Vector{ComplexF64},lattice_params::Dict; kwargs...)
+function ft_densitydensity_correlation(momentum_angle::Float64,momentum_radius::Float64,wavefunc::Union{Nothing,Vector{ComplexF64}},lattice_params::Dict; kwargs...)
     denscorrs = get(kwargs,:denscorrs,nothing)
     if isnothing(denscorrs)
         denscorrs = make_density_correlations(wavefunc,lattice_params; kwargs...)
     end
     if_save::Bool = get(kwargs,:if_save,false)
 
-    momentum = [cos(momentum_angle),sin(momentum_angle)]
+    momentum = momentum_radius .* [cos(momentum_angle),sin(momentum_angle)]
 
     all_distances::Array{Float64,4} = zeros(Float64,size(denscorrs))
     for j in 1:size(denscorrs)[1]
@@ -337,6 +337,10 @@ function ft_densitydensity_correlation(momentum_angle::Float64,wavefunc::Vector{
     end
 
     return result
+end
+
+function ft_densitydensity_correlation(momentum::Vector{Float64},wavefunc::Union{Nothing,Vector{ComplexF64}},lattice_params::Dict; kwargs...)
+    return ft_densitydensity_correlation(atan(momentum[2]/momentum[1]),sqrt(momentum[1]^2 + momentum[2]^2),wavefunc,lattice_params; kwargs...)
 end
 
 function findall_ft_dd(lx::Int64,ly::Int64,n::Int64,which_angle::Float64=0.5; kwargs...)
@@ -397,18 +401,19 @@ function get_ftdd_ratio(lx::Int64,ly::Int64,n::Int64; kwargs...)
         filepath = dataloc * "/" * f
         d,m = read_data_jld2(filepath; output_level=0)
 
-        if !haskey(m,"ft_dd_0.0") || !haskey(m,"ft_dd_0.5")
+        append!(intstrens,[m["U"][end]])
+        println("Working on $(lx)x$(ly) n=$n at Interaction Strength $(intstrens[end])")
+        #=if !haskey(m,"ft_dd_0.0") || !haskey(m,"ft_dd_0.5")
             latparas = get_lattice_params_from_metadata(m)
             denscorr = make_density_correlations(d["state"][1],latparas)
             ft_vals = [ft_densitydensity_correlation(k,d["state"][1],latparas; denscorrs=denscorr) for k in [0.0,pi/2]]
             save_ft_dd(ft_vals[1],0.0,filepath)
             save_ft_dd(ft_vals[2],0.5,filepath)
             ft_vals = abs.(ft_vals)
-        else
+        else=#
             ft_vals = abs.([m["ft_dd_0.0"],m["ft_dd_0.5"]])
-        end
-        append!(intstrens,[m["U"][end]])
-        println("Finished $(lx)x$(ly) n=$n at Interaction Strength $(intstrens[end])")
+        #end
+
         append!(ft_ratios,[ft_vals[1] / ft_vals[2]])
     end
 

@@ -163,7 +163,7 @@ end
 
 # build phase diagram for ULR vs rho1D at finite and infinite ULR from flatness
 function build_phase_diagram_ulr_rho1d_flatness()
-    configs = [(8,3,3),(8,4,4),(4,6,3),(3,8,3),(8,5,5)]
+    configs = [(8,3,3),(8,4,4),(4,6,3),(3,8,3),(8,5,5),(8,7,7)]
 
     ulrs::Vector{Float64} = Float64[]
     flatnesses::Vector{Float64} = Float64[]
@@ -176,12 +176,15 @@ function build_phase_diagram_ulr_rho1d_flatness()
         append!(oneDrhos,[n/lx])
     end
 
-    for (lx,ly,n) in configs
-        local_strens,local_flats = twist_flatness_ed(lx,ly,n; if_plot=false, max_intstren=500.0)
+    #=for (lx,ly,n) in configs
+        if (lx,ly,n) == (8,7,7)
+            continue
+        end
+        local_strens,local_flats = twist_flatness_ed(lx,ly,n; if_plot=true, max_intstren=500.0)
         append!(ulrs,local_strens)
         append!(flatnesses,local_flats)
         append!(oneDrhos,ones(Float64,length(local_strens)) .* (n / lx))
-    end
+    end=#
 
     bin_count = 100
     data_dict = bin_values(flatnesses,bin_count)
@@ -202,9 +205,9 @@ function build_phase_diagram_ulr_rho1d_flatness()
 end
 
 # build_phase_diagram_ulr_rho1d for ft dd
-if true
+if false
     which_angle = 0.0
-    configs = [(8,3,3),(4,6,3),(3,8,3)]#,(8,4,4),(8,5,5)]
+    configs = [(8,3,3),(4,6,3),(3,8,3),(8,4,4),(8,5,5)]
 
     ulrs::Vector{Float64} = Float64[]
     ftdds::Vector{Float64} = Float64[]
@@ -212,17 +215,20 @@ if true
     oneDrhos::Vector{Float64} = Float64[]
 
     for (lx,ly,n) in configs
+        if (lx,ly,n) == (8,5,5)
+            continue
+        end
         local_strens,local_ftdd,local_start_ratio = get_ftdd_ratio(lx,ly,n)
         zeroint_ratios[string(round(n/lx,digits=3))] = local_start_ratio
         append!(ulrs,local_strens)
-        append!(ftdds,local_ftdd ./ local_start_ratio)
+        append!(ftdds,local_ftdd) #./ local_start_ratio)
         append!(oneDrhos,ones(Float64,length(local_strens)) .* (n / lx))
     end
 
     for (idx,config) in enumerate(configs)
         lx,ly,n = config
-        local_start_ratio = zeroint_ratios[string(round(n/lx,digits=3))]
-        append!(ftdds,[get_ftdd_ratio_1deff(lx,ly,n) / local_start_ratio])
+        #local_start_ratio = zeroint_ratios[string(round(n/lx,digits=3))]
+        append!(ftdds,[get_ftdd_ratio_1deff(lx,ly,n)]) #/ local_start_ratio])
         append!(ulrs,[900.0])
         append!(oneDrhos,[n/lx])
     end

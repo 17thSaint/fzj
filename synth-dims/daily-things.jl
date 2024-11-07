@@ -21,6 +21,7 @@ function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
     if_hatsugai::Bool = get(kwargs,:if_hatsugai,true)
     cutoff::Float64 = get(kwargs,:cutoff,1e-8)
     nrgtol::Float64 = get(kwargs,:nrgtol,1e-6)
+    mdim::Int64 = get(kwargs,:mdim,200)
 
 
     tws_count::Int64 = get(kwargs,:tws_count,10)
@@ -37,7 +38,7 @@ function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
     for (idx2,tw1) in enumerate(tws)
         for (idx3,tw2) in enumerate(tws)
 
-            params_dict = Dict([("Lphys",Lx),("Lsynth",Ly),("particles",N),("tw2",tw2),("tw1",tw1),("if_remapping",false),("es_count",2),("nrgtol",nrgtol),("cutoff",cutoff),("mdim",200),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",true),("if_save_data",true)])
+            params_dict = Dict([("Lphys",Lx),("Lsynth",Ly),("particles",N),("tw2",tw2),("tw1",tw1),("if_remapping",false),("es_count",2),("nrgtol",nrgtol),("cutoff",cutoff),("mdim",mdim),("if_periodic_phys",true),("if_periodic_synth",true),("filling",0.5),("if_find_data",true),("if_save_data",true)])
             psis,rhos,nrgs,model_paras,if_found = run_normal_1deffmps(params_dict)
             filepath = model_paras[:location]*"/"*model_paras[:name]*".jld2"
 

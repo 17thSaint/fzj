@@ -59,7 +59,7 @@ function make_density_correlations(wavefunc::MPS; kwargs...)
     
 end
 
-function ft_densitydensity_correlation(momentum_angle::Float64,wavefunc::Union{Nothing,MPS}; kwargs...)
+function ft_densitydensity_correlation(momentum_angle::Float64,momentum_radius::Float64,wavefunc::Union{Nothing,MPS}; kwargs...)
     denscorrs = get(kwargs,:denscorrs,nothing)
 	if_save::Bool = get(kwargs,:if_save,false)
 
@@ -71,7 +71,7 @@ function ft_densitydensity_correlation(momentum_angle::Float64,wavefunc::Union{N
         denscorrs = make_density_correlations(wavefunc; kwargs...)
     end
 
-    momentum = [cos(momentum_angle),sin(momentum_angle)]
+    momentum = momentum_radius .* [cos(momentum_angle),sin(momentum_angle)]
 
     all_distances::Array{Float64,4} = zeros(Float64,size(denscorrs))
     for j in 1:size(denscorrs)[1]
@@ -92,6 +92,10 @@ function ft_densitydensity_correlation(momentum_angle::Float64,wavefunc::Union{N
     end
 
     return result
+end
+
+function ft_densitydensity_correlation(momentum::Vector{Float64},wavefunc::Union{Nothing,MPS}; kwargs...)
+    return ft_densitydensity_correlation(atan(momentum[2]/momentum[1]),sqrt(momentum[1]^2 + momentum[2]^2),wavefunc; kwargs...)
 end
 
 # find or calculate ftdd ratio for all existing data of intstrens
