@@ -425,7 +425,7 @@ if false
 end
 
 # save denscorrs for all configs at all interaction strengths
-if true
+if false
     configs = [(8,3,3),(4,6,3),(3,8,3),(8,4,4)]
     for (lx,ly,n) in configs
         pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
@@ -454,13 +454,14 @@ if true
 
 end
 
-
 # getting fourier transform of density-density correlation at given angle for all phase diag configurations
-if false
-    mom_angle = 0.0
-    configs = [(8,3,3),(4,6,3),(3,8,3),(8,4,4)]
+function datacollection_ftdd(mom_angle::Float64,configs::Vector{Tuple{Int64,Int64,Int64}}=[(8,3,3),(4,6,3),(3,8,3),(8,4,4),(8,5,5)]; kwargs...)
+    hanis::Float64 = get(kwargs,:hopping_anisotropy,1.0)
+    if_redo::Bool = get(kwargs,:if_redo,false)
+    if_plot::Bool = get(kwargs,:if_plot,false)
+
     for (lx,ly,n) in configs
-        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis)])
         dataloc = get_folder_location("cluster-data/exact-diag/torus")
         all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
         
@@ -476,22 +477,32 @@ if false
 
             push!(intstrens,m["U"][end])
 
-            if !haskey(m,"ft_dd_$mom_angle")
+            if if_redo || !haskey(m,"ft_dd_$mom_angle")
 
-                println("Working on Interaction Strength: $(m["U"][end])")
+                println("Working on $(lx)x$(ly) n=$n at Interaction Strength: $(m["U"][end])")
 
                 latparas = get_lattice_params_from_metadata(m)
 
-                append!(results,[abs(ft_densitydensity_correlation(pi*mom_angle,d["state"][1],latparas; if_save=true,filepath=filepath))])
+                if !haskey(m,"dens_corr_mat")
+                    denscorrs = make_density_correlations(d["state"][1],latparas; if_save=true,filepath=filepath)
+                else
+                    denscorrs = m["dens_corr_mat"]
+                end
+
+                append!(results,[abs(ft_densitydensity_correlation(pi*mom_angle,d["state"][1],latparas; denscorrs=denscorrs,if_save=true,filepath=filepath))])
+            else
+                append!(results,[abs(m["ft_dd_$mom_angle"])])
             end
 
         end
-    end
 
-    #=fig = figure()
-    scatter(intstrens,results,c="b")
-    xlabel("Interaction Strength")
-    title("FT DD-Corr at "*L"\pi/2"*" for $(lx)x$(ly) N=$(n)")=#
+        if if_plot
+            fig = figure()
+            scatter(intstrens,results,c="b")
+            xlabel("Interaction Strength")
+            title("FT DD-Corr at $mom_angle"*L"\pi"*" for $(lx)x$(ly) N=$(n)")
+        end
+    end
     
 end
 
