@@ -280,6 +280,7 @@ end
 # make two site density correlations
 function make_density_correlations(wavefunc::Vector{ComplexF64},lattice_params::Dict; kwargs...)
     if_zero_shift::Bool = get(kwargs,:if_zero_shift,true)
+    if_save::Bool = get(kwargs,:if_save,false)
     Lphys::Int64,Lsynth::Int64 = lattice_params["Lx"],lattice_params["Ly"]
 
     density_correlations::Array{Float64,4} = zeros(Lphys,Lphys,Lsynth,Lsynth)
@@ -298,6 +299,11 @@ function make_density_correlations(wavefunc::Vector{ComplexF64},lattice_params::
                 end
             end
         end
+    end
+
+    if if_save
+        filepath = kwargs[:filepath]
+        save_dd_correlation(density_correlations,filepath)
     end
 
     return density_correlations
@@ -402,16 +408,16 @@ function get_ftdd_ratio(lx::Int64,ly::Int64,n::Int64; kwargs...)
             ft_vals = abs.([m["ft_dd_0.0"],m["ft_dd_0.5"]])
         end
         append!(intstrens,[m["U"][end]])
-        println("Finished Interaction Strength $(intstrens[end])")
+        println("Finished $(lx)x$(ly) n=$n at Interaction Strength $(intstrens[end])")
         append!(ft_ratios,[ft_vals[1] / ft_vals[2]])
     end
 
     zero_intstren_index = findfirst(x -> intstrens[x] == 0.0, 1:length(intstrens))
     starting_ratio = ft_ratios[zero_intstren_index]
-    result = ft_ratios ./ starting_ratio
+    result = ft_ratios
 
     if if_plot
-        scatter(intstrens,result)
+        scatter(intstrens,result ./ starting_ratio)
         xlabel("Interaction Strength")
         ylabel("Normalized Ratio FT-DD 0pi / pi/2")
         title("Results for $(lx)x$(ly) n=$n")

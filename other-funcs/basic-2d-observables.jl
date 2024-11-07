@@ -36,6 +36,11 @@ function save_ft_dd(ft_dd_val::ComplexF64,angle::Float64,filepath::String)
     modify_data_jld2(data_dict,filepath,"metadata"; output_level=1)
 end
 
+function save_dd_correlation(dens_corr_mat::Array{Float64},filepath::String)
+    data_dict::Dict{String,Array} = Dict([("dens_corr_mat",dens_corr_mat)])
+    modify_data_jld2(data_dict,filepath,"metadata"; output_level=1)
+end
+
 
 
 

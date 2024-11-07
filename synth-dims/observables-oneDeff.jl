@@ -20,7 +20,7 @@ function get_local_nrgs(metadata::Dict)
 end
 
 function get_correct_gs_mpsstring(metadata::Dict)
-	local_nrgs = get_local_nrgs(m)
+	local_nrgs = get_local_nrgs(metadata)
 	if local_nrgs[1] != sort(local_nrgs)[1]
 		println("Levels are not sorted")
 		which_level_gs = findfirst(x -> minimum(local_nrgs) == local_nrgs[x],1:length(local_nrgs))
@@ -32,28 +32,44 @@ function get_correct_gs_mpsstring(metadata::Dict)
 	return wavefunc_string
 end
 
+# maybe zero shift is needed
 function make_density_correlations(wavefunc::MPS; kwargs...)
+	if_save::Bool = get(kwargs,:if_save,false)
+	if_zero_shift::Bool = get(kwargs,:if_zero_shift,true)
     Lphys::Int64,Lsynth::Int64 = get_mps_dims(wavefunc)
 
-    density_correlations::Array{ComplexF64,4} = zeros(Lphys,Lphys,Lsynth,Lsynth)
+    density_correlations::Array{Float64,4} = zeros(Lphys,Lphys,Lsynth,Lsynth)
 
     for s in 1:Lsynth
         for ss in 1:Lsynth
-            corr_mat::Matrix{ComplexF64} = correlation_matrix(wavefunc,"Ns$(s)","Ns$(ss)")
+            corr_mat::Matrix{Float64} = real.(correlation_matrix(wavefunc,"Ns$(s)","Ns$(ss)"))
             density_correlations[:,:,s,ss] = corr_mat
+			if if_zero_shift
+				density_correlations[:,:,s,ss] -= real.(expect(wavefunc,"Ns$(s)")) * transpose(real.(expect(wavefunc,"Ns$(ss)")))
+			end
         end
     end
+
+	if if_save
+		filepath = kwargs[:filepath]
+		save_dd_correlation(density_correlations,filepath)
+	end
 
     return density_correlations
     
 end
 
-function ft_densitydensity_correlation(momentum_angle::Float64,wavefunc::MPS; kwargs...)
+function ft_densitydensity_correlation(momentum_angle::Float64,wavefunc::Union{Nothing,MPS}; kwargs...)
     denscorrs = get(kwargs,:denscorrs,nothing)
+	if_save::Bool = get(kwargs,:if_save,false)
+
+	if isnothing(denscorrs) && isnothing(wavefunc)
+		error("Either denscorrs or wavefunc must be provided")
+	end
+
     if isnothing(denscorrs)
         denscorrs = make_density_correlations(wavefunc; kwargs...)
     end
-    if_save::Bool = get(kwargs,:if_save,false)
 
     momentum = [cos(momentum_angle),sin(momentum_angle)]
 

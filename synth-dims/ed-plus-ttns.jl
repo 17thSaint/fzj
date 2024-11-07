@@ -215,14 +215,14 @@ if true
         local_strens,local_ftdd,local_start_ratio = get_ftdd_ratio(lx,ly,n)
         zeroint_ratios[string(round(n/lx,digits=3))] = local_start_ratio
         append!(ulrs,local_strens)
-        append!(ftdds,local_ftdd .* local_start_ratio)
+        append!(ftdds,local_ftdd ./ local_start_ratio)
         append!(oneDrhos,ones(Float64,length(local_strens)) .* (n / lx))
     end
 
     for (idx,config) in enumerate(configs)
         lx,ly,n = config
         local_start_ratio = zeroint_ratios[string(round(n/lx,digits=3))]
-        append!(ftdds,[get_ftdd_ratio_1deff(lx,ly,n)])
+        append!(ftdds,[get_ftdd_ratio_1deff(lx,ly,n) / local_start_ratio])
         append!(ulrs,[900.0])
         append!(oneDrhos,[n/lx])
     end
@@ -231,17 +231,17 @@ if true
     data_dict = bin_values(ftdds,bin_count)
     bv = [data_dict[val] for val in ftdds]
     min_nrgs2, max_nrgs2 = minimum(ftdds),maximum(ftdds)
-    #normalized_bv = [(val - minimum(bv)) / (maximum(bv) - minimum(bv)) * (max_nrgs2 - min_nrgs2) + min_nrgs2 for val in bv]
+    normalized_bv = [(val - minimum(bv)) / (maximum(bv) - minimum(bv)) * (max_nrgs2 - min_nrgs2) + min_nrgs2 for val in bv]
 
     #=fig = figure()
-    scatter(oneDrhos, ulrs, c=bv, cmap="plasma")
+    scatter(oneDrhos, ulrs, c=normalized_bv, cmap="plasma")
     colorbar()
     xlabel(L"\rho_{1D}")
     ylabel("ULR")
     title("FT-DD Ratio Phase Diagram")
     yscale("log")=#
 
-    plot_phasediag_ulrrho1d_flatness(oneDrhos,ulrs,bv,1000.0)
+    plot_phasediag_ulrrho1d_flatness(oneDrhos,ulrs,normalized_bv,1000.0)
     title("FT DD Ratio Phase Diagram")
 end
 

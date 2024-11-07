@@ -288,7 +288,7 @@ if false
     lx,ly,n = 8,3,3
     #for (idx,n) in enumerate([2,3,4,5])
     intstrens = [3,4,5,6,7,8,9,20,30,40,70,150,200,300,400]
-    #intstren = 0.0
+    intstren = 0.0
     #other_intstrens = range(2.0,10.0,length=37)
     #intstrens = sort([intstrens; other_intstrens])
     #all_nrgs = zeros(Float64,length(thetas))
@@ -299,7 +299,7 @@ if false
     #for (idx,ly) in enumerate(lys)
     #for (idx,nu) in enumerate(nus)
     #for (idx,anis) in enumerate(anises)
-    for (idx,intstren) in enumerate(intstrens)
+    #for (idx,intstren) in enumerate(intstrens)
     #for (idx2,sigma) in enumerate(sigmas)
     #for lrd in [0,1]
     #intstren = 0.0
@@ -334,7 +334,7 @@ if false
 
         states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
 
-        plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title="")
+        #plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title="")
         #plot_spectrum(tws,nrgs,idx,params_dict["nev"],"Theta_x / 2pi",false; plot_title=" V=$intstren")
 
         #=if !if_found
@@ -353,7 +353,7 @@ if false
         gammas2[idx,idx2] = gamma2=#
 
     #end
-    end
+    #end
 
     #plot_omega(collect(tws),collect(tws),omegas)
 

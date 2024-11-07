@@ -213,7 +213,7 @@ end
 
 # making ft_dd data
 if false
-    configs = [(8,3,3),(4,6,3),(3,8,3),(8,4,4),(8,5,5)]
+    configs = [(8,3,3),(4,6,3),(3,8,3)]#,(8,4,4),(8,5,5)]
     for (lx,ly,n) in configs
     #lx,ly,n = 8,3,3
         pdict = Dict([("Lphys",lx),("Lsynth",ly),("nbosons",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
@@ -247,6 +247,95 @@ if false
 
         println("Final FT-DD value for $(lx)x$(ly) n=$n is ",results)
     end
+end
+
+# save denscorrs for all configs
+if false
+    configs = [(8,3,3),(4,6,3),(3,8,3),(8,4,4),(8,5,5)]
+    for (lx,ly,n) in configs
+        pdict = Dict([("Lphys",lx),("Lsynth",ly),("nbosons",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+        dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
+        all_files = find_data_file(pdict,"mps",dataloc; output_level=0)
+        
+        filter!(x -> !occursin("twist_angle1",x),all_files)
+        filter!(x -> !occursin("mk",x),all_files)
+
+        f = all_files[1]
+
+        filepath_metadata = dataloc * "/" * f
+        filepath_wavefunc = dataloc * "/wavefunc" * f
+        d,m = read_data_jld2(filepath_metadata; output_level=0)
+
+        if !haskey(m,"dens_corr_mat")
+            d_wavefunc = read_data_jld2(filepath_wavefunc; output_level=0)
+            make_density_correlations(d_wavefunc[get_correct_gs_mpsstring(m)]; if_save=true,filepath=filepath_metadata)
+        end
+        println("Finished $(lx)x$(ly) N=$(n)")
+
+    end
+end
+
+# save ft-dd at given angle for all configs
+if false
+    configs = [(8,3,3),(4,6,3),(3,8,3),(8,4,4),(8,5,5)]
+    for (lx,ly,n) in configs
+        pdict = Dict([("Lphys",lx),("Lsynth",ly),("nbosons",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+        dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
+        all_files = find_data_file(pdict,"mps",dataloc; output_level=0)
+        
+        filter!(x -> !occursin("twist_angle1",x),all_files)
+        filter!(x -> !occursin("mk",x),all_files)
+
+        f = all_files[1]
+
+        filepath_metadata = dataloc * "/" * f
+        d,m = read_data_jld2(filepath_metadata; output_level=0)
+
+        #if !haskey(m,"dens_corr_mat")
+            denscorrs = m["dens_corr_mat"]
+            ftdd_val_0p5 = ft_densitydensity_correlation(pi/2,nothing; denscorrs=denscorrs,if_save=true,filepath=filepath_metadata)
+            ftdd_val_0p0 = ft_densitydensity_correlation(0.0,nothing; denscorrs=denscorrs,if_save=true,filepath=filepath_metadata)
+        #end
+        println("Finished $(lx)x$(ly) N=$(n)")
+
+        scatter(n/lx,abs(ftdd_val_0p5),c="b")
+        scatter(n/lx,abs(ftdd_val_0p0),c="r")
+        xlabel(L"\rho_{1D}")
+        ylabel("FT-DD Value")
+        title("FT-DD at 0pi and pi/2 ranging rho_1D")
+
+    end
+
+end
+
+
+# look at full angle range FT-DD for given configuration
+if false
+    lx,ly,n = 3,8,3
+    pdict = Dict([("Lphys",lx),("Lsynth",ly),("nbosons",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+
+    dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
+    all_files = find_data_file(pdict,"mps",dataloc; output_level=0)
+    
+    filter!(x -> !occursin("twist_angle1",x),all_files)
+    filter!(x -> !occursin("mk",x),all_files)
+
+    f = all_files[1]
+
+    filepath_metadata = dataloc * "/" * f
+    d,m = read_data_jld2(filepath_metadata; output_level=0)
+
+    denscorrs = m["dens_corr_mat"]
+
+    momenta = range(0.0,2*pi,length=100)
+    for k in momenta
+        ftdd_val = ft_densitydensity_correlation(k,nothing; denscorrs=denscorrs)
+        scatter(k / pi,abs(ftdd_val),c="b")
+    end
+    xlabel("Momenta / pi")
+    ylabel("FT-DD Value")
+    title("FT-DD for $(lx)x$(ly) N=$(n)")
+
 end
 
 

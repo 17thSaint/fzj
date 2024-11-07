@@ -420,7 +420,7 @@ function plot_phasediag_ulrrho1d_flatness(rho1Ds::Vector{Float64},ulrs::Vector{F
     # Plot data on both axes
     ax1.scatter(rho1Ds, ulrs, c=normalized_bv, cmap="viridis")
     ax2.scatter(rho1Ds, ulrs, c=normalized_bv, cmap="viridis")
-    ax2.plot([minimum(rho1Ds),maximum(rho1Ds)],[400,400],c="r",linestyle="--",label=L"\infty")
+    ax2.plot([minimum(rho1Ds),maximum(rho1Ds)],[maximum(ulrs),maximum(ulrs)],c="r",linestyle="--",label=L"\infty")
     
     # Set the ranges for each axis
     ax1.set_ylim(linear_range)  # log scale portion

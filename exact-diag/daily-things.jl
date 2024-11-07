@@ -424,6 +424,37 @@ if false
     plot_phasediag_ulrrho1d_flatness(rez...)
 end
 
+# save denscorrs for all configs at all interaction strengths
+if true
+    configs = [(8,3,3),(4,6,3),(3,8,3),(8,4,4)]
+    for (lx,ly,n) in configs
+        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+        dataloc = get_folder_location("cluster-data/exact-diag/torus")
+        all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
+        
+        filter!(x -> !occursin("twist_angle1",x),all_files)
+        filter!(x -> !occursin("mk",x),all_files)
+
+        intstrens = Float64[]
+        results = Float64[]
+        for f in all_files
+
+            display(f)
+
+            filepath = dataloc * "/" * f
+            d,m = read_data_jld2(filepath; output_level=0)
+
+            if !haskey(m,"dens_corr_mat")
+                make_density_correlations(d["state"][1],get_lattice_params_from_metadata(m); if_save=true,filepath=filepath)
+            end
+            println("Finished $(lx)x$(ly) N=$(n) U=$(m["U"][end])")
+
+        end
+    end
+
+end
+
+
 # getting fourier transform of density-density correlation at given angle for all phase diag configurations
 if false
     mom_angle = 0.0
@@ -465,7 +496,7 @@ if false
 end
 
 # phase diag with ft-dd ratio
-if true
+if false
     configs = [(8,4,4)]#[(8,3,3),(4,6,3),(3,8,3)]#,(8,4,4)]#,(8,5,5)]
 
     ulrs::Vector{Float64} = Float64[]
