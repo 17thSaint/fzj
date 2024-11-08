@@ -52,7 +52,7 @@ function get_occupancy(rho::Array{ComplexF64,2},lattice_params::Dict{String,Any}
 end
 
 function plot_occupancy(exp_occ; kwargs...)
-    fix_colorbar = get(kwargs,:fix_colorbar,false)
+    fix_colorbar = get(kwargs,:fix_colorbar,true)
 	fig = figure()
 	fix_colorbar ? imshow(exp_occ;vmin=0,vmax=maximum(exp_occ)) : imshow(exp_occ)
 	colorbar()
@@ -354,7 +354,7 @@ function findall_ft_dd(lx::Int64,ly::Int64,n::Int64; kwargs...)
     hanis::Float64 = get(kwargs,:hanis,1.0)
     if_plot::Bool = get(kwargs,:if_plot,false)
 
-    ks = range(0.0,2*pi,length=50)
+    ks = range(0.0,2*pi,length=51)
 
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis)])
     dataloc = get_folder_location("cluster-data/exact-diag/torus")

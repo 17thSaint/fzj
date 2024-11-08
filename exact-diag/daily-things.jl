@@ -532,9 +532,11 @@ end
 
 # generic size playing with FT-DD rectangle/square
 if true
-    ks = range(0.0,2*pi,length=100)
-    intstren = 100.0
-    lx,ly,n = 3,8,3
+    #=plotting_ys = []
+    ks = range(0*pi/2,2*pi/1,length=100)
+    for (lx,ly,n) in [(4,8,4),(8,4,4)]
+    intstren = 400.0
+    #lx,ly,n = 4,8,4
     params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren)])
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     all_files = find_data_file(params_dict,"ed",dataloc; output_level=0)
@@ -542,26 +544,89 @@ if true
     filter!(x -> !occursin("twist_angle1",x),all_files)
     filter!(x -> !occursin("mk",x),all_files)
 
-    f = all_files[1]
-    filepath = dataloc * "/" * f
-    d,m = read_data_jld2(filepath; output_level=0)
+    if length(all_files) == 0
+        println("No data found")
+        params_dict["if_save_data"] = false
+        params_dict["if_find_data"] = false
+        states,nrgs,rhos,filepath,if_found,latparas,hamilt_params = run_normal_ed(params_dict; output_level=1)
+        denscorrs = make_density_correlations(states[1],latparas)
+    else
+        display(all_files)
 
-    latparas = get_lattice_params_from_metadata(m)
-    denscorrs = m["dens_corr_mat"]
+        f = all_files[1]
+        filepath = dataloc * "/" * f
+        d,m = read_data_jld2(filepath; output_level=0)
+
+        latparas = get_lattice_params_from_metadata(m)
+        denscorrs = m["dens_corr_mat"]
+    end
 
     ftdd_results = zeros(Float64,length(ks),length(ks))
     for (idx,kx) in enumerate(ks)
         for (idx2,ky) in enumerate(ks)
             ftdd = ft_densitydensity_correlation([kx,ky],nothing,latparas; denscorrs=denscorrs,if_save=false,filepath=filepath)
-            ftdds[idx,idx2] = abs(ftdd)
+            ftdd_results[idx,idx2] = abs(ftdd)
         end
     end
-    fig = figure()
-    imshow(reverse(ftdds,dims=1),extent=(0,2*pi,0,2*pi),origin="lower")
+
+    norm_factor = integrate_2d_matrix(ftdd_results)
+    ftdd_results = ftdd_results ./ norm_factor
+
+    if lx == 4
+        append!(plotting_ys,[[ftdd_results[1,:]]])
+    elseif lx == 8
+        append!(plotting_ys,[[ftdd_results[:,1]]])
+    end
+
+    #=fig = figure()
+    imshow(ftdd_results,extent=(minimum(ks),maximum(ks),minimum(ks),maximum(ks)),origin="lower")
     xlabel(L"k_x")
     ylabel(L"k_y")
     colorbar()
     title("FT-DD for $(lx)x$(ly) N=$(n) ULR=$intstren")
+
+    fig = figure()
+    plot(ks ./ pi,ftdd_results[1,:])
+    xlabel(L"k_x")
+    title("FT-DD at ky=0 for $(lx)x$(ly) N=$(n) ULR=$intstren")
+
+    fig = figure()
+    plot(ks ./ pi,ftdd_results[:,1])
+    xlabel(L"k_y")
+    title("FT-DD at kx=0 for $(lx)x$(ly) N=$(n) ULR=$intstren")=#
+
+    #get_occupancy(d["state"][1],latparas; plot_title=" $(lx)x$(ly) N=$(n) ULR=$intstren")
+    end=#
+
+    fig, ax = subplots()
+
+    x1 = collect(ks)
+    x2 = collect(ks)
+    y1 = plotting_ys[1][1]
+    y2 = plotting_ys[2][1]
+
+    # Plot the first line
+    ax.plot(x1, y1, c="b", label=L"\rho_{1D}"*"=1.0")
+    ax.set_xlabel(L"k_x")
+    ax.set_ylabel("FT-DD at ULR=400.0")
+    ax.tick_params(axis="x", colors="b")
+
+    # Create a twin x-axis
+    ax2 = ax.twiny()
+
+    # Plot the second line on the twin x-axis
+    ax2.plot(x2, y2, color="r", label=L"\rho_{1D}"*"=0.5")
+    ax2.set_xlabel(L"k_y")
+    ax2.tick_params(axis="x", colors="r")
+
+    # Add a legend
+    lines1, labels1 = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax.legend(loc="upper left")
+    ax2.legend(loc="upper right")
+
+    # Adjust the layout
+    tight_layout()
 end
 
 

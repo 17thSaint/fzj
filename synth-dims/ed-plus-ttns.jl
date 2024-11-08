@@ -206,7 +206,6 @@ end
 
 # build_phase_diagram_ulr_rho1d for ft dd
 if true
-    which_angle = 0.0
     configs = [(8,3,3),(4,6,3),(3,8,3),(8,4,4),(8,5,5)]
 
     ulrs::Vector{Float64} = Float64[]
@@ -214,21 +213,18 @@ if true
     oneDrhos::Vector{Float64} = Float64[]
 
     for (lx,ly,n) in configs
-        if (lx,ly,n) == (8,5,5)
-            continue
-        end
-        local_strens,local_ftdd,local_ftmax_locs = findall_ft_dd(lx,ly,n; if_plot=false)
+        local_strens,local_ftdd = findall_ft_dd(lx,ly,n; if_plot=false)
         append!(ulrs,local_strens)
-        append!(ftdds,local_ftdd)
+        append!(ftdds,1 ./ local_ftdd)
         append!(oneDrhos,ones(Float64,length(local_strens)) .* (n / lx))
     end
 
-    for (idx,config) in enumerate(configs)
+    #=for (idx,config) in enumerate(configs)
         lx,ly,n = config
         append!(ftdds,[findall_ft_dd_1deff(lx,ly,n)])
         append!(ulrs,[900.0])
         append!(oneDrhos,[n/lx])
-    end
+    end=#
 
     bin_count = 100
     data_dict = bin_values(ftdds,bin_count)
@@ -245,7 +241,7 @@ if true
     yscale("log")=#
 
     plot_phasediag_ulrrho1d_flatness(oneDrhos,ulrs,normalized_bv,1000.0)
-    title("FT DD Ratio Phase Diagram")
+    title("Inverse FT DD Max Phase Diagram")
 end
 
 # check perturbative 1Deff against ED # it seems this only works for rho1D = 1/2 and 1.0

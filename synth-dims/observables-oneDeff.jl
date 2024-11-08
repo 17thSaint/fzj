@@ -105,7 +105,7 @@ end
 function findall_ft_dd_1deff(lx::Int64,ly::Int64,n::Int64; kwargs...)
     hanis::Float64 = get(kwargs,:hanis,1.0)
 
-	ks = range(0,stop=2*pi,length=50)
+	ks = range(0,stop=2*pi,length=51)
 
     pdict = Dict([("Lphys",lx),("Lsynth",ly),("nbosons",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
