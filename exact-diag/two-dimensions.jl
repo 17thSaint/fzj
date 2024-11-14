@@ -906,8 +906,6 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
 
         end
     end
-
-    # onsite potential
     
 
     if hamilt_params["disorder_strength"] != 0.0
@@ -934,6 +932,18 @@ function buildHam(lattice_params::Dict,hamilt_params::Dict; kwargs...)
             println(round(j/size(full_basis)[2]*100,digits=2),"% done.")
         end
     end
+
+    # onsite pinning potential
+    if haskey(hamilt_params,"if_pinning") && hamilt_params["if_pinning"]
+        pinning_strength::ComplexF64 = 1E-4
+        ham[1,1] += pinning_strength
+        previous_basis_index = [1]
+        for i in 1:(lattice_params["Lx"]*lattice_params["Ly"]) - 1
+            previous_basis_index[1] += i
+            ham[previous_basis_index[1],previous_basis_index[1]] += pinning_strength
+        end
+    end
+
 
     return ham
 end

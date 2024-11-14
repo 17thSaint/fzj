@@ -190,8 +190,10 @@ function get_normal_model_params_ed(params_dict::Dict)
     if_check_fluxes ? flux_dir = check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y,flux_dir; output_level=opl) : nothing
 
     disorder_strength::Float64 = get(params_dict,"disorder_strength",0.0)
+    if_pinning::Bool = get(params_dict,"if_pinning",false)
     hamilt_params::Dict{String,Any} = Dict("alpha"=>alpha,
                         "flux_direction"=>flux_dir,
+                        "if_pinning"=>if_pinning,
                         "tx"=>tx,
                         "ty"=>ty,
                         "hopping_anisotropy"=>hopping_anisotropy,
@@ -283,11 +285,12 @@ function run_normal_ed(params_dict::Dict; kwargs...)
 end
 
 # run data collection with for loops
-if false
+if true
     
-    lx,ly,n = 4,8,4
+    lx,ly,n = 6,3,3
     #for (idx,n) in enumerate([2,3,4,5])
-    intstrens = [3,4,5,6,7,8,9,20,30,40,70,150,200,300,400]
+    intstrens = range(0.0,10.0,length=10)#[3,4,5,6,7,8,9,20,30,40,70,150,200,300,400]
+    #intstren = 0.0
     #other_intstrens = range(2.0,10.0,length=37)
     #intstrens = sort([intstrens; other_intstrens])
     #all_nrgs = zeros(Float64,length(thetas))
@@ -328,14 +331,22 @@ if false
         #    continue
         #end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_pinning",true),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
         states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
-        make_density_correlations(states[1],lattice_params; if_save=true,filepath=filepath)
+        #make_density_correlations(states[1],lattice_params; if_save=true,filepath=filepath)
+        if idx == 1
+            get_occupancy(states[1],lattice_params; fix_colorbar=false,plot_title=" ULR=$intstren")
+            fig = figure()
+        end
 
-        #plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title="")
+        plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title="")
         #plot_spectrum(tws,nrgs,idx,params_dict["nev"],"Theta_x / 2pi",false; plot_title=" V=$intstren")
+
+        if idx == 10
+            get_occupancy(states[1],lattice_params; fix_colorbar=false,plot_title=" ULR=$intstren")
+        end
 
         #=if !if_found
             gamma1,gamma2,omega = get_hatsugaifull(states[1],states[2],ref_multiplets; if_save=true,filepath=filepath,ref_multis_filenames=[rm1_name,rm2_name])
