@@ -309,6 +309,67 @@ function make_density_correlations(wavefunc::Vector{ComplexF64},lattice_params::
     return density_correlations
 end
 
+# finds the distance correlation of density-density along physical direction
+function get_dd_distance_correlations_physical(dens_corr_mat::Array{Float64}; kwargs...)
+    if_plot::Bool = get(kwargs,:if_plot,true)
+    Lphys::Int64 = size(dens_corr_mat)[1]
+    Lsynth::Int64 = size(dens_corr_mat)[3]
+
+    distances::Vector{Int64} = collect(1:Lphys-1)
+    distance_correlations::Vector{Float64} = zeros(Float64,Lphys-1)
+
+    for j in 1:Lphys
+        for d in 1:Lphys-1
+            next_site = mod1(j+d,Lphys)
+            for s in 1:Lsynth
+                distance_correlations[d] += dens_corr_mat[j,next_site,s,s] / Lsynth
+            end
+        end
+    end
+
+    if_plot ? plot_distdensdenscorrs(distances,distance_correlations,"Physical"; kwargs...) : nothing
+
+    return distances,distance_correlations
+end
+
+# finds the distance correlation of density-density along synthetic direction
+function get_dd_distance_correlations_synthetic(dens_corr_mat::Array{Float64}; kwargs...)
+    if_plot::Bool = get(kwargs,:if_plot,true)
+    Lphys::Int64 = size(dens_corr_mat)[1]
+    Lsynth::Int64 = size(dens_corr_mat)[3]
+
+    distances::Vector{Int64} = collect(1:Lsynth-1)
+    distance_correlations::Vector{Float64} = zeros(Float64,Lsynth-1)
+
+    for s in 1:Lsynth
+        for d in 1:Lsynth-1
+            next_site = mod1(s+d,Lsynth)
+            for j in 1:Lphys
+                distance_correlations[d] += dens_corr_mat[j,j,s,next_site] / Lphys
+            end
+        end
+    end
+
+    if_plot ? plot_distdensdenscorrs(distances,distance_correlations,"Synthetic"; kwargs...) : nothing
+
+    return distances,distance_correlations
+end
+
+# finds the distance correlation of density-density for given direction
+function get_distDDcorrs(dens_corr_mat::Array{Float64},direction::String; kwargs...)
+    if direction == "x"
+        return get_dd_distance_correlations_physical(dens_corr_mat; kwargs...)
+    elseif direction == "y"
+        return get_dd_distance_correlations_synthetic(dens_corr_mat; kwargs...)
+    elseif direction == "both"
+        dists1,corrs1 = get_dd_distance_correlations_physical(dens_corr_mat; kwargs...)
+        dists2,corrs2 = get_dd_distance_correlations_synthetic(dens_corr_mat; kwargs...)
+        return dists1,corrs1,dists2,corrs2
+    else
+        error("Invalid direction")
+    end
+end
+
 function ft_densitydensity_correlation(momentum_angle::Float64,momentum_radius::Float64,wavefunc::Union{Nothing,Vector{ComplexF64}},lattice_params::Union{Dict,Nothing}; kwargs...)
     denscorrs = get(kwargs,:denscorrs,nothing)
     if isnothing(denscorrs)

@@ -10,8 +10,8 @@ Depends on:
 ######################################################
 
 include("execute-ed.jl")
-#include("plottings.jl")
-#include("../other-funcs/basic-2d-plottings.jl")
+include("plottings.jl")
+include("../other-funcs/basic-2d-plottings.jl")
 
 function datacollection_flatness(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
     hanis::Float64 = get(kwargs,:hopping_anisotropy,1.0)
@@ -532,11 +532,11 @@ end
 
 # generic size playing with FT-DD rectangle/square
 if true
-    #=plotting_ys = []
-    ks = range(0*pi/2,2*pi/1,length=100)
-    for (lx,ly,n) in [(4,8,4),(8,4,4)]
-    intstren = 400.0
-    #lx,ly,n = 4,8,4
+    ks = collect(range(0*pi/2,2*pi/1,length=100))
+    intstren = 0.0
+    lx,ly,n = 8,4,4
+    allowed_momenta_physical = filter(x-> x<2*pi+0.01,[2*pi*i / (lx/1) for i in 0:20])
+    allowed_momenta_synthetic = filter(x-> x<2*pi+0.01,[2*pi*i / (ly/1) for i in 0:20])
     params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren)])
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     all_files = find_data_file(params_dict,"ed",dataloc; output_level=0)
@@ -572,13 +572,22 @@ if true
     norm_factor = integrate_2d_matrix(ftdd_results)
     ftdd_results = ftdd_results ./ norm_factor
 
-    if lx == 4
+    #=if lx == 4
         append!(plotting_ys,[[ftdd_results[1,:]]])
     elseif lx == 8
         append!(plotting_ys,[[ftdd_results[:,1]]])
-    end
+    end=#
 
-    #=fig = figure()
+    #=allow_physmom_index = zeros(Int,length(allowed_momenta_physical))
+    for (idx,ak) in enumerate(allowed_momenta_physical)
+        allow_physmom_index[idx] = findfirst(x -> isapprox(x,ak;atol=1e-2),ks)
+    end
+    allow_synmom_index = zeros(Int,length(allowed_momenta_synthetic))
+    for (idx,ak) in enumerate(allowed_momenta_synthetic)
+        allow_synmom_index[idx] = findfirst(x -> isapprox(x,ak;atol=1e-2),ks)
+    end=#
+
+    fig = figure()
     imshow(ftdd_results,extent=(minimum(ks),maximum(ks),minimum(ks),maximum(ks)),origin="lower")
     xlabel(L"k_x")
     ylabel(L"k_y")
@@ -586,19 +595,29 @@ if true
     title("FT-DD for $(lx)x$(ly) N=$(n) ULR=$intstren")
 
     fig = figure()
-    plot(ks ./ pi,ftdd_results[1,:])
+    these_ys = ftdd_results[1,:]
+    plot(ks ./ pi,these_ys)
+    for k in allowed_momenta_synthetic
+        plot([k / pi,k/pi],[minimum(these_ys),maximum(these_ys)],c="r")
+    end
     xlabel(L"k_x")
     title("FT-DD at ky=0 for $(lx)x$(ly) N=$(n) ULR=$intstren")
 
     fig = figure()
-    plot(ks ./ pi,ftdd_results[:,1])
+    these_ys = ftdd_results[:,Int(round(length(ks)/2,digits=0))]
+    plot(ks ./ pi,these_ys)
+    for k in allowed_momenta_physical
+        plot([k / pi,k/pi],[minimum(these_ys),maximum(these_ys)],c="r")
+    end
     xlabel(L"k_y")
-    title("FT-DD at kx=0 for $(lx)x$(ly) N=$(n) ULR=$intstren")=#
+    title("FT-DD at kx=pi for $(lx)x$(ly) N=$(n) ULR=$intstren")
+
+    get_distDDcorrs(denscorrs,"both"; plot_title=" $(lx)x$(ly) N=$(n) ULR=$intstren")
 
     #get_occupancy(d["state"][1],latparas; plot_title=" $(lx)x$(ly) N=$(n) ULR=$intstren")
-    end=#
+    #end
 
-    fig, ax = subplots()
+    #=fig, ax = subplots()
 
     x1 = collect(ks)
     x2 = collect(ks)
@@ -626,7 +645,7 @@ if true
     ax2.legend(loc="upper right")
 
     # Adjust the layout
-    tight_layout()
+    tight_layout()=#
 end
 
 

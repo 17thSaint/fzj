@@ -90,6 +90,8 @@ function plot_nrg_vs_intstren_fromdata_ed(lx::Int64,ly::Int64,which_strens::Unio
 
     all_files = find_data_file(pdict,"ed",dataloc)
 
+    display(all_files)
+
     nrgs::Dict{String,Vector{Float64}} = Dict([("1",Float64[])])
     for i in 2:levels_count
         nrgs[string(i)] = []
@@ -136,13 +138,29 @@ end
 
 # look at finite size scaling of commensurate filling interaction strength spectrum
 if false
-    eight_xs, eight_ys = plot_nrg_vs_intstren_fromdata_ttn(6; particles=8, if_gap=true)
-    plot_nrg_vs_intstren_fromdata_ed(4,8; particles=4, if_gap=true)
-    plot_nrg_vs_intstren_fromdata_ed(3,8; particles=3, if_gap=true)
-    plot_nrg_vs_intstren_fromdata_ed(5,8; particles=5, if_gap=true)
-    #twist_flatness_ed(3,8,3; if_plot=true)
-    #twist_flatness_ed(4,8,4; if_plot=true)
-    #twist_flatness_ed(5,8,5; if_plot=true)
+    eight_xs, eight_ys = plot_nrg_vs_intstren_fromdata_ttn(6; particles=8, if_gap=true,if_plot=false)
+    four_xs, four_ys = plot_nrg_vs_intstren_fromdata_ed(4,8; particles=4, if_gap=true,if_plot=false)
+    three_xs, three_ys = plot_nrg_vs_intstren_fromdata_ed(3,8; particles=3, if_gap=true,if_plot=false)
+    five_xs, five_ys = plot_nrg_vs_intstren_fromdata_ed(5,8; particles=5, if_gap=true,if_plot=false)
+
+    eight_23gap = eight_ys["3"] .- eight_ys["2"]
+    four_23gap = four_ys["3"] .- four_ys["2"]
+    three_23gap = three_ys["3"] .- three_ys["2"]
+    five_23gap = five_ys["3"] .- five_ys["2"]
+
+    cols = get_cmap("plasma")
+    divisor = 7
+
+    fig = figure()
+    plot(three_xs,three_23gap,"-p",c=cols(4/divisor),label="ED 3x8")
+    plot(four_xs,four_23gap,"-p",c=cols(3/divisor),label="ED 4x8")
+    plot(five_xs,five_23gap,"-p",c=cols(2/divisor),label="ED 5x8")
+    plot(eight_xs,eight_23gap,"-p",c=cols(1/divisor),label="TTN 8x8")
+    xlim([-0.1,2.1])
+    ylim([-0.1,0.7])
+    legend()
+    xlabel("Interaction Strength")
+    ylabel("E3 - E2")
 end
 
 # check the NRGs of synth-rectangle TTNs vs ED

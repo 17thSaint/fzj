@@ -309,7 +309,6 @@ if false
 
 end
 
-
 # look at full angle range FT-DD for given configuration
 if false
     lx,ly,n = 3,8,3
@@ -337,6 +336,28 @@ if false
     ylabel("FT-DD Value")
     title("FT-DD for $(lx)x$(ly) N=$(n)")
 
+end
+
+# remove all seed_ttn data and set to nothing
+if false
+    dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
+    all_files = readdir(dataloc)
+    filter!(x -> occursin("ttn",x),all_files)
+    println("Found $(length(all_files)) files")
+    seed_count = 0
+    for f in all_files
+        bf = jldopen(dataloc * "/" * f,"a+")
+        m = bf["metadata"]
+        if haskey(m,"seed_ttn") && !isnothing(m["seed_ttn"])
+            global seed_count += 1
+            close(bf)
+            modify_data_jld2(Dict([("seed_ttn",nothing)]),dataloc * "/" * f,"metadata"; output_level=0)
+            println("Removed from $f")
+        else
+            close(bf)
+        end
+    end
+    println("Of the $(length(all_files)) files, $(seed_count) had seed_ttn data")
 end
 
 

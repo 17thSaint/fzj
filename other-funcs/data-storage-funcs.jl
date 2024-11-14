@@ -471,6 +471,7 @@ function read_data_jld2(file_name,location=pwd(); kwargs...)
 	end
 	
 	close(binary_file)
+	close(binary_file)
 	cd(og_location)
 	if output_bool > 0
 		println("Data Extracted, File Closed: $file_name")
@@ -515,12 +516,19 @@ end
 function modify_data_jld2(to_modify_dict::Dict,file_path, which_group="all_data"; kwargs...)
 	output_level = get(kwargs, :output_level, 0)
 
-	file_name = split(file_path,"/")[end]
-	file_name = make_sure_file_type(file_name,"jld2")
-	file_path = join(split(file_path,"/")[1:end-1],"/") * "/" * file_name
+	println("Starting with $file_path")
+
+	if length(split(file_path,"/")) < 2
+		output_level > 0 ? println("No directory splits in input: $file_path") : nothing
+		file_name = make_sure_file_type(file_path,"jld2")
+	else
+		file_name = split(file_path,"/")[end]
+		file_name = make_sure_file_type(file_name,"jld2")
+		file_path = join(split(file_path,"/")[1:end-1],"/") * "/" * file_name
+	end
 
 	# Open the JLD2 file in write mode
-	jld_file = jldopen(file_path, "a+")
+	jld_file = jldopen(file_path, "r+")
 	data_dict = jld_file[which_group]
 
 	# Check if the key exists in the file

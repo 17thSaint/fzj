@@ -907,6 +907,9 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
         end
     end
 
+    # onsite potential
+    
+
     if hamilt_params["disorder_strength"] != 0.0
         local_disorder_strength = rand() * hamilt_params["disorder_strength"] * 2 - hamilt_params["disorder_strength"]
         push!(output_weights,local_disorder_strength)

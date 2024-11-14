@@ -12,7 +12,7 @@ Depends on:
 =#
 ######################################################
 
-using PyPlot,LaTeXStrings
+using LaTeXStrings,PyPlot
 
 function get_colors(nev::Int)
     cols = ["b","g","r","m","c"]

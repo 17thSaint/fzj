@@ -1702,7 +1702,6 @@ function run_synth_dims_generic(params_dict::Dict)
 		starting = time()
 		net = build_HH_net(model_paras)
 		ham = long_range_HH_ham(net,model_paras[:ts],model_paras[:alpha]; model_paras...)
-		display(ham)
 		metadata_dict["ham"] = ham
 		metadata_dict["net"] = net
 		if es_count > 0
@@ -1933,11 +1932,11 @@ if false
 	#alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
 	#strens = [0.0,0.5,1.0,1.5,2.0]#range(0.1,0.5,length=3)
 	#for (idx,anis) in enumerate(anises)
-	for (idx,stren) in enumerate(strens)
+	#for (idx,stren) in enumerate(strens)
 	#tws = range(0.0,1.0,length=10)
 	#for tw1 in tws
 	#for tw2 in tws
-		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",2),("if_synth_rectangle",true),("particles",8),("layers",7),("mdim",500),("if_save_data",true),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",3),("if_synth_rectangle",true),("expander_fraction",0.001),("particles",8),("layers",7),("mdim",300),("if_save_data",true),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		open_cores = get(params_dict, "open_cores", 5)
@@ -2041,7 +2040,7 @@ if false
 			fig = figure()
 			scatter(collect(1:mdim),-log.(specs))
 			=#
-	end
+	#end
 #end
 end
 

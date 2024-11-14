@@ -287,7 +287,7 @@ if false
     
     lx,ly,n = 4,8,4
     #for (idx,n) in enumerate([2,3,4,5])
-    intstrens = [400.0]#[3,4,5,6,7,8,9,20,30,40,70,150,200,300,400]
+    intstrens = [3,4,5,6,7,8,9,20,30,40,70,150,200,300,400]
     #other_intstrens = range(2.0,10.0,length=37)
     #intstrens = sort([intstrens; other_intstrens])
     #all_nrgs = zeros(Float64,length(thetas))

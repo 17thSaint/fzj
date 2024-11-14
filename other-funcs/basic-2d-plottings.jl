@@ -6,7 +6,7 @@ This file contains useful plotting functions for 2D physics
 =#
 ######################################################
 
-using PyPlot,LaTeXStrings
+using LaTeXStrings,PyPlot
 
 function range_cdwsf_angles(points_count::Int64,dens_corr_mat::Array{Float64},radius::Int64=1; kwargs...)
     if_plot::Bool = get(kwargs,:if_plot,true)
@@ -227,6 +227,17 @@ function plot_twisting_spectrum(tw1s::Vector{Float64},tw2s::Vector{Float64},nrgs
     ylabel(L"\theta_y / 2\pi")
     zlabel("Energy")
     title("Spectrum "*plot_title)
+end
+
+# plot distance density-density correlation function
+function plot_distdensdenscorrs(distances::Vector{Int64},denscorrs::Vector{Float64},which_direction::String; kwargs...)
+    plot_title::String = get(kwargs,:plot_title,"")
+
+    fig = figure()
+    plot(distances,denscorrs,"-p")
+    xlabel("Distance")
+    ylabel("Density-Density Correlation")
+    title("$which_direction Density-Density Correlation "*plot_title)
 end
 
 
