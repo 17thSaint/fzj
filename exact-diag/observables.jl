@@ -376,7 +376,7 @@ function ft_densitydensity_correlation(momentum_angle::Float64,momentum_radius::
         denscorrs = make_density_correlations(wavefunc,lattice_params; kwargs...)
         lx,ly = lattice_params["Lx"],lattice_params["Ly"]
     else
-        lx,ly = size(denscorrs)[1],size(denscorrs)[3]
+        ly,lx = size(denscorrs)[1],size(denscorrs)[3]
     end
     if_save::Bool = get(kwargs,:if_save,false)
 
@@ -410,6 +410,27 @@ function ft_densitydensity_correlation(momentum::Vector{Float64},wavefunc::Union
         return ft_densitydensity_correlation(atan(momentum[2]/momentum[1]),sqrt(momentum[1]^2 + momentum[2]^2),wavefunc,lattice_params; kwargs...)
     end
 end
+
+function ft_density(momentum::Vector{Float64},occs::Matrix{Float64}; kwargs...)
+    ly,lx = size(occs)
+
+    all_positions::Array{Float64,2} = zeros(Float64,ly,lx)
+    for j in 1:lx
+        for s in 1:ly
+            all_positions[s,j] = dot(momentum,[j,s])
+        end
+    end
+
+    result::ComplexF64 = sum(occs .* exp.(im .* all_positions)) / (lx * ly)
+
+    return result
+end
+
+function ft_density(momentum::Vector{Float64},wavefunc::Vector{ComplexF64},lattice_params::Dict; kwargs...)
+    occs = get_occupancy(wavefunc,lattice_params; if_plot=false)
+    return ft_density(momentum,occs; kwargs...)
+end
+
 
 function findall_ft_dd(lx::Int64,ly::Int64,n::Int64; kwargs...)
     hanis::Float64 = get(kwargs,:hanis,1.0)

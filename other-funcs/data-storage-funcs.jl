@@ -207,11 +207,14 @@ end
 
 function find_data_file(params_dict,calc_type,location="/home/patrick/fzj/main-git/cluster-data"; kwargs...)
 	file_type = get(kwargs, :file_type, "jld2")
+	if_exact::Bool = get(kwargs,:if_exact,false)
 	og_loc = pwd()
 	cd(location)
 	
+	# start with all files with the directory
 	file_choices = readdir()
 	
+	# remove all files that are not correct data storage type, pretty much always JLD2
 	remove_indices = []
 	for i in 1:length(file_choices)
 		split(file_choices[i],".")[end] != file_type ? append!(remove_indices,[i]) : nothing
@@ -219,6 +222,7 @@ function find_data_file(params_dict,calc_type,location="/home/patrick/fzj/main-g
 	deleteat!(file_choices,remove_indices)
 	remove_indices = []
 
+	# remove all files that are not the correct calculation type
 	for i in 1:length(file_choices)
 		current_calc_type = split(file_choices[i],"-")[1]
 		current_calc_type in ["virt","phys","Y","X"] ? current_calc_type = join(split(file_choices[i],"-")[1:3],"-") : nothing
@@ -226,23 +230,38 @@ function find_data_file(params_dict,calc_type,location="/home/patrick/fzj/main-g
 	end
 	deleteat!(file_choices,remove_indices)
 
+	# remove all files that do not have the correct parameters
 	remove_indices = []
-	for i in 1:length(file_choices)
-		current_file = file_choices[i]
-		current_file_params_dict = get_params_dict_from_filename(current_file)
-		for params in keys(params_dict)
-			try
-				current_file_params_dict[params] in params_dict[params] ? nothing : append!(remove_indices,i)
-			catch
-				#=try
-					#println("Error in first Attempt, $current_file")
-					current_file_metadata_dict = read_data_jld2(current_file; kwargs...)[2]
-					current_file_metadata_dict[params] in params_dict[params] ? nothing : append!(remove_indices,i)
-				catch
-					#println("Parameter $params could not be found in file $current_file, skipping")
-					append!(remove_indices,i)
-				end=#
+	# this is for finding a single file with all the correct parameters in the filename
+	if if_exact
+		for i in 1:length(file_choices)
+			current_file = file_choices[i]
+			current_file_params_dict = get_params_dict_from_filename(current_file)
+			if current_file_params_dict == params_dict
+				continue
+			else
 				append!(remove_indices,i)
+			end
+		end
+	# use this version for finding a large number of data files with a few common parameters
+	else
+		for i in 1:length(file_choices)
+			current_file = file_choices[i]
+			current_file_params_dict = get_params_dict_from_filename(current_file)
+			for params in keys(params_dict)
+				try
+					current_file_params_dict[params] in params_dict[params] ? nothing : append!(remove_indices,i)
+				catch
+					#=try
+						#println("Error in first Attempt, $current_file")
+						current_file_metadata_dict = read_data_jld2(current_file; kwargs...)[2]
+						current_file_metadata_dict[params] in params_dict[params] ? nothing : append!(remove_indices,i)
+					catch
+						#println("Parameter $params could not be found in file $current_file, skipping")
+						append!(remove_indices,i)
+					end=#
+					append!(remove_indices,i)
+				end
 			end
 		end
 	end
@@ -310,7 +329,7 @@ function check_data_exists(filename::AbstractString,data_type="observer"; kwargs
     return false,nothing
 end
 
-function check_duplicates(file_name)
+#=function check_duplicates_old(file_name)
 	split_period_name = split(file_name,".")
 	file_type = split_period_name[end]
 	file_string = join(split_period_name[1:end-1],".")
@@ -335,12 +354,39 @@ function check_duplicates(file_name)
 	return rename,file_name
 end
 
-function check_duplicates(filename,location)
+function check_duplicates_old(filename,location)
 	og_loc = pwd()
 	cd(location)
 	result = check_duplicates(filename)
 	cd(og_loc)
 	return result
+end=#
+
+function check_duplicates(full_file_name::String)
+	if length(split(full_file_name,"/")) > 1
+		location = join(split(full_file_name,"/")[1:end-1],"/")
+		file_name = split(full_file_name,"/")[end]
+	else
+		file_name = full_file_name
+	end
+	rename = false
+	if file_name in readdir()
+		rename = true
+	end
+	while file_name in readdir()
+		string_elems = split(file_name,"-")
+		if "mk" in string_elems
+			mk_number_loc = findfirst(x -> x == "mk",string_elems) + 1
+			string_elems[mk_number_loc] = string(parse(Int,string_elems[mk_number_loc]) + 1)
+		else
+			append!(string_elems,["mk","2"])
+		end
+		file_name = join(string_elems,"-")
+	end
+	if rename
+		println("Found Duplicate File, renaming $file_name")
+	end
+	return rename,file_name
 end
 
 function prep_file(file_name,desired_type)

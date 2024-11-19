@@ -277,37 +277,6 @@ if false
     legend()=#
 end
 
-# try charge pumping
-if false
-    lx,ly,n = 6,6,3
-    nev = 10
-
-    intstren = 0.0
-    tws = [0.0,0.5]#range(0.0,1.0,length=21)
-
-    pumped_charge = 0.0
-    cppuls = zeros(Float64,length(tws))
-    for (idx,tw1) in enumerate(tws)
-        params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("nev",nev),("tw1",tw1),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("if_find_data",false),("if_save_data",false)])
-        states,nrgs,rhos,filepath,if_found,latpara,hamiltpara = run_normal_ed(params_dict; output_level=1)
-
-        occs = get_occupancy(states[1],latpara; if_plot=false)
-        cppuls[idx] = sum([sum(occs[i,:] .* i) for i in 1:ly])
-        #=if idx == 1
-            global pumped_charge += cppul
-        else
-            global pumped_charge -= cppul
-        end=#
-        #plot_spectrum(tws,nrgs,idx,params_dict["nev"],L"\theta_x / 2 \pi",true; plot_title=" $(params_dict["Lx"])x$(params_dict["Ly"]) N=$(params_dict["N"]) ULR=$intstren")
-    end
-    #fig = figure()
-    #scatter(tws,cppuls,c="b")
-    #xlabel(L"\theta_x / 2 \pi")
-    #ylabel("Charge Polarization per Unit Length")
-    println("Pumped charge Q = $(round(cppuls[end] - cppuls[1],digits=3))")
-
-end
-
 # compare twisting for ED/1DeffMPS 4x4 n=2
 if false
     nev = 3
@@ -335,7 +304,7 @@ if false
 
 end
 
-# hatsugai for 3x7 n=3 data collection
+# hatsugai data collection from including ed data
 if false
     lx,ly,n = 3,7,3
     nev = 3
@@ -394,7 +363,7 @@ if false
     scatter(closing_stren,1.0,c="r",label="Guess")
 end
 
-# hatsugai data collection for (8,3,3)
+# hatsugai data collection from existing ed data
 if false
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     lx,ly,n = 8,3,3
@@ -531,7 +500,7 @@ if false
 end
 
 # generic size playing with FT-DD rectangle/square
-if true
+if false
     ks = collect(range(0*pi/2,2*pi/1,length=100))
     intstren = 0.0
     lx,ly,n = 8,4,4
@@ -647,6 +616,93 @@ if true
     # Adjust the layout
     tight_layout()=#
 end
+
+# phase transition by fourier transform of density profile at k=(pi,0) for given configs
+if false
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    ks = range(0,2*pi,length=50)
+    configs = [(6,4,3),(8,4,4),(10,4,5)]
+    for (lx,ly,n) in configs
+    if_pinning = true
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
+
+    filter!(x -> !occursin("twist_angle1",x),all_files)
+    filter!(x -> !occursin("mk",x),all_files)
+    filter!(x -> occursin("if_pinning",x),all_files)
+
+    display(all_files)
+
+    cdw_sfs = Float64[]
+    intstrens = Float64[]
+    for f in all_files
+
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+
+        append!(intstrens,m["U"][end])
+
+        if intstrens[end] == 0.0 || intstrens[end] == 1000.0 || (lx == 10 && isapprox(200.0,intstrens[end],atol=10.0))
+            if_plot = true
+        else
+            if_plot = false
+        end
+
+        latparas = get_lattice_params_from_metadata(m)
+        occs = get_occupancy(d["state"][1],latparas; if_plot=false,plot_title="$(lx)x$(ly) n=$n ULR=$(m["U"][end])")
+        ftd = ft_density([pi,0],occs)
+        append!(cdw_sfs,[abs(ftd)])
+
+    end
+
+    #fig = figure()
+    scatter(intstrens,cdw_sfs,label="$(lx)x$(ly)")
+    xlabel("Interaction Strength")
+    ylabel("CDW SF at k=(pi,0)")
+    title("CDW SF at "*L"\rho_{1D}=1/2")
+    xscale("log")
+    legend()#
+    end
+end
+
+# look at FT-D for ks range for other rho1D
+if false
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    ks = range(0,2*pi,length=50)
+    lx,ly,n = 9,3,3
+    if_pinning = true
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
+
+    filter!(x -> !occursin("twist_angle1",x),all_files)
+    filter!(x -> !occursin("mk",x),all_files)
+    filter!(x -> occursin("if_pinning",x),all_files)
+
+    filter!(x -> occursin("interaction_strength-1000.0-",x),all_files)
+    f = all_files[1]
+
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+        latparas = get_lattice_params_from_metadata(m)
+        occs = get_occupancy(d["state"][1],latparas; if_plot=true,plot_title="ULR=$(m["U"][end])")
+
+        ftds = zeros(Float64,length(ks),length(ks))
+        for (idx,kx) in enumerate(ks)
+            for (idx2,ky) in enumerate(ks)
+                ftd = ft_density([kx,ky],occs)
+                ftds[idx,idx2] = abs(ftd)
+            end
+        end
+        fig = figure()
+        imshow(ftds,extent=(minimum(ks),maximum(ks),minimum(ks),maximum(ks)),origin="lower")
+        xlabel(L"k_y")
+        ylabel(L"k_x")
+        colorbar()
+        title("FT-Density for $(lx)x$(ly) N=$(n) ULR=$(m["U"][end])")
+
+
+
+end
+
+
 
 
 

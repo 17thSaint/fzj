@@ -445,9 +445,10 @@ end
 function plot_hatsugai_fromsaveddata(lx::Int64,ly::Int64,N::Int64; kwargs...)
     intstren::Float64 = get(kwargs,:intstren,0.0)
     hanis::Float64 = get(kwargs,:hanis,1.0)
+    if_pinning::Bool = get(kwargs,:if_pinning,false)
 
     dataloc::String = get_folder_location("cluster-data/exact-diag/torus")
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",N),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis),("interaction_strength",intstren)])
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",N),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis),("interaction_strength",intstren),("if_pinning",if_pinning)])
     all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
 
     tw1s::Vector{Float64} = Float64[]

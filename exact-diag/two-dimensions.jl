@@ -812,7 +812,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
             end
             
             dir == -1 ? coeff = conj(coeff) : nothing
-            push!(output_weights,round(real(coeff),digits=10) + im*round(imag(coeff),digits=10))
+            push!(output_weights,coeff) #round(real(coeff),digits=10) + im*round(imag(coeff),digits=10))
 
             
             output_basis_state = zeros(Int64,length(basis_state)) + basis_state
@@ -870,7 +870,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
     end
     #
 
-    # interaction
+    #= interaction
     lr_dist = sum(abs.(U) .> interaction_cutoff) - 1
     if length(particle_locations_linear) > 1 && lr_dist > 0
         #println("Doing Interactions")
@@ -912,7 +912,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
         local_disorder_strength = rand() * hamilt_params["disorder_strength"] * 2 - hamilt_params["disorder_strength"]
         push!(output_weights,local_disorder_strength)
         push!(output_states,which_basis)
-    end
+    end=#
 
     return output_states,output_weights
 end
@@ -940,6 +940,9 @@ function buildHam(lattice_params::Dict,hamilt_params::Dict; kwargs...)
         previous_basis_index = [1]
         for i in 1:(lattice_params["Lx"]*lattice_params["Ly"]) - 1
             previous_basis_index[1] += i
+            if previous_basis_index[1] > size(full_basis)[2]
+                continue
+            end
             ham[previous_basis_index[1],previous_basis_index[1]] += pinning_strength
         end
     end
@@ -1177,6 +1180,10 @@ function make_latticehamilt_params_from_metadata(metadata::Dict)
     end
     hamilt_params["flux_direction"] = flux_dir
     hamilt_params["disorder_strength"] = "disorder_strength" in keys(metadata) ? metadata["disorder_strength"] : 0.0
+    if haskey(metadata,"if_pinning") && metadata["if_pinning"]
+        hamilt_params["if_pinning"] = true
+    end
+
     return lattice_params,hamilt_params
 end
 

@@ -42,7 +42,8 @@ function include_other_files(all_files,output_level=0)
 end
 
 
-include_other_files(["other-funcs/basic-2d-stuff.jl","other-funcs/basic-2d-observables.jl","exact-diag/two-dimensions.jl","exact-diag/observables.jl","exact-diag/hatsugai-mbcn.jl","exact-diag/plottings.jl"])
+include_other_files(["other-funcs/basic-2d-stuff.jl","other-funcs/basic-2d-observables.jl","exact-diag/two-dimensions.jl","exact-diag/observables.jl","exact-diag/hatsugai-mbcn.jl"])
+include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
 
 function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     if hamilt_params["U"][2] == 0.0
@@ -57,6 +58,9 @@ function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     end
     if hamilt_params["disorder_strength"] != 0.0
         fdict["disorder_strength"] = hamilt_params["disorder_strength"]
+    end
+    if haskey(hamilt_params,"if_pinning") && hamilt_params["if_pinning"]
+        fdict["if_pinning"] = hamilt_params["if_pinning"]
     end
     return fdict
 end
@@ -217,7 +221,7 @@ function run_normal_ed(params_dict::Dict; kwargs...)
     filename_dict::Dict{String,Any} = make_filename_dict(lattice_params,hamilt_params)
     filename::String = join(["ed",make_parameters_filename(filename_dict)],"-")
     output_level > 0 && display(filename)
-    if_exists::Bool,found_data::Union{Vector{Dict},Nothing} = running_args.if_find_data ? check_data_exists(filename_dict,"ed"; location=running_args.dataloc,output_level=output_level-1) : (false,nothing)
+    if_exists::Bool,found_data::Union{Vector{Dict},Nothing} = running_args.if_find_data ? check_data_exists(filename_dict,"ed"; location=running_args.dataloc,output_level=output_level-1,if_exact=true) : (false,nothing)
 
     # some old data has bad naming with int_stren = 1.0 even though rest of Us is zeros
     if params_dict["interaction_strength"] == 1.0 && if_exists
@@ -287,10 +291,15 @@ end
 # run data collection with for loops
 if true
     
-    lx,ly,n = 6,3,3
+    #args_dict = make_args_dict(ARGS)
+    #which_one = args_dict["which_one"]
+    #starting_val = (which_one-1)*10 + 1
+    #ending_val = which_one*10
+    
+    lx,ly,n = 6,4,3
     #for (idx,n) in enumerate([2,3,4,5])
-    intstrens = range(0.0,10.0,length=10)#[3,4,5,6,7,8,9,20,30,40,70,150,200,300,400]
-    #intstren = 0.0
+    #intstrens = vcat(range(0.0,1.0,length=11),exp10.(range(0.0,log10(1000),length=39)))#[3,4,5,6,7,8,9,20,30,40,70,150,200,300,400]
+    #intstren = 1000.0
     #other_intstrens = range(2.0,10.0,length=37)
     #intstrens = sort([intstrens; other_intstrens])
     #all_nrgs = zeros(Float64,length(thetas))
@@ -301,7 +310,7 @@ if true
     #for (idx,ly) in enumerate(lys)
     #for (idx,nu) in enumerate(nus)
     #for (idx,anis) in enumerate(anises)
-    for (idx,intstren) in enumerate(intstrens)
+    #for (idx,intstren) in enumerate(intstrens)
     #for (idx2,sigma) in enumerate(sigmas)
     #for lrd in [0,1]
     #intstren = 0.0
@@ -313,15 +322,15 @@ if true
         display(BLAS.get_config())
     end=#
 
-    #intstren = 0.0
+    intstren = 0.0
     tw2 = 0.0
     tw1 = 0.0
-    #tws = range(0.5,1.5,length=21)
-    #tws2 = range(0.7,0.8,length=11)
+    #tws = range(0.0,1.0,length=11)
+    #tws2 = range(0.0,1.0,length=3)
     #omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
     #gammas1::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
     #gammas2::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
-    #ref_multiplets,rm1_name,rm2_name = get_reference_multiplets(lx,ly,n; interaction_strength=intstren)
+    #ref_multiplets,rm1_name,rm2_name = get_reference_multiplets(lx,ly,n; interaction_strength=intstren,if_pinning=true)
     #cps = zeros(Float64,length(tws))    tws[args_dict["which_twist_angle"]]
     #for (idx,tw1) in enumerate(tws)
     #for (idx2,tw2) in enumerate(tws)
@@ -334,38 +343,50 @@ if true
         params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_pinning",true),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
+        #println("Starting from here")
+
         states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
-        #make_density_correlations(states[1],lattice_params; if_save=true,filepath=filepath)
+        
+        #scatter3D(tw1,tw2,nrgs[1] - nrgs[1],c="b")
+        #scatter3D(tw1,tw2,nrgs[2] - nrgs[1],c="g")
+        #scatter3D(tw1,tw2,nrgs[3] - nrgs[1],c="r")
+
+        #=make_density_correlations(states[1],lattice_params; if_save=true,filepath=filepath)
         if idx == 1
             get_occupancy(states[1],lattice_params; fix_colorbar=false,plot_title=" ULR=$intstren")
             fig = figure()
-        end
+        end=#
 
-        plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title="")
+        #plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",false; plot_title="")
         #plot_spectrum(tws,nrgs,idx,params_dict["nev"],"Theta_x / 2pi",false; plot_title=" V=$intstren")
 
-        if idx == 10
+        occs = get_occupancy(states[1],lattice_params; if_plot=true)
+        #ftd = ft_density([pi,0],occs)
+        #scatter(intstren,ftd,c="b")
+        #xlabel("Interaction Strength")
+        #ylabel("FT Density at k=(pi,0)")
+
+        #=if idx == length(intstrens)
             get_occupancy(states[1],lattice_params; fix_colorbar=false,plot_title=" ULR=$intstren")
-        end
+        end=#
 
-        #=if !if_found
-            gamma1,gamma2,omega = get_hatsugaifull(states[1],states[2],ref_multiplets; if_save=true,filepath=filepath,ref_multis_filenames=[rm1_name,rm2_name])
-        elseif if_found
-            d,m = read_data_jld2(filepath)
-            omega = m["omega"]
-            gamma1 = m["gamma1"]
-            gamma2 = m["gamma2"]
-        else
-            println("unclear finding")
-        end
-            
-        omegas[idx,idx2] = omega
-        gammas1[idx,idx2] = gamma1
-        gammas2[idx,idx2] = gamma2=#
+        
+        #gamma1,gamma2,omega = get_hatsugaifull(states[1],states[2],ref_multiplets; if_save=false,filepath=filepath,ref_multis_filenames=[rm1_name,rm2_name])
 
-    end
+        #omegas[idx,idx2] = omega
+        #gammas1[idx,idx2] = gamma1
+        #gammas2[idx,idx2] = gamma2
+
+    #end
     #end
 
+    #xlabel(L"\theta_x / 2\pi")
+    #ylabel(L"\theta_y / 2\pi")
+    #zlabel("Energy Gap")
+    #title("Energy Gap Spectrum for $(lx)x$(ly) with $n particles")
+
+    #plot_gamma(collect(tws),collect(tws),gammas1,1)
+    #plot_gamma(collect(tws),collect(tws),gammas2,2)
     #plot_omega(collect(tws),collect(tws),omegas)
 
     #=fig = figure()
