@@ -389,6 +389,10 @@ function check_duplicates(full_file_name::String)
 	return rename,file_name
 end
 
+function check_duplicates(substring_version::SubString{String})
+	return check_duplicates(String(substring_version))
+end
+
 function prep_file(file_name,desired_type)
 	file_name = make_sure_file_type(file_name,desired_type)
 	file_name = check_duplicates(file_name)[2]

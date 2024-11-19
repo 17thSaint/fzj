@@ -172,7 +172,7 @@ function get_normal_model_params_ed(params_dict::Dict)
     ty = 1/hopping_anisotropy=#
     
     # build magnetic field parameters
-    alpha::Union{Float64,Nothing} = get(params_dict,"alpha",nothing)
+    alpha = get(params_dict,"alpha",nothing)
     if_bc_shift::Bool = get(params_dict,"if_bc_shift",true)
     x_shift,y_shift = if_bc_shift ? (!if_periodic_x, !if_periodic_y) : (0.0,0.0)
     if isnothing(alpha)
@@ -184,14 +184,22 @@ function get_normal_model_params_ed(params_dict::Dict)
     # build hamiltonian parameters dictionary and check fluxes for periodicity
     int_cutoff::Float64 = get(params_dict,"interaction_cutoff",1e-5)
     which_dir::String = get(params_dict,"which_dir","virt")
-    flux_dir::String = get(params_dict,"flux_direction","x")
-    if if_periodic_y && !if_periodic_x
-        flux_dir = "y"
-    elseif !if_periodic_y && if_periodic_x
-        flux_dir = "x"
+
+    if typeof(alpha) == Vector{Float64}
+        flux_dir::Union{String,Vector{String}} = ["x","y"]
+    else
+        flux_dir = get(params_dict,"flux_direction","x")
+        if if_periodic_y && !if_periodic_x
+            flux_dir = "y"
+        elseif !if_periodic_y && if_periodic_x
+            flux_dir = "x"
+        end
     end
     if_check_fluxes::Bool = get(params_dict,"if_check_fluxes",true)
     if_check_fluxes ? flux_dir = check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y,flux_dir; output_level=opl) : nothing
+    if typeof(alpha) != Vector{Float64}
+        alpha = [alpha * (flux_dir == "x"), alpha * (flux_dir == "y")]
+    end
 
     disorder_strength::Float64 = get(params_dict,"disorder_strength",0.0)
     if_pinning::Bool = get(params_dict,"if_pinning",false)
@@ -340,7 +348,7 @@ if true
         #    continue
         #end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_pinning",true),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_pinning",true),("if_periodic_x",true),("if_periodic_y",true),("disorder_strength",0.1),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
         #println("Starting from here")
@@ -360,13 +368,14 @@ if true
         #plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",false; plot_title="")
         #plot_spectrum(tws,nrgs,idx,params_dict["nev"],"Theta_x / 2pi",false; plot_title=" V=$intstren")
 
-        occs = get_occupancy(states[1],lattice_params; if_plot=true)
-        #ftd = ft_density([pi,0],occs)
-        #scatter(intstren,ftd,c="b")
-        #xlabel("Interaction Strength")
-        #ylabel("FT Density at k=(pi,0)")
+        occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title=" $(lx)x$(ly) N=$n")
+        #=ftd = ft_density([pi,0],occs)
+        scatter(intstren,ftd,c="b")
+        xlabel("Interaction Strength")
+        ylabel("FT Density at k=(pi,0)")
+        xscale("log")
 
-        #=if idx == length(intstrens)
+        if idx == length(intstrens)
             get_occupancy(states[1],lattice_params; fix_colorbar=false,plot_title=" ULR=$intstren")
         end=#
 

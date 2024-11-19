@@ -111,6 +111,70 @@ function check_fluxes(alpha::Float64,Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_
     return flux_direction
 end
 
+# checks flux counting for fluxes in both directions
+function check_fluxes(alpha::Vector{Float64},Lx::Int64,Ly::Int64,if_periodic_x::Bool,if_periodic_y::Bool,flux_direction::Vector{String}; kwargs...)
+    if_error = get(kwargs,:if_error,true)
+    if_ed = get(kwargs,:if_ed,true)
+    output_level = kwargs[:output_level]
+
+    # needs to be general to ttn and ed
+    if if_ed
+        if flux_direction[1] == "x"
+            flux_direction[1] = "phys"
+        elseif flux_direction[2] == "y"
+            flux_direction[2] = "synth"
+        end
+    end
+
+    total_alpha::Float64 = alpha[2] - alpha[1]
+
+    if alpha[1] == 0.0 && alpha[2] == 0.0
+        return nothing
+    end
+	if total_alpha > 0.4
+        error("Alpha is too large: ",alpha)
+    end
+    x_shift,y_shift = !if_periodic_x, !if_periodic_y
+    total_num_fluxes::Float64 = round(total_alpha*(Lx - x_shift) * (Ly - y_shift),digits=5)
+    if_error && output_level > 0 ? println("Total Number of Fluxes = ",total_num_fluxes," for Lx = ",Lx," and Ly = ",Ly) : nothing
+    if !isinteger(total_num_fluxes)
+        if_error ? error("Total Number of fluxes is not an integer") : return false
+    end
+
+    results = ["phys","synth"]
+    for i in 1:2
+        num_fluxes::Float64 = round(alpha[i]*(Lx - x_shift) * (Ly - y_shift),digits=5)
+        if_error && output_level > 0 ? println("Checking fluxes only along Gauge Direction") : nothing
+        if flux_direction[1] == "synth"
+
+            if if_periodic_x && !isinteger(num_fluxes/Ly)
+                if_error ? error("Number of fluxes is not an integer multiple of Lx") : return false
+            end
+
+        elseif flux_direction[1] == "phys"
+
+            if if_periodic_y && !isinteger(num_fluxes/Lx)
+                if_error ? error("Number of fluxes is not an integer multiple of Ly") : return false
+            end
+
+        else
+            error("Flux direction is not valid")
+        end
+
+    end
+
+    # convert flux_direction back to x or y if ED
+    if if_ed
+        if results[1] == "phys"
+            results[1] = "x"
+        elseif results == "synth"
+            results = "y"
+        end
+    end
+
+    return results
+end
+
 # finds the linear index assuming jump snake mapping with site 1 at bottom left corner
 function linear_index(site::Tuple{Int64,Int64},Lx::Int64,Ly::Int64)
     return (site[2] - 1)*Lx + site[1]

@@ -776,8 +776,47 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
 
     # get the hopping weights
     for (idx,starting_site) in enumerate(particle_locations_coordinate)
+
+        for dir in [(1,0),(-1,0),(0,1),(0,-1)]
+
+            # skip if at boundary and no periodic boundary
+            # x-direction
+            if !if_periodic_x && ((starting_site .+ dir)[1] < 1 || (starting_site .+ dir)[1] > Lx)
+                continue
+            end
+
+            # y-direction
+            if !if_periodic_y && ((starting_site .+ dir)[2] < 1 || (starting_site .+ dir)[2] > Ly)
+                continue
+            end
+
+            # find the next site modulo the system size
+            next_site = (mod1(starting_site[1]+dir[1],Lx),mod1(starting_site[2]+dir[2],Ly))
+
+            # enforce hard-core constraint
+            if next_site in particle_locations_coordinate
+                continue
+            end
+
+            # hopping amplitude
+            coeff = -tx
+
+            # flux attachment
+            coeff *= exp(im*dot(alpha,dir)*dot(starting_site,abs.(reverse(dir)))*2*pi)
+            
+            # boundary condition twisting
+            coeff *= exp(im*2*pi*dot(twist_angle ./ (Lx,Ly),dir))
+
+            output_basis_state = zeros(Int64,length(basis_state)) + basis_state
+            output_basis_state[idx] = linear_index(next_site,Lx,Ly)
+            sort!(output_basis_state,rev=true)
+            output_basis_state_index = find_basis_index(output_basis_state)
+            push!(output_states,output_basis_state_index)
+            push!(output_weights,coeff)
+
+        end
         
-        # x-direction hopping (physical)
+        #= x-direction hopping (physical)
         for dir in [1,-1]
 
             # skip term if at boundary and no periodic boundary
@@ -865,12 +904,12 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
             sort!(output_basis_state,rev=true)
             output_basis_state_index = find_basis_index(output_basis_state)
             push!(output_states,output_basis_state_index)
-        end
+        end=#
 
     end
     #
 
-    #= interaction
+    # interaction
     lr_dist = sum(abs.(U) .> interaction_cutoff) - 1
     if length(particle_locations_linear) > 1 && lr_dist > 0
         #println("Doing Interactions")
@@ -912,7 +951,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
         local_disorder_strength = rand() * hamilt_params["disorder_strength"] * 2 - hamilt_params["disorder_strength"]
         push!(output_weights,local_disorder_strength)
         push!(output_states,which_basis)
-    end=#
+    end#
 
     return output_states,output_weights
 end
