@@ -777,7 +777,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
     # get the hopping weights
     for (idx,starting_site) in enumerate(particle_locations_coordinate)
 
-        for dir in [(1,0),(-1,0),(0,1),(0,-1)]
+        for (did,dir) in enumerate([(1,0),(-1,0),(0,1),(0,-1)])
 
             # skip if at boundary and no periodic boundary
             # x-direction
@@ -799,7 +799,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
             end
 
             # hopping amplitude
-            coeff = -tx
+            coeff = did > 2 ? -ty : -tx
 
             # flux attachment
             coeff *= exp(im*dot(alpha,dir)*dot(starting_site,abs.(reverse(dir)))*2*pi)
@@ -974,7 +974,7 @@ function buildHam(lattice_params::Dict,hamilt_params::Dict; kwargs...)
 
     # onsite pinning potential
     if haskey(hamilt_params,"if_pinning") && hamilt_params["if_pinning"]
-        pinning_strength::ComplexF64 = 1E-4
+        pinning_strength::ComplexF64 = 1E-6
         ham[1,1] += pinning_strength
         previous_basis_index = [1]
         for i in 1:(lattice_params["Lx"]*lattice_params["Ly"]) - 1

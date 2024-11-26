@@ -483,7 +483,83 @@ function plot_hatsugai_fromsaveddata(lx::Int64,ly::Int64,N::Int64; kwargs...)
 
 end
 
+function plot_occupancy(exp_occ; kwargs...)
+    fix_colorbar = get(kwargs,:fix_colorbar,true)
+	fig = figure()
+	fix_colorbar ? imshow(exp_occ;vmin=0,vmax=maximum(exp_occ)) : imshow(exp_occ)
+	colorbar()
+	plot_title = get(kwargs, :plot_title, "")
+	title_string = "Occupancy, " * plot_title
+	title(title_string)
+	ylabel("Synthetic")
+	xlabel("Physical")
 
+    return nothing
+end
+
+function plot_physical_correlation(phys_corrs::Array{Float64,2}; kwargs...)
+    plot_title = get(kwargs,:plot_title,"")
+    fig = figure()
+    for i in 1:size(phys_corrs)[2]
+        plot(0:size(phys_corrs)[1]-1,phys_corrs[:,i],"-p",label="$i")
+    end
+    xlabel("Physical Distance")
+    ylabel("Correlation")
+    title("Physical Correlation "*plot_title)
+    legend()
+    yscale("log")
+    return nothing
+end
+
+function plot_synthetic_correlation(syn_corrs::Array{Float64,2}; kwargs...)
+    plot_title = get(kwargs,:plot_title,"")
+    fig = figure()
+    for i in 1:size(syn_corrs)[1]
+        plot(0:size(syn_corrs)[2]-1,syn_corrs[i,:],"-p",label="$i")
+    end
+    xlabel("Synthetic Distance")
+    ylabel("Correlation")
+    title("Synthetic Correlation "*plot_title)
+    legend()
+    yscale("log")
+    return nothing
+end
+
+function plot_physical_current(currents::Array{Float64,2}; kwargs...)
+    plot_title = get(kwargs,:plot_title,"")
+    fig = figure()
+    for i in 1:size(currents)[1]
+        plot(1:size(currents)[2],currents[i,:],"-p",label="$i")
+    end
+    xlabel("Synthetic Site")
+    ylabel("Current")
+    title("Physical Current "*plot_title)
+    legend()
+    return nothing
+end
+
+function plot_synthetic_current(currents::Array{Float64,2}; kwargs...)
+    plot_title = get(kwargs,:plot_title,"")
+    fig = figure()
+    for i in 1:size(currents)[2]
+        plot(1:size(currents)[1],currents[:,i],"-p",label="$i")
+    end
+    xlabel("Physical Site")
+    ylabel("Current")
+    title("Synthetic Current "*plot_title)
+    legend()
+    return nothing
+end
+
+function plot_canonical_momentum(can_mom::Matrix{Float64}; kwargs...)
+    plot_title::String = get(kwargs,:plot_title,"")
+    fig = figure()
+    imshow(transpose(can_mom); origin="lower")
+    colorbar()
+    title("Canonical Momentum "*plot_title)
+    xlabel("Physical Site")
+    ylabel("Synthetic Site")
+end
 
 
 

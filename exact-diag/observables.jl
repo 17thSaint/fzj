@@ -51,21 +51,6 @@ function get_occupancy(rho::Array{ComplexF64,2},lattice_params::Dict{String,Any}
     return occs
 end
 
-function plot_occupancy(exp_occ; kwargs...)
-    fix_colorbar = get(kwargs,:fix_colorbar,true)
-	fig = figure()
-	fix_colorbar ? imshow(exp_occ;vmin=0,vmax=maximum(exp_occ)) : imshow(exp_occ)
-	colorbar()
-	plot_title = get(kwargs, :plot_title, "")
-	title_string = "Occupancy, " * plot_title
-	title(title_string)
-	ylabel("Synthetic")
-	xlabel("Physical")
-
-    return nothing
-end
-
-
 # functions for two-site correlation along physical or synthetic dimension, made from density matrix
 function physical_correlation(densmat::Array{ComplexF64,2},Lx::Int64,Ly::Int64; kwargs...)
     if_plot = get(kwargs,:if_plot,true)
@@ -84,20 +69,6 @@ function physical_correlation(densmat::Array{ComplexF64,2},Lx::Int64,Ly::Int64; 
     return phys_corrs
 end
 
-function plot_physical_correlation(phys_corrs::Array{Float64,2}; kwargs...)
-    plot_title = get(kwargs,:plot_title,"")
-    fig = figure()
-    for i in 1:size(phys_corrs)[2]
-        plot(0:size(phys_corrs)[1]-1,phys_corrs[:,i],"-p",label="$i")
-    end
-    xlabel("Physical Distance")
-    ylabel("Correlation")
-    title("Physical Correlation "*plot_title)
-    legend()
-    yscale("log")
-    return nothing
-end
-
 function synthetic_correlation(densmat::Array{ComplexF64,2},Lx::Int64,Ly::Int64; kwargs...)
     if_plot = get(kwargs,:if_plot,true)
 
@@ -114,21 +85,6 @@ function synthetic_correlation(densmat::Array{ComplexF64,2},Lx::Int64,Ly::Int64;
 
     return syn_corrs
 end
-
-function plot_synthetic_correlation(syn_corrs::Array{Float64,2}; kwargs...)
-    plot_title = get(kwargs,:plot_title,"")
-    fig = figure()
-    for i in 1:size(syn_corrs)[1]
-        plot(0:size(syn_corrs)[2]-1,syn_corrs[i,:],"-p",label="$i")
-    end
-    xlabel("Synthetic Distance")
-    ylabel("Correlation")
-    title("Synthetic Correlation "*plot_title)
-    legend()
-    yscale("log")
-    return nothing
-end
-
 
 # functions for current along physical or synthetic dimension, made from density matrix
 function physical_current(densmat::Array{ComplexF64,2},lattice_params::Dict{String,Any}; kwargs...)
@@ -156,19 +112,6 @@ function physical_current(densmat::Array{ComplexF64,2},lattice_params::Dict{Stri
     return currents
 end
 
-function plot_physical_current(currents::Array{Float64,2}; kwargs...)
-    plot_title = get(kwargs,:plot_title,"")
-    fig = figure()
-    for i in 1:size(currents)[1]
-        plot(1:size(currents)[2],currents[i,:],"-p",label="$i")
-    end
-    xlabel("Synthetic Site")
-    ylabel("Current")
-    title("Physical Current "*plot_title)
-    legend()
-    return nothing
-end
-
 function synthetic_current(densmat::Array{ComplexF64,2},lattice_params::Dict{String,Any}; kwargs...)
     if_plot = get(kwargs,:if_plot,true)
     Lx = lattice_params["Lx"]
@@ -193,20 +136,6 @@ function synthetic_current(densmat::Array{ComplexF64,2},lattice_params::Dict{Str
 
     return currents
 end
-
-function plot_synthetic_current(currents::Array{Float64,2}; kwargs...)
-    plot_title = get(kwargs,:plot_title,"")
-    fig = figure()
-    for i in 1:size(currents)[2]
-        plot(1:size(currents)[1],currents[:,i],"-p",label="$i")
-    end
-    xlabel("Physical Site")
-    ylabel("Current")
-    title("Synthetic Current "*plot_title)
-    legend()
-    return nothing
-end
-
 
 # gap from Cecille Repellin's paper on Harper-Hofstadter model by hopping anisotropy
 function hh_gap_exact(hopping_anisotropy::Float64,alpha::Float64)
@@ -527,6 +456,7 @@ end
 # measures the flatness parameter which is max E2 - E1 / E3 - E1
 function twist_flatness_ed(lx::Int,ly::Int,n::Int; kwargs...)
     hanis = get(kwargs,:hanis,1.0)
+    if_pinning = get(kwargs,:if_pinning,false)
     if_plot = get(kwargs,:if_plot,true)
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     max_intstren::Float64 = get(kwargs,:max_intstren,2.0)
@@ -537,6 +467,9 @@ function twist_flatness_ed(lx::Int,ly::Int,n::Int; kwargs...)
     intstrens = Float64[]
 
     params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis)])
+    if if_pinning
+        params_dict["if_pinning"] = true
+    end
     all_files = find_data_file(params_dict,"ed",dataloc; output_level=0)
     for f in all_files
 
@@ -660,6 +593,46 @@ function plot_fourpointcorrelator(fourpointcorrs::Array{Float64,2}; kwargs...)
     xlabel("Physical")
     ylabel("Synthetic")
     return nothing
+end
+
+# these are not exactly correct I think
+# calculate canonical momentum -i * d H(j,s) / d flux_density
+function canonical_momentum(psi::Vector{ComplexF64},direction::Int64,lattice_params::Dict,hamilt_params::Dict; kwargs...)
+    if_plot::Bool = get(kwargs,:if_plot,true)
+
+    Lx::Int64 = lattice_params["Lx"]
+    Ly::Int64 = lattice_params["Ly"]
+    flux_density::Float64 = hamilt_params["alpha"][direction]
+
+    canonical_momentum::Matrix{Float64} = zeros(Float64,Lx,Ly)
+    for j in 1:Lx
+        for s in 1:Ly
+            starting_site::Tuple = (j,s)
+            starting_site_linear::Int64 = linear_index(starting_site,Lx,Ly)
+
+            change_vector = zeros(Int64,2)
+            change_vector[direction] = 1
+            ending_site = starting_site .+ change_vector
+            ending_site[1] = mod1(ending_site[1],Lx)
+            ending_site[2] = mod1(ending_site[2],Ly)
+            ending_site_linear::Int64 = linear_index(ending_site,Lx,Ly)
+
+            hopmat = buildHopping(lattice_params,starting_site_linear,ending_site_linear)
+            exp_val = conj(transpose(psi)) * (hopmat .- conj(transpose(hopmat))) * psi
+            canonical_momentum[j,s] = real(2*pi*im*flux_density*exp_val)
+        end
+    end
+
+    if_plot ? plot_canonical_momentum(canonical_momentum; kwargs...) : nothing
+
+    return canonical_momentum
+end
+
+function average_canonical_momentum(psi::Vector{ComplexF64},lattice_params::Dict,hamilt_params::Dict; kwargs...)
+    canonical_momentum_x = canonical_momentum(psi,1,lattice_params,hamilt_params; kwargs...)
+    canonical_momentum_y = canonical_momentum(psi,2,lattice_params,hamilt_params; kwargs...)
+
+    return sum(canonical_momentum_x) / prod(size(canonical_momentum_x)),sum(canonical_momentum_y) / prod(size(canonical_momentum_y))
 end
 
 

@@ -51,7 +51,12 @@ function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     else
         intstren = hamilt_params["U"][1]
     end
-    fdict = Dict([("Lx",lattice_params["Lx"]),("Ly",lattice_params["Ly"]),("N",lattice_params["N"]),("alpha",hamilt_params["alpha"]),("hopping_anisotropy",hamilt_params["tx"]/hamilt_params["ty"]),("interaction_strength",intstren),("if_periodic_x",lattice_params["if_periodic_x"]),("if_periodic_y",lattice_params["if_periodic_y"])])
+    if typeof(hamilt_params["alpha"]) == Vector{Float64}
+        alpha_val = filter(x -> x != 0.0,hamilt_params["alpha"])[1]
+    else
+        alpha_val = hamilt_params["alpha"]
+    end
+    fdict = Dict([("Lx",lattice_params["Lx"]),("Ly",lattice_params["Ly"]),("N",lattice_params["N"]),("alpha",alpha_val),("hopping_anisotropy",hamilt_params["tx"]/hamilt_params["ty"]),("interaction_strength",intstren),("if_periodic_x",lattice_params["if_periodic_x"]),("if_periodic_y",lattice_params["if_periodic_y"])])
     if lattice_params["twist_angle"] != [0.0,0.0]
         fdict["twist_angle1"] = lattice_params["twist_angle"][1]
         fdict["twist_angle2"] = lattice_params["twist_angle"][2]
@@ -297,16 +302,16 @@ function run_normal_ed(params_dict::Dict; kwargs...)
 end
 
 # run data collection with for loops
-if true
+if false
     
     #args_dict = make_args_dict(ARGS)
     #which_one = args_dict["which_one"]
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
     
-    lx,ly,n = 6,4,3
+    lx,ly,n = 6,3,3
     #for (idx,n) in enumerate([2,3,4,5])
-    #intstrens = vcat(range(0.0,1.0,length=11),exp10.(range(0.0,log10(1000),length=39)))#[3,4,5,6,7,8,9,20,30,40,70,150,200,300,400]
+    intstrens = vcat(range(0.0,1.0,length=11),exp10.(range(0.0,log10(1000),length=39)))#[3,4,5,6,7,8,9,20,30,40,70,150,200,300,400]
     #intstren = 1000.0
     #other_intstrens = range(2.0,10.0,length=37)
     #intstrens = sort([intstrens; other_intstrens])
@@ -318,7 +323,7 @@ if true
     #for (idx,ly) in enumerate(lys)
     #for (idx,nu) in enumerate(nus)
     #for (idx,anis) in enumerate(anises)
-    #for (idx,intstren) in enumerate(intstrens)
+    for (idx,intstren) in enumerate(intstrens)
     #for (idx2,sigma) in enumerate(sigmas)
     #for lrd in [0,1]
     #intstren = 0.0
@@ -330,11 +335,12 @@ if true
         display(BLAS.get_config())
     end=#
 
-    intstren = 0.0
+    #intstren = 0.0
     tw2 = 0.0
     tw1 = 0.0
     #tws = range(0.0,1.0,length=11)
     #tws2 = range(0.0,1.0,length=3)
+    #fts = zeros(Float64,length(tws),length(tws))
     #omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
     #gammas1::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
     #gammas2::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
@@ -348,12 +354,14 @@ if true
         #    continue
         #end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_pinning",true),("if_periodic_x",true),("if_periodic_y",true),("disorder_strength",0.1),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_check_fluxes",false),("if_pinning",true),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
         #println("Starting from here")
 
-        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+        if true
+            states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+        end
         
         #scatter3D(tw1,tw2,nrgs[1] - nrgs[1],c="b")
         #scatter3D(tw1,tw2,nrgs[2] - nrgs[1],c="g")
@@ -368,14 +376,32 @@ if true
         #plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",false; plot_title="")
         #plot_spectrum(tws,nrgs,idx,params_dict["nev"],"Theta_x / 2pi",false; plot_title=" V=$intstren")
 
-        occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title=" $(lx)x$(ly) N=$n")
-        #=ftd = ft_density([pi,0],occs)
+        if true
+            if idx == 1
+                occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title=" $(lx)x$(ly) N=$n ULR=$intstren")
+                fig = figure()
+            else
+                occs = get_occupancy(states[1],lattice_params; if_plot=false)
+            end
+            #display(occs)
+            #display(nrgs)
+            #println("GS gap is $(nrgs[2] - nrgs[1])")
+        end
+
+        
+        ftd = ft_density([pi,0],occs)
+        #fts[idx,idx2] = real(ftd)
         scatter(intstren,ftd,c="b")
+        
         xlabel("Interaction Strength")
         ylabel("FT Density at k=(pi,0)")
         xscale("log")
 
         if idx == length(intstrens)
+            get_occupancy(states[1],lattice_params; if_plot=true,plot_title=" ULR=$intstren")
+        end
+
+        #=if idx == length(intstrens)
             get_occupancy(states[1],lattice_params; fix_colorbar=false,plot_title=" ULR=$intstren")
         end=#
 
@@ -388,6 +414,15 @@ if true
 
     #end
     #end
+
+    #=fig = figure()
+    imshow(fts; origin="lower",extent=[minimum(tws),maximum(tws),minimum(tws),maximum(tws)])
+    colorbar()
+    xlabel(L"\theta_x / 2\pi")
+    ylabel(L"\theta_y / 2\pi")
+    title("FT Density at k=(pi,0) for $(lx)x$(ly) N=$n ULR=$intstren")=#
+
+    end
 
     #xlabel(L"\theta_x / 2\pi")
     #ylabel(L"\theta_y / 2\pi")

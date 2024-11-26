@@ -621,7 +621,7 @@ end
 if false
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     ks = range(0,2*pi,length=50)
-    configs = [(6,4,3),(8,4,4),(10,4,5)]
+    configs = [(8,4,4)]#[(6,4,3),(8,4,4),(10,4,5)]
     for (lx,ly,n) in configs
     if_pinning = true
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
@@ -648,19 +648,19 @@ if false
         end
 
         latparas = get_lattice_params_from_metadata(m)
-        occs = get_occupancy(d["state"][1],latparas; if_plot=false,plot_title="$(lx)x$(ly) n=$n ULR=$(m["U"][end])")
+        occs = get_occupancy(d["state"][1],latparas; if_plot=if_plot,plot_title="$(lx)x$(ly) n=$n ULR=$(m["U"][end])")
         ftd = ft_density([pi,0],occs)
         append!(cdw_sfs,[abs(ftd)])
 
     end
 
-    #fig = figure()
+    #=fig = figure()
     scatter(intstrens,cdw_sfs,label="$(lx)x$(ly)")
     xlabel("Interaction Strength")
     ylabel("CDW SF at k=(pi,0)")
     title("CDW SF at "*L"\rho_{1D}=1/2")
     xscale("log")
-    legend()#
+    legend()=#
     end
 end
 
@@ -668,9 +668,9 @@ end
 if false
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     ks = range(0,2*pi,length=50)
-    lx,ly,n = 9,3,3
+    lx,ly,n = 10,5,5
     if_pinning = true
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    #=pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
 
     filter!(x -> !occursin("twist_angle1",x),all_files)
@@ -680,9 +680,9 @@ if false
     filter!(x -> occursin("interaction_strength-1000.0-",x),all_files)
     f = all_files[1]
 
-        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)=#
         latparas = get_lattice_params_from_metadata(m)
-        occs = get_occupancy(d["state"][1],latparas; if_plot=true,plot_title="ULR=$(m["U"][end])")
+        occs = get_occupancy(d["state"][1],latparas; if_plot=true,plot_title="$(lx)x$(ly) n=$n ULR=$(m["U"][end])")
 
         ftds = zeros(Float64,length(ks),length(ks))
         for (idx,kx) in enumerate(ks)
@@ -697,11 +697,100 @@ if false
         ylabel(L"k_x")
         colorbar()
         title("FT-Density for $(lx)x$(ly) N=$(n) ULR=$(m["U"][end])")
+end
 
+# flatness finite size scaling at Lx by 4 with rho_1D = 1/2
+if false
+    configs = [(4,4,2),(6,4,3),(8,4,4)]
+    flatnesses = Dict([("4",[]),("6",[]),("8",[])])
+    for (lx,ly,n) in configs
 
+        if lx == 8
+            tws = range(0.0,1.0,length=11)
+        else
+            tws = range(0.0,1.0,length=21)
+        end
+
+        for intstren in [0.0]
+            #all_nrgs = Dict([("1",zeros(Float64,length(tws),length(tws))),("2",zeros(Float64,length(tws),length(tws))),("3",zeros(Float64,length(tws),length(tws)))])
+            #fts = zeros(Float64,length(tws),length(tws))
+            site_occs = Dict([("11",zeros(Float64,length(tws),length(tws))),("22",zeros(Float64,length(tws),length(tws))),("12",zeros(Float64,length(tws),length(tws))),("21",zeros(Float64,length(tws),length(tws)))])
+            for (idx,tw1) in enumerate(tws)
+                for (idx2,tw2) in enumerate(tws)
+                    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("tw1",tw1),("tw2",tw2),("hopping_anisotropy",1.0),("if_pinning",true),("interaction_strength",intstren),("filling",0.5),("lr","all"),("if_find_data",true),("if_save_data",false),("nev",10)])
+                    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
+                    occs = get_occupancy(states[1],lattice_params; if_plot=false,plot_title="ULR=$(intstren) tw1=$tw1 tw2=$tw2")
+                    site_occs["11"][idx,idx2] = occs[1,1]
+                    site_occs["22"][idx,idx2] = occs[2,2]
+                    site_occs["12"][idx,idx2] = occs[1,2]
+                    site_occs["21"][idx,idx2] = occs[2,1]
+                    #fts[idx,idx2] = real(ft_density([pi,0],occs))
+                    #all_nrgs["1"][idx,idx2] = nrgs[1]
+                    #all_nrgs["2"][idx,idx2] = nrgs[2]
+                    #all_nrgs["3"][idx,idx2] = nrgs[3]
+                end
+            end
+
+            for (k,v) in site_occs
+                fig = figure()
+                imshow(v,extent=(minimum(tws),maximum(tws),minimum(tws),maximum(tws)),origin="lower")
+                xlabel(L"\theta_x / 2 \pi")
+                ylabel(L"\theta_y / 2 \pi")
+                colorbar()
+                title("Occupancy for $(lx)x$(ly) N=$(n) ULR=$intstren k=$k")
+            end
+            #=fig = figure()
+            imshow(fts,extent=(minimum(tws),maximum(tws),minimum(tws),maximum(tws)),origin="lower")
+            xlabel(L"\theta_x / 2 \pi")
+            ylabel(L"\theta_y / 2 \pi")
+            colorbar()
+            title("FT-Density for $(lx)x$(ly) N=$(n) ULR=$intstren")=#
+
+            #flatness = maximum((all_nrgs["2"] .- all_nrgs["1"]) ./ (all_nrgs["3"] .- all_nrgs["1"]))
+            #append!(flatnesses[string(lx)],[flatness])
+        end
+    end
+
+    #=fig = figure()
+    for (lx,flatness) in flatnesses
+        if lx == 4
+            plot([lx],flatness[1],c="b",label="ULR=0.0")
+            plot([lx],flatness[2],c="r",label="ULR=1000.0")
+        else
+            plot([lx],flatness[1],c="b")
+            plot([lx],flatness[2],c="r")
+        end
+    end
+    xlabel("Lx")
+    ylabel("Flatness")
+    title("Flatness Finite Size Scaling")
+    legend()=#
 
 end
 
+# energy spectrum scaling with Lx/Ly = 2.0
+if true
+    configs = [(6,3,3),(8,4,4),(10,5,5)]
+    for config in configs
+        lx,ly,n = config
+        if lx == 10
+            filename = "../cluster-data/exact-diag/torus/ed-Ly-5-interaction_strength-0.0-Lx-10-if_pinning-true-N-5-alpha-0.2-if_periodic_x-true-if_periodic_y-true-hopping_anisotropy-1.0.jld2"
+            d,m = read_data_jld2(filename; output_level=0)
+            nrgs = d["nrg"]
+        else
+            pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("filling",0.5),("lr","all"),("if_find_data",true),("if_save_data",false),("nev",10)])
+            states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
+        end
+
+        scatter(lx,nrgs[1] - nrgs[1],c="b")
+        scatter(lx,nrgs[2] - nrgs[1],c="g")
+        scatter(lx,nrgs[3] - nrgs[1],c="r")
+
+        xlabel("Lx")
+        ylabel("Energy Gap")
+        title("Energy Spectrum Finite Size Scaling")
+    end
+end
 
 
 

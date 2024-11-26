@@ -542,7 +542,7 @@ function modify_data_jld2(key_to_modify::String, new_value, file_path, which_gro
 	file_path = join(split(file_path,"/")[1:end-1],"/") * "/" * file_name
 
 	# Open the JLD2 file in write mode
-    jld_file = jldopen(file_path, "a+")
+    jld_file = jldopen(file_path, "r+")
 	data_dict = jld_file[which_group]
 
     # Check if the key exists in the file
@@ -596,6 +596,7 @@ function modify_data_jld2(to_modify_dict::Dict,file_path, which_group="all_data"
 	#
 
 	# Close the JLD2 file
+	close(jld_file)
 	close(jld_file)
 	save(file_path, load(file_path))
 	return split(file_path,"/")[end]

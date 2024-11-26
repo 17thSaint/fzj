@@ -1907,7 +1907,7 @@ if false
 end
 
 # synth-dims for loop runnings
-if false
+if true
 
 	cols = ["b","g","r"]
 	#nnst = 0.0
@@ -1927,8 +1927,8 @@ if false
 	#anises = [0.01,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.6,0.8,0.9,1.1,1.3,1.5,1.7,1.9,2.0,2.5,3.0,3.5,4.0,6.0,8.0,9.0,10.0,15.0,20.0,25.0,30.0,40.0,50.0,70.0,90.0,100.0,1000.0,10000.0]
 	#anises = range(1.0,5.0,length=10)
 	#strens = range(0.0,2.0,length=11)
-	args_dict = make_args_dict(ARGS)
-	stren = args_dict["onsite_strength"]
+	#args_dict = make_args_dict(ARGS)
+	stren = 0.0#args_dict["onsite_strength"]
 	#alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
 	#strens = [0.0,0.5,1.0,1.5,2.0]#range(0.1,0.5,length=3)
 	#for (idx,anis) in enumerate(anises)
@@ -1936,7 +1936,7 @@ if false
 	#tws = range(0.0,1.0,length=10)
 	#for tw1 in tws
 	#for tw2 in tws
-		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",3),("if_synth_rectangle",true),("expander_fraction",0.001),("particles",8),("layers",7),("mdim",300),("if_save_data",true),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",3),("if_synth_rectangle",true),("expander_fraction",0.001),("particles",4),("layers",5),("mdim",300),("if_save_data",true),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		open_cores = get(params_dict, "open_cores", 5)
