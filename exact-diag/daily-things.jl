@@ -769,7 +769,7 @@ if false
 end
 
 # energy spectrum scaling with Lx/Ly = 2.0
-if true
+if false
     configs = [(6,3,3),(8,4,4),(10,5,5)]
     for config in configs
         lx,ly,n = config
@@ -789,6 +789,19 @@ if true
         xlabel("Lx")
         ylabel("Energy Gap")
         title("Energy Spectrum Finite Size Scaling")
+    end
+end
+
+# looking at laughlin finite scaling at ULR=0.0
+if true
+    configs = [(4,4,2),(6,4,3),(8,4,4),(10,4,5)]
+    for config in configs
+        lx,ly,n = config
+        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("if_pinning",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("filling",0.5),("lr","all"),("if_find_data",true),("if_save_data",false),("nev",10)])
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
+
+        get_occupancy(states[1],lattice_params; if_plot=true,plot_title="$(lx)x$(ly) n=$n ULR=0.0")
+        get_occupancy(states[2],lattice_params; if_plot=true,plot_title="E1 - E0 = $(round(nrgs[2] - nrgs[1],digits=5))")
     end
 end
 

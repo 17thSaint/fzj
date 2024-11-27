@@ -485,8 +485,8 @@ end
 
 function plot_occupancy(exp_occ; kwargs...)
     fix_colorbar = get(kwargs,:fix_colorbar,true)
-	fig = figure()
-	fix_colorbar ? imshow(exp_occ;vmin=0,vmax=maximum(exp_occ)) : imshow(exp_occ)
+	fig = figure() #maximum(exp_occ)
+	fix_colorbar ? imshow(exp_occ;vmin=0,vmax=0.2) : imshow(exp_occ)
 	colorbar()
 	plot_title = get(kwargs, :plot_title, "")
 	title_string = "Occupancy, " * plot_title

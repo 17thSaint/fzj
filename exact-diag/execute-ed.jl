@@ -125,9 +125,11 @@ function get_normal_model_params_ed(params_dict::Dict)
     if_densmat::Bool = get(params_dict, "if_densmat", false)
     if_find_data::Bool = get(params_dict, "if_find_data", true)
     if_function::Bool = get(params_dict, "if_function", false)
+    if_reading::Bool = get(params_dict, "if_reading", false)
     running_args::NamedTuple = (nev=nev,
                     if_exact=if_exact,
                     if_function=if_function,
+                    if_reading=if_reading,
                     if_densmat=if_densmat,
                     if_find_data=if_find_data,
                     if_save_data=if_save_data,
@@ -309,7 +311,7 @@ if false
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
     
-    lx,ly,n = 6,3,3
+    lx,ly,n = 8,4,4
     #for (idx,n) in enumerate([2,3,4,5])
     intstrens = vcat(range(0.0,1.0,length=11),exp10.(range(0.0,log10(1000),length=39)))#[3,4,5,6,7,8,9,20,30,40,70,150,200,300,400]
     #intstren = 1000.0
@@ -335,7 +337,7 @@ if false
         display(BLAS.get_config())
     end=#
 
-    #intstren = 0.0
+    #intstren = 1.0
     tw2 = 0.0
     tw1 = 0.0
     #tws = range(0.0,1.0,length=11)
@@ -354,13 +356,14 @@ if false
         #    continue
         #end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_check_fluxes",false),("if_pinning",true),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_pinning",true),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
         #params_dict = make_args_dict(ARGS)
 
         #println("Starting from here")
 
         if true
             states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+            #get_occupancy(states[1],lattice_params; if_plot=true,plot_title="$(lx)x$(ly) N=$n ULR=$intstren")
         end
         
         #scatter3D(tw1,tw2,nrgs[1] - nrgs[1],c="b")
@@ -399,7 +402,7 @@ if false
 
         if idx == length(intstrens)
             get_occupancy(states[1],lattice_params; if_plot=true,plot_title=" ULR=$intstren")
-        end
+        end#
 
         #=if idx == length(intstrens)
             get_occupancy(states[1],lattice_params; fix_colorbar=false,plot_title=" ULR=$intstren")
@@ -412,7 +415,7 @@ if false
         #gammas1[idx,idx2] = gamma1
         #gammas2[idx,idx2] = gamma2
 
-    #end
+    end
     #end
 
     #=fig = figure()
@@ -422,7 +425,7 @@ if false
     ylabel(L"\theta_y / 2\pi")
     title("FT Density at k=(pi,0) for $(lx)x$(ly) N=$n ULR=$intstren")=#
 
-    end
+    #end
 
     #xlabel(L"\theta_x / 2\pi")
     #ylabel(L"\theta_y / 2\pi")

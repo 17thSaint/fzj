@@ -15,7 +15,7 @@ Depends on:
 #Pkg.activate(".")
 using LinearAlgebra,KrylovKit,Combinatorics,SparseArrays
 
-include_other_files(["other-funcs/data-storage-funcs.jl"])
+include_other_files(["other-funcs/data-storage-funcs.jl","exact-diag/reading-hamiltonian.jl"])
 
 ######## hopping is wrong because has amplitude even if no particle at starting location #########
 #=
@@ -1063,6 +1063,7 @@ function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwa
     if_save_data = get(kwargs,:if_save_data,false)
     if_exact = get(kwargs,:if_exact,false)
     if_function = get(kwargs,:if_function,true)
+    if_reading = kwargs[:if_reading]
 
     metadata_dict = merge(merge(lattice_params,hamilt_params),named_tuple_to_dict(kwargs))
 
@@ -1089,6 +1090,19 @@ function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwa
         kdim = get(kwargs,:kdim,nev+10)
         x0 = rand(Float64,size(lattice_params["full_basis"])[2])
         rez = eigsolve(ham_func,x0,nev,:SR; krylovdim=kdim)
+    elseif if_reading
+        H = getHamiltonian(lattice_params,hamilt_params; output_level=output_level)
+        #display(H)
+        metadata_dict["H"] = H
+        output_level > 0 ? println("Sparsity = ",SparseArrays.nnz(H)/size(H)[1]^2) : nothing
+
+        if if_exact
+            everything = eigen(Matrix(H))
+            rez = (everything.values,everything.vectors)
+        else
+            x0 = rand(Float64,size(lattice_params["full_basis"])[2])
+            rez = eigsolve(H,x0,nev,:SR,Lanczos())
+        end
     else
         H = buildHam(lattice_params,hamilt_params; output_level)
         #display(H)
