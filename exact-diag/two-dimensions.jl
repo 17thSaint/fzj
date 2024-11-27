@@ -973,19 +973,25 @@ function buildHam(lattice_params::Dict,hamilt_params::Dict; kwargs...)
     end
 
     # onsite pinning potential
-    if haskey(hamilt_params,"if_pinning") && hamilt_params["if_pinning"]
-        pinning_strength::ComplexF64 = 1E-6
-        ham[1,1] += pinning_strength
-        previous_basis_index = [1]
-        for i in 1:(lattice_params["Lx"]*lattice_params["Ly"]) - 1
-            previous_basis_index[1] += i
-            if previous_basis_index[1] > size(full_basis)[2]
-                continue
-            end
-            ham[previous_basis_index[1],previous_basis_index[1]] += pinning_strength
-        end
-    end
+    (haskey(hamilt_params,"if_pinning") && hamilt_params["if_pinning"]) && (addPinning(ham,lattice_params,hamilt_params))
 
+
+    return ham
+end
+
+function addPinning(ham::SparseMatrixCSC{ComplexF64},lattice_params::Dict,hamilt_params::Dict)
+    full_basis = lattice_params["full_basis"]
+
+    pinning_strength::ComplexF64 = 1E-6
+    ham[1,1] += pinning_strength
+    previous_basis_index = [1]
+    for i in 1:(lattice_params["Lx"]*lattice_params["Ly"]) - 1
+        previous_basis_index[1] += i
+        if previous_basis_index[1] > size(full_basis)[2]
+            continue
+        end
+        ham[previous_basis_index[1],previous_basis_index[1]] += pinning_strength
+    end
 
     return ham
 end

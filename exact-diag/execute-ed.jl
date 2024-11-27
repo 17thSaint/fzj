@@ -311,7 +311,7 @@ if false
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
     
-    lx,ly,n = 8,4,4
+    lx,ly,n = 4,4,2
     #for (idx,n) in enumerate([2,3,4,5])
     intstrens = vcat(range(0.0,1.0,length=11),exp10.(range(0.0,log10(1000),length=39)))#[3,4,5,6,7,8,9,20,30,40,70,150,200,300,400]
     #intstren = 1000.0
@@ -356,7 +356,7 @@ if false
         #    continue
         #end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_pinning",true),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_pinning",true),("if_reading",true),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
         #println("Starting from here")

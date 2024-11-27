@@ -87,7 +87,7 @@ if do_all || false
 end;
 end
 
-if do_all || false
+if do_all || true
 @testset "High level getHamiltonian function (with pinning)" begin;
     lx,ly,n = 4,4,2
     tw1 = 0.0
@@ -96,7 +96,7 @@ if do_all || false
     intstren = 1.0
     if_periodic_x = true
     if_periodic_y = true
-    pdict = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_pinning",true),("if_pinning",false),("if_periodic_x",if_periodic_x),("if_periodic_y",if_periodic_y),("hopping_anisotropy",hanis),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+    pdict = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_pinning",true),("if_periodic_x",if_periodic_x),("if_periodic_y",if_periodic_y),("hopping_anisotropy",hanis),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
     lattice_params,hamilt_params,running_args = get_normal_model_params_ed(pdict)
     basis_dataloc = running_args.basis_dataloc
     full_basis = n_particle_basis(lattice_params; output_level=running_args.output_level,dataloc=basis_dataloc)

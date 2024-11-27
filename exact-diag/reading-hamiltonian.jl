@@ -187,7 +187,12 @@ function dressInteraction(hamilt_params::Dict,lattice_params::Dict,interaction::
     Ly::Int64 = lattice_params["Ly"]
 
     if length(unique(U[2:end])) == 1
-        return dressInteraction(U[2],lattice_params,interaction; kwargs...)
+        interaction = dressInteraction(U[2],lattice_params,interaction; kwargs...)
+        
+        # onsite pinning potential
+        (haskey(hamilt_params,"if_pinning") && hamilt_params["if_pinning"]) && (addPinning(interaction,lattice_params,hamilt_params))
+
+        return interaction
     end
 
     rows,cols,vals = findnz(interaction)
@@ -213,24 +218,14 @@ function dressInteraction(hamilt_params::Dict,lattice_params::Dict,interaction::
     end
 
     # onsite pinning potential
-    if haskey(hamilt_params,"if_pinning") && hamilt_params["if_pinning"]
-        pinning_strength::ComplexF64 = 1E-6
-        ham[1,1] += pinning_strength
-        previous_basis_index = [1]
-        for i in 1:(lattice_params["Lx"]*lattice_params["Ly"]) - 1
-            previous_basis_index[1] += i
-            if previous_basis_index[1] > size(full_basis)[2]
-                continue
-            end
-            ham[previous_basis_index[1],previous_basis_index[1]] += pinning_strength
-        end
-    end
+    (haskey(hamilt_params,"if_pinning") && hamilt_params["if_pinning"]) && (addPinning(interaction,lattice_params,hamilt_params))
 
     return interaction
 end
 
 function dressInteraction(flat_intstren::Float64,lattice_params::Dict,interaction::SparseMatrixCSC{ComplexF64}; kwargs...)
-    return flat_intstren .* interaction
+    interaction .*= flat_intstren
+    return interaction
 end
 
 function saveInteraction(interaction::SparseMatrixCSC{ComplexF64},dataloc::String,lattice_params::Dict; kwargs...)
