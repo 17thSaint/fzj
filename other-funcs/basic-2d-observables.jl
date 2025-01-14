@@ -73,6 +73,38 @@ function integrate_2d_matrix(matrix::Matrix{Float64})
     return integral
 end
 
+function ft_density(momentum::Vector{Float64},occs::Matrix{Float64}; kwargs...)
+    ly,lx = size(occs)
+
+    all_positions::Array{Float64,2} = zeros(Float64,ly,lx)
+    for j in 1:lx
+        for s in 1:ly
+            all_positions[s,j] = dot(momentum,[j,s])
+        end
+    end
+
+    result::ComplexF64 = sum(occs .* exp.(im .* all_positions)) / (lx * ly)
+
+    return result
+end
+
+function ft_densitydensity(momentum::Vector{Float64},dds::Matrix{Float64}; kwargs...)
+    ly,lx = size(dds)
+
+    center_site::Vector{Int64} = [Int64(ceil(lx/2)),Int64(ceil(ly/2))]
+
+    all_distances::Array{Float64,2} = zeros(Float64,ly,lx)
+    for j in 1:lx
+        for s in 1:ly
+            all_distances[s,j] = dot(momentum,([j,s] - center_site))
+        end
+    end
+
+    result::ComplexF64 = sum(dds .* exp.(im .* all_distances)) / (lx * ly)
+
+    return result
+end
+
 
 
 

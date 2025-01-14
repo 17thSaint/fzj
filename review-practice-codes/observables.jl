@@ -40,6 +40,38 @@ function get_occupancy(ttn::TTNKit.TreeTensorNetwork; kwargs...)
 	return exp_occ
 end
 
+function get_occupancy(densmat::Matrix; kwargs...)
+	if isinteger(sqrt(size(densmat)[1]))
+		phys_length = Int(sqrt(size(densmat)[1]))
+		virt_length = Int(phys_length)
+	else
+		phys_length = Int(sqrt(2*size(densmat)[1]))
+		virt_length = Int(phys_length/2)
+	end
+
+	lat = TTNKit.SimpleLattice((phys_length,virt_length),TTNKit.ITensorNode,"Boson")
+
+	exp_occ = zeros(phys_length,virt_length)
+	for j in 1:phys_length
+		for s in 1:virt_length
+			linear_index = TTNKit.linear_ind(lat,(j,s))
+			exp_occ[j,s] = abs(densmat[linear_index,linear_index])
+		end
+	end
+
+    if_synth_rectangle::Bool = get(kwargs,:if_synth_rectangle,false)
+    if_synth_rectangle ? exp_occ = transpose(exp_occ) : nothing
+
+	if_save_data = get(kwargs, :if_save_data, false)
+	if_save_fig = get(kwargs, :if_save_fig, false)
+	if_plot = get(kwargs, :if_plot, true)
+
+    if_save_data ? save_occupancy(exp_occ; kwargs...) : nothing
+	if_plot	|| if_save_fig ? plot_occupancy(exp_occ; kwargs...) : nothing
+
+	return exp_occ
+end
+
 function save_occupancy(exp_occ; kwargs...)
 	location = get(kwargs, :location, pwd())
 	filename = get(kwargs, :name, "occs")
@@ -334,6 +366,61 @@ function range_cdwsf_angles(points_count::Int64,dens_corr_mat::Array{Float64},ra
     return angles,cdwsfs
 end
 
+function pointfourhopping(psi::TTNKit.TreeTensorNetwork,s1::Int64,s2::Int64)
+    result = TTNKit.correlation(psi,"N","N",s1,s2)
+
+    if s1 == s2
+        result -= TTNKit.expect(psi,"N",s1)
+    end
+
+    return result
+end
+
+# to be used when using smaller lattice than TTN actual size
+function fourpoint_alberto(psi::TTNKit.TreeTensorNetwork,restricted_size::Vector{Int64}; kwargs...)
+    if_plot::Bool = get(kwargs,:if_plot,true)
+
+    ttn_lx,ttn_ly = get_lattice_dims(psi)
+    r_lx,r_ly = restricted_size
+
+    center_site::Vector{Int64} = [Int64(ceil(r_lx/2)),Int64(ceil(r_ly/2))]
+    center_linear::Int64 = linear_index(center_site,ttn_lx,ttn_ly)
+
+    rez::Matrix{Float64} = zeros(Float64,r_ly,r_lx)
+    for j in 1:r_lx
+        for s in 1:r_ly
+            println("Working on site ($(j), $(s))")
+            rez[s,j] = real(pointfourhopping(psi,center_linear,linear_index((j,s),ttn_lx,ttn_ly)))
+        end
+    end
+
+    if_plot ? plot_fourpointcorrelator(rez; kwargs...) : nothing
+
+    return rez
+end
+
+function fourpoint_alberto(psi::TTNKit.TreeTensorNetwork; kwargs...)
+    if_restricted_size::Bool = get(kwargs,:if_restricted_size,false)
+    if_restricted_size && fourpoint_alberto(psi,if_restricted_size; kwargs...)
+    if_plot::Bool = get(kwargs,:if_plot,true)
+
+    lx,ly = get_lattice_dims(psi)
+
+    center_site::Vector{Int64} = [Int64(ceil(lx/2)),Int64(ceil(ly/2))]
+    center_linear::Int64 = linear_index(center_site,lx,ly)
+
+    rez::Matrix{Float64} = zeros(Float64,ly,lx)
+    for j in 1:lx
+        for s in 1:ly
+            println("Working on site ($(j), $(s))")
+            rez[s,j] = real(pointfourhopping(psi,center_linear,linear_index((j,s),lx,ly)))
+        end
+    end
+
+    if_plot ? plot_fourpointcorrelator(rez; kwargs...) : nothing
+
+    return rez
+end
 
 
 

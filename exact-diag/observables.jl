@@ -340,21 +340,6 @@ function ft_densitydensity_correlation(momentum::Vector{Float64},wavefunc::Union
     end
 end
 
-function ft_density(momentum::Vector{Float64},occs::Matrix{Float64}; kwargs...)
-    ly,lx = size(occs)
-
-    all_positions::Array{Float64,2} = zeros(Float64,ly,lx)
-    for j in 1:lx
-        for s in 1:ly
-            all_positions[s,j] = dot(momentum,[j,s])
-        end
-    end
-
-    result::ComplexF64 = sum(occs .* exp.(im .* all_positions)) / (lx * ly)
-
-    return result
-end
-
 function ft_density(momentum::Vector{Float64},wavefunc::Vector{ComplexF64},lattice_params::Dict; kwargs...)
     occs = get_occupancy(wavefunc,lattice_params; if_plot=false)
     return ft_density(momentum,occs; kwargs...)
@@ -552,11 +537,14 @@ end
 function pointfourhopping(psi::Vector{ComplexF64},s1::Int64,s2::Int64,lattice_params::Dict)
     hopmat = buildHopping(lattice_params,s1,s2)
 
+    #= this is the old verion, saved data from before 12 Jan 25 uses this
     if s1 != s2
         return conj(transpose(psi)) * (conj(transpose(hopmat)) * hopmat) * psi
     else
         return conj(transpose(psi)) * (conj(transpose(hopmat)) * hopmat - hopmat) * psi
-    end
+    end=#
+
+    return conj(transpose(psi)) * (conj(transpose(hopmat)) * hopmat) * psi
 end
 
 function fourpointcorrelator(psi::Vector{ComplexF64},lattice_params::Dict; kwargs...)
@@ -584,15 +572,33 @@ function fourpointcorrelator(psi::Vector{ComplexF64},lattice_params::Dict; kwarg
     return fourpointcorrs
 end
 
-function plot_fourpointcorrelator(fourpointcorrs::Array{Float64,2}; kwargs...)
-    plot_title = get(kwargs,:plot_title,"")
-    fig = figure()
-    imshow(fourpointcorrs)
-    colorbar()
-    title("Four Point Correlator" * plot_title)
-    xlabel("Physical")
-    ylabel("Synthetic")
-    return nothing
+function fourpoint_alberto(psi::Vector{ComplexF64},lattice_params::Dict; kwargs...)
+    if_plot::Bool = get(kwargs,:if_plot,true)
+    
+    # only need single site occs, would be good to make function for this instead of global occs
+    occs::Union{Nothing,Matrix{Float64}} = get(kwargs,:occs,nothing)
+    if isnothing(occs)
+        occs = get_occupancy(psi,lattice_params; if_plot=false)
+    end
+
+    center_site::Vector{Int64} = [Int64(ceil(lattice_params["Lx"]/2)),Int64(ceil(lattice_params["Ly"]/2))]
+    center_linear::Int = linear_index(center_site,lattice_params["Lx"],lattice_params["Ly"])
+
+    rez::Matrix{Float64} = zeros(Float64,lattice_params["Ly"],lattice_params["Lx"])
+    for j in 1:lattice_params["Lx"]
+        for s in 1:lattice_params["Ly"]
+            println("Working on site ($(j), $(s))")
+            rez[s,j] = pointfourhopping(psi,center_linear,linear_index((j,s),lattice_params["Lx"],lattice_params["Ly"]),lattice_params)
+        end
+    end
+    
+    # shift from the commutation relation
+    rez .-= occs[center_site[2],center_site[1]]
+    rez .*= -1
+
+    if_plot ? plot_fourpointcorrelator(rez; kwargs...) : nothing
+
+    return rez
 end
 
 # these are not exactly correct I think

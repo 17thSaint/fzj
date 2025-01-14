@@ -72,6 +72,8 @@ function dressHopping(hamilt_params::Dict,lattice_params::Dict,hopping::SparseMa
 
     for idx in 1:length(rows)
 
+        (output_level > 0) && (round(100*idx/length(rows),digits=0) % 10 == 0) && println(round(100*idx/length(rows),digits=4),"% complete")
+
         # find the starting and ending basis
         starting_basis::Vector{Int64} = lattice_params["full_basis"][:,rows[idx]]
         ending_basis::Vector{Int64} = lattice_params["full_basis"][:,cols[idx]]

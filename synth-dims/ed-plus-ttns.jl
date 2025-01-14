@@ -223,7 +223,7 @@ function build_phase_diagram_ulr_rho1d_flatness()
 end
 
 # build_phase_diagram_ulr_rho1d for ft dd
-if true
+if false
     configs = [(8,3,3),(4,6,3),(3,8,3),(8,4,4),(8,5,5)]
 
     ulrs::Vector{Float64} = Float64[]
@@ -330,6 +330,198 @@ if false
     
 end
 
+# energy spectrum scaling with Lx/Ly = 2.0
+if false
+    configs = [(6,3,3),(8,4,4),(10,5,5)]
+    for config in configs
+        lx,ly,n = config
+        if lx == 10
+            filename = "../cluster-data/exact-diag/torus/ed-Ly-5-interaction_strength-0.0-Lx-10-if_pinning-true-N-5-alpha-0.2-if_periodic_x-true-if_periodic_y-true-hopping_anisotropy-1.0.jld2"
+            d,m = read_data_jld2(filename; output_level=0)
+            nrgs = d["nrg"]
+        else
+            pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("filling",0.5),("lr","all"),("if_find_data",true),("if_save_data",false),("nev",10)])
+            states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
+        end
+
+        scatter(lx,nrgs[1] - nrgs[1],c="b")
+        scatter(lx,nrgs[2] - nrgs[1],c="g")
+        scatter(lx,nrgs[3] - nrgs[1],c="r")
+
+        xlabel("Lx")
+        ylabel("Energy Gap")
+        title("Energy Spectrum Finite Size Scaling")
+    end
+
+    ttn_configs = [(16,8,8)]
+    for config in ttn_configs
+        lx,ly,n = config
+        layers = get_layers_from_latticesize(lx,ly)
+        pdict = Dict([("layers",layers),("particles",n),("hopping_anisotropy",1.0),("if_periodic_phys",true),("if_periodic_synth",true),("onsite_strength",0.0)])
+        dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
+        all_files = find_data_file(pdict,"ttn",dataloc)
+        d,m = read_data_jld2(dataloc * "/" * all_files[1]; output_level=0)
+        nrgs::Dict{String,Float64} = Dict([("1",m["observer"].nrg[end])])
+
+        for i in 2:3
+            keyname = "observer_$(i-1)"
+            if keyname in keys(m)
+                nrgs[string(i)] = m[keyname].nrg[end]
+            else
+                nrgs[string(i)] = 0.0
+            end
+        end
+
+        scatter(lx,nrgs["1"] - nrgs["1"],c="b")
+        scatter(lx,nrgs["2"] - nrgs["1"],c="g")
+        scatter(lx,nrgs["3"] - nrgs["1"],c="r")
+
+        xlabel("Lx")
+        ylabel("Energy Gap")
+        title("Energy Spectrum Finite Size Scaling")
+    end
+end
+
+# check the FT-D scaling with Lx/Ly = 2.0
+if false
+    limit_vals = Float64[]
+    limit_sizes = Int64[]
+
+    # ED section
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    ks = range(0,2*pi,length=50)
+    configs = [(10,5,5),(8,4,4)]#(6,4,3),(8,4,4),(10,4,5)]
+    for (lx,ly,n) in configs
+        if_pinning = true
+        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+        all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
+
+        filter!(x -> !occursin("twist_angle1",x),all_files)
+        filter!(x -> !occursin("mk",x),all_files)
+        filter!(x -> occursin("if_pinning",x),all_files)
+
+        display(all_files)
+
+        cdw_sfs = Float64[]
+        intstrens = Float64[]
+        if_plot = false
+        for f in all_files
+
+            filename_dict = get_params_dict_from_filename(f)
+            if lx == 10 && filename_dict["interaction_strength"] == 0.8
+                continue
+            end
+            d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+
+            if lx == 8 && round(m["U"][end],digits=0) != m["U"][end]
+                continue
+            end
+
+            append!(intstrens,m["U"][end])
+
+            latparas = get_lattice_params_from_metadata(m)
+            occs = get_occupancy(d["state"][1],latparas; if_plot=if_plot,plot_title="$(lx)x$(ly) n=$n ULR=$(m["U"][end])")
+            ftd = ft_density([pi,0],occs)
+            append!(cdw_sfs,[abs(ftd)])
+
+            if m["U"][end] == 1000.0
+                push!(limit_vals,abs(ftd))
+                push!(limit_sizes,lx)
+            end
+
+        end
+
+        #fig = figure()
+        scatter(intstrens,cdw_sfs,label="$(lx)x$(ly)")
+        xlabel("Interaction Strength")
+        ylabel("CDW SF at k=(pi,0)")
+        title("CDW SF at "*L"\rho_{1D}=1/2")
+        xscale("log")
+        legend()
+    end
+
+    # TTN section
+    dataloc = get_folder_location("cluster-data/synth-dims/torus")
+    configs = [(7,8),(7,6)]
+    for (layers,particles) in configs
+        pdict = Dict([("layers",layers),("particles",particles),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+        all_files = find_data_file(pdict,"ttn",dataloc)
+        display(all_files)
+
+        intstrens = Float64[]
+        ftvals = ComplexF64[]
+        for f in all_files
+            d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+
+            #= checking convergence of energies
+            all_convs = [false,false,false]
+            for i in 1:3
+                observerkey = i == 1 ? "observer" : "observer_$(i-1)"
+                if observerkey in keys(m)
+                    all_convs[i] = abs(m[observerkey].nrg[end] - m[observerkey].nrg[end-1]) < m["nrgtol"]
+                end
+            end
+            println("For $(m["onsite_strength"]) all convs are ",all_convs)=#
+
+            lx,ly = 2*particles,particles
+            occs = get_occupancy(d["densmat"]; plot_title="Intstren = $(m["onsite_strength"])",if_plot=false)[1:lx,1:ly]
+            ftval = ft_density([pi,0.0],occs)
+            push!(intstrens,m["onsite_strength"])
+            push!(ftvals,ftval)
+
+            if m["onsite_strength"] == 1000.0
+                push!(limit_vals,abs(ftval))
+                push!(limit_sizes,particles*2)
+            end
+        end
+        scatter(intstrens,abs.(ftvals),label="$(2*particles)x$particles")
+        legend()
+    end
+
+
+    fig = figure()
+    scatter(limit_sizes,limit_vals)
+    xlabel("Lx")
+    ylabel("CDW SF at k=(pi,0)")
+    title("CDW SF at "*L"\rho_{1D}=1/2"*", ULR=1000.0")
+    yscale("log")
+
+end
+
+# finite size scaling of FT-DD at ULR = 0.0
+if true
+
+    # ED version with 8x4 and 10x5
+    configs = [(8,4,4),(10,5,5)]
+    for config in configs
+        lx,ly,n = config
+        dataloc = get_folder_location("cluster-data/exact-diag/torus")
+        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",0.0),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+        all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
+        filter!(x -> !occursin("twist_angle1",x),all_files)
+        filter!(x -> !occursin("mk",x),all_files)
+        filter!(x -> !occursin("pinning",x),all_files)
+        f = all_files[1]
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=1)
+        dds = m["densitydensity"]
+        ft_dds_stripe = abs(ft_densitydensity([pi,0],dds))
+        scatter(lx,ft_dds_stripe,c="r")
+    end
+
+    # TTN version with 16x8 and 12x6
+    configs = [6,8]
+    for n in configs
+        dataloc = get_folder_location("cluster-data/synth-dims/torus")
+        pdict = Dict([("layers",7),("particles",n),("onsite_strength",0.0),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+        all_files = find_data_file(pdict,"ttn",dataloc)
+        f = all_files[1]
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=1)
+        dds = m["densitydensity"]
+        ft_dds_stripe = abs(ft_densitydensity([pi,0],dds))
+        scatter(n*2,ft_dds_stripe,c="b")
+    end
+
+end
 
 
 

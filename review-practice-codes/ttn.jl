@@ -1770,42 +1770,6 @@ function get_2part_corr(ttn,particle_count; kwargs...)
 	return corr
 end
 
-function get_occupancy(densmat::Matrix; kwargs...)
-	if isinteger(sqrt(size(densmat)[1]))
-		phys_length = Int(sqrt(size(densmat)[1]))
-		virt_length = Int(phys_length)
-	else
-		phys_length = Int(sqrt(2*size(densmat)[1]))
-		virt_length = Int(phys_length/2)
-	end
-
-	lat = TTNKit.SimpleLattice((phys_length,virt_length),TTNKit.ITensorNode,"Boson")
-
-	exp_occ = zeros(phys_length,virt_length)
-	for j in 1:phys_length
-		for s in 1:virt_length
-			linear_index = TTNKit.linear_ind(lat,(j,s))
-			exp_occ[j,s] = abs(densmat[linear_index,linear_index])
-		end
-	end
-
-	if_save_data = get(kwargs, :if_save_data, false)
-	if_save_fig = get(kwargs, :if_save_fig, false)
-	if_plot = get(kwargs, :if_plot, true)
-	if_3d = get(kwargs, :if_3d, false)
-
-	if_save_data ? save_occupancy(exp_occ; kwargs...) : nothing
-	if if_plot
-		if if_3d
-			plot_occupancy_3d(exp_occ; kwargs...)
-		else
-			plot_occupancy(exp_occ; kwargs...)
-		end
-	end
-
-	return exp_occ
-end
-
 function c2(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
 	if_c3 = get(kwargs, :if_c3, false)
 	if_plot = get(kwargs, :if_plot, false)

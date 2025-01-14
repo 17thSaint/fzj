@@ -113,21 +113,23 @@ if false
 
     save_rawdata(rawdata_net,"net",filename,"metadata")
     save_rawdata(rawdata_ttn,"ttn",filename,"all_data")
-end
+end=#
 
 # extract rawdata from file and then build the new network and save it
-if true
+if false
+    #=filename = "ttn-if_periodic_phys-true-onsite_strength-10.0-lr-7-particles-4-alpha-0.125-layers-6-hopping_anisotropy-0.3.jld2"
+    bf = jldopen(filename,"r+")
     rawdata_net = bf["metadata"]["net-rawdata"]
     new_net = rebuild_BinaryNetwork(rawdata_net)
 
     rawdata_ttn = bf["all_data"]["ttn-rawdata"]
     new_ttn = rebuild_TreeTensorNetwork(rawdata_ttn)
 
-    close(bf)
+    close(bf)=#
 
-    save_newdata(new_net,"net",filename)
+    #save_newdata(new_net,"net",filename)
     save_newdata(new_ttn,"ttn",filename,"all_data")
-end=#
+end
 
 function extract_data(binary_file,filename::String)
     
@@ -264,8 +266,9 @@ if false
     end
 end
 
-# not rebuilding ttn from all_data correctly, maybe the TypeError
-if true
+# not rebuilding ttn from all_data correctly, comes from reconstructing ITensors.Index
+# this relates to the reconstructed GenericTagSet
+if false
     all_files = readdir()
     filter!(x -> occursin(".jld2",x),all_files)
     filter!(x -> occursin("ttn",x),all_files)

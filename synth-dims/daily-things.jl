@@ -13,7 +13,7 @@ Depends on:
 ######################################################
 
 include("../other-funcs/include-other-files.jl")
-include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","review-practice-codes/plottings.jl","synth-dims/hatsugai-mbcn.jl","other-funcs/basic-2d-plottings.jl"])
+include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","review-practice-codes/plottings.jl","synth-dims/hatsugai-mbcn.jl","other-funcs/basic-2d-plottings.jl","other-funcs/basic-2d-observables.jl"])
 include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
 
 function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
@@ -359,6 +359,74 @@ if false
     end
     println("Of the $(length(all_files)) files, $(seed_count) had seed_ttn data")
 end
+
+# density-density stuff for 16x8
+if true
+    dataloc = get_folder_location("cluster-data/synth-dims/torus")
+    pdict = Dict([("layers",7),("particles",8),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc)
+    display(all_files)
+
+    ulrs = []
+    ft_dds = []
+    #for f in all_files
+    f = all_files[1]
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+
+        #= checking convergence of energies
+        all_convs = [false,false,false]
+        for i in 1:3
+            observerkey = i == 1 ? "observer" : "observer_$(i-1)"
+            if observerkey in keys(m)
+                all_convs[i] = abs(m[observerkey].nrg[end] - m[observerkey].nrg[end-1]) < m["nrgtol"]
+            end
+        end
+        println("For $(m["onsite_strength"]) all convs are ",all_convs)=#
+
+        #occs = get_occupancy(d["densmat"]; plot_title="Intstren = $(m["onsite_strength"])",if_plot=true,if_synth_rectangle=true)
+        dds = m["densitydensity"]
+        ft_dds_stripe = abs(ft_densitydensity([pi,0],dds))
+        #plot_fourpointcorrelator(dds; if_plot=true,plot_title="ULR=$(m["onsite_strength"])")
+        ks = range(-pi,pi,length=100)
+        allmoms::Matrix{Float64} = zeros(Float64,length(ks),length(ks))
+        for (idx1,kx) in enumerate(ks)
+            for (idx2,ky) in enumerate(ks)
+                allmoms[idx2,idx1] = abs(ft_densitydensity([kx,ky],dds))
+            end
+        end
+        fig = figure()
+        imshow(allmoms,extent=(minimum(ks),maximum(ks),minimum(ks),maximum(ks)),origin="lower")
+        xlabel(L"k_{phys}")
+        ylabel(L"k_{synth}")
+        colorbar()
+        title("FT-Density-Density for 16x8 N=8 ULR=$(m["onsite_strength"])")
+        #append!(ulrs,[m["onsite_strength"]])
+        #append!(ft_dds,[ft_dds_stripe])
+
+
+    #=end
+    fig = figure()
+    scatter(ulrs,ft_dds)
+    xlabel("Interaction Strength")
+    #ylabel("FT-DD at k=("*L"\pi"*",0)")
+    title("FT-DD at k=("*L"\pi"*",0)")=#
+end
+
+# trying DD for 12x6
+if false
+    dataloc = get_folder_location("cluster-data/synth-dims/torus")
+    pdict = Dict([("layers",7),("particles",6),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc)
+
+    f = all_files[1]
+    d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+    d_wavefunc,m_wavefunc = read_data_jld2(dataloc * "/wavefunc" * f; output_level=0)
+
+    occs = get_occupancy(d["densmat"]; plot_title="Intstren = $(m["onsite_strength"])",if_plot=true,if_synth_rectangle=true)
+    dds = fourpoint_alberto(d_wavefunc["ttn"]; if_plot=true,plot_title="Intstren = $(m["onsite_strength"])")
+
+end
+
 
 
 

@@ -483,20 +483,6 @@ function plot_hatsugai_fromsaveddata(lx::Int64,ly::Int64,N::Int64; kwargs...)
 
 end
 
-function plot_occupancy(exp_occ; kwargs...)
-    fix_colorbar = get(kwargs,:fix_colorbar,true)
-	fig = figure() #maximum(exp_occ)
-	fix_colorbar ? imshow(exp_occ;vmin=0,vmax=0.2) : imshow(exp_occ)
-	colorbar()
-	plot_title = get(kwargs, :plot_title, "")
-	title_string = "Occupancy, " * plot_title
-	title(title_string)
-	ylabel("Synthetic")
-	xlabel("Physical")
-
-    return nothing
-end
-
 function plot_physical_correlation(phys_corrs::Array{Float64,2}; kwargs...)
     plot_title = get(kwargs,:plot_title,"")
     fig = figure()

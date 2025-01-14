@@ -311,9 +311,9 @@ if false
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
     
-    lx,ly,n = 4,4,2
+    lx,ly,n = 10,5,5
     #for (idx,n) in enumerate([2,3,4,5])
-    intstrens = vcat(range(0.0,1.0,length=11),exp10.(range(0.0,log10(1000),length=39)))#[3,4,5,6,7,8,9,20,30,40,70,150,200,300,400]
+    intstrens = vcat(range(0.0,1.0,length=6),exp10.(range(0.0,log10(1000),length=19)))#[3,4,5,6,7,8,9,20,30,40,70,150,200,300,400]
     #intstren = 1000.0
     #other_intstrens = range(2.0,10.0,length=37)
     #intstrens = sort([intstrens; other_intstrens])
@@ -325,6 +325,7 @@ if false
     #for (idx,ly) in enumerate(lys)
     #for (idx,nu) in enumerate(nus)
     #for (idx,anis) in enumerate(anises)
+    #    anis = 1/anis
     for (idx,intstren) in enumerate(intstrens)
     #for (idx2,sigma) in enumerate(sigmas)
     #for lrd in [0,1]
@@ -337,7 +338,7 @@ if false
         display(BLAS.get_config())
     end=#
 
-    #intstren = 1.0
+    #intstren = 0.0
     tw2 = 0.0
     tw1 = 0.0
     #tws = range(0.0,1.0,length=11)
@@ -356,30 +357,30 @@ if false
         #    continue
         #end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_pinning",true),("if_reading",true),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_pinning",false),("if_reading",true),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",true)])
         #params_dict = make_args_dict(ARGS)
 
         #println("Starting from here")
 
         if true
             states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
-            #get_occupancy(states[1],lattice_params; if_plot=true,plot_title="$(lx)x$(ly) N=$n ULR=$intstren")
         end
         
         #scatter3D(tw1,tw2,nrgs[1] - nrgs[1],c="b")
         #scatter3D(tw1,tw2,nrgs[2] - nrgs[1],c="g")
         #scatter3D(tw1,tw2,nrgs[3] - nrgs[1],c="r")
 
-        #=make_density_correlations(states[1],lattice_params; if_save=true,filepath=filepath)
-        if idx == 1
+        #make_density_correlations(states[1],lattice_params; if_save=true,filepath=filepath)
+        #=if idx == 1
             get_occupancy(states[1],lattice_params; fix_colorbar=false,plot_title=" ULR=$intstren")
             fig = figure()
         end=#
 
-        #plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",false; plot_title="")
+        #plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title="")
         #plot_spectrum(tws,nrgs,idx,params_dict["nev"],"Theta_x / 2pi",false; plot_title=" V=$intstren")
+        #plot_spectrum(anises,nrgs,idx,params_dict["nev"],"Hopping Anis",true; plot_title=" Cecille")
 
-        if true
+        #=if true
             if idx == 1
                 occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title=" $(lx)x$(ly) N=$n ULR=$intstren")
                 fig = figure()
@@ -402,7 +403,7 @@ if false
 
         if idx == length(intstrens)
             get_occupancy(states[1],lattice_params; if_plot=true,plot_title=" ULR=$intstren")
-        end#
+        end=#
 
         #=if idx == length(intstrens)
             get_occupancy(states[1],lattice_params; fix_colorbar=false,plot_title=" ULR=$intstren")
@@ -415,7 +416,7 @@ if false
         #gammas1[idx,idx2] = gamma1
         #gammas2[idx,idx2] = gamma2
 
-    end
+    #end
     #end
 
     #=fig = figure()
@@ -425,7 +426,7 @@ if false
     ylabel(L"\theta_y / 2\pi")
     title("FT Density at k=(pi,0) for $(lx)x$(ly) N=$n ULR=$intstren")=#
 
-    #end
+    end
 
     #xlabel(L"\theta_x / 2\pi")
     #ylabel(L"\theta_y / 2\pi")

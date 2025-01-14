@@ -10,8 +10,8 @@ Depends on:
 ######################################################
 
 include("execute-ed.jl")
-include("plottings.jl")
-include("../other-funcs/basic-2d-plottings.jl")
+#include("plottings.jl")
+#include("../other-funcs/basic-2d-plottings.jl")
 
 function datacollection_flatness(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
     hanis::Float64 = get(kwargs,:hopping_anisotropy,1.0)
@@ -621,7 +621,7 @@ end
 if false
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     ks = range(0,2*pi,length=50)
-    configs = [(8,4,4)]#[(6,4,3),(8,4,4),(10,4,5)]
+    configs = [(10,5,5),(8,4,4)]#(6,4,3),(8,4,4),(10,4,5)]
     for (lx,ly,n) in configs
     if_pinning = true
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
@@ -635,17 +635,32 @@ if false
 
     cdw_sfs = Float64[]
     intstrens = Float64[]
+    if_plot = false
     for f in all_files
 
+        filename_dict = get_params_dict_from_filename(f)
+        if lx == 10 && filename_dict["interaction_strength"] == 0.8
+            continue
+        end
         d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+
+        if lx == 8 && round(m["U"][end],digits=0) != m["U"][end]
+            continue
+        end
 
         append!(intstrens,m["U"][end])
 
-        if intstrens[end] == 0.0 || intstrens[end] == 1000.0 || (lx == 10 && isapprox(200.0,intstrens[end],atol=10.0))
+        #=if intstrens[end] == 0.0 || intstrens[end] == 1000.0 || (lx == 10 && isapprox(200.0,intstrens[end],atol=10.0))
             if_plot = true
         else
             if_plot = false
-        end
+        end=#
+
+        #=if if_plot
+            if_plot = false
+        else
+            if_plot = true
+        end=#
 
         latparas = get_lattice_params_from_metadata(m)
         occs = get_occupancy(d["state"][1],latparas; if_plot=if_plot,plot_title="$(lx)x$(ly) n=$n ULR=$(m["U"][end])")
@@ -654,13 +669,13 @@ if false
 
     end
 
-    #=fig = figure()
+    #fig = figure()
     scatter(intstrens,cdw_sfs,label="$(lx)x$(ly)")
     xlabel("Interaction Strength")
     ylabel("CDW SF at k=(pi,0)")
     title("CDW SF at "*L"\rho_{1D}=1/2")
     xscale("log")
-    legend()=#
+    legend()
     end
 end
 
@@ -793,11 +808,11 @@ if false
 end
 
 # looking at laughlin finite scaling at ULR=0.0
-if true
+if false
     configs = [(4,4,2),(6,4,3),(8,4,4),(10,4,5)]
     for config in configs
         lx,ly,n = config
-        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("if_pinning",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("filling",0.5),("lr","all"),("if_find_data",true),("if_save_data",false),("nev",10)])
+        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("if_pinning",false),("hopping_anisotropy",1.0),("interaction_strength",0.0),("filling",0.5),("lr","all"),("if_find_data",true),("if_save_data",false),("nev",10)])
         states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
 
         get_occupancy(states[1],lattice_params; if_plot=true,plot_title="$(lx)x$(ly) n=$n ULR=0.0")
@@ -805,8 +820,79 @@ if true
     end
 end
 
+# do density-density correlations like Alberto
+if false
+    lx,ly,n = 8,4,4
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
 
+    filter!(x -> !occursin("twist_angle1",x),all_files)
+    filter!(x -> !occursin("mk",x),all_files)
+    filter!(x -> !occursin("pinning",x),all_files)
 
+    filter!(x -> occursin(".0-",x),all_files)
+
+    #= for when has saved non-Alberto version of density-density
+    for f in all_files
+        d,m = read_data_jld2(f,dataloc; output_level=0)
+        if haskey(m,"dens_corr_mat")
+            println(f)
+            dd = m["dens_corr_mat"]
+        end
+    end=#
+
+    us = []
+    fts = []
+    for f in all_files
+    #f = all_files[5]
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+        latparas = get_lattice_params_from_metadata(m)
+        occs = get_occupancy(d["state"][1],latparas; if_plot=false,plot_title="$(lx)x$(ly) n=$n ULR=$(m["U"][end])")
+        dds = fourpoint_alberto(d["state"][1],latparas; occs=occs, plot_title="$(lx)x$(ly) n=$n ULR=$(m["U"][end])",if_plot=false)
+        mdata = Dict([("densitydensity",dds),("occs",occs)])
+        modify_data_jld2(mdata,dataloc * "/" * f,"metadata"; output_level=1)
+        ft_dds_stripe = abs(ft_densitydensity([pi,0],dds))
+        append!(us,m["U"][end])
+        append!(fts,ft_dds_stripe)
+        #=moms = range(0.0,2*pi,length=100)
+        ft_dds = zeros(Float64,length(moms),length(moms))
+        for (idx,kx) in enumerate(moms)
+            for (idx2,ky) in enumerate(moms)
+                ft_dds[idx2,idx] = abs(ft_densitydensity([kx,ky],dds))
+            end
+        end
+        #display(ft_dds)
+        fig = figure()
+        imshow(ft_dds,extent=(minimum(moms),maximum(moms),minimum(moms),maximum(moms)),origin="lower")
+        xlabel(L"k_{phys}")
+        ylabel(L"k_{synth}")
+        colorbar()
+        title("FT-Density-Density for $(lx)x$(ly) N=$(n) ULR=$(m["U"][end])")=#
+    end
+    fig = figure()
+    scatter(us,fts)
+    xlabel("Interaction Strength")
+    ylabel("FT-DD at k=("*L"\pi"*",0)")
+    title("FT-DD at k=("*L"\pi"*",0) for $(lx)x$(ly) N=$(n)")
+end
+
+# checking 10x5 N=5 unpinned data
+if true
+    lx,ly,n = 10,5,5
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
+
+    display(all_files)
+    for f in all_files
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+        latparas = get_lattice_params_from_metadata(m)
+        occs = m["occs"]
+        dds = fourpoint_alberto(d["state"][1],latparas; occs=occs, plot_title="$(lx)x$(ly) n=$n ULR=$(m["U"][end])",if_plot=true)
+        modify_data_jld2(Dict([("densitydensity",dds)]),filepath,"metadata"; output_level=1)
+    end
+end
 
 
 

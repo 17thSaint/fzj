@@ -2,6 +2,8 @@
 #Pkg.activate(".")
 include("../review-practice-codes/ttn.jl")
 include("../other-funcs/basic-2d-stuff.jl")
+include("../review-practice-codes/observables.jl")
+#include("../review-practice-codes/plottings.jl")
 using Profile,MKL
 
 function spin_matrix_element(m1,m2,spin,direction::String)
@@ -249,6 +251,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	if_nn_int = get(kwargs, :if_nn_int, false)
 	onsite_strength = get(kwargs, :onsite_strength, 0.0)
 	if_pinning_pot = get(kwargs, :if_pinning_pot, false)
+	if_pinning::Bool = get(kwargs, :if_pinning, false)
 	vpinning = get(kwargs, :vpinning, 2.5)
 	no_magF = get(kwargs, :no_magF, false)
 	chem_strength = get(kwargs, :chem_strength, 0.0)
@@ -425,15 +428,23 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 		end
 		append!(resulting_ham,[chem])
 	end
+
+	if if_pinning
+		vpinning::Float64 = 1E-6
+		pinning = TTNKit.OpSum()
+		pinning += (vpinning,"N",(1,1))
+
+		append!(resulting_ham,[pinning])
+	end
 	
-	if if_pinning_pot
+	#=if if_pinning_pot
 		Vj = v_central(size(lat), vpinning)
 		pinning_pot = TTNKit.OpSum()
 		for p in TTNKit.coordinates(lat)
 	    		pinning_pot += (Vj[p[1],p[2]], "N", p)
 		end
 		append!(resulting_ham,[pinning_pot])
-	end
+	end=#
 	
 	if length(resulting_ham) > 1
 		return sum(resulting_ham)
@@ -1599,7 +1610,8 @@ function get_normal_model_params(params_dict::Dict)
 						"if_redo"=>if_redo,
 						"restricted_size"=>make_smaller_lattice,
 						"centralflux_strength"=>centralflux_strength,
-						"if_pinning_pot"=>if_pinning,
+						"if_pinning_pot"=>false,
+						"if_pinning"=>if_pinning,
 						"if_periodic_phys"=>if_periodic_phys,
 						"if_periodic_synth"=>if_periodic_synth,
 						"if_nn_int"=>if_NN,
@@ -1907,7 +1919,7 @@ if false
 end
 
 # synth-dims for loop runnings
-if true
+if false
 
 	cols = ["b","g","r"]
 	#nnst = 0.0
@@ -1926,17 +1938,17 @@ if true
 	#lr = 7
 	#anises = [0.01,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.6,0.8,0.9,1.1,1.3,1.5,1.7,1.9,2.0,2.5,3.0,3.5,4.0,6.0,8.0,9.0,10.0,15.0,20.0,25.0,30.0,40.0,50.0,70.0,90.0,100.0,1000.0,10000.0]
 	#anises = range(1.0,5.0,length=10)
-	#strens = range(0.0,2.0,length=11)
+	strens = [0.0,1.0,10.0,20.0,50.0,100.0,300.0,500.0,1000.0]#range(0.0,2.0,length=11)
 	#args_dict = make_args_dict(ARGS)
-	stren = 0.0#args_dict["onsite_strength"]
+	#stren = 1000.0#args_dict["onsite_strength"]
 	#alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
 	#strens = [0.0,0.5,1.0,1.5,2.0]#range(0.1,0.5,length=3)
 	#for (idx,anis) in enumerate(anises)
-	#for (idx,stren) in enumerate(strens)
+	for (idx,stren) in enumerate(strens)
 	#tws = range(0.0,1.0,length=10)
 	#for tw1 in tws
 	#for tw2 in tws
-		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",3),("if_synth_rectangle",true),("expander_fraction",0.001),("particles",4),("layers",5),("mdim",300),("if_save_data",true),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("hopping_anisotropy",1.0),("make_smaller_lattice",[12,6]),("es_count",0),("if_synth_rectangle",false),("expander_fraction",0.01),("particles",6),("layers",7),("mdim",20),("if_save_data",false),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		open_cores = get(params_dict, "open_cores", 5)
@@ -1954,7 +1966,9 @@ if true
 			scatter(tw1,all_results[3][i].nrg[end],c=cols[i])
 		end=#
 
-		#occs = get_occupancy(all_results[1]; densmat=all_results[end])
+		#occs = get_occupancy(all_results[1]; densmat=all_results[end],if_plot=true)
+		#modify_data_jld2(Dict([("occs",occs)]),filepath,"metadata")
+		
 		#=bothoccs = []
 		for i in 1:params_dict["es_count"]+1
 			append!(bothoccs,[get_occupancy(all_results[1][i]; densmat=all_results[end-1][i], plot_title="Level $(i-1) NRG=$(round(all_results[3][i].nrg[end],digits=4))")])
@@ -2040,7 +2054,7 @@ if true
 			fig = figure()
 			scatter(collect(1:mdim),-log.(specs))
 			=#
-	#end
+	end
 #end
 end
 
