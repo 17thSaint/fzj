@@ -490,13 +490,14 @@ end
 
 # finite size scaling of FT-DD at ULR = 0.0
 if true
+    intstren = 100.0
 
     # ED version with 8x4 and 10x5
     configs = [(8,4,4),(10,5,5)]
     for config in configs
         lx,ly,n = config
         dataloc = get_folder_location("cluster-data/exact-diag/torus")
-        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",0.0),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
         all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
         filter!(x -> !occursin("twist_angle1",x),all_files)
         filter!(x -> !occursin("mk",x),all_files)
@@ -509,10 +510,10 @@ if true
     end
 
     # TTN version with 16x8 and 12x6
-    configs = [6,8]
+    configs = [8,6]
     for n in configs
         dataloc = get_folder_location("cluster-data/synth-dims/torus")
-        pdict = Dict([("layers",7),("particles",n),("onsite_strength",0.0),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+        pdict = Dict([("layers",7),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
         all_files = find_data_file(pdict,"ttn",dataloc)
         f = all_files[1]
         d,m = read_data_jld2(dataloc * "/" * f; output_level=1)
@@ -521,6 +522,10 @@ if true
         scatter(n*2,ft_dds_stripe,c="b")
     end
 
+    xlabel("Lx")
+    ylabel("FT-DD at k=(" * L"\pi" * ",0)")
+    title("Finite Size Scaling of FT-DD at ULR=$intstren")
+    yscale("log")
 end
 
 

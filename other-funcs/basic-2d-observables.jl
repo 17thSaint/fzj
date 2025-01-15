@@ -105,6 +105,24 @@ function ft_densitydensity(momentum::Vector{Float64},dds::Matrix{Float64}; kwarg
     return result
 end
 
+function pairdistribution(densitydensity::Matrix{Float64},occupancy_matrix; kwargs...)
+    if_plot::Bool = get(kwargs, :if_plot, false)
+
+    if size(densitydensity) != size(occupancy_matrix)
+        println("Sizes of Occs and DDs are not the same. Trimming Occs.")
+        occupancy_matrix = occupancy_matrix[1:size(densitydensity)[1],1:size(densitydensity)[2]]
+    end
+
+    Lsynth::Int64,Lphys::Int64 = size(densitydensity)
+
+    centersite::Vector{Int64} = [Int64(ceil(Lphys/2)),Int64(ceil(Lsynth/2))]
+    pairdist::Matrix{Float64} = densitydensity ./ (occupancy_matrix[centersite[2],centersite[1]] .* occupancy_matrix)    
+
+    if_plot ? plot_pairdistribution(pairdist; kwargs...) : nothing
+
+    return pairdist
+end
+
 
 
 

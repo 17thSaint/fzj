@@ -845,16 +845,19 @@ if false
     us = []
     fts = []
     for f in all_files
-    #f = all_files[5]
+    #f = all_files[1]
         d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+        if !(m["U"][end] in [0.0,1.0,20.0,100.0])
+            continue
+        end
         latparas = get_lattice_params_from_metadata(m)
         occs = get_occupancy(d["state"][1],latparas; if_plot=false,plot_title="$(lx)x$(ly) n=$n ULR=$(m["U"][end])")
-        dds = fourpoint_alberto(d["state"][1],latparas; occs=occs, plot_title="$(lx)x$(ly) n=$n ULR=$(m["U"][end])",if_plot=false)
+        #=dds = fourpoint_alberto(d["state"][1],latparas; occs=occs, plot_title="$(lx)x$(ly) n=$n ULR=$(m["U"][end])",if_plot=false)
         mdata = Dict([("densitydensity",dds),("occs",occs)])
         modify_data_jld2(mdata,dataloc * "/" * f,"metadata"; output_level=1)
         ft_dds_stripe = abs(ft_densitydensity([pi,0],dds))
         append!(us,m["U"][end])
-        append!(fts,ft_dds_stripe)
+        append!(fts,ft_dds_stripe)=#
         #=moms = range(0.0,2*pi,length=100)
         ft_dds = zeros(Float64,length(moms),length(moms))
         for (idx,kx) in enumerate(moms)
@@ -869,16 +872,31 @@ if false
         ylabel(L"k_{synth}")
         colorbar()
         title("FT-Density-Density for $(lx)x$(ly) N=$(n) ULR=$(m["U"][end])")=#
+
+        dds = m["densitydensity"]
+        centersite = [Int64(ceil(lx/2)),Int64(ceil(ly/2))]
+        pairdist = pairdistribution(dds,occs; if_plot=true,plot_title="$(lx)x$(ly) n=$n ULR=$(m["U"][end])")
+        #=fig = figure()
+        plot(1:lx,pairdist[centersite[2],:],"-p",label=m["U"][end])
+        xlabel("Physical Site")
+
+        #plot(1:ly,pairdist[:,centersite[1]],"-p",label=m["U"][end])
+        #xlabel("Synthetic Site")
+
+        ylabel("Pairdist")
+        title("Pairdist Slice")
+        legend()=#
+
     end
-    fig = figure()
+    #=fig = figure()
     scatter(us,fts)
     xlabel("Interaction Strength")
     ylabel("FT-DD at k=("*L"\pi"*",0)")
-    title("FT-DD at k=("*L"\pi"*",0) for $(lx)x$(ly) N=$(n)")
+    title("FT-DD at k=("*L"\pi"*",0) for $(lx)x$(ly) N=$(n)")=#
 end
 
 # checking 10x5 N=5 unpinned data
-if true
+if false
     lx,ly,n = 10,5,5
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])

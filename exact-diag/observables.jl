@@ -601,6 +601,24 @@ function fourpoint_alberto(psi::Vector{ComplexF64},lattice_params::Dict; kwargs.
     return rez
 end
 
+function pairdistribution(psi::Vector{ComplexF64},lattice_params::Dict; kwargs...)
+    if_plot::Bool = get(kwargs,:if_plot,true)
+    occs::Union{Nothing,Matrix{Float64}} = get(kwargs,:occs,nothing)
+    if isnothing(occs)
+        occs = get_occupancy(psi,lattice_params; kwargs...,if_plot=false)
+    end
+
+    Lsynth::Int64,Lphys::Int64 = size(occs)
+
+    fourpoint::Matrix{Float64} = fourpoint_alberto(psi,lattice_params; kwargs...)
+    centersite::Vector{Int64} = [Int64(ceil(Lphys/2)),Int64(ceil(Lsynth/2))]
+    pairdist::Matrix{Float64} = fourpoint ./ (occs[centersite[2],centersite[1]] .* occs)
+
+    if_plot ? plot_pairdistribution(pairdist; kwargs...) : nothing
+
+    return pairdist
+end
+
 # these are not exactly correct I think
 # calculate canonical momentum -i * d H(j,s) / d flux_density
 function canonical_momentum(psi::Vector{ComplexF64},direction::Int64,lattice_params::Dict,hamilt_params::Dict; kwargs...)

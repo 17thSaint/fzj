@@ -241,9 +241,9 @@ function plot_distdensdenscorrs(distances::Vector{Int64},denscorrs::Vector{Float
 end
 
 function plot_occupancy(exp_occ; kwargs...)
-    fix_colorbar = get(kwargs,:fix_colorbar,true)
+    vmax = get(kwargs,:vmax,nothing)
 	fig = figure() #maximum(exp_occ)
-	fix_colorbar ? imshow(exp_occ;vmin=0,vmax=maximum(exp_occ)) : imshow(exp_occ)
+	isnothing(vmax) ? imshow(exp_occ;vmin=0) : imshow(exp_occ,vmin=0,vmax=vmax)
 	colorbar()
 	plot_title = get(kwargs, :plot_title, "")
 	title_string = "Occupancy, " * plot_title
@@ -256,10 +256,23 @@ end
 
 function plot_fourpointcorrelator(fourpointcorrs::Array{Float64,2}; kwargs...)
     plot_title = get(kwargs,:plot_title,"")
+    vmax = get(kwargs,:vmax,nothing)
     fig = figure()
-    imshow(fourpointcorrs)
+    isnothing(vmax) ? imshow(fourpointcorrs,vmin=0.0) : imshow(fourpointcorrs,vmin=0.0,vmax=vmax)
     colorbar()
     title("Four Point Correlator " * plot_title)
+    xlabel("Physical")
+    ylabel("Synthetic")
+    return nothing
+end
+
+function plot_pairdistribution(pairdist::Array{Float64,2}; kwargs...)
+    plot_title = get(kwargs,:plot_title,"")
+    vmax = get(kwargs,:vmax,nothing)
+    fig = figure()
+    isnothing(vmax) ? imshow(pairdist,vmin=0.0) : imshow(pairdist,vmin=0.0,vmax=vmax)
+    colorbar()
+    title("Pair Distribution " * plot_title)
     xlabel("Physical")
     ylabel("Synthetic")
     return nothing

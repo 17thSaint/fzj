@@ -361,7 +361,7 @@ if false
 end
 
 # density-density stuff for 16x8
-if true
+if false
     dataloc = get_folder_location("cluster-data/synth-dims/torus")
     pdict = Dict([("layers",7),("particles",8),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc)
@@ -369,9 +369,15 @@ if true
 
     ulrs = []
     ft_dds = []
-    #for f in all_files
-    f = all_files[1]
+    for f in all_files
+    #f = all_files[1]
         d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+
+        if !(m["onsite_strength"] in [0.0,1.0,20.0,100.0])
+            continue
+        end
+
+        display(m)
 
         #= checking convergence of energies
         all_convs = [false,false,false]
@@ -383,11 +389,23 @@ if true
         end
         println("For $(m["onsite_strength"]) all convs are ",all_convs)=#
 
-        #occs = get_occupancy(d["densmat"]; plot_title="Intstren = $(m["onsite_strength"])",if_plot=true,if_synth_rectangle=true)
+        occs = get_occupancy(d["densmat"]; plot_title="ULR = $(m["onsite_strength"])",if_plot=false,if_synth_rectangle=true,vmax=0.1)
         dds = m["densitydensity"]
-        ft_dds_stripe = abs(ft_densitydensity([pi,0],dds))
+        #ft_dds_stripe = abs(ft_densitydensity([pi,0],dds))
+        
+        pairdist = pairdistribution(dds,occs; if_plot=false, plot_title="ULR = $(m["onsite_strength"])",vmax=1.5)
+        centersite = [Int64(ceil(size(pairdist,2)/2)),Int64(ceil(size(pairdist,1)/2))]
+        #fig = figure()
+        #plot(1:size(pairdist,2),pairdist[centersite[2],:],"-p",label=m["onsite_strength"])
+        #xlabel("Physical Site")
+        plot(1:size(pairdist,1),pairdist[:,centersite[1]],"-p",label=m["onsite_strength"])
+        xlabel("Synthetic Site")
+        ylabel("Pair Dist")
+        title("Pair Distribution Synthetic Slice 16x8 N=8")
+        legend()
+
         #plot_fourpointcorrelator(dds; if_plot=true,plot_title="ULR=$(m["onsite_strength"])")
-        ks = range(-pi,pi,length=100)
+        #=ks = range(-pi,pi,length=100)
         allmoms::Matrix{Float64} = zeros(Float64,length(ks),length(ks))
         for (idx1,kx) in enumerate(ks)
             for (idx2,ky) in enumerate(ks)
@@ -399,13 +417,13 @@ if true
         xlabel(L"k_{phys}")
         ylabel(L"k_{synth}")
         colorbar()
-        title("FT-Density-Density for 16x8 N=8 ULR=$(m["onsite_strength"])")
+        title("FT-Density-Density for 16x8 N=8 ULR=$(m["onsite_strength"])")=#
         #append!(ulrs,[m["onsite_strength"]])
         #append!(ft_dds,[ft_dds_stripe])
 
 
-    #=end
-    fig = figure()
+    end
+    #=fig = figure()
     scatter(ulrs,ft_dds)
     xlabel("Interaction Strength")
     #ylabel("FT-DD at k=("*L"\pi"*",0)")
