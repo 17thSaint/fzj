@@ -745,10 +745,22 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	etol = get(kwargs, :nrgtol, nothing)
 	if_continuous_saving::Bool = get(kwargs, :if_continuous_saving, false)
 	file_path::String = get(kwargs, :file_path, "")
+	measurements = kwargs[:measurements]
+	measurement_functions = kwargs[:measurement_functions]
+
+	# picking the observer
 	if isnothing(etol)
 		observer = NoObserver()
 	elseif if_continuous_saving
-		observer = isnothing(psi_ortho) ? SavingNRGVarObserver(file_path,etol) : SavingExcitedNRGVarObserver(file_path,etol,length(psi_ortho))
+		if isnothing(psi_ortho)
+			if length(measurements) > 0
+				observer = SavingMeasurementsObserver(measurement_functions,measurements,file_path,etol)
+			else
+				observer = SavingNRGVarObserver(file_path,etol)
+			end
+		else
+			SavingExcitedNRGVarObserver(file_path,etol,length(psi_ortho))
+		end
 	else
 		observer = NRGVarObserver(etol)
 	end
@@ -1446,6 +1458,49 @@ function TTNKit.ITensors.measure!(o::SavingNRGVarObserver; kwargs...)
 end
 
 function TTNKit.ITensors.checkdone!(o::SavingNRGVarObserver;kwargs...)
+	outputlevel = kwargs[:outputlevel]
+	sh = kwargs[:sweep_handler]
+	sweep_num = sh.current_sweep
+
+	if sweep_num > 5 && abs(o.nrg[end] - o.nrg[end-1]) < o.var_tol
+		outputlevel > 0 ? println("Energy Converged. Stopping DMRG") : nothing
+		return true
+	else
+  		# Otherwise, keep going
+		return false
+	end
+end
+
+mutable struct SavingMeasurementsObserver <: AbstractObserver
+	measurement_functions::Vector{NamedTuple}
+	measurements::Dict{String,Any}
+	file_path::String
+	var_tol::Float64
+    nrg::Vector{Float64}
+ 
+    SavingMeasurementsObserver(measurement_functions,measurements,file_path="ttn.jld2",var_tol=0.0) = new(measurement_functions,measurements,file_path,var_tol,[10000.0])
+end
+
+function TTNKit.ITensors.measure!(o::SavingMeasurementsObserver; kwargs...)
+    dmrg = kwargs[:sweep_handler]
+    append!(o.nrg,[dmrg.current_energy])
+
+	wavefunc_update::Dict{String,Any} = Dict([("ttn",dmrg.ttn)])
+	modify_data_jld2(wavefunc_update,add_wavefunc_to_filepath(o.file_path),"all_data")
+	
+	densmat_update::Dict{String,Any} = Dict([("densmat",density_matrix(dmrg.ttn))])
+	metadata_update = Dict([("observer",o),("maxlinkdim",TTNKit.maxlinkdim(dmrg.ttn))])
+	modify_data_jld2(metadata_update,o.file_path,"metadata")
+	modify_data_jld2(densmat_update,o.file_path,"all_data")
+
+	for info_tuple in o.measurement_functions
+		o.measurements[info_tuple[:name]] = info_tuple[:func](dmrg.ttn; info_tuple[:arguments]...)
+	end
+	#modify_data_jld2(o.measurements,o.file_path,"metadata")
+
+end
+
+function TTNKit.ITensors.checkdone!(o::SavingMeasurementsObserver;kwargs...)
 	outputlevel = kwargs[:outputlevel]
 	sh = kwargs[:sweep_handler]
 	sweep_num = sh.current_sweep

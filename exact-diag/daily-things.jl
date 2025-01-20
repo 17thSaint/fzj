@@ -844,14 +844,14 @@ if false
 
     us = []
     fts = []
-    for f in all_files
-    #f = all_files[1]
+    #for f in all_files
+    f = all_files[1]
         d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
-        if !(m["U"][end] in [0.0,1.0,20.0,100.0])
+        #=if !(m["U"][end] in [0.0,1.0,20.0,100.0])
             continue
-        end
+        end=#
         latparas = get_lattice_params_from_metadata(m)
-        occs = get_occupancy(d["state"][1],latparas; if_plot=false,plot_title="$(lx)x$(ly) n=$n ULR=$(m["U"][end])")
+        #occs = get_occupancy(d["state"][1],latparas; if_plot=false,plot_title="$(lx)x$(ly) n=$n ULR=$(m["U"][end])")
         #=dds = fourpoint_alberto(d["state"][1],latparas; occs=occs, plot_title="$(lx)x$(ly) n=$n ULR=$(m["U"][end])",if_plot=false)
         mdata = Dict([("densitydensity",dds),("occs",occs)])
         modify_data_jld2(mdata,dataloc * "/" * f,"metadata"; output_level=1)
@@ -874,8 +874,8 @@ if false
         title("FT-Density-Density for $(lx)x$(ly) N=$(n) ULR=$(m["U"][end])")=#
 
         dds = m["densitydensity"]
-        centersite = [Int64(ceil(lx/2)),Int64(ceil(ly/2))]
-        pairdist = pairdistribution(dds,occs; if_plot=true,plot_title="$(lx)x$(ly) n=$n ULR=$(m["U"][end])")
+        #centersite = [Int64(ceil(lx/2)),Int64(ceil(ly/2))]
+        #pairdist = pairdistribution(dds,occs; if_plot=true,plot_title="$(lx)x$(ly) n=$n ULR=$(m["U"][end])")
         #=fig = figure()
         plot(1:lx,pairdist[centersite[2],:],"-p",label=m["U"][end])
         xlabel("Physical Site")
@@ -887,7 +887,7 @@ if false
         title("Pairdist Slice")
         legend()=#
 
-    end
+    #end
     #=fig = figure()
     scatter(us,fts)
     xlabel("Interaction Strength")
@@ -911,7 +911,6 @@ if false
         modify_data_jld2(Dict([("densitydensity",dds)]),filepath,"metadata"; output_level=1)
     end
 end
-
 
 
 

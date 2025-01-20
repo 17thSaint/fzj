@@ -13,7 +13,8 @@ Depends on:
 ######################################################
 
 include("../other-funcs/include-other-files.jl")
-include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","review-practice-codes/plottings.jl","synth-dims/hatsugai-mbcn.jl","other-funcs/basic-2d-plottings.jl","other-funcs/basic-2d-observables.jl"])
+include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","synth-dims/hatsugai-mbcn.jl","other-funcs/basic-2d-observables.jl"])
+include_other_files(["review-practice-codes/plottings.jl","other-funcs/basic-2d-plottings.jl"])
 include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
 
 function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
@@ -373,11 +374,10 @@ if false
     #f = all_files[1]
         d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
 
-        if !(m["onsite_strength"] in [0.0,1.0,20.0,100.0])
-            continue
-        end
+        #if !(m["onsite_strength"] in [0.0,1.0,20.0,100.0])
+        #    continue
+        #end
 
-        display(m)
 
         #= checking convergence of energies
         all_convs = [false,false,false]
@@ -389,12 +389,12 @@ if false
         end
         println("For $(m["onsite_strength"]) all convs are ",all_convs)=#
 
-        occs = get_occupancy(d["densmat"]; plot_title="ULR = $(m["onsite_strength"])",if_plot=false,if_synth_rectangle=true,vmax=0.1)
-        dds = m["densitydensity"]
+        occs = get_occupancy(d["densmat"]; plot_title="ULR = $(m["onsite_strength"])",if_plot=true,if_synth_rectangle=true,vmax=0.1)
+        #dds = m["densitydensity"]
         #ft_dds_stripe = abs(ft_densitydensity([pi,0],dds))
         
-        pairdist = pairdistribution(dds,occs; if_plot=false, plot_title="ULR = $(m["onsite_strength"])",vmax=1.5)
-        centersite = [Int64(ceil(size(pairdist,2)/2)),Int64(ceil(size(pairdist,1)/2))]
+        #pairdist = pairdistribution(dds,occs; if_plot=false, plot_title="ULR = $(m["onsite_strength"])",vmax=1.5)
+        #=centersite = [Int64(ceil(size(pairdist,2)/2)),Int64(ceil(size(pairdist,1)/2))]
         #fig = figure()
         #plot(1:size(pairdist,2),pairdist[centersite[2],:],"-p",label=m["onsite_strength"])
         #xlabel("Physical Site")
@@ -402,7 +402,7 @@ if false
         xlabel("Synthetic Site")
         ylabel("Pair Dist")
         title("Pair Distribution Synthetic Slice 16x8 N=8")
-        legend()
+        legend()=#
 
         #plot_fourpointcorrelator(dds; if_plot=true,plot_title="ULR=$(m["onsite_strength"])")
         #=ks = range(-pi,pi,length=100)
@@ -445,6 +445,36 @@ if false
 
 end
 
+# spatial entanglement spectrum for 16x8
+if false
+    dataloc = get_folder_location("cluster-data/synth-dims/torus")
+    pdict = Dict([("layers",7),("particles",8),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc) 
+    filter!(x -> !occursin("0.25",x),all_files)
+
+    intstrens = zeros(Float64,length(all_files))
+    for (idx,f) in enumerate(all_files)
+        filenamedict = get_params_dict_from_filename(f)
+        intstrens[idx] = filenamedict["onsite_strength"]
+    end
+
+    ee = zeros(Float64,length(all_files))
+    for (idx,f) in enumerate(all_files)
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+
+        #plot_spectrum(intstrens,m["entanglement_spectrum"][1:20],idx,20,"Interaction Strength",false)
+        ee[idx] = entanglement_entropy(m["entanglement_spectrum"])
+    end
+    yscale("log")
+    title("Entanglement Spectrum")
+
+    fig = figure()
+    scatter(intstrens,ee)
+    xlabel("Interaction Strength")
+    title("Entanglement Entropy for 16x8 N=8")
+
+
+end
 
 
 

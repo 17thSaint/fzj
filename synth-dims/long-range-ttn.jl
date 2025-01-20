@@ -1433,6 +1433,25 @@ function memory_usage(psi::TreeTensorNetwork)
 	return (number_of_numbers * bytespercomplexnumber) * 1e-6, "MB"
 end
 
+function get_measurement_info(measurement_name::String)
+	measurements_list::Vector{NamedTuple} = NamedTuple[]
+	if measurement_name == "densitydensity"
+		return (name=measurement_name,func=fourpoint_alberto,arguments=(if_plot=false,s1=1.0))
+	elseif measurement_name == "occs"
+		return (name=measurement_name,func=get_occupancy,arguments=(if_plot=false,s1=1.0))
+	else
+		error("Measurement name $measurement_name not recognized")
+	end
+end
+
+function construct_measurement_info(all_measurements::Vector{String})
+	measurements_list::Vector{NamedTuple} = NamedTuple[]
+	for measurement_name in all_measurements
+		append!(measurements_list,[get_measurement_info(measurement_name)])
+	end
+	return measurements_list
+end
+
 function make_synthdims_filename(model_parameters::Dict)
 	# Start with the usual stuff for every filename
 	layer_count = model_parameters["layers"]
@@ -1564,6 +1583,13 @@ function get_normal_model_params(params_dict::Dict)
 	if_continuous_saving = get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 7)
 	save_data ? nothing : if_continuous_saving = false
 	es_count = get(params_dict, "es_count", 0)
+	
+	measurement_functions::Vector{NamedTuple} = construct_measurement_info(get(params_dict, "all_measurements", String[]))
+	measurements::Dict{String,Any} = Dict()
+	for info_tuple in measurement_functions
+		measurements[info_tuple[:name]] = nothing
+	end
+
 
 	if if_periodic_phys && if_periodic_synth
 		dataloc = get_folder_location("cluster-data/synth-dims/torus")
@@ -1638,6 +1664,8 @@ function get_normal_model_params(params_dict::Dict)
 						"mdim"=>mdim,
 						"num_sweeps"=>nswps,
 						"phi"=>alpha,
+						"measurements"=>measurements,
+						"measurement_functions"=>measurement_functions,
 						"output_level"=>0,
 						"location"=>loc,
 						"if_memobs"=>if_memobs)
@@ -1919,7 +1947,7 @@ if false
 end
 
 # synth-dims for loop runnings
-if false
+if true
 
 	cols = ["b","g","r"]
 	#nnst = 0.0
@@ -1938,17 +1966,17 @@ if false
 	#lr = 7
 	#anises = [0.01,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.6,0.8,0.9,1.1,1.3,1.5,1.7,1.9,2.0,2.5,3.0,3.5,4.0,6.0,8.0,9.0,10.0,15.0,20.0,25.0,30.0,40.0,50.0,70.0,90.0,100.0,1000.0,10000.0]
 	#anises = range(1.0,5.0,length=10)
-	strens = [0.0,1.0,10.0,20.0,50.0,100.0,300.0,500.0,1000.0]#range(0.0,2.0,length=11)
+	strens = [0.5,0.75,1.5,2.0,5.0,10.0]#range(0.0,2.0,length=11)
 	#args_dict = make_args_dict(ARGS)
-	#stren = 1000.0#args_dict["onsite_strength"]
+	stren = 0.1#args_dict["onsite_strength"]
 	#alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
 	#strens = [0.0,0.5,1.0,1.5,2.0]#range(0.1,0.5,length=3)
 	#for (idx,anis) in enumerate(anises)
-	for (idx,stren) in enumerate(strens)
+	#for (idx,stren) in enumerate(strens)
 	#tws = range(0.0,1.0,length=10)
 	#for tw1 in tws
 	#for tw2 in tws
-		params_dict = Dict([("hopping_anisotropy",1.0),("make_smaller_lattice",[12,6]),("es_count",0),("if_synth_rectangle",false),("expander_fraction",0.01),("particles",6),("layers",7),("mdim",20),("if_save_data",false),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("hopping_anisotropy",1.0),("if_continuous_saving",true),("es_count",0),("all_measurements",["densitydensity","occs"]),("expander_fraction",0.01),("particles",2),("layers",4),("mdim",20),("if_save_data",true),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		open_cores = get(params_dict, "open_cores", 5)
@@ -2054,7 +2082,7 @@ if false
 			fig = figure()
 			scatter(collect(1:mdim),-log.(specs))
 			=#
-	end
+	#end
 #end
 end
 
