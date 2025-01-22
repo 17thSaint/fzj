@@ -124,7 +124,7 @@ function pairdistribution(densitydensity::Matrix{Float64},occupancy_matrix; kwar
 end
 
 function entanglement_entropy(spec::Vector{Float64}; kwargs...)
-    return -sum((spec .^2) .* ( 2 .* log.(spec)))
+    return -sum((spec .^ 1) .* ( 1 .* log.(spec)))
 end
 
 

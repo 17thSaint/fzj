@@ -389,11 +389,13 @@ if false
         end
         println("For $(m["onsite_strength"]) all convs are ",all_convs)=#
 
-        occs = get_occupancy(d["densmat"]; plot_title="ULR = $(m["onsite_strength"])",if_plot=true,if_synth_rectangle=true,vmax=0.1)
-        #dds = m["densitydensity"]
+        occs = get_occupancy(d["densmat"]; plot_title="ULR = $(m["onsite_strength"])",if_plot=false,if_synth_rectangle=true)
+        dds = m["densitydensity"]
         #ft_dds_stripe = abs(ft_densitydensity([pi,0],dds))
+
+
         
-        #pairdist = pairdistribution(dds,occs; if_plot=false, plot_title="ULR = $(m["onsite_strength"])",vmax=1.5)
+        pairdist = pairdistribution(dds,occs; if_plot=true, plot_title="ULR = $(m["onsite_strength"])",vmax=1.5)
         #=centersite = [Int64(ceil(size(pairdist,2)/2)),Int64(ceil(size(pairdist,1)/2))]
         #fig = figure()
         #plot(1:size(pairdist,2),pairdist[centersite[2],:],"-p",label=m["onsite_strength"])
@@ -448,9 +450,9 @@ end
 # spatial entanglement spectrum for 16x8
 if false
     dataloc = get_folder_location("cluster-data/synth-dims/torus")
-    pdict = Dict([("layers",7),("particles",8),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    pdict = Dict([("layers",5),("particles",4),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc) 
-    filter!(x -> !occursin("0.25",x),all_files)
+    #filter!(x -> !occursin("0.25",x),all_files)
 
     intstrens = zeros(Float64,length(all_files))
     for (idx,f) in enumerate(all_files)
@@ -463,10 +465,17 @@ if false
         d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
 
         #plot_spectrum(intstrens,m["entanglement_spectrum"][1:20],idx,20,"Interaction Strength",false)
-        ee[idx] = entanglement_entropy(m["entanglement_spectrum"])
+        
+        if !haskey(m,"entanglement_spectrum")
+            d_wavefunc,m_wavefunc = read_data_jld2(dataloc * "/wavefunc" * f; output_level=0)
+            entspec = spatial_entanglement_spectrum(d_wavefunc["ttn"]; if_save=true,filepath=dataloc * "/" * f)
+        else
+            ee[idx] = entanglement_entropy(m["entanglement_spectrum"])
+        end
+
     end
-    yscale("log")
-    title("Entanglement Spectrum")
+    #yscale("log")
+    #title("Entanglement Spectrum")
 
     fig = figure()
     scatter(intstrens,ee)
@@ -475,6 +484,49 @@ if false
 
 
 end
+
+# doing scaling of bipartition size
+if true
+    dataloc = get_folder_location("cluster-data/synth-dims/torus")
+    pdict = Dict([("layers",7),("particles",8),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc) 
+    display(all_files)
+    
+    #=
+    f = all_files[1]
+    d = read_data_jld2(dataloc * "/" * f; output_level=0)
+
+    ee = zeros(Float64,pdict["layers"] - 1)
+    perims = [16,12,8,6]
+    for k in 0:pdict["layers"] - 2
+        entspec = spatial_entanglement_spectrum(d["ttn"]; layers_down=k)
+        ee[k+1] = entanglement_entropy(entspec)
+        println("Local Entanglement Entropy at Layer $(pdict["layers"]-k) with bonddim $(length(entspec)) is ",ee[k+1])
+    end
+    scatter(perims,ee,c="b")
+    xlabel("Perimeter")
+    ylabel("Entanglement Entropy")=#
+
+    for f in all_files
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+        ee = m["ee_scaling"]
+        perims = [32,24,16,12,8,6]
+        scatter(perims,ee,label=m["onsite_strength"])
+    end
+    xlabel("Perimeter")
+    ylabel("Entanglement Entropy")
+    legend()
+    xlim([0,35])
+    ylim([-1,5])
+
+    #=for f in all_files
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+        entspec = m["entanglement_spectrum"]
+        ee = entanglement_entropy(entspec)
+        scatter(m["onsite_strength"],ee,c="b")
+    end=#
+end
+
 
 
 

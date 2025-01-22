@@ -443,16 +443,20 @@ end
 function spatial_entanglement_spectrum(psi::TTNKit.TreeTensorNetwork; kwargs...)
     if_save::Bool = get(kwargs,:if_save,false)
     filepath::Union{String,Nothing} = get(kwargs,:filepath,nothing)
+    cap = get(kwargs,:if_cap,nothing)
+    layers_down = get(kwargs,:layers_down,0)
 
     numlayers = TTNKit.number_of_layers(psi)
-    TTNKit.move_ortho!(psi,(numlayers,1))
-    top_tensor = psi[numlayers,1]
-    idx_left = inds(top_tensor; tags = "Link,nl=$(numlayers-1),np=1")
+    TTNKit.move_ortho!(psi,(numlayers - layers_down,1))
+    top_tensor = psi[numlayers - layers_down,1]
+    idx_left = inds(top_tensor; tags = "Link,nl=$(numlayers-1-layers_down),np=1")
     u,s,v,spec = svd(top_tensor,idx_left)
 
-    if_save && save_spatialentanglementspectrum(spec.eigs[1:100],filepath)
+    result = isnothing(cap) ? spec.eigs : spec.eigs[1:cap]
 
-    return spec.eigs[1:100]
+    if_save && save_spatialentanglementspectrum(result,filepath)
+
+    return result
 end
 
 function save_spatialentanglementspectrum(spec::Vector{Float64},filepath::Nothing)
