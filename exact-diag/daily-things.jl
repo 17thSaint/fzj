@@ -912,99 +912,65 @@ if false
     end
 end
 
-# trying out a spatial entanglement bipartition
+# spatial entanglement bipartition
 if true
-    if true
-        lx,ly,n = 8,4,4
-        intstren = 0.0
-        pdict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",2),("if_find_data",true),("if_save_data",false)])
-        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
-    end
+    cols = ["b","r","g"]
+    for (idx,intstren) in enumerate([0.0])#,1.0,100.0])
+    #for (idx,intstren) in enumerate(range(0.0,20.0,length=10))
+        if true
+            lx,ly,n = 6,3,3
+            #intstren = 0.0
+            pdict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",2),("if_find_data",true),("if_save_data",false)])
+            states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
+        end
 
-    function find_subsystem_B(subsystem_A::Vector{Int64}, lx::Int64, ly::Int64)
-        subsystem_B = []
-        for i in 1:lx*ly
-            if !(i in subsystem_A)
-                push!(subsystem_B,i)
+        psi = states[1]
+        
+        perims = [6,8,10,12,14,16]
+        all_subsysts_phys = [[1,2],[1,2,3],[1,2,3,7,8,9],[1,2,3,4,7,8,9,10],[1,2,3,4,5,7,8,9,10,11],[1,2,3,4,5,6,7,8,9,10,11,12]]
+        all_subsysts_vert = [[1,7],[1,7,13],[1,2,7,8,13,14],[1,2,3,7,8,9,13,14,15],[1,2,3,4,7,8,9,10,13,14,15,16],[1,2,3,4,5,7,8,9,10,11,13,14,15,16,17]]
+        for (i,subsysA) in enumerate(all_subsysts_phys)
+            subsysB = find_subsystem_B(subsysA,lx,ly)
+            rho_A, unique_A_configs = compute_reduced_density_matrix(psi, lattice_params["full_basis"], subsysA, subsysB)
+            ee = entanglement_entropy(rho_A)
+            if i == 1
+                scatter(perims[i],ee,c="b",label="Physical")
+            else
+                scatter(perims[i],ee,c="b")
             end
         end
-        return subsystem_B
-    end
-
-    # Function to partition a configuration into subsystems A and B
-    function partition_config(config, subsystem_A, subsystem_B)
-        config_A = [pos for pos in config if pos in subsystem_A]
-        config_B = [pos for pos in config if pos in subsystem_B]
-        return config_A, config_B
-    end
-
-    # Group coefficients by configurations in A and B
-    function group_by_subsystems(wavefunc, full_basis, subsystem_A, subsystem_B)
-        grouped_coeffs = Dict{Tuple{Vector{Int}, Vector{Int}}, ComplexF64}()
-        for i in 1:size(full_basis,2)
-            config = full_basis[:,i]
-            config_A, config_B = partition_config(config, subsystem_A, subsystem_B)
-            key = (config_A, config_B)
-            grouped_coeffs[key] = get(grouped_coeffs, key, 0.0) + wavefunc[i]
-        end
-        return grouped_coeffs
-    end
-
-    # Compute the reduced density matrix for subsystem A
-    function compute_reduced_density_matrix(wavefunc, full_basis, subsystem_A, subsystem_B)
-        grouped_coeffs = group_by_subsystems(wavefunc, full_basis, subsystem_A, subsystem_B)
-        unique_A_configs = unique(key[1] for key in keys(grouped_coeffs))
-        dim_A = length(unique_A_configs)
-        rho_A = zeros(ComplexF64, dim_A, dim_A)
-
-        # Map each unique_A_config to an index
-        config_A_to_index = Dict(config => i for (i, config) in enumerate(unique_A_configs))
-
-        # Compute rho_A matrix elements
-        for ((config_A1, config_B1), coeff1) in grouped_coeffs
-            #println(round(100*idx/length(grouped_coeffs),digits=4)," % done")
-            for ((config_A2, config_B2), coeff2) in grouped_coeffs
-                if config_B1 == config_B2
-                    i = config_A_to_index[config_A1]
-                    j = config_A_to_index[config_A2]
-                    rho_A[i, j] += coeff1 * conj(coeff2)
-                end
+        for (i,subsysA) in enumerate(all_subsysts_vert)
+            subsysB = find_subsystem_B(subsysA,lx,ly)
+            rho_A, unique_A_configs = compute_reduced_density_matrix(psi, lattice_params["full_basis"], subsysA, subsysB)
+            ee = entanglement_entropy(rho_A)
+            if i == 1
+                scatter(perims[i],ee,c="r",label="Synthetic")
+            else
+                scatter(perims[i],ee,c="r")
             end
         end
+        xlabel("Perimeter")
+        ylabel("Entanglement Entropy")
+        title("Entanglement Entropy for Oriented Bipartitions 6x3 N=3 ED")
+        legend()
+        xlim(0,18)
+        ylim(-1,3)
 
-        return rho_A, unique_A_configs
+        #=all_subsysts = [[1,2,3],[1,7,13],[1,2,7,8]]
+        for (i,subsysA) in enumerate(all_subsysts)
+            subsysB = find_subsystem_B(subsysA,lx,ly)
+            rho_A, unique_A_configs = compute_reduced_density_matrix(psi, lattice_params["full_basis"], subsysA, subsysB)
+            ee = entanglement_entropy(rho_A)
+            if idx == 1
+                scatter(intstren,ee,c=cols[i],label="$subsysA")
+            else
+                scatter(intstren,ee,c=cols[i])
+            end
+        end
+        xlabel("Interaction Strength")
+        ylabel("Entanglement Entropy")
+        legend()=#
     end
-
-    function entanglement_entropy(rho_A::Matrix{ComplexF64}; tolerance=1e-8)
-        # Diagonalize rho_A to get eigenvalues
-        eigenvalues = real.(eigen(rho_A).values)
-    
-        # Filter out very small eigenvalues (numerical precision issues)
-        eigenvalues = eigenvalues[eigenvalues .> tolerance]
-    
-        entanglement_entropy = -sum(eigenvalues .* log.(eigenvalues))
-    
-        return entanglement_entropy
-    end
-
-    psi = states[1]
-    
-    perims = [6,8,12,16]
-    all_subsysts = [[1,2],[1,2,9,10],[1,2,3,4,9,10,11,12],[1,2,3,4,9,10,11,12,17,18,19,20,25,26,27,28]]
-    #perims = [4,6,8,10,12,14]
-    #all_subsysts = [[1],[1,2],[1,2,5,6],[1,2,3,5,6,7],[1,2,3,4,5,6,7,8],[1,2,3,4,5,6,7,8,9,10,11,12]]
-    #perims = [4,6,8,10]
-    #all_subsysts = [[1],[1,2],[1,2,7,8],[1,2,3,7,8,9]]
-    for (i,subsysA) in enumerate(all_subsysts)
-        subsysB = find_subsystem_B(subsysA,lx,ly)
-        rho_A, unique_A_configs = compute_reduced_density_matrix(psi, lattice_params["full_basis"], subsysA, subsysB)
-        ee = entanglement_entropy(rho_A)
-        scatter(perims[i],ee,c="r")
-    end
-    xlabel("Perimeter")
-    ylabel("Entanglement Entropy")
-    xlim(0,16)
-    ylim(-1,3)
 
 end
 

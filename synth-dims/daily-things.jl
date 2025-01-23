@@ -507,17 +507,38 @@ if true
     xlabel("Perimeter")
     ylabel("Entanglement Entropy")=#
 
+    all_ees = []
+    perims = []
+    intstrens = [0.0,1.0,100.0]
+    markers = ["o","s","^"]
+    global i = 0
     for f in all_files
         d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+        if !(m["onsite_strength"] in intstrens)
+            continue
+        end
+        global i += 1
         ee = m["ee_scaling"]
-        perims = [32,24,16,12,8,6]
-        scatter(perims,ee,label=m["onsite_strength"])
+        ee_vec = Float64[]
+        perims_vec = Int64[]
+        for (k,v) in ee
+            append!(ee_vec,v)
+            append!(perims_vec,calculate_perimeter(k))
+        end
+        append!(all_ees,[ee_vec])
+        global perims = perims_vec
+        scatter(perims_vec[2:end],ee_vec[2:end],marker=markers[i],label=m["onsite_strength"])
     end
     xlabel("Perimeter")
     ylabel("Entanglement Entropy")
     legend()
-    xlim([0,35])
+    xlim([0,26])
     ylim([-1,5])
+
+    first_fit = linear_fit(perims[2:end],all_ees[1,:][1][2:end])
+    plot(range(0,35,length=2),first_fit[1] .+ (first_fit[2] .* range(0,35,length=2)))
+    title("Entanglement Entropy Scaling 16x8 N=8, Top EE = $(round(-first_fit[1],digits=3))")
+
 
     #=for f in all_files
         d,m = read_data_jld2(dataloc * "/" * f; output_level=0)

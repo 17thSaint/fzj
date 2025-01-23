@@ -467,6 +467,144 @@ function save_spatialentanglementspectrum(spec::Vector{Float64},filepath::String
     modify_data_jld2(Dict([("entanglement_spectrum",spec)]),filepath,"metadata"; output_level=0)
 end
 
+function calculate_perimeter(which_layer::Int64)
+    all_perims = [6,8,12,16,24,32,48,62]
+    return all_perims[which_layer]
+end
+
+function get_layer_from_linkname(linkname::String)
+    return parse(Int64,split(split(linkname,",")[2],"=")[end])
+end
+
+function calculate_perimeter(linkname::String)
+    return calculate_perimeter(get_layer_from_linkname(linkname))
+end
+
+function tee(psi::TTNKit.TreeTensorNetwork,top_layer::Int64; kwargs...)
+    if_save::Bool = get(kwargs,:if_save,false)
+
+    numlayers = TTNKit.number_of_layers(psi)
+
+    if numlayers < top_layer
+        error("Top layer is higher than the number of layers in the TTN")
+    end
+
+    ee_data::Dict{String,Float64} = Dict()
+    cutlink_data::Dict{String,Tuple{Int64,Int64}} = Dict()
+
+    net = TTNKit.network(psi)
+
+    # start with S_ABDC at the top node
+    top_node = (top_layer,1)
+
+    # make sure the ortho_center is at the cutting tensor
+    TTNKit.move_ortho!(psi,top_node)
+
+    # get the tensor, link (and index) to cut (at top always cut the left link thus np=1)
+    tensor_abcd = psi[top_node]
+    link_abcd = "Link,nl=$(top_layer-1),np=1"
+    index_abcd = inds(tensor_abcd; tags = link_abcd)
+
+    # perform svd on the link and sum schmidt values for entanglement entropy
+    u,s,v,spec = svd(tensor_abcd,index_abcd)
+    s_abcd = entanglement_entropy(spec.eigs)
+
+    # save data to dictionary
+    ee_data["s_abcd"] = s_abcd
+    cutlink_data["s_abcd"] = (top_layer-1,1)
+
+    # find the child nodes to loop over to find S_AB and S_CD
+    middle_node = (top_node[1]-1,1)
+    middle_layer_children = TTNKit.child_nodes(net,middle_node)
+    for (i,middle_child) in enumerate(middle_layer_children)
+        
+        # move ortho_center to the tensor site to cut
+        TTNKit.move_ortho!(psi,middle_node)
+
+        # get tensor, link, and index
+        tensor_middle = psi[middle_node]
+        link_middle = "Link,nl=$(middle_child[1]),np=$(middle_child[2])"
+        index_middle = inds(tensor_middle; tags = link_middle)
+
+        # perform svd on the link and sum schmidt values for entanglement entropy
+        u,s,v,spec = svd(tensor_middle,index_middle)
+        s_middle = entanglement_entropy(spec.eigs)
+
+        # save data to dictionary
+        dict_key = i == 1 ? "s_ab" : "s_cd"
+        ee_data[dict_key] = s_middle
+        cutlink_data[dict_key] = middle_child
+
+        # now do loop over children of this middle node
+        baby_layer_children = TTNKit.child_nodes(net,middle_child)
+        for (j,baby_child) in enumerate(baby_layer_children)
+                
+                # move ortho_center to the tensor site to cut
+                TTNKit.move_ortho!(psi,middle_child)
+    
+                # get tensor, link, and index
+                tensor_baby = psi[middle_child]
+                link_baby = "Link,nl=$(baby_child[1]),np=$(baby_child[2])"
+                index_baby = inds(tensor_baby; tags = link_baby)
+    
+                # perform svd on the link and sum schmidt values for entanglement entropy
+                u,s,v,spec = svd(tensor_baby,index_baby)
+                s_baby = entanglement_entropy(spec.eigs)
+    
+                # save data to dictionary
+                if i == 1
+                    dict_key = j == 1 ? "s_a" : "s_b"
+                else
+                    dict_key = j == 1 ? "s_c" : "s_d"
+                end
+                ee_data[dict_key] = s_baby
+                cutlink_data[dict_key] = baby_child
+        end
+    end
+
+    # now for the mixed middle section S_BC and S_AD
+    TTNKit.move_ortho!(psi,middle_node)
+    combined_tensor = psi[middle_node] * psi[middle_layer_children[1]] * psi[middle_layer_children[2]]
+
+    # build indices for S_BC
+    link_data_b,link_data_c = (cutlink_data["s_b"],cutlink_data["s_c"])
+    link_bc = ["Link,nl=$(link_data_b[1]),np=$(link_data_b[2])","Link,nl=$(link_data_c[1]),np=$(link_data_c[2])"]
+    index_bc = [inds(combined_tensor; tags = link_bc[1]),inds(combined_tensor; tags = link_bc[2])]
+
+    # perform svd on the link and sum schmidt values for entanglement entropy
+    u,s,v,spec = svd(combined_tensor,index_bc)
+    s_bc = entanglement_entropy(spec.eigs)
+
+    # save data to dictionary (don't need to save cutlink data because it comes from the S_B and S_C)
+    ee_data["s_bc"] = s_bc
+
+    # build indices for S_AD
+    link_data_a,link_data_d = (cutlink_data["s_a"],cutlink_data["s_d"])
+    link_ad = ["Link,nl=$(link_data_a[1]),np=$(link_data_a[2])","Link,nl=$(link_data_d[1]),np=$(link_data_d[2])"]
+    index_ad = [inds(combined_tensor; tags = link_ad[1]),inds(combined_tensor; tags = link_ad[2])]
+
+    # perform svd on the link and sum schmidt values for entanglement entropy
+    u,s,v,spec = svd(combined_tensor,index_ad)
+    s_ad = entanglement_entropy(spec.eigs)
+
+    # save data to dictionary (don't need to save cutlink data because it comes from the S_A and S_D)
+    ee_data["s_ad"] = s_ad
+
+    gamma = -(ee_data["s_a"] + ee_data["s_b"] + ee_data["s_c"] + ee_data["s_d"]) + (ee_data["s_ab"] + ee_data["s_cd"] + ee_data["s_bc"] + ee_data["s_ad"]) - ee_data["s_abcd"]
+
+    if_save && save_tee(gamma,ee_data,cutlink_data; kwargs...)
+
+    return gamma,ee_data,cutlink_data
+
+end
+
+function save_tee(gamma::Float64,tee_data::Dict{String,Float64},cutlink_data::Dict{String,Tuple{Int64,Int64}}; kwargs...)
+    filepath = get(kwargs,:filepath,nothing)
+
+    isnothing(filepath) && error("No filepath provided for saving")
+
+    modify_data_jld2(Dict([("tee",gamma),("tee_data",tee_data),("tee_cutlink_data",cutlink_data)]),filepath,"metadata"; output_level=0)
+end
 
 
 

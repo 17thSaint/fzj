@@ -660,6 +660,73 @@ function average_canonical_momentum(psi::Vector{ComplexF64},lattice_params::Dict
 end
 
 
+function find_subsystem_B(subsystem_A::Vector{Int64}, lx::Int64, ly::Int64)
+    subsystem_B = []
+    for i in 1:lx*ly
+        if !(i in subsystem_A)
+            push!(subsystem_B,i)
+        end
+    end
+    return subsystem_B
+end
+
+# Function to partition a configuration into subsystems A and B
+function partition_config(config, subsystem_A, subsystem_B)
+    config_A = [pos for pos in config if pos in subsystem_A]
+    config_B = [pos for pos in config if pos in subsystem_B]
+    return config_A, config_B
+end
+
+# Group coefficients by configurations in A and B
+function group_by_subsystems(wavefunc, full_basis, subsystem_A, subsystem_B)
+    grouped_coeffs = Dict{Tuple{Vector{Int}, Vector{Int}}, ComplexF64}()
+    for i in 1:size(full_basis,2)
+        config = full_basis[:,i]
+        config_A, config_B = partition_config(config, subsystem_A, subsystem_B)
+        key = (config_A, config_B)
+        grouped_coeffs[key] = get(grouped_coeffs, key, 0.0) + wavefunc[i]
+    end
+    return grouped_coeffs
+end
+
+# Compute the reduced density matrix for subsystem A
+function compute_reduced_density_matrix(wavefunc, full_basis, subsystem_A, subsystem_B)
+    grouped_coeffs = group_by_subsystems(wavefunc, full_basis, subsystem_A, subsystem_B)
+    unique_A_configs = unique(key[1] for key in keys(grouped_coeffs))
+    dim_A = length(unique_A_configs)
+    rho_A = zeros(ComplexF64, dim_A, dim_A)
+
+    # Map each unique_A_config to an index
+    config_A_to_index = Dict(config => i for (i, config) in enumerate(unique_A_configs))
+
+    # Compute rho_A matrix elements
+    for ((config_A1, config_B1), coeff1) in grouped_coeffs
+        #println(round(100*idx/length(grouped_coeffs),digits=4)," % done")
+        for ((config_A2, config_B2), coeff2) in grouped_coeffs
+            if config_B1 == config_B2
+                i = config_A_to_index[config_A1]
+                j = config_A_to_index[config_A2]
+                rho_A[i, j] += coeff1 * conj(coeff2)
+            end
+        end
+    end
+
+    return rho_A, unique_A_configs
+end
+
+function entanglement_entropy(rho_A::Matrix{ComplexF64}; tolerance=1e-8)
+    # Diagonalize rho_A to get eigenvalues
+    eigenvalues = real.(eigen(rho_A).values)
+
+    # Filter out very small eigenvalues (numerical precision issues)
+    eigenvalues = eigenvalues[eigenvalues .> tolerance]
+
+    entanglement_entropy = -sum(eigenvalues .* log.(eigenvalues))
+
+    return entanglement_entropy
+end
+
+
 
 
 
