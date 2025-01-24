@@ -362,22 +362,26 @@ if false
 end
 
 # density-density stuff for 16x8
-if false
+if true
     dataloc = get_folder_location("cluster-data/synth-dims/torus")
     pdict = Dict([("layers",7),("particles",8),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc)
     display(all_files)
 
-    ulrs = []
-    ft_dds = []
+    #ulrs = []
+    #ft_dds = []
     for f in all_files
     #f = all_files[1]
         d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
 
-        #if !(m["onsite_strength"] in [0.0,1.0,20.0,100.0])
-        #    continue
-        #end
+        if m["onsite_strength"] in [5.0,50.0,1.0]
+            continue
+        end
 
+
+        if !haskey(m,"densitydensity")
+            continue
+        end
 
         #= checking convergence of energies
         all_convs = [false,false,false]
@@ -395,7 +399,7 @@ if false
 
 
         
-        pairdist = pairdistribution(dds,occs; if_plot=true, plot_title="ULR = $(m["onsite_strength"])",vmax=1.5)
+        pairdist = pairdistribution(dds,occs; if_plot=false, plot_title="ULR = $(m["onsite_strength"])",vmax=1.5)
         #=centersite = [Int64(ceil(size(pairdist,2)/2)),Int64(ceil(size(pairdist,1)/2))]
         #fig = figure()
         #plot(1:size(pairdist,2),pairdist[centersite[2],:],"-p",label=m["onsite_strength"])
@@ -405,6 +409,22 @@ if false
         ylabel("Pair Dist")
         title("Pair Distribution Synthetic Slice 16x8 N=8")
         legend()=#
+
+        rez = pairdist_ellipticalness(pairdist)
+
+        #=scatter(rez[2],rez[3],c="b")
+        xlabel("Center X")
+        ylabel("Center Y")
+        xlim([-1.0,1.0])
+        ylim([-1.0,1.0])=#
+
+
+        #=println("For ULR = $(m["onsite_strength"]) the x_var is $(round(rez[4],digits=4)) and y_var is $(round(rez[5],digits=4))")
+        scatter(m["onsite_strength"],rez[1],c="b")
+        xlabel("Interaction Strength")
+        ylabel("Variance Ratio, "*L"\Delta x / \Delta y")
+        title("Ellipticalness of Pair Distribution 16x8 N=8")
+        xscale("log")=#
 
         #plot_fourpointcorrelator(dds; if_plot=true,plot_title="ULR=$(m["onsite_strength"])")
         #=ks = range(-pi,pi,length=100)
@@ -486,7 +506,7 @@ if false
 end
 
 # doing scaling of bipartition size
-if true
+if false
     dataloc = get_folder_location("cluster-data/synth-dims/torus")
     pdict = Dict([("layers",7),("particles",8),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc) 
@@ -548,8 +568,35 @@ if true
     end=#
 end
 
+# abcd calculation of TEE from cluster data
+if false
+    dataloc = get_folder_location("cluster-data/synth-dims/torus")
+    pdict = Dict([("layers",7),("particles",8),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc) 
+    display(all_files)
 
+    cols = Dict([("0.0","b"),("1.0","g"),("100.0","r")])
+    for f in all_files
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
 
+        if !(m["onsite_strength"] in [0.0,1.0,100.0])
+            continue
+        end
+
+        as = [0,0,0,2,0,4]
+        for i in [4,6]
+            if i == 4
+                scatter(as[i],m["tee_$i"],c=cols[string(m["onsite_strength"])],label=m["onsite_strength"])
+            else
+                scatter(as[i],m["tee_$i"],c=cols[string(m["onsite_strength"])])
+            end
+        end
+        legend()
+        xlabel("Bipartition Width, a")
+        ylabel("Topological Entanglement Entropy")
+
+    end
+end
 
 
 

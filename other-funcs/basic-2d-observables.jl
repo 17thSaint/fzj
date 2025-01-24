@@ -127,6 +127,31 @@ function entanglement_entropy(spec::Vector{Float64}; kwargs...)
     return -sum((spec .^ 1) .* ( 1 .* log.(spec)))
 end
 
+function pairdist_ellipticalness(pairdist::Matrix{Float64}; kwargs...)
+
+    centersite = [Int64(ceil(size(pairdist,2)/2)),Int64(ceil(size(pairdist,1)/2))]
+    prob_pairdist = 1 .- pairdist
+    prob_pairdist = prob_pairdist ./ sum(prob_pairdist)
+    x_avg::Float64 = 0.0
+    y_avg::Float64 = 0.0
+    x_var::Float64 = 0.0
+    y_var::Float64 = 0.0
+    xy_var::Float64 = 0.0
+    for i in 1:size(prob_pairdist,2)
+        for j in 1:size(prob_pairdist,1)
+            x_avg += (i - centersite[1]) * prob_pairdist[j,i]
+            y_avg += (j - centersite[2]) * prob_pairdist[j,i]
+            x_var += (i - centersite[1])^2 * prob_pairdist[j,i]
+            y_var += (j - centersite[2])^2 * prob_pairdist[j,i]
+            xy_var += (i - centersite[1]) * (j - centersite[2]) * prob_pairdist[j,i]
+        end
+    end
+
+    ellipticalness::Float64 = x_var / y_var
+
+    return ellipticalness,x_avg,y_avg,x_var,y_var,xy_var
+end
+
 
 
 
