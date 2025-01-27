@@ -52,7 +52,12 @@ function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
         intstren = hamilt_params["U"][1]
     end
     if typeof(hamilt_params["alpha"]) == Vector{Float64}
-        alpha_val = filter(x -> x != 0.0,hamilt_params["alpha"])[1]
+        alpha_vals = filter(x -> x != 0.0,hamilt_params["alpha"])
+        if length(alpha_vals) == 0
+            alpha_val = 0.0
+        else
+            alpha_val = alpha_vals[1]
+        end
     else
         alpha_val = hamilt_params["alpha"]
     end

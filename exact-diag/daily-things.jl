@@ -912,13 +912,13 @@ if false
     end
 end
 
-# spatial entanglement bipartition
-if true
+# spatial entanglement bipartition general
+if false
     cols = ["b","r","g"]
     for (idx,intstren) in enumerate([0.0])#,1.0,100.0])
     #for (idx,intstren) in enumerate(range(0.0,20.0,length=10))
         if true
-            lx,ly,n = 6,3,3
+            lx,ly,n = 8,4,4
             #intstren = 0.0
             pdict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",2),("if_find_data",true),("if_save_data",false)])
             states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
@@ -974,10 +974,100 @@ if true
 
 end
 
+# find bipartition entanglement entropy for rho_1D = 1.0 hopefully zero. It is not
+if false
+    lx,ly,n = 4,8,4
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0)
+
+    keepints = [0.0,0.52632,2.0,100.0,400.0]
+    cols = ["b","r","g"]
+    for f in all_files
+
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+
+        if !(m["U"][end] in keepints)
+            continue
+        end
+
+        latparas = get_lattice_params_from_metadata(m)
+        psi = d["state"][1]
+
+        perims = [6,8,12,16]
+        all_subsysts = [[1,5],[1,2,5,6],[1,2,5,6,9,10,13,14],[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]
+
+        if m["U"][end] == 0.0
+            col = "b"
+        elseif m["U"][end] == 0.52632
+            col = "r"
+        elseif m["U"][end] == 2.0
+            col = "g"
+        elseif m["U"][end] == 100.0
+            col = "k"
+        elseif m["U"][end] == 400.0
+            col = "m"
+        end
 
 
+        for (i,subsysA) in enumerate(all_subsysts)
+            subsysB = find_subsystem_B(subsysA,lx,ly)
+            rho_A, unique_A_configs = compute_reduced_density_matrix(psi, latparas["full_basis"], subsysA, subsysB)
+            ee = entanglement_entropy(rho_A)
+            if i == 1
+                scatter(perims[i],ee,c=col,label="$(m["U"][end])")
+            else
+                scatter(perims[i],ee,c=col)
+            end
+        end
+    end
+    legend()
+    xlabel("Perimeter")
+    ylabel("Entanglement Entropy")
+
+end
+
+# find TEE of superfluid/charge ordered states 
+if true
+    lx,ly,n = 8,4,4
+    intstren = 0.0
+
+    params_dict = Dict([("output_level",1),("if_check_fluxes",false),("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("alpha",0.0),("nev",10),("if_find_data",false),("if_save_data",false)])
+    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+    psi = states[1]
+
+    occs = get_occupancy(states[1],lattice_params; plot_title=" $(lx)x$ly N=$n Superfluid")
+
+    #all_subsysts = [[1,2],[1,2,7,8],[1,2,3,7,8,9],[1,2,3,4,7,8,9,10]]
+    #perims = [6,8,10,12]
+    #all_subsysts = [[1],[1,2],[1,2,5,6],[1,2,3,5,6,7],[1,2,3,4,5,6,7,8]]
+    #perims = [4,6,8,10,12]
+    all_subsysts = [[1,2],[1,2,9,10],[1,2,3,9,10,11],[1,2,3,4,9,10,11,12]]
+    perims = [6,8,10,12]
+    ees = []
+
+    fig = figure()
+    for (i,subsysA) in enumerate(all_subsysts)
+        subsysB = find_subsystem_B(subsysA,lx,ly)
+        rho_A, unique_A_configs = compute_reduced_density_matrix(psi, lattice_params["full_basis"], subsysA, subsysB)
+        ee = entanglement_entropy(rho_A)
+        append!(ees,[ee])
+        scatter(perims[i],ee,c="b")
+    end
+    
+    xlabel("Perimeter")
+    ylabel("Entanglement Entropy")
+    xlim([0,13])
+    ylim([-1,1.1*maximum(ees)])
+
+    linfit = linear_fit(perims,ees)
+    plot(range(0,13,length=2),linfit[1] .+ range(0,13,length=2) .* linfit[2],c="r")
+
+    #title("TEE for Charge Ordered State, Anis=$(params_dict["hopping_anisotropy"])")
+    title("TEE for Superfluid, "*L"\gamma"*"=$(round(-linfit[1],digits=3))")
 
 
+end
 
 
 
