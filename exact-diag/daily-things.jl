@@ -1028,7 +1028,7 @@ if false
 end
 
 # find TEE of superfluid/charge ordered states 
-if true
+if false
     lx,ly,n = 8,4,4
     intstren = 0.0
 
@@ -1069,7 +1069,49 @@ if true
 
 end
 
+# FQH optimal control comparison
+if false
+    lx,ly,n = 6,6,3
 
+    #=alphas = range(0.15,0.35,length=20)
+    bds = zeros(Float64,length(alphas))
+    for (idx,alph) in enumerate(alphas)
+        params_dict = Dict([("output_level",1),("if_check_fluxes",false),("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("alpha",alph),("nev",10),("if_find_data",false),("if_save_data",false)])
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+        psi = states[1]
+
+        scatter(alph,nrgs[1] - nrgs[1],c="b")
+        scatter(alph,nrgs[2] - nrgs[1],c="g")
+        scatter(alph,nrgs[3] - nrgs[1],c="r")
+
+        #=occs = get_occupancy(psi,lattice_params; if_plot=false)
+        bulkdens = sum(occs[3:4,3:4]) / 4
+        bds[idx] = bulkdens
+        scatter(alph,bulkdens,c="b")=#
+    end
+    xlabel(L"\alpha")
+    #ylabel("Bulk Density")
+    ylabel("Energy Gap")
+
+    #linfit = linear_fit(alphas,bds)
+    #plot(range(0.2,0.25,length=2),linfit[1] .+ range(0.2,0.25,length=2) .* linfit[2],c="r",label="$(round(linfit[2],digits=3))")
+    =#
+
+    tws = range(0.0,1.0,length=11)
+    for (idx,tw1) in enumerate(tws)
+        for (idx2,tw2) in enumerate(tws)
+            params_dict = Dict([("output_level",1),("if_check_fluxes",false),("tw1",tw1),("tw2",tw2),("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr",0),("alpha",0.22),("nev",10),("if_find_data",false),("if_save_data",false)])
+            states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+            psi = states[1]
+
+            scatter3D(tw1,tw2,nrgs[2] - nrgs[1],c="b")
+            scatter3D(tw1,tw2,nrgs[3] - nrgs[1],c="r")
+            xlabel(L"\theta_x")
+            ylabel(L"\theta_y")
+        end
+    end
+
+end
 
 
 

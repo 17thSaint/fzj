@@ -14,6 +14,8 @@ This file is for converting the old Backend TTN data type to the main_new versio
 ######################################################
 
 include("data-storage-funcs.jl")
+include("../review-practice-codes/ttn.jl")
+include("../review-practice-codes/hdf5-highlevel-saving.jl")
 
 # convert ITensorNode to regular Node
 function convert_ITensorNode_to_Node(itn::TTNKit.AbstractNode)
@@ -290,6 +292,19 @@ if false
     end
 end
 
+
+# do just ttn alone by making new data file
+if true
+    all_files = readdir()
+    filter!(x -> occursin(".jld2",x),all_files)
+    filter!(x -> occursin("ttn",x),all_files)
+    f = all_files[1]
+
+    d,m = read_data_jld2(f);
+
+    write_data_hdf5("ttn-testing-true",d,m)
+
+end
 
 
 

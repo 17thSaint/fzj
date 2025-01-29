@@ -1,4 +1,4 @@
-using JLD2
+using JLD2,HDF5
 
 function get_folder_location(folder_name)
 	central_loc=find_center()
@@ -274,7 +274,7 @@ end
 function make_sure_file_type(file_name,desired_type)
 	split_name = split(file_name,".")
 	potential_type = split_name[end]
-	if potential_type in ["png","jld2","hdf5","txt"]
+	if potential_type in ["png","jld2","h5","txt"]
 		if potential_type != desired_type
 			println("Wrong File Type: changing $potential_type => $desired_type")
 			file_name = join(split_name[1:end-1],".") * ".$desired_type"
@@ -363,6 +363,7 @@ function check_duplicates_old(filename,location)
 end=#
 
 function check_duplicates(full_file_name::String)
+	file_type::String = split(full_file_name,".")[end]
 	if length(split(full_file_name,"/")) > 1
 		location = join(split(full_file_name,"/")[1:end-1],"/")
 		file_name = split(full_file_name,"/")[end]
@@ -381,7 +382,9 @@ function check_duplicates(full_file_name::String)
 		else
 			append!(string_elems,["mk","2"])
 		end
+		string_elems[end-2] = string(split(string_elems[end-2],".")[1])
 		file_name = join(string_elems,"-")
+		file_name = file_name * "." * file_type
 	end
 	if rename
 		println("Found Duplicate File, renaming $file_name")
@@ -470,6 +473,35 @@ function write_data_jld2(file_name::AbstractString,data::Dict,location=pwd(),met
 	cd(og_location)
 	println("Data Added, File Closed: $file_name")
 	return file_name
+end
+
+function write_data_hdf5(location::String,data::Dict,metadata::Dict; kwargs...)
+
+	file_name = prep_file(location,"h5")
+	data = check_dict(data)
+	metadata = check_dict(metadata)
+
+	binary_file = h5open(file_name,"w")
+
+	metadata_var = create_group(binary_file,"metadata")
+	for metadatum_key in keys(metadata)
+		isnothing(metadata[metadatum_key]) && continue
+		println("Working on $metadatum_key of type $(typeof(metadata[metadatum_key]))")
+		metadata_var[metadatum_key] = metadata[metadatum_key]
+	end
+
+	alldata = create_group(binary_file,"all_data")
+	for datum_key in keys(data)
+		isnothing(data[datum_key]) && continue
+		println("Working on $datum_key of type $(typeof(data[datum_key]))")
+		alldata[datum_key] = data[datum_key]
+	end
+
+	close(binary_file)
+	save(file_name, load(file_name))
+	println("Data Added, File Closed: $file_name")
+	return file_name
+
 end
 
 function write_data_jld2(location::AbstractString,data::Dict,metadata::Dict; kwargs...)
