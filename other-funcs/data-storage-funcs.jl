@@ -475,35 +475,6 @@ function write_data_jld2(file_name::AbstractString,data::Dict,location=pwd(),met
 	return file_name
 end
 
-function write_data_hdf5(location::String,data::Dict,metadata::Dict; kwargs...)
-
-	file_name = prep_file(location,"h5")
-	data = check_dict(data)
-	metadata = check_dict(metadata)
-
-	binary_file = h5open(file_name,"w")
-
-	metadata_var = create_group(binary_file,"metadata")
-	for metadatum_key in keys(metadata)
-		isnothing(metadata[metadatum_key]) && continue
-		println("Working on $metadatum_key of type $(typeof(metadata[metadatum_key]))")
-		metadata_var[metadatum_key] = metadata[metadatum_key]
-	end
-
-	alldata = create_group(binary_file,"all_data")
-	for datum_key in keys(data)
-		isnothing(data[datum_key]) && continue
-		println("Working on $datum_key of type $(typeof(data[datum_key]))")
-		alldata[datum_key] = data[datum_key]
-	end
-
-	close(binary_file)
-	save(file_name, load(file_name))
-	println("Data Added, File Closed: $file_name")
-	return file_name
-
-end
-
 function write_data_jld2(location::AbstractString,data::Dict,metadata::Dict; kwargs...)
 	split_location = split(location,"/")
 	file_name = split_location[end]
@@ -634,42 +605,73 @@ function modify_data_jld2(to_modify_dict::Dict,file_path, which_group="all_data"
 	return split(file_path,"/")[end]
 end
 
-#=function read_data_hdf5(file_name,location=pwd(); kwargs...)
-	output_level = get(kwargs, :output_level, true)
-	og_location = pwd()
-	cd(location)
+function write_data_hdf5(file_name::AbstractString,data::Dict,metadata::Dict; kwargs...)
 
-	file_name = make_sure_file_type(file_name,"hdf5")
+	file_name = prep_file(file_name,"h5")
+	data = check_dict(data)
+	metadata = check_dict(metadata)
 
-	output = []
-	binary_file = h5open(file_name,"r")
-
-	data = Dict()
-	alldata = binary_file["all_data"]
-	for datum_key in keys(alldata)
-		data[datum_key] = read(alldata,datum_key)
-	end
-	push!(output,data)
-
-	if !isnothing(findfirst(x -> x == "metadata",keys(binary_file)))
-		metadata = Dict()
-		metadata_vals = binary_file["metadata"]
-		for metadatum_key in keys(metadata_vals)
-			metadata[metadatum_key] = read(metadata_vals,metadatum_key)
+	h5open(file_name,"w") do f
+		g_alldata = create_group(f,"all_data")
+		for (datum_key,datum) in data
+			isnothing(datum) && continue
+			println("Working on $datum_key of type $(typeof(datum))")
+			write(g_alldata, datum_key, datum)
 		end
-	push!(output,metadata)
+		g_metadata = create_group(f,"metadata")
+		for (metadatum_key,metadatum) in metadata
+			isnothing(metadatum) && continue
+			println("Working on $metadatum_key of type $(typeof(metadatum))")
+			write(g_metadata, metadatum_key, metadatum)
+		end
 	end
 
-	close(binary_file)
-	cd(og_location)
-	output_level ? println("Data Extracted, File Closed: $file_name") : nothing
+	# this line deletes the attributes of the group, stupid
+	#save(file_name, load(file_name))
+	println("Data Added, File Closed: $file_name")
+	return file_name
 
-	if length(output) < 2
-		return data
-	else
-		return output
+end
+
+function read_data_hdf5(file_name; kwargs...)
+	file_name = make_sure_file_type(file_name,"h5")
+	
+	data::Dict{String,Any} = Dict()
+	metadata::Dict{String,Any} = Dict()
+
+	h5open(file_name,"r") do f
+		g_alldata = open_group(f,"all_data")
+		for datum_key in keys(f["all_data"])
+			if occursin("ttn",datum_key)
+				data[datum_key] = read(g_alldata, datum_key, TTNKit.TreeTensorNetwork)
+			else
+				data[datum_key] = read(g_alldata, datum_key)
+			end
+		end
+		g_metadata = open_group(f,"metadata")
+		for metadatum_key in keys(f["metadata"])
+			if occursin("ttn",metadatum_key)
+				metadata[metadatum_key] = read(g_metadata, metadatum_key, TTNKit.TreeTensorNetwork)
+			elseif occursin("observer",metadatum_key)
+				metadata[metadatum_key] = read(g_metadata, metadatum_key, TTNKit.ITensorMPS.AbstractObserver)
+			elseif occursin("ham",metadatum_key)
+				metadata[metadatum_key] = read(g_metadata,metadatum_key, TTNKit.ITensorMPS.Sum{TTNKit.ITensorMPS.Scaled{ComplexF64, TTNKit.ITensorMPS.Prod{TTNKit.ITensorMPS.Op}}})
+			elseif occursin("expander",metadatum_key)
+				metadata[metadatum_key] = read(g_metadata, metadatum_key, TTNKit.DefaultExpander)
+			else
+				metadata[metadatum_key] = read(g_metadata,metadatum_key)
+			end
+		end
 	end
-end=#
+
+	println("Data Extracted, File Closed: $file_name")
+	return data,metadata
+end
+	
+
+
+
+
 
 
 

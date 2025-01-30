@@ -7,7 +7,7 @@ using Printf, Random
 create_wavefunction(sz::NTuple{D, Int}) where{D} = create_wavefunction(ComplexF64, sz)
 create_wavefunction(elT, sz::NTuple{D,Int}) where{D} = normalize!(randn(elT, sz))
 
-function patron_application!(ttn::TreeTensorNetwork, wf_coefs::Array, op_ins::String; maxdim::Int = maxlinkdim(ttn), normalize::Bool = true)
+function patron_application!(ttn::TTNKit.TreeTensorNetwork, wf_coefs::Array, op_ins::String; maxdim::Int = maxlinkdim(ttn), normalize::Bool = true)
     net = TTNKit.network(ttn)
     lat = TTNKit.physical_lattice(net)
 

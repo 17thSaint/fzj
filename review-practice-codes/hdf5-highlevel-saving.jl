@@ -8,7 +8,21 @@ This file is for reading/writing data types in HDF5 format.
 
 using HDF5
 
-include("ttn.jl")
+#include("ttn.jl")
+
+function HDF5.read(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, observer::Type{<:TTNKit.ITensorMPS.AbstractObserver})
+    group = open_group(parent, name)
+    
+    observer_type = read(attributes(group)["type"])
+
+    if observer_type == "SavingNRGVarObserver"
+        return read_SNVO(group, SavingNRGVarObserver)
+    elseif observer_type == "SavingMeasurementsObserver"
+        return read_SMO(group, SavingMeasurementsObserver)
+    else
+        error("Observer type $observer_type not recognized")
+    end
+end
 
 function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, observer::SavingNRGVarObserver)
 	group = create_group(parent, name)
@@ -20,16 +34,18 @@ function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, o
 	write(group, "file_path", file_path)
 	write(group, "var_tol", var_tol)
 	write(group, "nrg", nrg)
+
+    attributes(group)["type"] = "SavingNRGVarObserver"
 end
 
-function HDF5.read(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, observer::Type{<:SavingNRGVarObserver})
-	group = get_group(parent, name)
+function read_SNVO(group::HDF5.Group, observer::Type{<:SavingNRGVarObserver})
+	#group = open_group(parent, name)
 	
 	file_path = read(group, "file_path")
 	var_tol = read(group, "var_tol")
 	nrg = read(group, "nrg")
 	
-	SavingNRGVarObserver(file_path, var_tol, nrg)
+	return SavingNRGVarObserver(file_path, var_tol, nrg)
 end
 
 function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, observer::SavingMeasurementsObserver)
@@ -46,10 +62,12 @@ function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, o
 	write(group, "nrg", nrg)
 	write(group, "measurement_functions", measurement_functions)
 	write(group, "measurements", measurements)
+
+    attributes(g)["type"] = "SavingMeasurementsObserver"
 end
 
-function HDF5.read(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, observer::Type{<:SavingMeasurementsObserver})
-	group = get_group(parent, name)
+function read_SMO(group::HDF5.Group, observer::Type{<:SavingMeasurementsObserver})
+	#group = open_group(parent, name)
 	
 	file_path = read(group, "file_path")
 	var_tol = read(group, "var_tol")
@@ -57,10 +75,10 @@ function HDF5.read(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, ob
 	measurement_functions = read(group, "measurement_functions")
 	measurements = read(group, "measurements")
 	
-	SavingMeasurementsObserver(measurement_functions, measurements, file_path, var_tol, nrg)
+	return SavingMeasurementsObserver(measurement_functions, measurements, file_path, var_tol, nrg)
 end
 
-function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, ham_op::Sum{Scaled{ComplexF64, Prod{Op}}})
+function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, ham_op::TTNKit.ITensorMPS.Sum{TTNKit.ITensorMPS.Scaled{ComplexF64, TTNKit.ITensorMPS.Prod{TTNKit.ITensorMPS.Op}}})
     group = create_group(parent, name)
 
     for (i, val) in enumerate(ham_op)
@@ -84,13 +102,13 @@ function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, h
 
 end
 
-function HDF5.read(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, ham_op::Type{<:Sum{Scaled{ComplexF64, Prod{Op}}}})
-    group = get_group(parent, name)
+function HDF5.read(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, ham::Type{<:TTNKit.ITensorMPS.Sum{TTNKit.ITensorMPS.Scaled{ComplexF64, TTNKit.ITensorMPS.Prod{TTNKit.ITensorMPS.Op}}}})
+    group = open_group(parent, name)
 
     ham_op = TTNKit.OpSum()
 
     for i in 1:length(group)
-        local_subgroup = get_group(group, "op_$i")
+        local_subgroup = open_group(group, "op_$i")
 
         coeff = read(local_subgroup, "coeff")
         
@@ -113,16 +131,25 @@ function HDF5.read(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, ha
         end
     end
 
-    ham_op
+    return ham_op
 
 end
 
 function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, expander::TTNKit.DefaultExpander)
     group = create_group(parent, name)
 
-    error("Not implemented yet")
+    write(group, "p", expander.p)
+    write(group, "min", expander.min)
 end
 
+function HDF5.read(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, expander::Type{<:TTNKit.DefaultExpander})
+    group = open_group(parent, name)
+
+    p = read(group, "p")
+    min = read(group, "min")
+
+    return TTNKit.DefaultExpander(p; min=min)
+end
 
 
 
