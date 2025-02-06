@@ -16,9 +16,9 @@ Depends on:
 ######################################################
 
 include("../other-funcs/include-other-files.jl")
-include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","review-practice-codes/plottings.jl","exact-diag/execute-ed.jl","exact-diag/observables.jl","exact-diag/plottings.jl"])
-include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
-include_other_files(["other-funcs/basic-2d-plottings.jl"])
+include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","exact-diag/execute-ed.jl","exact-diag/observables.jl"])
+#include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
+include_other_files(["other-funcs/basic-2d-plottings.jl","review-practice-codes/plottings.jl","exact-diag/plottings.jl"])
 
 function plot_nrg_vs_intstren_fromdata_ttn(layers::Int64,which_strens::Union{String,Vector{Float64}}="all"; kwargs...)
     hanis = get(kwargs, :hopping_anisotropy, 1.0)
@@ -489,7 +489,7 @@ if false
 end
 
 # finite size scaling of FT-DD at ULR = 0.0
-if true
+if false
     intstren = 100.0
 
     # ED version with 8x4 and 10x5
@@ -526,6 +526,19 @@ if true
     ylabel("FT-DD at k=(" * L"\pi" * ",0)")
     title("Finite Size Scaling of FT-DD at ULR=$intstren")
     yscale("log")
+end
+
+# testing MPO construction of 4point momentum correlator
+if true
+    lx,ly,n = 4,4,2
+    params_dict = Dict([("hopping_anisotropy",1.0),("if_check_fluxes",false),("es_count",0),("expander_fraction",0.5),("particles",2),("layers",4),("mdim",100),("if_save_data",false),("alpha",0.0),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
+    #psi, hamilthere, obs, rho, rt = run_synth_dims_generic(params_dict)
+
+
+
+    number_mpo_wrapped = projected_op_mpo(psi,"N")
+    val = calculate_mpo_expectation(psi,number_mpo_wrapped)
+    println("The resulting value is $val")
 end
 
 

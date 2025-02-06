@@ -606,6 +606,181 @@ function save_tee(gamma::Float64,tee_data::Dict{String,Float64},cutlink_data::Di
     modify_data_jld2(Dict([("tee",gamma),("tee_data",tee_data),("tee_cutlink_data",cutlink_data)]),filepath,"metadata"; output_level=0)
 end
 
+function construct_top_node_environments(ttn::TTNKit.TreeTensorNetwork, tpo::TTNKit.MPOWrapper)
+	
+	net = ttn.net
+
+	n_sites = TTNKit.number_of_sites(net)
+	n_tensors = TTNKit.number_of_tensors(net) + n_sites
+
+	mapping = tpo.mapping
+	ham = tpo.data
+	
+	bEnvironment = map(eachindex(net,1)) do pp
+        chdnds = TTNKit.child_nodes(net, (1,pp))
+        map(1:TTNKit.number_of_child_nodes(net, (1,pp))) do nn
+          ham[TTNKit.inverse_mapping(mapping)[chdnds[nn][2]]]
+        end
+    end
+	
+	for ll in Iterators.drop(TTNKit.eachlayer(net), 1)
+		bEnvironment_new = Vector{Vector{ITensor}}(undef, TTNKit.number_of_tensors(net, ll))
+		for pp in eachindex(net, ll)
+			n_chds = TTNKit.number_of_child_nodes(net, (ll,pp))
+			bEnvironment_new[pp] = Vector{ITensor}(undef, n_chds)
+		
+			for chd in TTNKit.child_nodes(net, (ll,pp))
+				chd_idx = TTNKit.index_of_child(net, chd)
+				Tn = ttn[chd]
+				
+				tensorListBottom = map(TTNKit.child_nodes(net, chd)) do cc
+					bEnvironment[chd[2]][TTNKit.index_of_child(net, cc)]
+				end
+                #println("At layer $ll and child $chd the tensorListBottom is")
+                #display(inds.(tensorListBottom))
+				tlist = vcat(Tn, tensorListBottom, prime(dag(Tn)))
+				opt_seq = ITensors.optimal_contraction_sequence(tlist)
+				bEnvironment_new[pp][chd_idx] = contract(tlist; sequence = opt_seq)
+				
+			end
+		end
+		bEnvironment = bEnvironment_new
+	end
+	return only(bEnvironment)
+end
+
+function calculate_mpo_expectation(ttn::TTNKit.TreeTensorNetwork, tpo::TTNKit.MPOWrapper)
+	topenvs = construct_top_node_environments(ttn, tpo)
+    #display(inds.(topenvs))
+	T = ttn[TTNKit.number_of_layers(ttn), 1]
+	tlist = [T, topenvs..., prime(dag(T))]
+	opt_seq = ITensors.optimal_contraction_sequence(tlist)
+	return scalar(contract(tlist; sequence = opt_seq))
+end
+
+function make_mpowrapper(mpo::MPO, lat::L; mapping::Vector{Int} = collect(eachindex(lat))) where{L}
+    @assert TTNKit.is_physical(lat)
+    @assert length(lat) == length(mpo)
+    #@assert isone(dimensionality(lat))
+    idx_lat = TTNKit.siteinds(lat)
+
+    mpoc = TTNKit.deepcopy(mpo)
+    idx_mpo = first.(TTNKit.siteinds(mpoc,plev = 0))
+
+    foreach(mapping) do jj
+        sj_lat = idx_lat[jj]
+        sj_mpo = idx_mpo[jj]
+        mpoc[jj] = replaceinds!(mpoc[jj], sj_mpo => sj_lat, prime(sj_mpo) => prime(sj_lat))
+    end
+    return TTNKit.MPOWrapper{L, MPO, TTNKit.ITensorsBackend}(lat, mpoc, mapping)
+end
+
+function build_W_singlepoint(which_ladder::Int,coeff::ComplexF64)
+    mat::Array{ComplexF64} = zeros(ComplexF64,2,2,2,2)
+    mat[1,:,1,:] = I(2)
+    mat[2,:,1,:] = zeros(2,2)
+    mat[2,:,2,:] = I(2)
+    if which_ladder == -1
+        mat[1,:,2,:] = [0.0 1.0*coeff; 0.0 0.0]
+    elseif which_ladder == 1
+        mat[1,:,2,:] = [0.0 0.0; 1.0*coeff 0.0]
+    elseif which_ladder == 0
+        mat[1,:,2,:] = [0.0 0.0; 0.0 1.0] # counts the total particle number
+    else
+        error("Invalid ladder type")
+    end
+
+    return mat
+end
+
+function build_W_4pt(coeff::ComplexF64)
+    error("Not implemented yet")
+end
+
+function build_W(op_string::String,coeff::ComplexF64)
+    if op_string == "A"
+        return build_W_singlepoint(-1,coeff)
+    elseif op_string == "Adag"
+        return build_W_singlepoint(1,coeff)
+    elseif op_string == "N"
+        return build_W_singlepoint(0,coeff)
+    elseif op_string == "4pt"
+        return build_W_4pt(coeff)
+    else
+        error("Invalid operator string")
+    end
+end
+
+function make_qnset(op_string::String)
+    if op_string == "A"
+        return [QN("Number",0)=>1,QN("Number",1)=>1]
+    elseif op_string == "Adag"
+        return [QN("Number",0)=>1,QN("Number",-1)=>1]
+    elseif op_string == "N" || op_string == "4pt"
+        return [QN("Number",0)=>2]
+    else
+        error("Invalid operator string")
+    end
+end
+
+function projected_op_mpo(wavefunc::TTNKit.TreeTensorNetwork,op_type::String; kwargs...)
+    lat = TTNKit.physical_lattice(wavefunc.net)
+    mapping = get(kwargs,:mapping,collect(1:TTNKit.number_of_sites(lat)))#TTNKit.hilbert_curve(lat)
+    if_wrap::Bool = get(kwargs,:if_wrap,true)
+
+    phys_sites = TTNKit.sites(wavefunc)
+
+    tensor_train = Vector{ITensor}(undef,length(phys_sites))
+    all_indices = Vector{Index}(undef,length(phys_sites)+1)
+
+
+
+    for s in 0:length(phys_sites)
+        qnset = make_qnset(op_type)
+        if s == 0
+            left_tag = "Start"
+            right_tag = string(s+1)
+        elseif s == length(phys_sites)
+            left_tag = string(s)
+            right_tag = "End"
+        else
+            left_tag = string(s)
+            right_tag = string(s+1)
+        end
+        all_indices[s+1] = Index(qnset; tags="Link,Left=$left_tag,Right=$right_tag")
+    end
+
+    # left starting tensor works but need to get the middles working
+
+    for (idx,s) in enumerate(phys_sites)
+        #println("Working on Physical Site $(TTNKit.tags(s))")
+
+        coeff::ComplexF64 = 1.0 + 0.0*im
+
+        mat = build_W(op_type,coeff)
+        left_index = all_indices[idx]
+        right_index = all_indices[idx+1]
+        mit = ITensor(mat,[all_indices[idx],dag(s),dag(all_indices[idx+1]),prime(s)])
+
+        if idx == 1
+            mit = mit * dag(onehot(all_indices[1] => 1))
+        elseif idx == length(phys_sites)
+            mit = mit * onehot(all_indices[end] => 2)
+        end
+
+        tensor_train[idx] = mit
+
+    end
+
+    if if_wrap
+        println("Mapping only linear")
+        return make_mpowrapper(MPO(tensor_train),lat)
+    else
+        return MPO(tensor_train)
+    end
+
+end
+
 
 
 

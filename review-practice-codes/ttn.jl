@@ -1,5 +1,5 @@
 using Statistics
-#using TTNKit
+using TTNKit
 using LsqFit
 
 include("../other-funcs/include-other-files.jl")
@@ -584,7 +584,7 @@ end
 
 function get_position_dims(ttn)
 	for pos in TTNKit.NodeIterator(TTNKit.network(ttn))
-		println("Position $pos: ",TTNKit.ITensorMPS.dims(ttn[pos]))
+		println("Position $pos: ",TTNKit.ITensors.dims(ttn[pos]))
 	end
 	return
 end
@@ -1410,7 +1410,7 @@ mutable struct NRGVarObserver <: TTNKit.AbstractObserver
     NRGVarObserver(var_tol=0.0) = new(var_tol,[10000.0,1000.0])
 end
 
-function TTNKit.ITensorMPS.measure!(o::NRGVarObserver; kwargs...)
+function TTNKit.ITensors.measure!(o::NRGVarObserver; kwargs...)
     nrgs = o.nrg
     var_tol = o.var_tol
     dmrg = kwargs[:sweep_handler]
@@ -1418,7 +1418,7 @@ function TTNKit.ITensorMPS.measure!(o::NRGVarObserver; kwargs...)
     append!(o.nrg,[dmrg.current_energy])
 end
 
-function TTNKit.ITensorMPS.checkdone!(o::NRGVarObserver;kwargs...)
+function TTNKit.ITensors.checkdone!(o::NRGVarObserver;kwargs...)
 	outputlevel = kwargs[:outputlevel]
 	sh = kwargs[:sweep_handler]
 	sweep_num = sh.current_sweep
@@ -1432,7 +1432,7 @@ function TTNKit.ITensorMPS.checkdone!(o::NRGVarObserver;kwargs...)
 	end
 end
 #
-mutable struct SavingNRGVarObserver <: TTNKit.ITensorMPS.AbstractObserver
+mutable struct SavingNRGVarObserver <: TTNKit.ITensors.AbstractObserver
     file_path::String
 	var_tol::Float64
     nrg::Vector{Float64}
@@ -1441,7 +1441,7 @@ mutable struct SavingNRGVarObserver <: TTNKit.ITensorMPS.AbstractObserver
 	SavingNRGVarObserver(file_path::String,var_tol::Float64,nrg::Vector{Float64}) = new(file_path,var_tol,nrg)
 end
 #
-function TTNKit.ITensorMPS.measure!(o::SavingNRGVarObserver; kwargs...)
+function TTNKit.ITensors.measure!(o::SavingNRGVarObserver; kwargs...)
     nrgs = o.nrg
     var_tol = o.var_tol
     dmrg = kwargs[:sweep_handler]
@@ -1458,7 +1458,7 @@ function TTNKit.ITensorMPS.measure!(o::SavingNRGVarObserver; kwargs...)
 	modify_data_jld2(densmat_update,o.file_path,"all_data")
 end
 
-function TTNKit.ITensorMPS.checkdone!(o::SavingNRGVarObserver;kwargs...)
+function TTNKit.ITensors.checkdone!(o::SavingNRGVarObserver;kwargs...)
 	outputlevel = kwargs[:outputlevel]
 	sh = kwargs[:sweep_handler]
 	sweep_num = sh.current_sweep
@@ -1472,7 +1472,7 @@ function TTNKit.ITensorMPS.checkdone!(o::SavingNRGVarObserver;kwargs...)
 	end
 end
 
-mutable struct SavingMeasurementsObserver <: TTNKit.ITensorMPS.AbstractObserver
+mutable struct SavingMeasurementsObserver <: TTNKit.ITensors.AbstractObserver
 	measurement_functions::Vector{NamedTuple}
 	measurements::Dict{String,Any}
 	file_path::String
@@ -1482,7 +1482,7 @@ mutable struct SavingMeasurementsObserver <: TTNKit.ITensorMPS.AbstractObserver
     SavingMeasurementsObserver(measurement_functions,measurements,file_path="ttn.jld2",var_tol=0.0) = new(measurement_functions,measurements,file_path,var_tol,[10000.0])
 end
 
-function TTNKit.ITensorMPS.measure!(o::SavingMeasurementsObserver; kwargs...)
+function TTNKit.ITensors.measure!(o::SavingMeasurementsObserver; kwargs...)
     dmrg = kwargs[:sweep_handler]
     append!(o.nrg,[dmrg.current_energy])
 
@@ -1501,7 +1501,7 @@ function TTNKit.ITensorMPS.measure!(o::SavingMeasurementsObserver; kwargs...)
 
 end
 
-function TTNKit.ITensorMPS.checkdone!(o::SavingMeasurementsObserver;kwargs...)
+function TTNKit.ITensors.checkdone!(o::SavingMeasurementsObserver;kwargs...)
 	outputlevel = kwargs[:outputlevel]
 	sh = kwargs[:sweep_handler]
 	sweep_num = sh.current_sweep
@@ -1515,7 +1515,7 @@ function TTNKit.ITensorMPS.checkdone!(o::SavingMeasurementsObserver;kwargs...)
 	end
 end
 
-mutable struct SavingExcitedNRGVarObserver <: TTNKit.ITensorMPS.AbstractObserver
+mutable struct SavingExcitedNRGVarObserver <: TTNKit.ITensors.AbstractObserver
     file_path::String
 	var_tol::Float64
 	nrg_level::Int64
@@ -1524,7 +1524,7 @@ mutable struct SavingExcitedNRGVarObserver <: TTNKit.ITensorMPS.AbstractObserver
     SavingExcitedNRGVarObserver(file_path="ttn.jld2",var_tol=0.0,nrg_level=1) = new(file_path,var_tol,nrg_level,[10000.0,1000.0])
 end
 
-function TTNKit.ITensorMPS.measure!(o::SavingExcitedNRGVarObserver; kwargs...)
+function TTNKit.ITensors.measure!(o::SavingExcitedNRGVarObserver; kwargs...)
     nrg_level = o.nrg_level
 	nrg_level > 0 ? string_part = "_$nrg_level" : string_part = ""
     dmrg = kwargs[:sweep_handler]
@@ -1537,7 +1537,7 @@ function TTNKit.ITensorMPS.measure!(o::SavingExcitedNRGVarObserver; kwargs...)
 	modify_data_jld2(metadata_update,o.file_path,"metadata")
 end
 
-function TTNKit.ITensorMPS.checkdone!(o::SavingExcitedNRGVarObserver;kwargs...)
+function TTNKit.ITensors.checkdone!(o::SavingExcitedNRGVarObserver;kwargs...)
 	outputlevel = kwargs[:outputlevel]
 	sh = kwargs[:sweep_handler]
 	sweep_num = sh.current_sweep
@@ -1551,34 +1551,34 @@ function TTNKit.ITensorMPS.checkdone!(o::SavingExcitedNRGVarObserver;kwargs...)
 	end
 end
 
-mutable struct MemoryObserver <: TTNKit.ITensorMPS.AbstractObserver
+mutable struct MemoryObserver <: TTNKit.ITensors.AbstractObserver
 	mem::Dict{String,Float64}
 
 	MemoryObserver() = new(Dict())
 end
 
-function TTNKit.ITensorMPS.measure!(o::MemoryObserver,memory_name::String,memory_value; kwargs...)
+function TTNKit.ITensors.measure!(o::MemoryObserver,memory_name::String,memory_value; kwargs...)
 	o.mem[memory_name] = float(memory_value)
 end
 
-function TTNKit.ITensorMPS.measure!(o::MemoryObserver,memory_dict::Dict{String,Float64}; kwargs...)
+function TTNKit.ITensors.measure!(o::MemoryObserver,memory_dict::Dict{String,Float64}; kwargs...)
 	for (key,value) in memory_dict
-		TTNKit.ITensorMPS.measure!(o,key,value; kwargs...)
+		TTNKit.ITensors.measure!(o,key,value; kwargs...)
 	end
 end
 
-function TTNKit.ITensorMPS.checkdone!(o::MemoryObserver;kwargs...)
+function TTNKit.ITensors.checkdone!(o::MemoryObserver;kwargs...)
 	return true
 end
 
-function TTNKit.ITensorMPS.measure!(os::Vector{TTNKit.ITensorMPS.AbstractObserver}; kwargs...)
+function TTNKit.ITensors.measure!(os::Vector{TTNKit.ITensors.AbstractObserver}; kwargs...)
 	for o in os
-		TTNKit.ITensorMPS.measure!(o; kwargs...)
+		TTNKit.ITensors.measure!(o; kwargs...)
 	end
 end
 
-function TTNKit.ITensorMPS.checkdone!(os::Vector{TTNKit.ITensorMPS.AbstractObserver};kwargs...)
-	return all([TTNKit.ITensorMPS.checkdone!(o; kwargs...) for o in os])
+function TTNKit.ITensors.checkdone!(os::Vector{TTNKit.ITensors.AbstractObserver};kwargs...)
+	return all([TTNKit.ITensors.checkdone!(o; kwargs...) for o in os])
 end
 
 function rerun_findGS(fileloc::String; kwargs...)
@@ -2024,7 +2024,7 @@ function localinner(ttn1::TTNKit.TreeTensorNetwork{N, T}, old_ttn2::TTNKit.TreeT
     length(res) == 1 || error("Tree Tensor Contraction don't leed to a single resulting tensor.")
     res = res[1]
     
-    sres = TTNKit.ITensorMPS.scalar(res)
+    sres = TTNKit.ITensors.scalar(res)
 
     return abs2(sres)
 end
@@ -2282,7 +2282,7 @@ function entanglement_spectrum(ttn::TTNKit.TreeTensorNetwork{N, ITensor}) where{
     ttnc = TTNKit.move_ortho!(copy(ttn), pos_right)
     T = ttnc[pos_right]
     
-    # this only works for ITensorMPS...
+    # this only works for ITensors...
     # getting the indices for decomposition, this only contains pos_left link
     if pos_left[1] == 0
         # pos_left is a physical site.. we need to filter differently
@@ -2367,7 +2367,7 @@ function calculate_energy(wavefunc::TTNKit.TreeTensorNetwork,ham_op)
 end
 
 
-
+include("hdf5-highlevel-saving.jl")
 
 
 

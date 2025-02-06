@@ -365,9 +365,10 @@ end=#
 function check_duplicates(full_file_name::String)
 	file_type::String = split(full_file_name,".")[end]
 	if length(split(full_file_name,"/")) > 1
-		location = join(split(full_file_name,"/")[1:end-1],"/")
+		location = join(split(full_file_name,"/")[1:end-1],"/") * "/"
 		file_name = split(full_file_name,"/")[end]
 	else
+		location = ""
 		file_name = full_file_name
 	end
 	rename = false
@@ -389,7 +390,7 @@ function check_duplicates(full_file_name::String)
 	if rename
 		println("Found Duplicate File, renaming $file_name")
 	end
-	return rename,file_name
+	return rename,location*file_name
 end
 
 function check_duplicates(substring_version::SubString{String})
@@ -615,13 +616,13 @@ function write_data_hdf5(file_name::AbstractString,data::Dict,metadata::Dict; kw
 		g_alldata = create_group(f,"all_data")
 		for (datum_key,datum) in data
 			isnothing(datum) && continue
-			println("Working on $datum_key of type $(typeof(datum))")
+			#println("Working on $datum_key of type $(typeof(datum))")
 			write(g_alldata, datum_key, datum)
 		end
 		g_metadata = create_group(f,"metadata")
 		for (metadatum_key,metadatum) in metadata
 			isnothing(metadatum) && continue
-			println("Working on $metadatum_key of type $(typeof(metadatum))")
+			#println("Working on $metadatum_key of type $(typeof(metadatum))")
 			write(g_metadata, metadatum_key, metadatum)
 		end
 	end

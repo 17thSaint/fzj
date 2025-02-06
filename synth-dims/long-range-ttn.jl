@@ -1757,7 +1757,7 @@ function run_synth_dims_generic(params_dict::Dict)
 	end
 
 	if es_count < 1
-		return og_ttn, hamilt, gs_sp, gs_obs, gs_runtime, gs_dens
+		return gs_sp.ttn, hamilt, gs_obs, gs_dens, gs_runtime
 	else
 		return all_states, hamilt, all_obs, all_densmats, all_runtimes
 	end

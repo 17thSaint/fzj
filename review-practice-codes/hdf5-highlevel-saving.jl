@@ -10,7 +10,7 @@ using HDF5
 
 #include("ttn.jl")
 
-function HDF5.read(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, observer::Type{<:TTNKit.ITensorMPS.AbstractObserver})
+function HDF5.read(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, observer::Type{<:TTNKit.ITensors.AbstractObserver})
     group = open_group(parent, name)
     
     observer_type = read(attributes(group)["type"])
@@ -78,7 +78,7 @@ function read_SMO(group::HDF5.Group, observer::Type{<:SavingMeasurementsObserver
 	return SavingMeasurementsObserver(measurement_functions, measurements, file_path, var_tol, nrg)
 end
 
-function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, ham_op::TTNKit.ITensorMPS.Sum{TTNKit.ITensorMPS.Scaled{ComplexF64, TTNKit.ITensorMPS.Prod{TTNKit.ITensorMPS.Op}}})
+function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, ham_op::TTNKit.ITensors.Sum{TTNKit.ITensors.Scaled{ComplexF64, TTNKit.ITensors.Prod{TTNKit.ITensors.Op}}})
     group = create_group(parent, name)
 
     for (i, val) in enumerate(ham_op)
@@ -102,7 +102,7 @@ function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, h
 
 end
 
-function HDF5.read(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, ham::Type{<:TTNKit.ITensorMPS.Sum{TTNKit.ITensorMPS.Scaled{ComplexF64, TTNKit.ITensorMPS.Prod{TTNKit.ITensorMPS.Op}}}})
+function HDF5.read(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, ham::Type{<:TTNKit.ITensors.Sum{TTNKit.ITensors.Scaled{ComplexF64, TTNKit.ITensors.Prod{TTNKit.ITensors.Op}}}})
     group = open_group(parent, name)
 
     ham_op = TTNKit.OpSum()
