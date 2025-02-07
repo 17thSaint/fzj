@@ -678,12 +678,13 @@ end
 function build_W_singlepoint(which_ladder::Int,coeff::ComplexF64)
     mat::Array{ComplexF64} = zeros(ComplexF64,2,2,2,2)
     mat[1,:,1,:] = I(2)
-    mat[2,:,1,:] = zeros(2,2)
     mat[2,:,2,:] = I(2)
     if which_ladder == -1
-        mat[1,:,2,:] = [0.0 1.0*coeff; 0.0 0.0]
+        mat[2,:,1,:] = [0.0 1.0; 0.0 0.0]
+        #mat[2,:,1,:] = zeros(2,2)
     elseif which_ladder == 1
-        mat[1,:,2,:] = [0.0 0.0; 1.0*coeff 0.0]
+        mat[2,:,1,:] = [0.0 0.0; 1.0 0.0]
+        #mat[1,:,2,:] = zeros(2,2)
     elseif which_ladder == 0
         mat[1,:,2,:] = [0.0 0.0; 0.0 1.0] # counts the total particle number
     else
@@ -697,6 +698,25 @@ function build_W_4pt(coeff::ComplexF64)
     error("Not implemented yet")
 end
 
+function build_W_2pt(coeff::ComplexF64)
+    error("Still not working with quantum numbers")
+    
+    mat::Array{ComplexF64} = zeros(ComplexF64,4,2,4,2)
+
+    mat[1,:,1,:] = I(2)
+    mat[2,:,2,:] = I(2)
+    mat[3,:,3,:] = I(2)
+    mat[4,:,4,:] = I(2)
+
+    mat[1,:,2,:] = [0.0 1.0; 0.0 0.0]
+    mat[1,:,3,:] = [0.0 0.0; 1.0 0.0]
+    mat[1,:,4,:] = [0.0 0.0; 0.0 1.0]
+    mat[2,:,4,:] = [0.0 0.0; 1.0 0.0]
+    mat[3,:,4,:] = [0.0 1.0; 0.0 0.0]
+
+    return mat
+end
+
 function build_W(op_string::String,coeff::ComplexF64)
     if op_string == "A"
         return build_W_singlepoint(-1,coeff)
@@ -704,6 +724,8 @@ function build_W(op_string::String,coeff::ComplexF64)
         return build_W_singlepoint(1,coeff)
     elseif op_string == "N"
         return build_W_singlepoint(0,coeff)
+    elseif op_string == "2pt"
+        return build_W_2pt(coeff)
     elseif op_string == "4pt"
         return build_W_4pt(coeff)
     else
@@ -713,11 +735,13 @@ end
 
 function make_qnset(op_string::String)
     if op_string == "A"
-        return [QN("Number",0)=>1,QN("Number",1)=>1]
-    elseif op_string == "Adag"
         return [QN("Number",0)=>1,QN("Number",-1)=>1]
-    elseif op_string == "N" || op_string == "4pt"
+    elseif op_string == "Adag"
+        return [QN("Number",0)=>1,QN("Number",1)=>1]
+    elseif op_string == "N"
         return [QN("Number",0)=>2]
+    elseif op_string == "2pt"
+        return [QN("Number",0)=>2,QN("Number",1)=>1,QN("Number",-1)=>1]
     else
         error("Invalid operator string")
     end
