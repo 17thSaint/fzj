@@ -655,7 +655,8 @@ function calculate_mpo_expectation(ttn::TTNKit.TreeTensorNetwork, tpo::TTNKit.MP
 	T = ttn[TTNKit.number_of_layers(ttn), 1]
 	tlist = [T, topenvs..., prime(dag(T))]
 	opt_seq = ITensors.optimal_contraction_sequence(tlist)
-	return scalar(contract(tlist; sequence = opt_seq))
+	#return scalar(contract(tlist; sequence = opt_seq))
+    return contract(tlist; sequence = opt_seq)
 end
 
 function make_mpowrapper(mpo::MPO, lat::L; mapping::Vector{Int} = collect(eachindex(lat))) where{L}
@@ -665,9 +666,10 @@ function make_mpowrapper(mpo::MPO, lat::L; mapping::Vector{Int} = collect(eachin
     idx_lat = TTNKit.siteinds(lat)
 
     mpoc = TTNKit.deepcopy(mpo)
-    idx_mpo = first.(TTNKit.siteinds(mpoc,plev = 0))
-
+    idx_mpo = last.(TTNKit.siteinds(mpoc,plev = 0))
+    println("Starting wrapping")
     foreach(mapping) do jj
+        println("working on wrapping site $jj")
         sj_lat = idx_lat[jj]
         sj_mpo = idx_mpo[jj]
         mpoc[jj] = replaceinds!(mpoc[jj], sj_mpo => sj_lat, prime(sj_mpo) => prime(sj_lat))
@@ -679,11 +681,11 @@ function build_W_singlepoint(which_ladder::Int,coeff::ComplexF64)
     mat::Array{ComplexF64} = zeros(ComplexF64,2,2,2,2)
     mat[1,:,1,:] = I(2)
     mat[2,:,2,:] = I(2)
-    if which_ladder == -1
-        mat[2,:,1,:] = [0.0 1.0; 0.0 0.0]
-        #mat[2,:,1,:] = zeros(2,2)
-    elseif which_ladder == 1
+    if which_ladder == 1
         mat[2,:,1,:] = [0.0 0.0; 1.0 0.0]
+        #mat[2,:,1,:] = zeros(2,2)
+    elseif which_ladder == -1
+        mat[2,:,1,:] = [0.0 1.0; 0.0 0.0]
         #mat[1,:,2,:] = zeros(2,2)
     elseif which_ladder == 0
         mat[1,:,2,:] = [0.0 0.0; 0.0 1.0] # counts the total particle number
@@ -701,18 +703,17 @@ end
 function build_W_2pt(coeff::ComplexF64)
     error("Still not working with quantum numbers")
     
-    mat::Array{ComplexF64} = zeros(ComplexF64,4,2,4,2)
+    mat::Array{ComplexF64} = zeros(ComplexF64,4,4,2,2)
 
-    mat[1,:,1,:] = I(2)
-    mat[2,:,2,:] = I(2)
-    mat[3,:,3,:] = I(2)
-    mat[4,:,4,:] = I(2)
+    mat[1,1,:,:] = I(2)
+    mat[2,2,:,:] = I(2)
+    #mat[3,3,:,:] = I(2)
+    mat[4,4,:,:] = I(2)
 
-    mat[1,:,2,:] = [0.0 1.0; 0.0 0.0]
-    mat[1,:,3,:] = [0.0 0.0; 1.0 0.0]
-    mat[1,:,4,:] = [0.0 0.0; 0.0 1.0]
-    mat[2,:,4,:] = [0.0 0.0; 1.0 0.0]
-    mat[3,:,4,:] = [0.0 1.0; 0.0 0.0]
+    mat[1,2,:,:] = [0.0 0.0; 0.0 1.0] # N
+    mat[1,3,:,:] = [0.0 0.0; 0.0 1.0] # N
+    mat[2,4,:,:] = [0.0 0.0; 0.0 1.0] # N
+    mat[3,4,:,:] = I(2) # Id
 
     return mat
 end
@@ -741,30 +742,45 @@ function make_qnset(op_string::String)
     elseif op_string == "N"
         return [QN("Number",0)=>2]
     elseif op_string == "2pt"
-        return [QN("Number",0)=>2,QN("Number",1)=>1,QN("Number",-1)=>1]
+        return [QN("Number",0)=>2,QN("Number",-1)=>1,QN("Number",1)=>1]
     else
         error("Invalid operator string")
     end
+end
+
+function make_sites_list(what_given::Vector{String},wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+    phys_sites::Vector{Vector{Index}} = [Vector{Index}(undef,TTNKit.number_of_sites(wavefunc.net)) for i in 1:length(what_given)]
+    for i in 1:length(what_given)
+        if what_given[i] == "pull"
+            phys_sites[i] = TTNKit.sites(wavefunc)
+        elseif what_given[i] == "new"
+            phys_sites[i] = [Index(make_qnset("Adag"); tags="MPO-Internal,Site,n=$i") for i in 1:TTNKit.number_of_sites(wavefunc.net)]
+        elseif what_given[i] == "provided"
+            phys_sites[i] = kwargs[:provided_sites][i]
+        else
+            error("Invalid option")
+        end
+    end
+    return phys_sites
 end
 
 function projected_op_mpo(wavefunc::TTNKit.TreeTensorNetwork,op_type::String; kwargs...)
     lat = TTNKit.physical_lattice(wavefunc.net)
     mapping = get(kwargs,:mapping,collect(1:TTNKit.number_of_sites(lat)))#TTNKit.hilbert_curve(lat)
     if_wrap::Bool = get(kwargs,:if_wrap,true)
+    what_given_inds::Vector{String} = get(kwargs,:what_given_inds,["pull","pull"])
 
-    phys_sites = TTNKit.sites(wavefunc)
+    top_phys_sites,bottom_phys_sites = make_sites_list(what_given_inds,wavefunc; kwargs...)
 
-    tensor_train = Vector{ITensor}(undef,length(phys_sites))
-    all_indices = Vector{Index}(undef,length(phys_sites)+1)
+    tensor_train = Vector{ITensor}(undef,length(top_phys_sites))
+    all_indices = Vector{Index}(undef,length(top_phys_sites)+1)
 
-
-
-    for s in 0:length(phys_sites)
+    for s in 0:length(top_phys_sites)
         qnset = make_qnset(op_type)
         if s == 0
             left_tag = "Start"
             right_tag = string(s+1)
-        elseif s == length(phys_sites)
+        elseif s == length(top_phys_sites)
             left_tag = string(s)
             right_tag = "End"
         else
@@ -774,21 +790,19 @@ function projected_op_mpo(wavefunc::TTNKit.TreeTensorNetwork,op_type::String; kw
         all_indices[s+1] = Index(qnset; tags="Link,Left=$left_tag,Right=$right_tag")
     end
 
-    # left starting tensor works but need to get the middles working
 
-    for (idx,s) in enumerate(phys_sites)
-        #println("Working on Physical Site $(TTNKit.tags(s))")
+    for (idx,s) in enumerate(top_phys_sites)
+        println("Working on Physical Site $(TTNKit.tags(s))")
 
         coeff::ComplexF64 = 1.0 + 0.0*im
 
         mat = build_W(op_type,coeff)
-        left_index = all_indices[idx]
-        right_index = all_indices[idx+1]
-        mit = ITensor(mat,[all_indices[idx],dag(s),dag(all_indices[idx+1]),prime(s)])
+        local_inds = [all_indices[idx],dag(bottom_phys_sites[idx]),dag(all_indices[idx+1]),prime(top_phys_sites[idx])]
+        mit = ITensor(mat,local_inds)
 
         if idx == 1
             mit = mit * dag(onehot(all_indices[1] => 1))
-        elseif idx == length(phys_sites)
+        elseif idx == length(top_phys_sites)
             mit = mit * onehot(all_indices[end] => 2)
         end
 
@@ -804,6 +818,62 @@ function projected_op_mpo(wavefunc::TTNKit.TreeTensorNetwork,op_type::String; kw
     end
 
 end
+
+function find_physical_inflow_sites(ind_list)
+    all_inflowing_sites = Vector{Index}(undef,length(ind_list))
+    for (idx,s) in enumerate(ind_list)
+        # remove the virtual indices and find the inflowing physical site
+        correct_index = filter(x -> occursin("Site",string(tags(x))) && string(x.dir)=="In",s)[1]
+        all_inflowing_sites[idx] = correct_index
+    end
+    return all_inflowing_sites
+end
+
+function combine_mpos(m1::MPO,m2::MPO; kwargs...)
+    tensor_train = Vector{ITensor}(undef,length(m1))
+
+    for i in 1:length(m1)
+        println("Combine MPOs on site $(i)")
+        ti = m1[i] * m2[i]
+
+        all_inds = inds(ti)
+        for i1 in 1:length(all_inds)
+            in1 = all_inds[i1]
+            for i2 in i1+1:length(all_inds)
+                in2 = all_inds[i2]
+                #println("Look at indices $(in1) and $(in2)")
+                if occursin("Left",string(tags(in1))) && string(tags(in1)) == string(tags(in2)) #&& true # include that the flow is in the same direction as check
+                    #println("Found that the indices are the same: $(tags(in1)) and $(tags(in2))")
+                    ci = combiner(in1,in2)
+                    ti = ti * ci
+                end
+            end
+        end
+
+        tensor_train[i] = ti
+    end
+
+    return MPO(tensor_train)
+end
+
+function two_point_mpo(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+    if_wrap::Bool = get(kwargs,:if_wrap,true)
+
+    annih = projected_op_mpo(wavefunc,"A"; if_wrap=false,what_given_inds=["pull","new"])
+
+    inflow_inds = dag.(find_physical_inflow_sites(inds.(annih)))
+
+    creat = projected_op_mpo(wavefunc,"Adag"; if_wrap=false,what_given_inds=["provided","pull"],provided_sites=(inflow_inds,nothing))
+
+    rho = combine_mpos(annih,noprime(creat))
+    println("Combined MPOs")
+    if if_wrap
+        return make_mpowrapper(rho,TTNKit.physical_lattice(wavefunc.net))
+    else
+        return rho
+    end
+end
+
 
 
 
