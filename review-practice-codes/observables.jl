@@ -624,12 +624,14 @@ function construct_top_node_environments(ttn::TTNKit.TreeTensorNetwork, tpo::TTN
     end
 	
 	for ll in Iterators.drop(TTNKit.eachlayer(net), 1)
+        println("Constructing top node environments for layer $ll")
 		bEnvironment_new = Vector{Vector{ITensor}}(undef, TTNKit.number_of_tensors(net, ll))
 		for pp in eachindex(net, ll)
 			n_chds = TTNKit.number_of_child_nodes(net, (ll,pp))
 			bEnvironment_new[pp] = Vector{ITensor}(undef, n_chds)
 		
 			for chd in TTNKit.child_nodes(net, (ll,pp))
+                println("Making environment for child $chd")
 				chd_idx = TTNKit.index_of_child(net, chd)
 				Tn = ttn[chd]
 				
@@ -639,9 +641,13 @@ function construct_top_node_environments(ttn::TTNKit.TreeTensorNetwork, tpo::TTN
                 #println("At layer $ll and child $chd the tensorListBottom is")
                 #display(inds.(tensorListBottom))
 				tlist = vcat(Tn, tensorListBottom, prime(dag(Tn)))
+                #display(prod(prod.(TTNKit.ITensors.dims.(tlist))))
+                #display(inds.(tlist))
 				opt_seq = ITensors.optimal_contraction_sequence(tlist)
 				bEnvironment_new[pp][chd_idx] = contract(tlist; sequence = opt_seq)
-				
+                #println("Now showing after contraction tags \n")
+                #display(inds(bEnvironment_new[pp][chd_idx]))
+                #display(prod(TTNKit.ITensors.dims(bEnvironment_new[pp][chd_idx])))
 			end
 		end
 		bEnvironment = bEnvironment_new
@@ -651,12 +657,12 @@ end
 
 function calculate_mpo_expectation(ttn::TTNKit.TreeTensorNetwork, tpo::TTNKit.MPOWrapper)
 	topenvs = construct_top_node_environments(ttn, tpo)
+    println("Finished making environments")
     #display(inds.(topenvs))
 	T = ttn[TTNKit.number_of_layers(ttn), 1]
 	tlist = [T, topenvs..., prime(dag(T))]
 	opt_seq = ITensors.optimal_contraction_sequence(tlist)
-	#return scalar(contract(tlist; sequence = opt_seq))
-    return contract(tlist; sequence = opt_seq)
+	return scalar(contract(tlist; sequence = opt_seq))
 end
 
 function make_mpowrapper(mpo::MPO, lat::L; mapping::Vector{Int} = collect(eachindex(lat))) where{L}
@@ -668,16 +674,16 @@ function make_mpowrapper(mpo::MPO, lat::L; mapping::Vector{Int} = collect(eachin
     mpoc = TTNKit.deepcopy(mpo)
     idx_mpo = last.(TTNKit.siteinds(mpoc,plev = 0))
     println("Starting wrapping")
-    foreach(mapping) do jj
+    for (idx,jj) in enumerate(mapping)
         println("working on wrapping site $jj")
         sj_lat = idx_lat[jj]
         sj_mpo = idx_mpo[jj]
-        mpoc[jj] = replaceinds!(mpoc[jj], sj_mpo => sj_lat, prime(sj_mpo) => prime(sj_lat))
+        mpoc[idx] = replaceinds!(mpoc[jj], sj_mpo => sj_lat, prime(sj_mpo) => prime(sj_lat))
     end
     return TTNKit.MPOWrapper{L, MPO, TTNKit.ITensorsBackend}(lat, mpoc, mapping)
 end
 
-function build_W_singlepoint(which_ladder::Int,coeff::ComplexF64)
+#=function build_W_singlepoint(which_ladder::Int,coeff::ComplexF64)
     mat::Array{ComplexF64} = zeros(ComplexF64,2,2,2,2)
     mat[1,:,1,:] = I(2)
     mat[2,:,2,:] = I(2)
@@ -732,7 +738,7 @@ function build_W(op_string::String,coeff::ComplexF64)
     else
         error("Invalid operator string")
     end
-end
+end=#
 
 function make_qnset(op_string::String)
     if op_string == "A"
@@ -836,7 +842,7 @@ function combine_mpos(m1::MPO,m2::MPO; kwargs...)
         println("Combine MPOs on site $(i)")
         ti = m1[i] * m2[i]
 
-        all_inds = inds(ti)
+        #=all_inds = inds(ti)
         for i1 in 1:length(all_inds)
             in1 = all_inds[i1]
             for i2 in i1+1:length(all_inds)
@@ -848,7 +854,7 @@ function combine_mpos(m1::MPO,m2::MPO; kwargs...)
                     ti = ti * ci
                 end
             end
-        end
+        end=#
 
         tensor_train[i] = ti
     end
@@ -868,11 +874,130 @@ function two_point_mpo(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
     rho = combine_mpos(annih,noprime(creat))
     println("Combined MPOs")
     if if_wrap
-        return make_mpowrapper(rho,TTNKit.physical_lattice(wavefunc.net))
+        lat = TTNKit.physical_lattice(wavefunc.net)
+        return make_mpowrapper(rho,lat)
     else
         return rho
     end
 end
+
+function two_point_mpo_reverse(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+    if_wrap::Bool = get(kwargs,:if_wrap,true)
+
+    creat = projected_op_mpo(wavefunc,"Adag"; if_wrap=false,what_given_inds=["pull","new"])
+
+    inflow_inds = dag.(find_physical_inflow_sites(inds.(creat)))
+
+    annih = projected_op_mpo(wavefunc,"A"; if_wrap=false,what_given_inds=["provided","pull"],provided_sites=(inflow_inds,nothing))
+
+    rho = combine_mpos(noprime(annih),creat)
+    println("Combined MPOs")
+    if if_wrap
+        lat = TTNKit.physical_lattice(wavefunc.net)
+        return make_mpowrapper(rho,lat)
+    else
+        return rho
+    end
+end
+
+
+
+
+
+
+
+function build_W_singlepoint(op_type::String,coeff::ComplexF64)
+    if op_type == "A"
+        mat = [0.0 0.0; 1.0 0.0]
+    elseif op_type == "Adag"
+        mat = [0.0 1.0; 0.0 0.0]
+    elseif op_type == "N"
+        mat = [1.0 0.0; 0.0 0.0]
+    else
+        error("Invalid operator type")
+    end
+
+    A11 = I(2)
+    A12 = zeros(2,2)
+    A21 = coeff * mat
+    A22 = I(2)
+    M = Array{Float64, 4}(undef, 2,2,2,2)
+    M[1,:,1,:] = A11
+    M[1,:,2,:] = A21
+    M[2,:,1,:] = A12
+    M[2,:,2,:] = A22
+
+    return M
+end
+
+function build_links_singlepoint(op_type::String,L::Int)
+    links = Vector{Index}(undef,L+1)
+    for i in 0:L
+        qnset = make_qnset(op_type)
+        if i == 0
+            left_tag = "Start"
+            right_tag = string(i+1)
+        elseif i == L
+            left_tag = string(i)
+            right_tag = "End"
+        else
+            left_tag = string(i)
+            right_tag = string(i+1)
+        end
+        links[i+1] = Index(qnset; tags="Link,Left=$left_tag,Right=$right_tag")
+    end
+    return links
+end
+
+function single_point_mpo(wavefunc::TTNKit.TreeTensorNetwork,op_type::String; kwargs...)
+    if_wrap::Bool = get(kwargs,:if_wrap,true)
+
+    lat = TTNKit.physical_lattice(wavefunc.net)
+
+    phys_sites = TTNKit.sites(wavefunc)
+
+    links = build_links_singlepoint(op_type,length(phys_sites))
+
+    tensor_train = Vector{ITensor}(undef,length(phys_sites))
+    for (idx,s) in enumerate(phys_sites)
+        println("Working on Physical Site $(TTNKit.tags(s))")
+
+        coeff::ComplexF64 = 1.0 + 0.0*im
+
+        mat = build_W_singlepoint(op_type,coeff)
+
+        local_inds = [links[idx],dag(s),dag(links[idx+1]),prime(s)]
+
+        mit = ITensor(mat,local_inds)
+
+        if idx == 1
+			mit = mit * dag(onehot(links[1] => 1))
+		elseif idx == length(phys_sites)
+			mit = mit * (onehot(links[end] => 2))
+		end
+        
+        tensor_train[idx] = mit
+    end
+
+    if if_wrap
+        return make_mpowrapper(MPO(tensor_train),lat)
+    else
+        return MPO(tensor_train)
+    end
+end
+
+function reshape_mpo_to_matrix(mpo::MPO)
+    s1 = [siteinds(mpo)[i][1] for i in 1:4]
+    s2 = [siteinds(mpo)[i][2] for i in 1:4]
+    cm1 = combiner(s1)
+    cm2 = combiner(s2)
+    
+    rez = (contract(mpo) * cm1) * cm2
+    return Matrix(rez,inds(rez)[1],inds(rez)[2])
+end
+
+
+
 
 
 
