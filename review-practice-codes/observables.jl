@@ -862,7 +862,7 @@ function combine_mpos(m1::MPO,m2::MPO; kwargs...)
     return MPO(tensor_train)
 end
 
-function two_point_mpo(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+#=function two_point_mpo(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
     if_wrap::Bool = get(kwargs,:if_wrap,true)
 
     annih = projected_op_mpo(wavefunc,"A"; if_wrap=false,what_given_inds=["pull","new"])
@@ -898,7 +898,7 @@ function two_point_mpo_reverse(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
     else
         return rho
     end
-end
+end=#
 
 
 
@@ -984,6 +984,17 @@ function single_point_mpo(wavefunc::TTNKit.TreeTensorNetwork,op_type::String; kw
     else
         return MPO(tensor_train)
     end
+end
+
+function two_point_mpo(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+    creat = single_point_mpo(wavefunc,"Adag"; if_wrap=false)
+    annih = single_point_mpo(wavefunc,"A"; if_wrap=false)
+
+    rho = creat * prime(annih)
+
+    wrapped_rho = make_mpowrapper(rho,TTNKit.physical_lattice(wavefunc.net))
+
+    return wrapped_rho
 end
 
 function reshape_mpo_to_matrix(mpo::MPO)
