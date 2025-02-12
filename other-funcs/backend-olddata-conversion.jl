@@ -21,7 +21,7 @@ include("../review-practice-codes/hdf5-highlevel-saving.jl")
 if true
     starting_location = pwd()
 
-    root_dir = get_folder_location("cluster-data/synth-dims")
+    root_dir = get_folder_location("cluster-data/synth-dims/torus")
 
     for (root,dirs,files) in walkdir(root_dir)
 

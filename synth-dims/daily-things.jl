@@ -362,7 +362,7 @@ if false
 end
 
 # density-density stuff for 16x8
-if true
+if false
     dataloc = get_folder_location("cluster-data/synth-dims/torus")
     pdict = Dict([("layers",7),("particles",8),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc)
@@ -596,6 +596,33 @@ if false
         ylabel("Topological Entanglement Entropy")
 
     end
+end
+
+# time scaling for long range interaction strength
+if true
+    dataloc = get_folder_location("cluster-data/synth-dims/torus")
+    pdict = Dict([("layers",7),("particles",8),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc) 
+    display(all_files)    
+
+    for f in all_files
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+
+        intstren = []
+        times = []
+        if !haskey(m,"runtime")
+            continue
+        else
+            append!(intstren,m["onsite_strength"])
+            append!(times,m["runtime"])
+        end
+        scatter(intstren,times)
+        xlabel("Interaction Strength")
+        ylabel("Runtime")
+        yscale("log")
+
+    end
+
 end
 
 

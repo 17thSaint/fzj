@@ -606,83 +606,6 @@ function save_tee(gamma::Float64,tee_data::Dict{String,Float64},cutlink_data::Di
     modify_data_jld2(Dict([("tee",gamma),("tee_data",tee_data),("tee_cutlink_data",cutlink_data)]),filepath,"metadata"; output_level=0)
 end
 
-function construct_top_node_environments(ttn::TTNKit.TreeTensorNetwork, tpo::TTNKit.MPOWrapper)
-	
-	net = ttn.net
-
-	n_sites = TTNKit.number_of_sites(net)
-	n_tensors = TTNKit.number_of_tensors(net) + n_sites
-
-	mapping = tpo.mapping
-	ham = tpo.data
-	
-	bEnvironment = map(eachindex(net,1)) do pp
-        chdnds = TTNKit.child_nodes(net, (1,pp))
-        map(1:TTNKit.number_of_child_nodes(net, (1,pp))) do nn
-          ham[TTNKit.inverse_mapping(mapping)[chdnds[nn][2]]]
-        end
-    end
-	
-	for ll in Iterators.drop(TTNKit.eachlayer(net), 1)
-        println("Constructing top node environments for layer $ll")
-		bEnvironment_new = Vector{Vector{ITensor}}(undef, TTNKit.number_of_tensors(net, ll))
-		for pp in eachindex(net, ll)
-			n_chds = TTNKit.number_of_child_nodes(net, (ll,pp))
-			bEnvironment_new[pp] = Vector{ITensor}(undef, n_chds)
-		
-			for chd in TTNKit.child_nodes(net, (ll,pp))
-                println("Making environment for child $chd")
-				chd_idx = TTNKit.index_of_child(net, chd)
-				Tn = ttn[chd]
-				
-				tensorListBottom = map(TTNKit.child_nodes(net, chd)) do cc
-					bEnvironment[chd[2]][TTNKit.index_of_child(net, cc)]
-				end
-                #println("At layer $ll and child $chd the tensorListBottom is")
-                #display(inds.(tensorListBottom))
-				tlist = vcat(Tn, tensorListBottom, prime(dag(Tn)))
-                #display(prod(prod.(TTNKit.ITensors.dims.(tlist))))
-                #display(inds.(tlist))
-				opt_seq = ITensors.optimal_contraction_sequence(tlist)
-				bEnvironment_new[pp][chd_idx] = contract(tlist; sequence = opt_seq)
-                #println("Now showing after contraction tags \n")
-                #display(inds(bEnvironment_new[pp][chd_idx]))
-                #display(prod(TTNKit.ITensors.dims(bEnvironment_new[pp][chd_idx])))
-			end
-		end
-		bEnvironment = bEnvironment_new
-	end
-	return only(bEnvironment)
-end
-
-function calculate_mpo_expectation(ttn::TTNKit.TreeTensorNetwork, tpo::TTNKit.MPOWrapper)
-	topenvs = construct_top_node_environments(ttn, tpo)
-    println("Finished making environments")
-    #display(inds.(topenvs))
-	T = ttn[TTNKit.number_of_layers(ttn), 1]
-	tlist = [T, topenvs..., prime(dag(T))]
-	opt_seq = ITensors.optimal_contraction_sequence(tlist)
-	return scalar(contract(tlist; sequence = opt_seq))
-end
-
-function make_mpowrapper(mpo::MPO, lat::L; mapping::Vector{Int} = collect(eachindex(lat))) where{L}
-    @assert TTNKit.is_physical(lat)
-    @assert length(lat) == length(mpo)
-    #@assert isone(dimensionality(lat))
-    idx_lat = TTNKit.siteinds(lat)
-
-    mpoc = TTNKit.deepcopy(mpo)
-    idx_mpo = last.(TTNKit.siteinds(mpoc,plev = 0))
-    println("Starting wrapping")
-    for (idx,jj) in enumerate(mapping)
-        println("working on wrapping site $jj")
-        sj_lat = idx_lat[jj]
-        sj_mpo = idx_mpo[jj]
-        mpoc[idx] = replaceinds!(mpoc[jj], sj_mpo => sj_lat, prime(sj_mpo) => prime(sj_lat))
-    end
-    return TTNKit.MPOWrapper{L, MPO, TTNKit.ITensorsBackend}(lat, mpoc, mapping)
-end
-
 #=function build_W_singlepoint(which_ladder::Int,coeff::ComplexF64)
     mat::Array{ComplexF64} = zeros(ComplexF64,2,2,2,2)
     mat[1,:,1,:] = I(2)
@@ -904,7 +827,82 @@ end=#
 
 
 
+function construct_top_node_environments(ttn::TTNKit.TreeTensorNetwork, tpo::TTNKit.MPOWrapper)
+	
+	net = ttn.net
 
+	n_sites = TTNKit.number_of_sites(net)
+	n_tensors = TTNKit.number_of_tensors(net) + n_sites
+
+	mapping = tpo.mapping
+	ham = tpo.data
+	
+	bEnvironment = map(eachindex(net,1)) do pp
+        chdnds = TTNKit.child_nodes(net, (1,pp))
+        map(1:TTNKit.number_of_child_nodes(net, (1,pp))) do nn
+          ham[TTNKit.inverse_mapping(mapping)[chdnds[nn][2]]]
+        end
+    end
+	
+	for ll in Iterators.drop(TTNKit.eachlayer(net), 1)
+        #println("Constructing top node environments for layer $ll")
+		bEnvironment_new = Vector{Vector{ITensor}}(undef, TTNKit.number_of_tensors(net, ll))
+		for pp in eachindex(net, ll)
+			n_chds = TTNKit.number_of_child_nodes(net, (ll,pp))
+			bEnvironment_new[pp] = Vector{ITensor}(undef, n_chds)
+		
+			for chd in TTNKit.child_nodes(net, (ll,pp))
+                #println("Making environment for child $chd")
+				chd_idx = TTNKit.index_of_child(net, chd)
+				Tn = ttn[chd]
+				
+				tensorListBottom = map(TTNKit.child_nodes(net, chd)) do cc
+					bEnvironment[chd[2]][TTNKit.index_of_child(net, cc)]
+				end
+                #println("At layer $ll and child $chd the tensorListBottom is")
+                #display(inds.(tensorListBottom))
+				tlist = vcat(Tn, tensorListBottom, prime(dag(Tn)))
+                #display(prod(prod.(TTNKit.ITensors.dims.(tlist))))
+                #display(inds.(tlist))
+				opt_seq = ITensors.optimal_contraction_sequence(tlist)
+				bEnvironment_new[pp][chd_idx] = contract(tlist; sequence = opt_seq)
+                #println("Now showing after contraction tags \n")
+                #display(inds(bEnvironment_new[pp][chd_idx]))
+                #display(prod(TTNKit.ITensors.dims(bEnvironment_new[pp][chd_idx])))
+			end
+		end
+		bEnvironment = bEnvironment_new
+	end
+	return only(bEnvironment)
+end
+
+function calculate_mpo_expectation(ttn::TTNKit.TreeTensorNetwork, tpo::TTNKit.MPOWrapper)
+	topenvs = construct_top_node_environments(ttn, tpo)
+    #println("Finished making environments")
+    #display(inds.(topenvs))
+	T = ttn[TTNKit.number_of_layers(ttn), 1]
+	tlist = [T, topenvs..., prime(dag(T))]
+	opt_seq = ITensors.optimal_contraction_sequence(tlist)
+	return scalar(contract(tlist; sequence = opt_seq))
+end
+
+function make_mpowrapper(mpo::MPO, lat::L; mapping::Vector{Int} = collect(eachindex(lat))) where{L}
+    @assert TTNKit.is_physical(lat)
+    @assert length(lat) == length(mpo)
+    #@assert isone(dimensionality(lat))
+    idx_lat = TTNKit.siteinds(lat)
+
+    mpoc = TTNKit.deepcopy(mpo)
+    idx_mpo = last.(TTNKit.siteinds(mpoc,plev = 0))
+    println("Starting wrapping")
+    for (idx,jj) in enumerate(mapping)
+        #println("working on wrapping site $jj")
+        sj_lat = idx_lat[jj]
+        sj_mpo = idx_mpo[jj]
+        mpoc[idx] = replaceinds!(mpoc[jj], sj_mpo => sj_lat, prime(sj_mpo) => prime(sj_lat))
+    end
+    return TTNKit.MPOWrapper{L, MPO, TTNKit.ITensorsBackend}(lat, mpoc, mapping)
+end
 
 function build_W_singlepoint(op_type::String,coeff::ComplexF64)
     if op_type == "A"
@@ -951,6 +949,7 @@ end
 
 function single_point_mpo(wavefunc::TTNKit.TreeTensorNetwork,op_type::String; kwargs...)
     if_wrap::Bool = get(kwargs,:if_wrap,true)
+    opl::Int = get(kwargs,:opl,1)
 
     lat = TTNKit.physical_lattice(wavefunc.net)
 
@@ -960,7 +959,7 @@ function single_point_mpo(wavefunc::TTNKit.TreeTensorNetwork,op_type::String; kw
 
     tensor_train = Vector{ITensor}(undef,length(phys_sites))
     for (idx,s) in enumerate(phys_sites)
-        println("Working on Physical Site $(TTNKit.tags(s))")
+        opl > 1 && println("Working on Physical Site $(TTNKit.tags(s))")
 
         coeff::ComplexF64 = 1.0 + 0.0*im
 
@@ -987,14 +986,27 @@ function single_point_mpo(wavefunc::TTNKit.TreeTensorNetwork,op_type::String; kw
 end
 
 function two_point_mpo(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+    if_wrap::Bool = get(kwargs,:if_wrap,true)
+
     creat = single_point_mpo(wavefunc,"Adag"; if_wrap=false)
     annih = single_point_mpo(wavefunc,"A"; if_wrap=false)
 
-    rho = creat * prime(annih)
+    rho = prime(creat) * annih
 
-    wrapped_rho = make_mpowrapper(rho,TTNKit.physical_lattice(wavefunc.net))
+    for t in rho
+        for i in inds(t)
+            if plev(i) > 1
+                new_ind = setprime(i,1)
+                replaceinds!(t,i => new_ind)
+            end
+        end
+    end
 
-    return wrapped_rho
+    if if_wrap
+        return make_mpowrapper(rho,TTNKit.physical_lattice(wavefunc.net))
+    else
+        return rho
+    end
 end
 
 function reshape_mpo_to_matrix(mpo::MPO)

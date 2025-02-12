@@ -530,22 +530,19 @@ end
 
 # testing MPO construction of 4point momentum correlator
 if true
-    lx,ly,n = 2,2,2
+    lx,ly,n = 4,4,2
     params_dict = Dict([("hopping_anisotropy",1.0),("if_check_fluxes",false),("es_count",0),("expander_fraction",0.5),("particles",n),("layers",Int(log(2,lx*ly))),("mdim",100),("if_save_data",false),("alpha",0.0),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
-    psi, hamilthere, obs, rho, rt = run_synth_dims_generic(params_dict)
-
-
-
-    #creat = projected_op_mpo(psi,"Adag"; if_wrap=false)#,what_given_inds=["pull","pull"])
-    #anh = projected_op_mpo(psi, "A"; if_wrap = false)
+    #psi, hamilthere, obs, rho, rt = run_synth_dims_generic(params_dict)
+f
     
-    creat = single_point_mpo(psi, "Adag"; if_wrap=false)
-    annih = single_point_mpo(psi, "A"; if_wrap=false)
+    #creat = single_point_mpo(psi, "Adag"; if_wrap=false)
+    #annih = single_point_mpo(psi, "A"; if_wrap=false)
+    rho = two_point_mpo(psi)
     
 
     #rho = two_point_mpo_reverse(psi; if_wrap=true)
-    #val = calculate_mpo_expectation(psi,creat)
-    #println("The value is $val")
+    val = calculate_mpo_expectation(psi,rho)
+    println("The value is $val")
 end
 
 
