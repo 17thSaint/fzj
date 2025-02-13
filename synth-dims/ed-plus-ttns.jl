@@ -528,23 +528,47 @@ if false
     yscale("log")
 end
 
-# testing MPO construction of 4point momentum correlator
-if true
+# testing 2pt MPO FT constructor against known density matrix FT
+if false
     lx,ly,n = 4,4,2
     params_dict = Dict([("hopping_anisotropy",1.0),("if_check_fluxes",false),("es_count",0),("expander_fraction",0.5),("particles",n),("layers",Int(log(2,lx*ly))),("mdim",100),("if_save_data",false),("alpha",0.0),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
     #psi, hamilthere, obs, rho, rt = run_synth_dims_generic(params_dict)
 
-    
-    #creat1 = single_point_mpo(psi, "Adag"; if_wrap=false)
-    #annih1 = single_point_mpo(psi, "A"; if_wrap=false)
-    #creat2 = single_point_mpo(psi, "Adag"; if_wrap=false)
-    #annih2 = single_point_mpo(psi, "A"; if_wrap=false)
-    #rho = two_point_mpo(psi)
-    fourpt = four_point_mpo(psi)
+    ks = range(0,1.0,length=16)
+    vals = zeros(Float64,length(ks),length(ks))
+    for (idx,kx) in enumerate(ks)
+        for (idx2,ky) in enumerate(ks)
+            println("Working on kx = $kx, ky = $ky")
+            rho = two_point_mpo(psi; momentum = [kx,ky])
+            vals[idx2,idx] = real(calculate_mpo_expectation(psi,rho))
+        end
+    end
+    fig = figure()
+    imshow(vals,origin="lower",extent=[0,1,0,1])
+    colorbar()
+    xlabel("kx")
+    ylabel("ky")
 
-    
-    val = calculate_mpo_expectation(psi,fourpt)
-    println("The value is $val")
+    rho_real = density_matrix(psi)
+    dm_vals = zeros(Float64,length(ks),length(ks))
+    for (idx,kx) in enumerate(ks)
+        for (idx2,ky) in enumerate(ks)
+            println("Working on kx = $kx, ky = $ky")
+            dm_vals[idx2,idx] = real(ft_density_matrix(rho_real,[kx,ky],lx,ly))
+        end
+    end
+    fig = figure()
+    imshow(dm_vals,origin="lower",extent=[0,1,0,1])
+    colorbar()
+    xlabel("kx")
+    ylabel("ky")
+
+end
+
+# do 4pt momentum MPO
+if false
+    fourpt = four_point_mpo(psi; momentum1 = [0.0,0.0], momentum2 = [0.0,0.0])
+    val = real(calculate_mpo_expectation(psi,fourpt))
 end
 
 

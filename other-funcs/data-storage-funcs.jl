@@ -1,4 +1,4 @@
-using JLD2,HDF5
+using HDF5
 
 function get_folder_location(folder_name)
 	central_loc=find_center()
@@ -206,7 +206,7 @@ function change_numparticles_metadata(filename)
 end
 
 function find_data_file(params_dict,calc_type,location="/home/patrick/fzj/main-git/cluster-data"; kwargs...)
-	file_type = get(kwargs, :file_type, "jld2")
+	file_type = get(kwargs, :file_type, "h5")
 	if_exact::Bool = get(kwargs,:if_exact,false)
 	og_loc = pwd()
 	cd(location)
@@ -254,7 +254,7 @@ function find_data_file(params_dict,calc_type,location="/home/patrick/fzj/main-g
 				catch
 					#=try
 						#println("Error in first Attempt, $current_file")
-						current_file_metadata_dict = read_data_jld2(current_file; kwargs...)[2]
+						current_file_metadata_dict = read_data(current_file; kwargs...)[2]
 						current_file_metadata_dict[params] in params_dict[params] ? nothing : append!(remove_indices,i)
 					catch
 						#println("Parameter $params could not be found in file $current_file, skipping")
@@ -312,7 +312,7 @@ function check_data_exists(params_dict::Dict,data_type::String; kwargs...)
 			display(possible_files)
 			return false,nothing
 		else
-			return true,read_data_jld2(possible_files[1],location; kwargs...)
+			return true,read_data(possible_files[1],location; kwargs...)
 		end
 	end
 end
@@ -323,7 +323,7 @@ function check_data_exists(filename::AbstractString,data_type="observer"; kwargs
     cd(location)
     if check_duplicates(filename)[1]
         cd(here)
-        return true,read_data_jld2(filename,location; kwargs...)
+        return true,read_data(filename,location; kwargs...)
     end
     cd(here)
     return false,nothing
@@ -606,6 +606,7 @@ function modify_data_jld2(to_modify_dict::Dict,file_path, which_group="all_data"
 	return split(file_path,"/")[end]
 end
 
+
 function write_data_hdf5(file_name::AbstractString,data::Dict,metadata::Dict; kwargs...)
 
 	file_name = prep_file(file_name,"h5")
@@ -668,6 +669,88 @@ function read_data_hdf5(file_name; kwargs...)
 	println("Data Extracted, File Closed: $file_name")
 	return data,metadata
 end
+
+function modify_data_hdf5(key_to_modify::String, new_value, file_path, which_group="all_data"; kwargs...)
+	output_level = get(kwargs, :output_level, 0)
+	
+	h5open(file_path,"r+") do f
+		g_datagroup = open_group(f,which_group)
+		if haskey(g_datagroup, key_to_modify)
+			delete!(g_datagroup, key_to_modify)
+			write(g_datagroup, key_to_modify, new_value)
+			output_level > 0 ? println("Value associated with key $key_to_modify has been modified.") : nothing
+		else
+			output_level > 0 ? println("Key $key_to_modify does not exist in the file. Making it") : nothing
+			write(g_datagroup, key_to_modify, new_value)
+		end
+	end
+	
+	return split(file_path,"/")[end]
+end
+
+function modify_data_hdf5(to_modify_dict::Dict,file_path, which_group="all_data"; kwargs...)
+	output_level = get(kwargs, :output_level, 0)
+
+	h5open(file_path,"r+") do f
+		g_datagroup = open_group(f,which_group)
+		for (k,v) in to_modify_dict
+			if haskey(g_datagroup, k)
+				delete!(g_datagroup, k)
+				write(g_datagroup, k, v)
+				output_level > 0 ? println("Value associated with key $k has been modified.") : nothing
+			else
+				output_level > 0 ? println("Key $k does not exist in the file. Making it") : nothing
+				write(g_datagroup, k, v)
+			end
+		end
+	end
+
+	return split(file_path,"/")[end]
+end
+
+
+function read_data(file_name; kwargs...)
+	if occursin("jld2",file_name)
+		actual_filename = split(file_name,"/")[end]
+		location = join(split(file_name,"/")[1:end-1],"/")
+		return read_data_jld2(actual_filename,location; kwargs...)
+	elseif occursin("h5",file_name)
+		return read_data_hdf5(file_name; kwargs...)
+	else
+		error("File Type not recognized")
+	end
+end
+
+function write_data(file_name,data,metadata; kwargs...)
+	if occursin("jld2",file_name)
+		return write_data_jld2(file_name,data,metadata; kwargs...)
+	elseif occursin("h5",file_name)
+		return write_data_hdf5(file_name,data,metadata; kwargs...)
+	else
+		error("File Type not recognized")
+	end
+end
+
+function modify_data(key_to_modify::String,new_value,file_path,which_group="all_data"; kwargs...)
+	if occursin("jld2",file_path)
+		return modify_data_jld2(key_to_modify,new_value,file_path,which_group; kwargs...)
+	elseif occursin("h5",file_path)
+		return modify_data_hdf5(key_to_modify,new_value,file_path,which_group; kwargs...)
+	else
+		error("File Type not recognized")
+	end
+end
+
+function modify_data(to_modify_dict::Dict,file_path,which_group="all_data"; kwargs...)
+	if occursin("jld2",file_path)
+		return modify_data_jld2(to_modify_dict,file_path,which_group; kwargs...)
+	elseif occursin("h5",file_path)
+		return modify_data_hdf5(to_modify_dict,file_path,which_group; kwargs...)
+	else
+		error("File Type not recognized")
+	end
+end
+
 	
 
 

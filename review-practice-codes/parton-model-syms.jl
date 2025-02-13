@@ -1,4 +1,4 @@
-using ITensors
+using ITensorMPS
 using LinearAlgebra
 using LaTeXStrings
 using KrylovKit

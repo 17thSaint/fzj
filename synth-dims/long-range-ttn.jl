@@ -3,7 +3,7 @@
 include("../review-practice-codes/ttn.jl")
 include("../other-funcs/basic-2d-stuff.jl")
 include("../review-practice-codes/observables.jl")
-#include("../review-practice-codes/plottings.jl")
+include("../review-practice-codes/plottings.jl")
 using Profile,MKL
 
 function spin_matrix_element(m1,m2,spin,direction::String)
@@ -78,7 +78,7 @@ end
 	location = get(kwargs, :location, pwd())
 	xcoord = [i for i in 0:virt_edge_length-1]
 	scaling_data = Dict([("strengths",strengths),("xcoord",xcoord)])
-	write_data_jld2(filename,scaling_data,location=location; kwargs...)
+	write_data(filename,scaling_data,location=location; kwargs...)
 	return
 end
 
@@ -722,7 +722,7 @@ function save_allAVG_densdenscorr(distances,avg_corrs,avg_errors; kwargs...)
 	filename = get(kwargs, :name, "densdens")
 	metadata = get(kwargs, :metadata, nothing)
 	avg_data_dict = Dict([("dists",distances),("vals",avg_corrs),("errors",avg_errors)])
-	write_data_jld2(filename,avg_data_dict,location,metadata)
+	write_data(filename,avg_data_dict,location,metadata)
 end
 
 function get_mdim(num_layers,shift=(false,0.5))
@@ -766,7 +766,7 @@ function radial_box_dist(ttn)
 	return full_rads,combined_vals
 end
 
-function bulk_density(ttn::TreeTensorNetwork,bulk_width_phys=1,bulk_width_virt=1; kwargs...)
+function bulk_density(ttn::TTNKit.TreeTensorNetwork,bulk_width_phys=1,bulk_width_virt=1; kwargs...)
 	if isnothing(ttn)
 		occ_mat = get(kwargs, :occ_mat, nothing)
 	else
@@ -821,7 +821,7 @@ function reorder_vector_to_matrix(left_moving,right_moving)
 	return right_moving_mat .+ left_moving_mat
 end
 
-function ttn_current_site(psi::TreeTensorNetwork,virt_site; kwargs...)
+function ttn_current_site(psi::TTNKit.TreeTensorNetwork,virt_site; kwargs...)
 	centralflux_strength = get(kwargs, :centralflux_strength, 0.0)
 	phys_length,virt_length = get_lattice_dims(psi)
 	phys_left = (virt_site-1)*phys_length + Int(phys_length/2)
@@ -831,7 +831,7 @@ function ttn_current_site(psi::TreeTensorNetwork,virt_site; kwargs...)
 	return right_moving + left_moving
 end
 
-function ttn_current(psi::TreeTensorNetwork; kwargs...)
+function ttn_current(psi::TTNKit.TreeTensorNetwork; kwargs...)
 	centralflux_strength = get(kwargs, :centralflux_strength, 0.0)
 	phys_length,virt_length = get_lattice_dims(psi)
 	position_pairs = get_position_pairs(phys_length,virt_length)
@@ -862,7 +862,7 @@ function find_dist(p1::Tuple{Int,Int}, p2::Tuple{Int,Int}, size::Tuple{Int,Int},
     return sqrt(dx^2 + dy^2),(dx,dy)
 end
 
-function physical_distance_correlation(psi::TreeTensorNetwork; kwargs...)
+function physical_distance_correlation(psi::TTNKit.TreeTensorNetwork; kwargs...)
 	if_plot = get(kwargs, :if_plot, false)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, true)
 	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
@@ -951,7 +951,7 @@ function correlation_length(dists,phys_correlations; kwargs...)
 	return corr_lengths
 end
 
-function distance_correlation(psi::TreeTensorNetwork; kwargs...)
+function distance_correlation(psi::TTNKit.TreeTensorNetwork; kwargs...)
 	if_plot = get(kwargs, :if_plot, true)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, true)
 	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
@@ -1003,7 +1003,7 @@ function plot_distance_correlation(dists,corrs,corr_errors; kwargs...)
 	title(title_string)
 end
 
-function momentum_occupation(psi::TreeTensorNetwork,p_count::Int,p_end::Real,direction="phys"; kwargs...)
+function momentum_occupation(psi::TTNKit.TreeTensorNetwork,p_count::Int,p_end::Real,direction="phys"; kwargs...)
 	if_neg = get(kwargs, :if_neg, true)
 	if_save_data = get(kwargs, :if_save_data, false)
 	if_plot = p_count != 1 ? get(kwargs, :if_plot, false) : false
@@ -1046,7 +1046,7 @@ function momentum_occupation(psi::TreeTensorNetwork,p_count::Int,p_end::Real,dir
 	return momenta,mom_occs
 end
 
-function momentum_occupation(psi::TreeTensorNetwork,p_count::Int,p_end::Real; kwargs...)
+function momentum_occupation(psi::TTNKit.TreeTensorNetwork,p_count::Int,p_end::Real; kwargs...)
 	if_neg = get(kwargs, :if_neg, true)
 	p_start = get(kwargs, :p_start, 0.0)
 	if_plot = get(kwargs, :if_plot, false)
@@ -1131,7 +1131,7 @@ function loop_sites(starting_site,which_quadrant,phys_length,virt_length; kwargs
 	end
 end
 
-function closed_loop(psi::TreeTensorNetwork, starting_site; kwargs...)
+function closed_loop(psi::TTNKit.TreeTensorNetwork, starting_site; kwargs...)
 	phys_length,virt_length = get_lattice_dims(psi)
 	which_direction = get(kwargs, :direction, 1)
 	loop_length = get(kwargs, :loop_length, 1)
@@ -1159,7 +1159,7 @@ function closed_loop(psi::TreeTensorNetwork, starting_site; kwargs...)
 	return angle(prod(calced_values)),calced_values,sites_to_loop
 end
 
-function cdw_structure_factor(rho,qvec::Tuple,psi::TreeTensorNetwork; kwargs...)
+function cdw_structure_factor(rho,qvec::Tuple,psi::TTNKit.TreeTensorNetwork; kwargs...)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
 	if_periodic_synth = get(kwargs, :if_periodic_synth, false)
 
@@ -1186,7 +1186,7 @@ function cdw_structure_factor(rho,qvec::Tuple,psi::TreeTensorNetwork; kwargs...)
 	return struc_fact / sum(occs)
 end
 
-function cdw_struct_full(rho,psi::TreeTensorNetwork,howmany=100,qmax=3.0; kwargs...)
+function cdw_struct_full(rho,psi::TTNKit.TreeTensorNetwork,howmany=100,qmax=3.0; kwargs...)
 	if_plot = get(kwargs, :if_plot, true)
 
 	qs = range(-qmax,stop=qmax,length=howmany)
@@ -1209,7 +1209,7 @@ function cdw_struct_full(rho,psi::TreeTensorNetwork,howmany=100,qmax=3.0; kwargs
 	return struct_factor,qs
 end
 
-function distance_correlation(rho::Matrix,wavefunc::TreeTensorNetwork,Lx::Int64,Ly::Int64,direction::String="x")
+function distance_correlation(rho::Matrix,wavefunc::TTNKit.TreeTensorNetwork,Lx::Int64,Ly::Int64,direction::String="x")
     #=if layers % 2 == 0.0
 		Lx = Int(sqrt(2^layers))
 		Ly = Int(sqrt(2^layers))
@@ -1290,7 +1290,7 @@ function rydberg_2pcorr(rho::Matrix; kwargs...)
 	return dist_corrs
 end
 
-function rydberg_2pcorr(wavefunc::TreeTensorNetwork; kwargs...)
+function rydberg_2pcorr(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
 	if_plot = get(kwargs, :if_plot, true)
 
 	site_count = Int(2^TTNKit.number_of_layers(wavefunc))
@@ -1418,7 +1418,7 @@ end
     return flux_direction
 end=#
 
-function memory_usage(psi::TreeTensorNetwork)
+function memory_usage(psi::TTNKit.TreeTensorNetwork)
 	number_of_numbers = 0
 	net = TTNKit.network(psi)
 	nlayers = TTNKit.number_of_layers(net)
@@ -1771,7 +1771,7 @@ if false
 	for f in files
 		nrgs = []
 		if occursin("ttn",f)
-			data,metadata = read_data_jld2(f,"../cluster-data/synth-dims/excited-states/")
+			data,metadata = read_data(f,"../cluster-data/synth-dims/excited-states/")
 			if !metadata["if_periodic_phys"] || metadata["particles"] != 4 || !metadata["if_periodic_synth"]
 				continue
 			end
@@ -1800,7 +1800,7 @@ if false
 	pdict = Dict([("layers",6),("particles",8),("hopping_anisotropy",1.0),("if_periodic_phys",true),("if_periodic_synth",true)])
 	allfiles = find_data_file(pdict,"ttn",dataloc)
 	for (idx,f) in enumerate(allfiles)
-		data,metadata = read_data_jld2(f,dataloc)
+		data,metadata = read_data(f,dataloc)
 		intstren = metadata["onsite_strength"]
 		nrgs = [metadata["observer"].nrg[end]]
 		for i in 1:Int(length(keys(data))/2)-1
@@ -1841,13 +1841,13 @@ if false
 	for f in all_files
 		if occursin("wavefuncttn",f)
 			other_f = string(split(f,"wavefunc")[2])
-			d,m = read_data_jld2(dataloc*"/"*other_f; output_level=0)
+			d,m = read_data(dataloc*"/"*other_f; output_level=0)
 			if !("c2_value" in keys(m)) && !("c3_value" in keys(m))
 				println("Didn't find c2/c3 values, calculating for file $other_f")
-				data = read_data_jld2(data_loc*"/"*f; output_level=0)
+				data = read_data(data_loc*"/"*f; output_level=0)
 				c2val,c3val = c23(data["ttn"])
 				new_data_dict = Dict([("c2_value",c2val),("c3_value",c3val)])
-				modify_data_jld2(new_data_dict,data_loc*"/"*other_f,"metadata")
+				modify_data(new_data_dict,data_loc*"/"*other_f,"metadata")
 				println("Saved c2/c3 values")
 			end
 		end
@@ -1867,7 +1867,7 @@ if false
 	nrgs = []
 	bdims = []
 	for f in allfiles
-		data,metadata = read_data_jld2(f,data_loc; output_level=0)
+		data,metadata = read_data(f,data_loc; output_level=0)
 		#typeof(check_fluxes(metadata["alpha"],Int(sqrt(2^metadata["layers"])),Int(sqrt(2^metadata["layers"])),metadata["if_periodic_phys"],metadata["if_periodic_synth"],metadata["flux_direction"],false)) == Bool ? println("No") : println("Yes")
 		if !("c2_value" in keys(metadata)) || !("c3_value" in keys(metadata))
 			println("Didn't find C2/C3 value at $f")
@@ -1979,7 +1979,7 @@ if false
 	#for tw1 in tws
 	#for tw2 in tws
 		#("all_measurements",["densitydensity","occs"])
-		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",0),("expander_fraction",0.5),("particles",4),("layers",5),("mdim",500),("if_save_data",true),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",0),("expander_fraction",0.5),("particles",4),("layers",5),("mdim",100),("if_save_data",true),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		open_cores = get(params_dict, "open_cores", 5)
@@ -1998,7 +1998,7 @@ if false
 		end=#
 
 		#occs = get_occupancy(all_results[1]; densmat=all_results[end],if_plot=true)
-		#modify_data_jld2(Dict([("occs",occs)]),filepath,"metadata")
+		#modify_data(Dict([("occs",occs)]),filepath,"metadata")
 		
 		#=bothoccs = []
 		for i in 1:params_dict["es_count"]+1
