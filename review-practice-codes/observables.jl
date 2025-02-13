@@ -825,7 +825,19 @@ end=#
 
 
 
+function ft_coeff(phys_site::Tuple{Int,Int},momentum::Vector{Float64},op_type::String)
+    dag_sign::Int = op_type == "Adag" ? -1 : 1
+    return exp(2*pi*im*dag_sign*dot(momentum,phys_site))
+end
 
+function ft_coeff(phys_site::Index,momentum::Vector{Float64},op_type::String,lx::Int,ly::Int)
+    index_tag = string(tags(phys_site))
+    @assert occursin("Site",index_tag)
+
+    lin_ind = parse(Int,split(index_tag,"=")[end])
+    coord_label = coordinate(lin_ind,lx,ly)
+    return ft_coeff(coord_label,momentum,op_type)
+end
 
 function construct_top_node_environments(ttn::TTNKit.TreeTensorNetwork, tpo::TTNKit.MPOWrapper)
 	
@@ -878,7 +890,7 @@ end
 
 function calculate_mpo_expectation(ttn::TTNKit.TreeTensorNetwork, tpo::TTNKit.MPOWrapper)
 	topenvs = construct_top_node_environments(ttn, tpo)
-    #println("Finished making environments")
+    println("Finished making environments")
     #display(inds.(topenvs))
 	T = ttn[TTNKit.number_of_layers(ttn), 1]
 	tlist = [T, topenvs..., prime(dag(T))]
@@ -950,8 +962,10 @@ end
 function single_point_mpo(wavefunc::TTNKit.TreeTensorNetwork,op_type::String; kwargs...)
     if_wrap::Bool = get(kwargs,:if_wrap,true)
     opl::Int = get(kwargs,:opl,1)
+    mom::Vector{Float64} = get(kwargs,:momentum,[0.0,0.0])
 
     lat = TTNKit.physical_lattice(wavefunc.net)
+    lx::Int,ly::Int = size(lat)
 
     phys_sites = TTNKit.sites(wavefunc)
 
@@ -961,7 +975,7 @@ function single_point_mpo(wavefunc::TTNKit.TreeTensorNetwork,op_type::String; kw
     for (idx,s) in enumerate(phys_sites)
         opl > 1 && println("Working on Physical Site $(TTNKit.tags(s))")
 
-        coeff::ComplexF64 = 1.0 + 0.0*im
+        coeff::ComplexF64 = ft_coeff(s,mom,op_type,lx,ly)
 
         mat = build_W_singlepoint(op_type,coeff)
 
@@ -985,15 +999,8 @@ function single_point_mpo(wavefunc::TTNKit.TreeTensorNetwork,op_type::String; kw
     end
 end
 
-function two_point_mpo(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
-    if_wrap::Bool = get(kwargs,:if_wrap,true)
-
-    creat = single_point_mpo(wavefunc,"Adag"; if_wrap=false)
-    annih = single_point_mpo(wavefunc,"A"; if_wrap=false)
-
-    rho = prime(creat) * annih
-
-    for t in rho
+function set_single_prime(mpo::MPO)
+    for t in mpo
         for i in inds(t)
             if plev(i) > 1
                 new_ind = setprime(i,1)
@@ -1001,11 +1008,48 @@ function two_point_mpo(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
             end
         end
     end
+    return mpo
+end
+
+function two_point_mpo(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+    if_wrap::Bool = get(kwargs,:if_wrap,true)
+
+    creat = single_point_mpo(wavefunc,"Adag"; kwargs...,if_wrap=false)
+    println("Made Creation")
+    annih = single_point_mpo(wavefunc,"A"; kwargs...,if_wrap=false)
+    println("Made Annihilation")
+
+    rho = prime(creat) * annih
+
+    rho = set_single_prime(rho)
 
     if if_wrap
         return make_mpowrapper(rho,TTNKit.physical_lattice(wavefunc.net))
     else
         return rho
+    end
+end
+
+function four_point_mpo(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+    if_wrap::Bool = get(kwargs,:if_wrap,true)
+
+    creat1 = single_point_mpo(wavefunc,"Adag"; kwargs...,if_wrap=false)
+    println("Made Creation 1")
+    creat2 = single_point_mpo(wavefunc,"Adag"; kwargs...,if_wrap=false)
+    println("Made Creation 2")
+    annih1 = single_point_mpo(wavefunc,"A"; kwargs...,if_wrap=false)
+    println("Made Annihilation 1")
+    annih2 = single_point_mpo(wavefunc,"A"; kwargs...,if_wrap=false)
+    println("Made Annihilation 2")
+
+    fourpt = (prime(creat1) * creat2) * prime(prime(prime(annih1) * annih2))
+
+    fourpt = set_single_prime(fourpt)
+
+    if if_wrap
+        return make_mpowrapper(fourpt,TTNKit.physical_lattice(wavefunc.net))
+    else
+        return fourpt
     end
 end
 

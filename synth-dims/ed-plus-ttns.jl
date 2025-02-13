@@ -533,15 +533,17 @@ if true
     lx,ly,n = 4,4,2
     params_dict = Dict([("hopping_anisotropy",1.0),("if_check_fluxes",false),("es_count",0),("expander_fraction",0.5),("particles",n),("layers",Int(log(2,lx*ly))),("mdim",100),("if_save_data",false),("alpha",0.0),("onsite_strength",0.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
     #psi, hamilthere, obs, rho, rt = run_synth_dims_generic(params_dict)
-f
-    
-    #creat = single_point_mpo(psi, "Adag"; if_wrap=false)
-    #annih = single_point_mpo(psi, "A"; if_wrap=false)
-    rho = two_point_mpo(psi)
-    
 
-    #rho = two_point_mpo_reverse(psi; if_wrap=true)
-    val = calculate_mpo_expectation(psi,rho)
+    
+    #creat1 = single_point_mpo(psi, "Adag"; if_wrap=false)
+    #annih1 = single_point_mpo(psi, "A"; if_wrap=false)
+    #creat2 = single_point_mpo(psi, "Adag"; if_wrap=false)
+    #annih2 = single_point_mpo(psi, "A"; if_wrap=false)
+    #rho = two_point_mpo(psi)
+    fourpt = four_point_mpo(psi)
+
+    
+    val = calculate_mpo_expectation(psi,fourpt)
     println("The value is $val")
 end
 
