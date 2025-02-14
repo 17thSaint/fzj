@@ -7,39 +7,39 @@ using Printf, Random
 create_wavefunction(sz::NTuple{D, Int}) where{D} = create_wavefunction(ComplexF64, sz)
 create_wavefunction(elT, sz::NTuple{D,Int}) where{D} = normalize!(randn(elT, sz))
 
-function patron_application!(ttn::TTNKit.TreeTensorNetwork, wf_coefs::Array, op_ins::String; maxdim::Int = maxlinkdim(ttn), normalize::Bool = true)
-    net = TTNKit.network(ttn)
-    lat = TTNKit.physical_lattice(net)
+function patron_application!(ttn::TTN.TreeTensorNetwork, wf_coefs::Array, op_ins::String; maxdim::Int = maxlinkdim(ttn), normalize::Bool = true)
+    net = TTN.network(ttn)
+    lat = TTN.physical_lattice(net)
 
     all(size(lat) .== size(wf_coefs)) || error("Trying to apply a patron wavefunction of dimensionality $(size(wf_coefs)) to a TTN defined on a lattice $(size(lat))")
 
 
     patron_mpo = wf_mpo(wf_coefs, net, op_ins)
     
-    for p in eachindex(TTNKit.lattice(net, 1))
-        ttn = TTNKit.move_ortho!(ttn, (1,p))
-        pc = TTNKit.child_nodes(net, (1, p))
+    for p in eachindex(TTN.lattice(net, 1))
+        ttn = TTN.move_ortho!(ttn, (1,p))
+        pc = TTN.child_nodes(net, (1, p))
         Tpat = map(j -> patron_mpo[j], last.(pc))
         
-        pr = TTNKit.parent_node(net, (1,p))
+        pr = TTN.parent_node(net, (1,p))
         #println("Site $p has parent ",pr)
-        #println("Child nodes with lattice coords are $(pc[1][2]) at $(TTNKit.coordinate(lat,pc[1][2])) and $(pc[2][2]) at $(TTNKit.coordinate(lat,pc[2][2]))")
+        #println("Child nodes with lattice coords are $(pc[1][2]) at $(TTN.coordinate(lat,pc[1][2])) and $(pc[2][2]) at $(TTN.coordinate(lat,pc[2][2]))")
         Tt  = ttn[(1, p)]
 
-        rind = TTNKit.commonind(Tt, ttn[pr])
-        linds = TTNKit.uniqueinds(Tt, rind)
-        Tn = TTNKit.noprime(TTNKit.contract(Tt, Tpat...))
+        rind = TTN.commonind(Tt, ttn[pr])
+        linds = TTN.uniqueinds(Tt, rind)
+        Tn = TTN.noprime(TTN.contract(Tt, Tpat...))
 
         #println("Multiplication worked")
         #if p == 2
         #    return Tn,linds,rind
         #end
-        A, R = TTNKit.factorize(Tn, linds, maxdim = maxdim, tags = TTNKit.tags(rind))
+        A, R = TTN.factorize(Tn, linds, maxdim = maxdim, tags = TTN.tags(rind))
         
         #=
         println("Physical Site $p")
-        println("Sizes: ",", Tn",length(TTNKit.inds(Tn)),", R",length(TTNKit.inds(R)),", Pr",length(TTNKit.inds(ttn[pr])),", A",length(TTNKit.inds(A)))
-        println(", Tn",TTNKit.tags.(TTNKit.inds(Tn)),", R",TTNKit.tags.(TTNKit.inds(R)),", Pr",TTNKit.tags.(TTNKit.inds(ttn[pr])),", A",TTNKit.tags.(TTNKit.inds(A)))
+        println("Sizes: ",", Tn",length(TTN.inds(Tn)),", R",length(TTN.inds(R)),", Pr",length(TTN.inds(ttn[pr])),", A",length(TTN.inds(A)))
+        println(", Tn",TTN.tags.(TTN.inds(Tn)),", R",TTN.tags.(TTN.inds(R)),", Pr",TTN.tags.(TTN.inds(ttn[pr])),", A",TTN.tags.(TTN.inds(A)))
         =#
         ttn[(1,p)] = A
         ttn[pr] = ttn[pr] * R    
@@ -48,31 +48,31 @@ function patron_application!(ttn::TTNKit.TreeTensorNetwork, wf_coefs::Array, op_
         ttn.ortho_center[1] = pr[1]
         ttn.ortho_center[2] = pr[2]
         # this has to be deleted in the future... dont need this anymore
-        ttn.ortho_direction[1][p] = TTNKit.number_of_child_nodes(net, (1,p)) + 1
+        ttn.ortho_direction[1][p] = TTN.number_of_child_nodes(net, (1,p)) + 1
         ttn.ortho_direction[pr[1]][pr[2]] = -1
     end
     # now move to the higher layers layer by layer, excluding the top node
-    TTNKit.ITensors.set_warn_order(20)
-    for ll in 2:TTNKit.number_of_layers(net)-1
-        for p in 1:TTNKit.number_of_tensors(net, ll)
+    TTN.ITensors.set_warn_order(20)
+    for ll in 2:TTN.number_of_layers(net)-1
+        for p in 1:TTN.number_of_tensors(net, ll)
             pp = (ll, p)
-            ttnc = TTNKit.move_ortho!(ttn, pp)
+            ttnc = TTN.move_ortho!(ttn, pp)
             
             Tt = ttn[pp]
 
-            pr = TTNKit.parent_node(net, pp)
+            pr = TTN.parent_node(net, pp)
 
-            pc = TTNKit.child_nodes(net, pp)
+            pc = TTN.child_nodes(net, pp)
             
-            linds = map(p -> TTNKit.commonind(Tt, ttn[p]), pc)
+            linds = map(p -> TTN.commonind(Tt, ttn[p]), pc)
             ptags = "Link,nl=$(ll),np=$(p)"#tags(commonind(Tt, ttn[pr]))
         
             A, R = factorize(Tt, linds; maxdim = maxdim, tags = ptags)
             #=
             println(ll,", ",p)
             println("With Parent $pr")
-            println("Sizes: ",", R",length(TTNKit.inds(R)),", Tt",length(TTNKit.inds(Tt)),", A",length(TTNKit.inds(A)))
-            println(", R",TTNKit.tags.(TTNKit.inds(R)),", Tt",TTNKit.tags.(TTNKit.inds(Tt)),", A",TTNKit.tags.(TTNKit.inds(A)))
+            println("Sizes: ",", R",length(TTN.inds(R)),", Tt",length(TTN.inds(Tt)),", A",length(TTN.inds(A)))
+            println(", R",TTN.tags.(TTN.inds(R)),", Tt",TTN.tags.(TTN.inds(Tt)),", A",TTN.tags.(TTN.inds(A)))
             =#
             ttn[pp] = A
             ttn[pr] = ttn[pr] * R
@@ -81,13 +81,13 @@ function patron_application!(ttn::TTNKit.TreeTensorNetwork, wf_coefs::Array, op_
             ttn.ortho_center[1] = pr[1]
             ttn.ortho_center[2] = pr[2]
             # this has to be deleted in the future... dont need this anymore
-            ttn.ortho_direction[ll][p] = TTNKit.number_of_child_nodes(net, (ll,p)) + 1
+            ttn.ortho_direction[ll][p] = TTN.number_of_child_nodes(net, (ll,p)) + 1
             ttn.ortho_direction[pr[1]][pr[2]] = -1
         end
     end
 
     if normalize
-        tpnd = (TTNKit.number_of_layers(net), 1) 
+        tpnd = (TTN.number_of_layers(net), 1) 
         T = ttn[tpnd]
         ttn[tpnd] = T/norm(T)
     end
@@ -176,9 +176,9 @@ function construct_first_layer(mpo,mapping,net)
     bEnvironment = Vector{ITensor}(undef, 1) 
 
     bEnvironment = map(eachindex(net,1)) do pp
-        chdnds = TTNKit.child_nodes(net, (1,pp))
-        map(1:TTNKit.number_of_child_nodes(net, (1,pp))) do nn
-          mpo[TTNKit.inverse_mapping(mapping)[chdnds[nn][2]]]
+        chdnds = TTN.child_nodes(net, (1,pp))
+        map(1:TTN.number_of_child_nodes(net, (1,pp))) do nn
+          mpo[TTN.inverse_mapping(mapping)[chdnds[nn][2]]]
         end
     end
     
@@ -186,12 +186,12 @@ function construct_first_layer(mpo,mapping,net)
 end
 
 function wf_mpo(wf, net, op_ins)
-    ampo = TTNKit.OpSum()
-    lat = TTNKit.physical_lattice(net)
+    ampo = TTN.OpSum()
+    lat = TTN.physical_lattice(net)
     for pci in keys(wf)
         pt = to_indices(wf, (pci,))
 
-        plin = TTNKit.linear_ind(lat, pt)
+        plin = TTN.linear_ind(lat, pt)
         ampo += (wf[pci], op_ins, plin)
     end
     
@@ -199,9 +199,9 @@ function wf_mpo(wf, net, op_ins)
     
     # build MPO out of OpSum
     idx_lat = map(mapping) do pos
-        TTNKit.hilbertspace(lat[pos])
+        TTN.hilbertspace(lat[pos])
     end
-    mpo = TTNKit.MPO(ampo,idx_lat)
+    mpo = TTN.MPO(ampo,idx_lat)
     
     rez_data = construct_first_layer(mpo,mapping,net)
     

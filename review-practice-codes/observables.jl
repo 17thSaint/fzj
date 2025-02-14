@@ -13,18 +13,18 @@ include("../other-funcs/include-other-files.jl")
 
 include_other_files(["review-practice-codes/ttn.jl"])
 
-function get_occupancy(ttn::TTNKit.TreeTensorNetwork; kwargs...)
+function get_occupancy(ttn::TTN.TreeTensorNetwork; kwargs...)
 	densmat = get(kwargs, :densmat, nothing)
 
 	if isnothing(densmat)
-		exp_occ = abs.(TTNKit.expect(ttn,"N"))
+		exp_occ = abs.(TTN.expect(ttn,"N"))
 	else
-		lat = TTNKit.physical_lattice(TTNKit.network(ttn))
+		lat = TTN.physical_lattice(TTN.network(ttn))
 		phys_length,virt_length = get_lattice_dims(ttn)
 		exp_occ = zeros(phys_length,virt_length)
 		for j in 1:phys_length
 			for s in 1:virt_length
-				linear_index = TTNKit.linear_ind(lat,(j,s))
+				linear_index = TTN.linear_ind(lat,(j,s))
 				exp_occ[j,s] = abs(densmat[linear_index,linear_index])
 			end
 		end
@@ -49,12 +49,12 @@ function get_occupancy(densmat::Matrix; kwargs...)
 		virt_length = Int(phys_length/2)
 	end
 
-	lat = TTNKit.SimpleLattice((phys_length,virt_length),TTNKit.ITensorNode,"Boson")
+	lat = TTN.SimpleLattice((phys_length,virt_length),TTN.ITensorNode,"Boson")
 
 	exp_occ = zeros(phys_length,virt_length)
 	for j in 1:phys_length
 		for s in 1:virt_length
-			linear_index = TTNKit.linear_ind(lat,(j,s))
+			linear_index = TTN.linear_ind(lat,(j,s))
 			exp_occ[j,s] = abs(densmat[linear_index,linear_index])
 		end
 	end
@@ -98,25 +98,25 @@ function physical_correlation(densmat::Matrix{ComplexF64},Lx::Int64,Ly::Int64; k
     return phys_corrs
 end
 
-function physical_correlation(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+function physical_correlation(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     if_plot = get(kwargs,:if_plot,true)
     densmat = get(kwargs,:densmat,nothing)
 	if !isnothing(densmat)
-        lat = TTNKit.physical_lattice(TTNKit.network(wavefunc))
+        lat = TTN.physical_lattice(TTN.network(wavefunc))
 	    Lx,Ly = size(lat)
         return physical_correlation(densmat,Lx,Ly; kwargs...)
     else
         densmat = density_matrix(wavefunc)
     end
 
-	lat = TTNKit.physical_lattice(TTNKit.network(wavefunc))
+	lat = TTN.physical_lattice(TTN.network(wavefunc))
 	Lx,Ly = size(lat)
 
     phys_corrs = Array{Float64,2}(undef,Lx-1,Ly)
     for j in 2:Lx
         for s in 1:Ly
-            phys_corr = densmat[TTNKit.linear_ind(lat,(j,s)),TTNKit.linear_ind(lat,(1,s))]
-            phys_corr /= sqrt(densmat[TTNKit.linear_ind(lat,(j,s)),TTNKit.linear_ind(lat,(j,s))] * densmat[TTNKit.linear_ind(lat,(1,s)),TTNKit.linear_ind(lat,(1,s))])
+            phys_corr = densmat[TTN.linear_ind(lat,(j,s)),TTN.linear_ind(lat,(1,s))]
+            phys_corr /= sqrt(densmat[TTN.linear_ind(lat,(j,s)),TTN.linear_ind(lat,(j,s))] * densmat[TTN.linear_ind(lat,(1,s)),TTN.linear_ind(lat,(1,s))])
             phys_corrs[j-1,s] = abs(phys_corr)
         end
     end
@@ -143,25 +143,25 @@ function synthetic_correlation(densmat::Matrix{ComplexF64},Lx::Int64,Ly::Int64; 
     return syn_corrs
 end
 
-function synthetic_correlation(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+function synthetic_correlation(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     if_plot = get(kwargs,:if_plot,true)
 	densmat = get(kwargs,:densmat,nothing)
 	if isnothing(densmat)
 		densmat = density_matrix(wavefunc)
     else
-        lat = TTNKit.physical_lattice(TTNKit.network(wavefunc))
+        lat = TTN.physical_lattice(TTN.network(wavefunc))
         Lx,Ly = size(lat)
         return synthetic_correlation(densmat,Lx,Ly; kwargs...)
 	end
 
-	lat = TTNKit.physical_lattice(TTNKit.network(wavefunc))
+	lat = TTN.physical_lattice(TTN.network(wavefunc))
 	Lx,Ly = size(lat)
 
     syn_corrs = Array{Float64,2}(undef,Lx,Ly-1)
     for j in 1:Lx
         for s in 2:Ly
-			syn_corr = densmat[TTNKit.linear_ind(lat,(j,s)),TTNKit.linear_ind(lat,(j,1))]
-			syn_corr /= sqrt(densmat[TTNKit.linear_ind(lat,(j,s)),TTNKit.linear_ind(lat,(j,s))] * densmat[TTNKit.linear_ind(lat,(j,1)),TTNKit.linear_ind(lat,(j,1))])
+			syn_corr = densmat[TTN.linear_ind(lat,(j,s)),TTN.linear_ind(lat,(j,1))]
+			syn_corr /= sqrt(densmat[TTN.linear_ind(lat,(j,s)),TTN.linear_ind(lat,(j,s))] * densmat[TTN.linear_ind(lat,(j,1)),TTN.linear_ind(lat,(j,1))])
 			syn_corrs[j,s-1] = abs(syn_corr)
         end
     end
@@ -191,25 +191,25 @@ function physical_current(densmat::Matrix{ComplexF64},Lx::Int64,Ly::Int64; kwarg
     return currents
 end
 
-function physical_current(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+function physical_current(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     if_plot = get(kwargs,:if_plot,true)
 	densmat = get(kwargs,:densmat,nothing)
 	if isnothing(densmat)
 		densmat = density_matrix(wavefunc)
     else
-        lat = TTNKit.physical_lattice(TTNKit.network(wavefunc))
+        lat = TTN.physical_lattice(TTN.network(wavefunc))
         Lx,Ly = size(lat)
         return physical_current(densmat,Lx,Ly; kwargs...)
 	end
 
-    lat = TTNKit.physical_lattice(TTNKit.network(wavefunc))
+    lat = TTN.physical_lattice(TTN.network(wavefunc))
 	Lx,Ly = size(lat)
 
     currents = Array{Float64,2}(undef,Lx,Ly)
     for s in 1:Ly
         for j in 1:Lx
-            site1 = TTNKit.linear_ind(lat,(j,s))
-            site2 = TTNKit.linear_ind(lat,(mod1(j+1,Lx),s))
+            site1 = TTN.linear_ind(lat,(j,s))
+            site2 = TTN.linear_ind(lat,(mod1(j+1,Lx),s))
             current_val = imag(densmat[site1,site2] - densmat[site2,site1])
             current_normalization = densmat[site1,site1] + densmat[site2,site2]
             current_val /= current_normalization
@@ -242,25 +242,25 @@ function synthetic_current(densmat::Matrix{ComplexF64},Lx::Int64,Ly::Int64; kwar
     return currents
 end
 
-function synthetic_current(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+function synthetic_current(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     if_plot = get(kwargs,:if_plot,true)
 	densmat = get(kwargs,:densmat,nothing)
 	if isnothing(densmat)
 		densmat = density_matrix(wavefunc)
     else
-        lat = TTNKit.physical_lattice(TTNKit.network(wavefunc))
+        lat = TTN.physical_lattice(TTN.network(wavefunc))
         Lx,Ly = size(lat)
         return synthetic_current(densmat,Lx,Ly; kwargs...)
 	end
 
-	lat = TTNKit.physical_lattice(TTNKit.network(wavefunc))
+	lat = TTN.physical_lattice(TTN.network(wavefunc))
 	Lx,Ly = size(lat)
 
     currents = Array{Float64,2}(undef,Lx,Ly)
     for j in 1:Lx
         for s in 1:Lx
-            site1 = TTNKit.linear_ind(lat,(j,s))
-            site2 = TTNKit.linear_ind(lat,(j,mod1(s+1,Ly)))
+            site1 = TTN.linear_ind(lat,(j,s))
+            site2 = TTN.linear_ind(lat,(j,mod1(s+1,Ly)))
             current_val = imag(densmat[site1,site2] - densmat[site2,site1])
             current_normalization = densmat[site1,site1] + densmat[site2,site2]
             current_val /= current_normalization
@@ -298,7 +298,7 @@ function check_nrg_convergence(metadata::Dict,if_perfect::Bool=true)
 end
 
 # find some way to speed this up
-function make_density_correlations(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+function make_density_correlations(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     Lphys::Int64,Lsynth::Int64 = get_lattice_dims(wavefunc)
 
     density_correlations::Array{Float64,4} = zeros(Lphys,Lphys,Lsynth,Lsynth)
@@ -307,7 +307,7 @@ function make_density_correlations(wavefunc::TTNKit.TreeTensorNetwork; kwargs...
         for j in 1:Lphys
             for ss in 1:Lsynth
                 for jj in 1:Lphys
-                    corr_val::Float64 = real(TTNKit.correlation(wavefunc,"N","N",(j,s),(jj,ss)))
+                    corr_val::Float64 = real(TTN.correlation(wavefunc,"N","N",(j,s),(jj,ss)))
                     density_correlations[j,jj,s,ss] = corr_val
                 end
             end
@@ -366,18 +366,18 @@ function range_cdwsf_angles(points_count::Int64,dens_corr_mat::Array{Float64},ra
     return angles,cdwsfs
 end
 
-function pointfourhopping(psi::TTNKit.TreeTensorNetwork,s1::Int64,s2::Int64)
-    result = TTNKit.correlation(psi,"N","N",s1,s2)
+function pointfourhopping(psi::TTN.TreeTensorNetwork,s1::Int64,s2::Int64)
+    result = TTN.correlation(psi,"N","N",s1,s2)
 
     if s1 == s2
-        result -= TTNKit.expect(psi,"N",s1)
+        result -= TTN.expect(psi,"N",s1)
     end
 
     return result
 end
 
 # to be used when using smaller lattice than TTN actual size
-function fourpoint_alberto(psi::TTNKit.TreeTensorNetwork,restricted_size::Vector{Int64}; kwargs...)
+function fourpoint_alberto(psi::TTN.TreeTensorNetwork,restricted_size::Vector{Int64}; kwargs...)
     if_plot::Bool = get(kwargs,:if_plot,true)
 
     ttn_lx,ttn_ly = get_lattice_dims(psi)
@@ -399,7 +399,7 @@ function fourpoint_alberto(psi::TTNKit.TreeTensorNetwork,restricted_size::Vector
     return rez
 end
 
-function fourpoint_alberto(psi::TTNKit.TreeTensorNetwork; kwargs...)
+function fourpoint_alberto(psi::TTN.TreeTensorNetwork; kwargs...)
     if_restricted_size::Bool = get(kwargs,:if_restricted_size,false)
     if_restricted_size && fourpoint_alberto(psi,if_restricted_size; kwargs...)
     if_plot::Bool = get(kwargs,:if_plot,true)
@@ -422,7 +422,7 @@ function fourpoint_alberto(psi::TTNKit.TreeTensorNetwork; kwargs...)
     return rez
 end
 
-function pairdistribution(psi::TTNKit.TreeTensorNetwork; kwargs...)
+function pairdistribution(psi::TTN.TreeTensorNetwork; kwargs...)
     if_plot::Bool = get(kwargs,:if_plot,true)
     occs::Union{Nothing,Matrix{Float64}} = get(kwargs,:occs,nothing)
     if isnothing(occs)
@@ -440,14 +440,14 @@ function pairdistribution(psi::TTNKit.TreeTensorNetwork; kwargs...)
     return pairdist
 end
 
-function spatial_entanglement_spectrum(psi::TTNKit.TreeTensorNetwork; kwargs...)
+function spatial_entanglement_spectrum(psi::TTN.TreeTensorNetwork; kwargs...)
     if_save::Bool = get(kwargs,:if_save,false)
     filepath::Union{String,Nothing} = get(kwargs,:filepath,nothing)
     cap = get(kwargs,:if_cap,nothing)
     layers_down = get(kwargs,:layers_down,0)
 
-    numlayers = TTNKit.number_of_layers(psi)
-    TTNKit.move_ortho!(psi,(numlayers - layers_down,1))
+    numlayers = TTN.number_of_layers(psi)
+    TTN.move_ortho!(psi,(numlayers - layers_down,1))
     top_tensor = psi[numlayers - layers_down,1]
     idx_left = inds(top_tensor; tags = "Link,nl=$(numlayers-1-layers_down),np=1")
     u,s,v,spec = svd(top_tensor,idx_left)
@@ -480,10 +480,10 @@ function calculate_perimeter(linkname::String)
     return calculate_perimeter(get_layer_from_linkname(linkname))
 end
 
-function tee(psi::TTNKit.TreeTensorNetwork,top_layer::Int64; kwargs...)
+function tee(psi::TTN.TreeTensorNetwork,top_layer::Int64; kwargs...)
     if_save::Bool = get(kwargs,:if_save,false)
 
-    numlayers = TTNKit.number_of_layers(psi)
+    numlayers = TTN.number_of_layers(psi)
 
     if numlayers < top_layer
         error("Top layer is higher than the number of layers in the TTN")
@@ -492,13 +492,13 @@ function tee(psi::TTNKit.TreeTensorNetwork,top_layer::Int64; kwargs...)
     ee_data::Dict{String,Float64} = Dict()
     cutlink_data::Dict{String,Tuple{Int64,Int64}} = Dict()
 
-    net = TTNKit.network(psi)
+    net = TTN.network(psi)
 
     # start with S_ABDC at the top node
     top_node = (top_layer,1)
 
     # make sure the ortho_center is at the cutting tensor
-    TTNKit.move_ortho!(psi,top_node)
+    TTN.move_ortho!(psi,top_node)
 
     # get the tensor, link (and index) to cut (at top always cut the left link thus np=1)
     tensor_abcd = psi[top_node]
@@ -515,11 +515,11 @@ function tee(psi::TTNKit.TreeTensorNetwork,top_layer::Int64; kwargs...)
 
     # find the child nodes to loop over to find S_AB and S_CD
     middle_node = (top_node[1]-1,1)
-    middle_layer_children = TTNKit.child_nodes(net,middle_node)
+    middle_layer_children = TTN.child_nodes(net,middle_node)
     for (i,middle_child) in enumerate(middle_layer_children)
         
         # move ortho_center to the tensor site to cut
-        TTNKit.move_ortho!(psi,middle_node)
+        TTN.move_ortho!(psi,middle_node)
 
         # get tensor, link, and index
         tensor_middle = psi[middle_node]
@@ -536,11 +536,11 @@ function tee(psi::TTNKit.TreeTensorNetwork,top_layer::Int64; kwargs...)
         cutlink_data[dict_key] = middle_child
 
         # now do loop over children of this middle node
-        baby_layer_children = TTNKit.child_nodes(net,middle_child)
+        baby_layer_children = TTN.child_nodes(net,middle_child)
         for (j,baby_child) in enumerate(baby_layer_children)
                 
                 # move ortho_center to the tensor site to cut
-                TTNKit.move_ortho!(psi,middle_child)
+                TTN.move_ortho!(psi,middle_child)
     
                 # get tensor, link, and index
                 tensor_baby = psi[middle_child]
@@ -563,7 +563,7 @@ function tee(psi::TTNKit.TreeTensorNetwork,top_layer::Int64; kwargs...)
     end
 
     # now for the mixed middle section S_BC and S_AD
-    TTNKit.move_ortho!(psi,middle_node)
+    TTN.move_ortho!(psi,middle_node)
     combined_tensor = psi[middle_node] * psi[middle_layer_children[1]] * psi[middle_layer_children[2]]
 
     # build indices for S_BC
@@ -606,19 +606,19 @@ function save_tee(gamma::Float64,tee_data::Dict{String,Float64},cutlink_data::Di
     modify_data(Dict([("tee",gamma),("tee_data",tee_data),("tee_cutlink_data",cutlink_data)]),filepath,"metadata"; output_level=0)
 end
 
-function density_matrix(ttn::TTNKit.TreeTensorNetwork; kwargs...)
+function density_matrix(ttn::TTN.TreeTensorNetwork; kwargs...)
 	if_fermion::Bool = get(kwargs, :if_fermion, false)
 	creation = if_fermion ? "Cdag" : "Adag"
 	annihilation = if_fermion ? "C" : "A"
 	output_level = get(kwargs, :output_level, false)
 	
-	lat = TTNKit.physical_lattice(TTNKit.network(ttn))
+	lat = TTN.physical_lattice(TTN.network(ttn))
 	num_sites = prod(size(lat))
 	densmat = zeros(ComplexF64,num_sites,num_sites)
 	for i in 1:num_sites
 		for j in 1:i
 			output_level ? println(i,", ",j) : nothing
-			densmat[i,j] = TTNKit.correlation(ttn,creation,annihilation,i,j)
+			densmat[i,j] = TTN.correlation(ttn,creation,annihilation,i,j)
 			densmat[j,i] = conj(densmat[i,j])
 		end
 	end
@@ -661,7 +661,7 @@ function ft_coeff(phys_site::Tuple{Int,Int},momentum::Vector{Float64},op_type::S
     return exp(2*pi*im*dag_sign*dot(momentum,phys_site))
 end
 
-function ft_coeff(phys_site::TTNKit.Index,momentum::Vector{Float64},op_type::String,lx::Int,ly::Int)
+function ft_coeff(phys_site::TTN.Index,momentum::Vector{Float64},op_type::String,lx::Int,ly::Int)
     index_tag = string(tags(phys_site))
     @assert occursin("Site",index_tag)
 
@@ -670,48 +670,48 @@ function ft_coeff(phys_site::TTNKit.Index,momentum::Vector{Float64},op_type::Str
     return ft_coeff(coord_label,momentum,op_type)
 end
 
-function construct_top_node_environments(ttn::TTNKit.TreeTensorNetwork, tpo::TTNKit.MPOWrapper)
+function construct_top_node_environments(ttn::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper)
 	
 	net = ttn.net
 
-	n_sites = TTNKit.number_of_sites(net)
-	n_tensors = TTNKit.number_of_tensors(net) + n_sites
+	n_sites = TTN.number_of_sites(net)
+	n_tensors = TTN.number_of_tensors(net) + n_sites
 
 	mapping = tpo.mapping
 	ham = tpo.data
 	
 	bEnvironment = map(eachindex(net,1)) do pp
-        chdnds = TTNKit.child_nodes(net, (1,pp))
-        map(1:TTNKit.number_of_child_nodes(net, (1,pp))) do nn
-          ham[TTNKit.inverse_mapping(mapping)[chdnds[nn][2]]]
+        chdnds = TTN.child_nodes(net, (1,pp))
+        map(1:TTN.number_of_child_nodes(net, (1,pp))) do nn
+          ham[TTN.inverse_mapping(mapping)[chdnds[nn][2]]]
         end
     end
 	
-	for ll in Iterators.drop(TTNKit.eachlayer(net), 1)
+	for ll in Iterators.drop(TTN.eachlayer(net), 1)
         #println("Constructing top node environments for layer $ll")
-		bEnvironment_new = Vector{Vector{TTNKit.ITensor}}(undef, TTNKit.number_of_tensors(net, ll))
+		bEnvironment_new = Vector{Vector{TTN.ITensor}}(undef, TTN.number_of_tensors(net, ll))
 		for pp in eachindex(net, ll)
-			n_chds = TTNKit.number_of_child_nodes(net, (ll,pp))
-			bEnvironment_new[pp] = Vector{TTNKit.ITensor}(undef, n_chds)
+			n_chds = TTN.number_of_child_nodes(net, (ll,pp))
+			bEnvironment_new[pp] = Vector{TTN.ITensor}(undef, n_chds)
 		
-			for chd in TTNKit.child_nodes(net, (ll,pp))
+			for chd in TTN.child_nodes(net, (ll,pp))
                 #println("Making environment for child $chd")
-				chd_idx = TTNKit.index_of_child(net, chd)
+				chd_idx = TTN.index_of_child(net, chd)
 				Tn = ttn[chd]
 				
-				tensorListBottom = map(TTNKit.child_nodes(net, chd)) do cc
-					bEnvironment[chd[2]][TTNKit.index_of_child(net, cc)]
+				tensorListBottom = map(TTN.child_nodes(net, chd)) do cc
+					bEnvironment[chd[2]][TTN.index_of_child(net, cc)]
 				end
                 #println("At layer $ll and child $chd the tensorListBottom is")
                 #display(inds.(tensorListBottom))
 				tlist = vcat(Tn, tensorListBottom, prime(dag(Tn)))
-                #display(prod(prod.(TTNKit.ITensorMPS.dims.(tlist))))
+                #display(prod(prod.(TTN.ITensorMPS.dims.(tlist))))
                 #display(inds.(tlist))
 				opt_seq = ITensorMPS.optimal_contraction_sequence(tlist)
 				bEnvironment_new[pp][chd_idx] = contract(tlist; sequence = opt_seq)
                 #println("Now showing after contraction tags \n")
                 #display(inds(bEnvironment_new[pp][chd_idx]))
-                #display(prod(TTNKit.ITensorMPS.dims(bEnvironment_new[pp][chd_idx])))
+                #display(prod(TTN.ITensorMPS.dims(bEnvironment_new[pp][chd_idx])))
 			end
 		end
 		bEnvironment = bEnvironment_new
@@ -719,24 +719,24 @@ function construct_top_node_environments(ttn::TTNKit.TreeTensorNetwork, tpo::TTN
 	return only(bEnvironment)
 end
 
-function calculate_mpo_expectation(ttn::TTNKit.TreeTensorNetwork, tpo::TTNKit.MPOWrapper)
+function calculate_mpo_expectation(ttn::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper)
 	topenvs = construct_top_node_environments(ttn, tpo)
     println("Finished making environments")
     #display(inds.(topenvs))
-	T = ttn[TTNKit.number_of_layers(ttn), 1]
+	T = ttn[TTN.number_of_layers(ttn), 1]
 	tlist = [T, topenvs..., prime(dag(T))]
 	opt_seq = ITensorMPS.optimal_contraction_sequence(tlist)
 	return scalar(contract(tlist; sequence = opt_seq))
 end
 
-function make_mpowrapper(mpo::TTNKit.MPO, lat::L; mapping::Vector{Int} = collect(eachindex(lat))) where{L}
-    @assert TTNKit.is_physical(lat)
+function make_mpowrapper(mpo::TTN.MPO, lat::L; mapping::Vector{Int} = collect(eachindex(lat))) where{L}
+    @assert TTN.is_physical(lat)
     @assert length(lat) == length(mpo)
     #@assert isone(dimensionality(lat))
-    idx_lat = TTNKit.siteinds(lat)
+    idx_lat = TTN.siteinds(lat)
 
-    mpoc = TTNKit.deepcopy(mpo)
-    idx_mpo = last.(TTNKit.siteinds(mpoc,plev = 0))
+    mpoc = TTN.deepcopy(mpo)
+    idx_mpo = last.(TTN.siteinds(mpoc,plev = 0))
     println("Starting wrapping")
     for (idx,jj) in enumerate(mapping)
         #println("working on wrapping site $jj")
@@ -744,7 +744,7 @@ function make_mpowrapper(mpo::TTNKit.MPO, lat::L; mapping::Vector{Int} = collect
         sj_mpo = idx_mpo[jj]
         mpoc[idx] = replaceinds!(mpoc[jj], sj_mpo => sj_lat, prime(sj_mpo) => prime(sj_lat))
     end
-    return TTNKit.MPOWrapper{L, MPO, TTNKit.ITensorMPSBackend}(lat, mpoc, mapping)
+    return TTN.MPOWrapper{L, MPO, TTN.ITensorMPSBackend}(lat, mpoc, mapping)
 end
 
 function build_W_singlepoint(op_type::String,coeff::ComplexF64)
@@ -790,21 +790,21 @@ function build_links_singlepoint(op_type::String,L::Int)
     return links
 end
 
-function single_point_mpo(wavefunc::TTNKit.TreeTensorNetwork,op_type::String; kwargs...)
+function single_point_mpo(wavefunc::TTN.TreeTensorNetwork,op_type::String; kwargs...)
     if_wrap::Bool = get(kwargs,:if_wrap,true)
     opl::Int = get(kwargs,:opl,1)
     mom::Vector{Float64} = get(kwargs,:momentum,[0.0,0.0])
 
-    lat = TTNKit.physical_lattice(wavefunc.net)
+    lat = TTN.physical_lattice(wavefunc.net)
     lx::Int,ly::Int = size(lat)
 
-    phys_sites = TTNKit.sites(wavefunc)
+    phys_sites = TTN.sites(wavefunc)
 
     links = build_links_singlepoint(op_type,length(phys_sites))
 
     tensor_train = Vector{ITensor}(undef,length(phys_sites))
     for (idx,s) in enumerate(phys_sites)
-        opl > 1 && println("Working on Physical Site $(TTNKit.tags(s))")
+        opl > 1 && println("Working on Physical Site $(TTN.tags(s))")
 
         coeff::ComplexF64 = ft_coeff(s,mom,op_type,lx,ly)
 
@@ -830,7 +830,7 @@ function single_point_mpo(wavefunc::TTNKit.TreeTensorNetwork,op_type::String; kw
     end
 end
 
-function set_single_prime(mpo::TTNKit.MPO)
+function set_single_prime(mpo::TTN.MPO)
     for t in mpo
         for i in inds(t)
             if plev(i) > 1
@@ -842,7 +842,7 @@ function set_single_prime(mpo::TTNKit.MPO)
     return mpo
 end
 
-function two_point_mpo(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+function two_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     if_wrap::Bool = get(kwargs,:if_wrap,true)
 
     creat = single_point_mpo(wavefunc,"Adag"; kwargs...,if_wrap=false)
@@ -855,13 +855,13 @@ function two_point_mpo(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
     rho = set_single_prime(rho)
 
     if if_wrap
-        return make_mpowrapper(rho,TTNKit.physical_lattice(wavefunc.net))
+        return make_mpowrapper(rho,TTN.physical_lattice(wavefunc.net))
     else
         return rho
     end
 end
 
-function four_point_mpo(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+function four_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     if_wrap::Bool = get(kwargs,:if_wrap,true)
 
     k1::Vector{Float64} = get(kwargs,:momentum1,[0.0,0.0])
@@ -881,13 +881,13 @@ function four_point_mpo(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
     fourpt = set_single_prime(fourpt)
 
     if if_wrap
-        return make_mpowrapper(fourpt,TTNKit.physical_lattice(wavefunc.net))
+        return make_mpowrapper(fourpt,TTN.physical_lattice(wavefunc.net))
     else
         return fourpt
     end
 end
 
-function reshape_mpo_to_matrix(mpo::TTNKit.MPO)
+function reshape_mpo_to_matrix(mpo::TTN.MPO)
     s1 = [siteinds(mpo)[i][1] for i in 1:4]
     s2 = [siteinds(mpo)[i][2] for i in 1:4]
     cm1 = combiner(s1)

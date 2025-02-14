@@ -1289,7 +1289,7 @@ version = "1.0.3"
 
 [[deps.TTN]]
 deps = ["Adapt", "CUDA", "Distributions", "HDF5", "ITensorMPS", "ITensors", "KrylovKit", "LinearAlgebra", "NDTensors", "Printf", "SparseArrays"]
-path = "/home/patrick/Programs/mainnew_TTNKit/"
+path = "/home/patrick/Programs/TTN/"
 uuid = "b44c321c-291e-437f-af1d-05cac99632ef"
 version = "0.1.0"
 

@@ -1,5 +1,5 @@
 using Statistics
-import TTN as TTNKit
+using TTN
 using LsqFit
 
 include("../other-funcs/include-other-files.jl")
@@ -50,10 +50,10 @@ function get_lattice_dims_from_layers(layers::Int; kwargs...)
 	end
 end
 
-function back2cpu(ttn::TTNKit.TreeTensorNetwork)
+function back2cpu(ttn::TTN.TreeTensorNetwork)
 	datagpu = deepcopy(ttn.data)
 	datac = map(datagpu) do layerdata
-		map(T -> TTNKit.cpu(T), layerdata)
+		map(T -> TTN.cpu(T), layerdata)
 	end
 	ortho_centerc = deepcopy(ttn.ortho_center)
 	netc = deepcopy(ttn.net)
@@ -62,12 +62,12 @@ function back2cpu(ttn::TTNKit.TreeTensorNetwork)
 end
 
 function get_site_count(ttn)
-	layers = Int(TTNKit.number_of_layers(ttn))
+	layers = Int(TTN.number_of_layers(ttn))
 	return 2^layers
 end
 
 function get_lattice_dims(input_data; kwargs...)
-	num_layers = TTNKit.number_of_layers(input_data)
+	num_layers = TTN.number_of_layers(input_data)
 	return get_lattice_dims_from_layers(num_layers; kwargs...)
 end
 
@@ -82,7 +82,7 @@ end
 	direct = get(kwargs, :direction, "norm")
 	all_yvals = zeros(phys_edge_length,virt_edge_length)
 	all_greens = im.*zeros(phys_edge_length,virt_edge_length)
-	lat = TTNKit.physical_lattice(TTNKit.network(ttn))
+	lat = TTN.physical_lattice(TTN.network(ttn))
 	for x in 1:phys_edge_length
 		for y in 1:virt_edge_length
 			if direct == "norm"
@@ -93,12 +93,12 @@ end
 				site_right = get_site_number(phys_edge_length,x,virt_edge_length,phys_edge_length)
 			end
 			
-			all_greens[x,y] = TTNKit.correlation(ttn,adag,ahat,(site_left),(site_right))
+			all_greens[x,y] = TTN.correlation(ttn,adag,ahat,(site_left),(site_right))
 			all_yvals[x,y] = y
 			
 			if true
-			norm_reg = TTNKit.correlation(ttn,adag,ahat,(site_left),(site_left))
-			norm_prime = TTNKit.correlation(ttn,adag,ahat,(site_right),(site_right))
+			norm_reg = TTN.correlation(ttn,adag,ahat,(site_left),(site_left))
+			norm_prime = TTN.correlation(ttn,adag,ahat,(site_right),(site_right))
 			if norm_reg == 0.0
 				println("Normalization is zero at $x,$y")
 			end
@@ -190,12 +190,12 @@ function get_xdir_greenfunc(ttn; kwargs...)
 				site_left = get_site_number(y,x,virt_edge_length,phys_edge_length)
 				site_right = get_site_number(y,virt_edge_length,virt_edge_length,phys_edge_length)
 			end
-			all_greens[x,y] = TTNKit.correlation(ttn,adag,ahat,(site_left),(site_right))
+			all_greens[x,y] = TTN.correlation(ttn,adag,ahat,(site_left),(site_right))
 			all_xvals[x,y] = x
 			
 			if true
-			norm_reg = TTNKit.correlation(ttn,adag,ahat,(site_left),(site_left))
-			norm_prime = TTNKit.correlation(ttn,adag,ahat,(site_right),(site_right))
+			norm_reg = TTN.correlation(ttn,adag,ahat,(site_left),(site_left))
+			norm_prime = TTN.correlation(ttn,adag,ahat,(site_right),(site_right))
 			all_greens[x,y] /= sqrt(norm_reg * norm_prime)
 			end
 		end
@@ -212,7 +212,7 @@ function get_xdir_greenfunc(ttn; kwargs...)
 	return all_xvals,all_greens
 end
 
-function get_greenfunc(ttn::TTNKit.TreeTensorNetwork,dir="phys"; kwargs...)
+function get_greenfunc(ttn::TTN.TreeTensorNetwork,dir="phys"; kwargs...)
 	if dir == "phys"
 		return get_xdir_greenfunc(ttn; kwargs...)
 	elseif dir =="virt"
@@ -257,8 +257,8 @@ function get_current_yfunc(ttn; kwargs...)
 		end
 		for y in 1:size(all_currents)[2]
 			all_yvals[x,y] = y
-			all_currents[x,y] = TTNKit.correlation(ttn,adag,ahat,(get_site_number(y,x_upper,virt_edge_length,phys_edge_length)),(get_site_number(y,x,virt_edge_length,phys_edge_length))) - TTNKit.correlation(ttn,ahat,adag,(get_site_number(y,x_upper,virt_edge_length,phys_edge_length)),(get_site_number(y,x,virt_edge_length,phys_edge_length)))
-			norm_left = TTNKit.expect(ttn,norm_string,get_site_number(y,x,virt_edge_length,phys_edge_length)) + TTNKit.expect(ttn,norm_string,get_site_number(y,x_upper,virt_edge_length,phys_edge_length))
+			all_currents[x,y] = TTN.correlation(ttn,adag,ahat,(get_site_number(y,x_upper,virt_edge_length,phys_edge_length)),(get_site_number(y,x,virt_edge_length,phys_edge_length))) - TTN.correlation(ttn,ahat,adag,(get_site_number(y,x_upper,virt_edge_length,phys_edge_length)),(get_site_number(y,x,virt_edge_length,phys_edge_length)))
+			norm_left = TTN.expect(ttn,norm_string,get_site_number(y,x,virt_edge_length,phys_edge_length)) + TTN.expect(ttn,norm_string,get_site_number(y,x_upper,virt_edge_length,phys_edge_length))
 			all_currents[x,y] *= 1/norm_left
 		end
 	end
@@ -340,8 +340,8 @@ function get_current_xfunc(ttn; kwargs...)
 		end
 		for x in 1:size(all_currents)[1]
 			all_xvals[x,y] = x
-			all_currents[x,y] = TTNKit.correlation(ttn,adag,ahat,(get_site_number(y_upper,x,virt_edge_length,phys_edge_length)),(get_site_number(y,x,virt_edge_length,phys_edge_length))) - TTNKit.correlation(ttn,ahat,adag,(get_site_number(y_upper,x,virt_edge_length,phys_edge_length)),(get_site_number(y,x,virt_edge_length,phys_edge_length)))
-			norm_left = TTNKit.expect(ttn,norm_string,get_site_number(y,x,virt_edge_length,phys_edge_length)) + TTNKit.expect(ttn,norm_string,get_site_number(y_upper,x,virt_edge_length,phys_edge_length))
+			all_currents[x,y] = TTN.correlation(ttn,adag,ahat,(get_site_number(y_upper,x,virt_edge_length,phys_edge_length)),(get_site_number(y,x,virt_edge_length,phys_edge_length))) - TTN.correlation(ttn,ahat,adag,(get_site_number(y_upper,x,virt_edge_length,phys_edge_length)),(get_site_number(y,x,virt_edge_length,phys_edge_length)))
+			norm_left = TTN.expect(ttn,norm_string,get_site_number(y,x,virt_edge_length,phys_edge_length)) + TTN.expect(ttn,norm_string,get_site_number(y_upper,x,virt_edge_length,phys_edge_length))
 			all_currents[x,y] *= 1/norm_left
 		end
 	end
@@ -374,8 +374,8 @@ function get_shape(layers::Int,if_synth_rectangle::Bool=false)
 end
 
 function get_chain_hofstadter(edge_length,u_strength,t_strength,phi; kwargs...)
-	onsite = TTNKit.OpSum()
-	interaction = TTNKit.OpSum()
+	onsite = TTN.OpSum()
+	interaction = TTN.OpSum()
 	if_periodic = get(kwargs, :if_periodic, true)
 	for i in 1:edge_length
 		next_site = i+1
@@ -482,14 +482,14 @@ function get_hofstadter_interacting_hamilt(net,t_strength,phi; kwargs...)
 	chem_strength = get(kwargs, :chem_strength, 0.0)
 	u_strength = get(kwargs, :u_strength, 1.0)
 	
-	lat = TTNKit.physical_lattice(net)
+	lat = TTN.physical_lattice(net)
 	edge_length_x,edge_length_y = size(lat)
 	#
 	if if_hopping
-		hopping = TTNKit.OpSum()
-		for (s1,s2) in TTNKit.nearest_neighbours(lat,collect(1:TTNKit.number_of_sites(lat)); periodic=if_periodic)
-			s1_coord = TTNKit.coordinate(lat,s1)
-			s2_coord = TTNKit.coordinate(lat,s2)
+		hopping = TTN.OpSum()
+		for (s1,s2) in TTN.nearest_neighbours(lat,collect(1:TTN.number_of_sites(lat)); periodic=if_periodic)
+			s1_coord = TTN.coordinate(lat,s1)
+			s2_coord = TTN.coordinate(lat,s2)
 			
 			#s1_coord = get_site_number(s1_coord_2d[1],s1_coord_2d[2],edge_length)
 			#s2_coord = get_site_number(s2_coord_2d[1],s2_coord_2d[2],edge_length)
@@ -501,9 +501,9 @@ function get_hofstadter_interacting_hamilt(net,t_strength,phi; kwargs...)
 		append!(resulting_ham,[hopping])
 	end
 	if if_onsite
-		onsite = TTNKit.OpSum()
-		for i in TTNKit.eachindex(lat)
-			onsite += (u_strength/2,"Adag * Adag * A * A",TTNKit.coordinate(lat,i))
+		onsite = TTN.OpSum()
+		for i in TTN.eachindex(lat)
+			onsite += (u_strength/2,"Adag * Adag * A * A",TTN.coordinate(lat,i))
 		end
 		append!(resulting_ham,[onsite])
 	end
@@ -518,9 +518,9 @@ function get_hofstadter_interacting_hamilt(net,t_strength,phi; kwargs...)
 	=#
 	
 	if if_chem && chem_strength != 0.0
-		chem = TTNKit.OpSum()
-		for i in TTNKit.eachindex(lat)
-			chem -= (chem_strength,"N",TTNKit.coordinate(lat,i))
+		chem = TTN.OpSum()
+		for i in TTN.eachindex(lat)
+			chem -= (chem_strength,"N",TTN.coordinate(lat,i))
 		end
 		#=
 		for x in 1:edge_length
@@ -534,8 +534,8 @@ function get_hofstadter_interacting_hamilt(net,t_strength,phi; kwargs...)
 	
 	if if_pinning_pot
 		Vj = v_central(size(lat), vpinning)
-		pinning_pot = TTNKit.OpSum()
-		for p in TTNKit.coordinates(lat)
+		pinning_pot = TTN.OpSum()
+		for p in TTN.coordinates(lat)
 	    		pinning_pot += (Vj[p[1],p[2]], "N", p)
 		end
 		append!(resulting_ham,[pinning_pot])
@@ -543,7 +543,7 @@ function get_hofstadter_interacting_hamilt(net,t_strength,phi; kwargs...)
 	
 	#=
 	if if_hand
-	interaction = TTNKit.OpSum()
+	interaction = TTN.OpSum()
 	for x in 1:edge_length
 		x_upper = x+1
 		if if_periodic && x == edge_length
@@ -583,8 +583,8 @@ function get_hofstadter_interacting_hamilt(net,t_strength,phi; kwargs...)
 end
 
 function get_position_dims(ttn)
-	for pos in TTNKit.NodeIterator(TTNKit.network(ttn))
-		println("Position $pos: ",TTNKit.ITensorMPS.dims(ttn[pos]))
+	for pos in TTN.NodeIterator(TTN.network(ttn))
+		println("Position $pos: ",TTN.ITensorMPS.dims(ttn[pos]))
 	end
 	return
 end
@@ -638,26 +638,26 @@ function make_metadata_from_kwargs(given_data)
 	return metadata
 end
 
-function localsweep(psi0::TTNKit.TreeTensorNetwork, sp::TTNKit.AbstractSweepHandler; kwargs...)
+function localsweep(psi0::TTN.TreeTensorNetwork, sp::TTN.AbstractSweepHandler; kwargs...)
     
-    obs = get(kwargs, :observer, TTNKit.NoObserver())
+    obs = get(kwargs, :observer, TTN.NoObserver())
 
     outputlevel = get(kwargs, :outputlevel, 1)
 
     # now start with the sweeping protocol
-    TTNKit.initialize!(sp)
+    TTN.initialize!(sp)
     #sp = SimpleSweepProtocol(net, n_sweeps)
-    for sw in TTNKit.sweeps(sp)
+    for sw in TTN.sweeps(sp)
         if outputlevel ≥ 2 
             println("Start sweep number $(sw)")
             flush(stdout)
         end
         t_p = time()
         for pos in sp
-            TTNKit.update!(sp, pos)
+            TTN.update!(sp, pos)
             println("Position $pos")
             get_position_dims(sp.ttn)
-            TTNKit.measure!(
+            TTN.measure!(
                 obs;
                 sweep_handler=sp,
                 pos=pos,
@@ -669,7 +669,7 @@ function localsweep(psi0::TTNKit.TreeTensorNetwork, sp::TTNKit.AbstractSweepHand
             print("Finsihed sweep $sw. ")
             #@printf("Needed Time %.3fs\n", t_f - t_p)
             # additional info string provided by the sweephandler
-            TTNKit.info_string(sp, outputlevel)
+            TTN.info_string(sp, outputlevel)
             #@printf("\n")
             flush(stdout)
         end
@@ -710,8 +710,8 @@ function initialize_ttn(ttn,maxdim,particle_count; kwargs...)
 	end
 	
 	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
-	site_count = TTNKit.number_of_sites(TTNKit.network(ttn))
-	wf_coefs = create_wavefunction(Float64,size(TTNKit.physical_lattice(TTNKit.network(ttn))))
+	site_count = TTN.number_of_sites(TTN.network(ttn))
+	wf_coefs = create_wavefunction(Float64,size(TTN.physical_lattice(TTN.network(ttn))))
 	for i in 1:particle_count
 		ttn = patron_application!(ttn,wf_coefs,creation;maxdim=maxdim)
 	end
@@ -741,7 +741,7 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	max_dim = get(kwargs, :mdim, 10)
 	num_sweeps::Int = get(kwargs, :num_sweeps, 1)
 	noise = get(kwargs, :noise, 0.0)
-	expander = get(kwargs, :expander, TTNKit.NoExpander())
+	expander = get(kwargs, :expander, TTN.NoExpander())
 	etol = get(kwargs, :nrgtol, nothing)
 	if_continuous_saving::Bool = get(kwargs, :if_continuous_saving, false)
 	file_path::String = get(kwargs, :file_path, "")
@@ -774,41 +774,41 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	end
 
 	if sweep_type == "dmrg"
-		#println("Before starting DMRG the bond dim is ",TTNKit.maxlinkdim(ttn))
+		#println("Before starting DMRG the bond dim is ",TTN.maxlinkdim(ttn))
 		#get_occupancy(ttn; plot_title="Before DMRG")
 		if isnothing(psi_ortho)
-			sp::TTNKit.AbstractSweepHandler = TTNKit.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff)
+			sp::TTN.AbstractSweepHandler = TTN.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff)
 		else
 			# prep the orthogonal states before starting DMRG
 			for ortho_state in psi_ortho
-				TTNKit.move_ortho!(ortho_state,ttn.ortho_center)
+				TTN.move_ortho!(ortho_state,ttn.ortho_center)
 			end
 		
-			sp = TTNKit.dmrg(ttn,psi_ortho,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff, weight=weight, if_old_excited=if_old_excited)
+			sp = TTN.dmrg(ttn,psi_ortho,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff, weight=weight, if_old_excited=if_old_excited)
 		end
 	elseif sweep_type == "simple"
-		proj_tpo = TTNKit.ProjectedTensorProductOperator(ttn,ham)
+		proj_tpo = TTN.ProjectedTensorProductOperator(ttn,ham)
 		#println("Finished Making Hamiltonian")
-		eigsolve_tol = TTNKit.DEFAULT_TOL_DMRG
-		eigsolve_krylovdim = TTNKit.DEFAULT_KRYLOVDIM_DMRG
-		eigsolve_maxiter = TTNKit.DEFAULT_MAXITER_DMRG
-		ishermitian = TTNKit.DEFAULT_ISHERMITIAN_DMRG
-		eigsolve_which_eigenvalue = TTNKit.DEFAULT_WHICH_EIGENVALUE_DMRG
-		func = (action,T) -> TTNKit.eigsolve(action, T, 1,
+		eigsolve_tol = TTN.DEFAULT_TOL_DMRG
+		eigsolve_krylovdim = TTN.DEFAULT_KRYLOVDIM_DMRG
+		eigsolve_maxiter = TTN.DEFAULT_MAXITER_DMRG
+		ishermitian = TTN.DEFAULT_ISHERMITIAN_DMRG
+		eigsolve_which_eigenvalue = TTN.DEFAULT_WHICH_EIGENVALUE_DMRG
+		func = (action,T) -> TTN.eigsolve(action, T, 1,
 					    eigsolve_which_eigenvalue;
 					    ishermitian=ishermitian,
 					    tol=eigsolve_tol,
 					    krylovdim=eigsolve_krylovdim,
 					    maxiter=eigsolve_maxiter)
 		
-		#ttnc = TTNKit.copy(ttn)
-		#ttnc = TTNKit.move_ortho!(ttnc,(TTNKit.number_of_layers(TTNKit.network(ttnc)),1))
-		sp = TTNKit.SimpleSweepHandler(ttnc,proj_tpo,func,num_sweeps,[max_dim],[noise],expander)
-		#println("Sweep Built Link Dim = ",TTNKit.maxlinkdim(sp.ttn))
-		TTNKit.sweep(ttnc,sp;outputlevel=opl);
+		#ttnc = TTN.copy(ttn)
+		#ttnc = TTN.move_ortho!(ttnc,(TTN.number_of_layers(TTN.network(ttnc)),1))
+		sp = TTN.SimpleSweepHandler(ttnc,proj_tpo,func,num_sweeps,[max_dim],[noise],expander)
+		#println("Sweep Built Link Dim = ",TTN.maxlinkdim(sp.ttn))
+		TTN.sweep(ttnc,sp;outputlevel=opl);
 		return ttnc,ham,sp,observer
-		#println("PostSweep TTN Link Dim = ",TTNKit.maxlinkdim(ttn))
-		#println("PostSweep SP-TTN Link Dim = ",TTNKit.maxlinkdim(sp.ttn))
+		#println("PostSweep TTN Link Dim = ",TTN.maxlinkdim(ttn))
+		#println("PostSweep SP-TTN Link Dim = ",TTN.maxlinkdim(sp.ttn))
 	end
 	
 	return ttn,ham,sp,observer
@@ -819,7 +819,7 @@ function warming(ttn,ham,sp,warming_limit; kwargs...)
 	max_dim = get(kwargs, :max_dim, particle_count+1)
 	num_sweeps = 3#get(kwargs, :num_sweeps, 1)
 	noise = get(kwargs, :noise, 0.0)
-	expander = get(kwargs, :expander, TTNKit.NoExpander())
+	expander = get(kwargs, :expander, TTN.NoExpander())
 	sweep_type = get(kwargs, :sweep_type, "dmrg")
 
 	warming_count = 1
@@ -827,9 +827,9 @@ function warming(ttn,ham,sp,warming_limit; kwargs...)
 	global old_data = [ttn,ham,sp]
 	while frozen && warming_count < warming_limit
 		new_maxdim = Int(ceil((warming_count+10)*max_dim/10))
-		reexpanded_ttn = TTNKit.adjust_tree_tensor_dimensions(old_data[1],new_maxdim)
+		reexpanded_ttn = TTN.adjust_tree_tensor_dimensions(old_data[1],new_maxdim)
 		new_ttn, new_ham, new_sp, new_obs = do_sweep(reexpanded_ttn,ham,sweep_type; kwargs...)
-		println("Max Dim = ",TTNKit.maxlinkdim(new_sp.ttn),", Expected = $new_maxdim")
+		println("Max Dim = ",TTN.maxlinkdim(new_sp.ttn),", Expected = $new_maxdim")
 		if_frozen,why = check_if_frozen(new_sp.ttn)
 		if if_frozen
 			#get_occupancy(new_sp.ttn; plot_title="Attempt $warming_count")
@@ -912,21 +912,21 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 	start_time = time()
 
 	if isnothing(net)
-		net = TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, particle_type;conserve_qns=conserve_qns,dim=max_occ+1)
+		net = TTN.BinaryRectangularNetwork(num_layers, TTN.ITensorNode, particle_type;conserve_qns=conserve_qns,dim=max_occ+1)
 		metadata["ttn_net"] = net
 	end
-	lat::TTNKit.AbstractLattice = TTNKit.physical_lattice(net)
+	lat::TTN.AbstractLattice = TTN.physical_lattice(net)
 
 	println("Finished Building Network")
 	
 	if isnothing(ttn)
 		if particle_type .== "Boson"
-			ttn = initialize_ttn(TTNKit.ProductTreeTensorNetwork(net,fill("0", num_sites)),max_dim,particle_count; kwargs...)
+			ttn = initialize_ttn(TTN.ProductTreeTensorNetwork(net,fill("0", num_sites)),max_dim,particle_count; kwargs...)
 		else
 			states = fill_states(particle_count,num_sites,1)
-			old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
-			ttn = TTNKit.increase_dim_tree_tensor_network_zeros(old_ttn, maxdim = max_dim)
-			ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
+			old_ttn = TTN.ProductTreeTensorNetwork(net,states)
+			ttn = TTN.increase_dim_tree_tensor_network_zeros(old_ttn, maxdim = max_dim)
+			ttn = TTN.adjust_tree_tensor_dimensions(old_ttn,max_dim)
 		end
 		metadata["seed_ttn"] = ttn
 	end
@@ -968,14 +968,14 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 	
 	if if_gpu
 		println("Doing GPU TTN")
-		ttn = TTNKit.gpu(ttn)
+		ttn = TTN.gpu(ttn)
 	end
 	println("Added States")
 	
-	ham::TTNKit.AbstractTensorProductOperator = TTNKit.TPO(ham_operator,lat)
+	ham::TTN.AbstractTensorProductOperator = TTN.TPO(ham_operator,lat)
 	if if_gpu
 		println("Doing GPU Ham TPO")
-		ham = TTNKit.gpu(ham,ttn)
+		ham = TTN.gpu(ham,ttn)
 	end
 	println("Built Hamiltonian")
 	sp = 0.0
@@ -983,7 +983,7 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 	if if_sweep
 		for i in 1:sweep_iter
 			time_start::Float64 = time()
-			new_ttn::TTNKit.TreeTensorNetwork, new_ham, new_sp::TTNKit.AbstractSweepHandler, new_obs = do_sweep(ttn,ham,sweep_type; kwargs...,file_path = location * "/" * actual_filename)
+			new_ttn::TTN.TreeTensorNetwork, new_ham, new_sp::TTN.AbstractSweepHandler, new_obs = do_sweep(ttn,ham,sweep_type; kwargs...,file_path = location * "/" * actual_filename)
 			time_end::Float64 = time()
 			append!(times,[time_end - time_start])
 			#return sp.ttn, ham, sp
@@ -1017,8 +1017,8 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 			metadata["observer"] = obs
 			metadata["runtime"] = end_time-start_time
 			metadata["energies"] = obs.nrg
-			metadata["maxlinkdim"] = TTNKit.maxlinkdim(sp.ttn)=#
-			new_metadata::Dict{String,Any} = Dict([("observer",obs),("runtime",end_time-start_time),("energies",obs.nrg),("maxlinkdim",TTNKit.maxlinkdim(sp.ttn))])
+			metadata["maxlinkdim"] = TTN.maxlinkdim(sp.ttn)=#
+			new_metadata::Dict{String,Any} = Dict([("observer",obs),("runtime",end_time-start_time),("energies",obs.nrg),("maxlinkdim",TTN.maxlinkdim(sp.ttn))])
 			metadata = merge(metadata,new_metadata)
 			#=if if_continuous_saving || if_redo
 				#new_metadata::Dict{String,Any} = Dict([("observer",metadata["observer"]),("runtime",metadata["runtime"]),("energies",metadata["energies"]),("maxlinkdim",metadata["maxlinkdim"])])
@@ -1054,11 +1054,11 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 	return ttn,ham,"no sweep",end_time-start_time
 end
 
-function find_excited_state(starting_ttn::TTNKit.TreeTensorNetwork,ttns_ortho::Vector{TTNKit.TreeTensorNetwork},ham_tpo::TTNKit.AbstractTensorProductOperator,sweep_type::String,if_densmat::Bool,location::String,actual_filename::String; kwargs...)
+function find_excited_state(starting_ttn::TTN.TreeTensorNetwork,ttns_ortho::Vector{TTN.TreeTensorNetwork},ham_tpo::TTN.AbstractTensorProductOperator,sweep_type::String,if_densmat::Bool,location::String,actual_filename::String; kwargs...)
 
 	sp = 0.0
 	time_start::Float64 = time()
-	new_ttn::TTNKit.TreeTensorNetwork, new_ham, new_sp::TTNKit.AbstractSweepHandler, new_obs::AbstractObserver = do_sweep(starting_ttn,ham_tpo,sweep_type; kwargs...,psi_ortho=ttns_ortho,file_path = location * "/" * actual_filename)
+	new_ttn::TTN.TreeTensorNetwork, new_ham, new_sp::TTN.AbstractSweepHandler, new_obs::AbstractObserver = do_sweep(starting_ttn,ham_tpo,sweep_type; kwargs...,psi_ortho=ttns_ortho,file_path = location * "/" * actual_filename)
 	time_end::Float64 = time()
 	
 	if_densmat ? densmat = density_matrix(new_sp.ttn) : nothing
@@ -1100,21 +1100,21 @@ function find_excited_states(num_layers::Int,num_excited_states::Int,particle_co
 	
 	start_time = time()
 
-	net = TTNKit.network(ortho_states[1])
+	net = TTN.network(ortho_states[1])
 	metadata["ttn_net"] = net
-	lat::TTNKit.AbstractLattice = TTNKit.physical_lattice(net)
+	lat::TTN.AbstractLattice = TTN.physical_lattice(net)
 	println("Finished Building Network")
 	
 	if isnothing(seed_ttn)
 		if particle_type .== "Boson"
 			states::Vector{String} = fill("0", num_sites)
-			old_ttn::TTNKit.TreeTensorNetwork = TTNKit.ProductTreeTensorNetwork(net,states)
+			old_ttn::TTN.TreeTensorNetwork = TTN.ProductTreeTensorNetwork(net,states)
 			ttn = initialize_ttn(old_ttn,max_dim,particle_count; kwargs...)
 		else
 			states = fill_states(particle_count,num_sites,1)
-			old_ttn = TTNKit.ProductTreeTensorNetwork(net,states)
-			ttn = TTNKit.increase_dim_tree_tensor_network_zeros(old_ttn, maxdim = max_dim)
-			ttn = TTNKit.adjust_tree_tensor_dimensions(old_ttn,max_dim)
+			old_ttn = TTN.ProductTreeTensorNetwork(net,states)
+			ttn = TTN.increase_dim_tree_tensor_network_zeros(old_ttn, maxdim = max_dim)
+			ttn = TTN.adjust_tree_tensor_dimensions(old_ttn,max_dim)
 		end
 		metadata["seed_ttn"] = ttn
 	end
@@ -1133,25 +1133,25 @@ function find_excited_states(num_layers::Int,num_excited_states::Int,particle_co
 	
 	if if_gpu
 		println("Doing GPU TTN")
-		ttn = TTNKit.gpu(ttn)
+		ttn = TTN.gpu(ttn)
 	end
 	println("Added States")
 	
 	if isnothing(ham_operator)
 		ham_operator = metadata["ham"]
 	end
-	ham::TTNKit.AbstractTensorProductOperator = TTNKit.TPO(ham_operator,lat)
+	ham::TTN.AbstractTensorProductOperator = TTN.TPO(ham_operator,lat)
 	if if_gpu
 		println("Doing GPU Ham TPO")
-		ham = TTNKit.gpu(ham,ttn)
+		ham = TTN.gpu(ham,ttn)
 	end
 	println("Built Hamiltonian")
 
 	es_start = length(ortho_states)
 	runtimes = zeros(num_excited_states)
-	obss = Vector{TTNKit.AbstractObserver}(undef,num_excited_states)
+	obss = Vector{TTN.AbstractObserver}(undef,num_excited_states)
 	densmats = Vector{Matrix{ComplexF64}}(undef,num_excited_states)
-	ttns_ortho::Vector{TTNKit.TreeTensorNetwork} = ortho_states
+	ttns_ortho::Vector{TTN.TreeTensorNetwork} = ortho_states
 	for es_number in es_start:num_excited_states
 		if if_densmat
 			new_ttn, new_ham, new_sp, new_obs, runtime, new_densmat = find_excited_state(ttn,ttns_ortho,ham,sweep_type,if_densmat,location,actual_filename; kwargs...)
@@ -1172,8 +1172,8 @@ function find_excited_states(num_layers::Int,num_excited_states::Int,particle_co
 			catch
 				nothing
 			end
-			metadata["maxlinkdim_$es_number"] = TTNKit.maxlinkdim(new_sp.ttn)=#
-			new_metadata::Dict{String,Any} = Dict([("location",metadata["location"]),("observer_$es_number",new_obs),("runtime_$es_number",runtime),("energies_$es_number",new_obs.nrg),("maxlinkdim_$es_number",TTNKit.maxlinkdim(new_sp.ttn))])
+			metadata["maxlinkdim_$es_number"] = TTN.maxlinkdim(new_sp.ttn)=#
+			new_metadata::Dict{String,Any} = Dict([("location",metadata["location"]),("observer_$es_number",new_obs),("runtime_$es_number",runtime),("energies_$es_number",new_obs.nrg),("maxlinkdim_$es_number",TTN.maxlinkdim(new_sp.ttn))])
 			metadata = merge(metadata,new_metadata)
 			#=wavefunc_dict::Dict{String,Any} = if_gpu ? Dict([("ttn_$es_number",back2cpu(new_sp.ttn))]) : Dict([("ttn_$es_number",new_sp.ttn)])
 			densmat_dict::Dict{String,Any} = if_densmat ? Dict([("densmat_$es_number",new_densmat)]) : Dict()
@@ -1196,7 +1196,7 @@ function find_excited_states(num_layers::Int,num_excited_states::Int,particle_co
 	end
 end
 
-function find_excited_states(num_layers::Int,num_excited_states::Int,particle_count::Int,ground_state::TTNKit.TreeTensorNetwork; kwargs...)
+function find_excited_states(num_layers::Int,num_excited_states::Int,particle_count::Int,ground_state::TTN.TreeTensorNetwork; kwargs...)
 	return find_excited_states(num_layers::Int,num_excited_states::Int,particle_count::Int,[ground_state]; kwargs...)
 end
 
@@ -1230,9 +1230,9 @@ function find_excited_states(filename::String,num_excited_states::Int,new_parame
 	# see if already found all states asking for
 	if count_found_states >= num_excited_states + 1 && !if_redo
 		println("Existing data found")
-		ortho_states = Vector{TTNKit.TreeTensorNetwork}(undef,num_excited_states+1)
+		ortho_states = Vector{TTN.TreeTensorNetwork}(undef,num_excited_states+1)
 		densmats = Vector{Matrix{ComplexF64}}(undef,num_excited_states+1)
-		obss = Vector{TTNKit.AbstractObserver}(undef,num_excited_states+1)
+		obss = Vector{TTN.AbstractObserver}(undef,num_excited_states+1)
 		runtimes = zeros(num_excited_states+1)
 		ortho_states[1] = data["ttn"]
 		densmats[1] = data["densmat"]
@@ -1247,7 +1247,7 @@ function find_excited_states(filename::String,num_excited_states::Int,new_parame
 		
 		return ortho_states, metadata_old["ham"], obss, densmats, runtimes
 	else
-		ortho_states = Vector{TTNKit.TreeTensorNetwork}(undef,count_found_states)
+		ortho_states = Vector{TTN.TreeTensorNetwork}(undef,count_found_states)
 		ortho_states[1] = data["ttn"]
 		for i in 2:count_found_states
 			ortho_states[i] = data["ttn_$(i-1)"]
@@ -1289,7 +1289,7 @@ function find_spectrum(model_paras::Dict,num_excited_states::Int,metadata::Dict;
 	end
 end
 
-function save_excited_ttn(ttn::TTNKit.TreeTensorNetwork,metadata::Dict,actual_filename::String,es_number::Int,densmat::Matrix{ComplexF64}=zeros(ComplexF64,1,1); kwargs...)
+function save_excited_ttn(ttn::TTN.TreeTensorNetwork,metadata::Dict,actual_filename::String,es_number::Int,densmat::Matrix{ComplexF64}=zeros(ComplexF64,1,1); kwargs...)
 	if_gpu = kwargs[:if_gpu]
 
 	wavefunc_dict::Dict{String,Any} = if_gpu ? Dict([("ttn_$es_number",back2cpu(ttn))]) : Dict([("ttn_$es_number",ttn)])
@@ -1300,7 +1300,7 @@ function save_excited_ttn(ttn::TTNKit.TreeTensorNetwork,metadata::Dict,actual_fi
 	modify_data(metadata,metadata["location"] * "/" * actual_filename,"metadata")
 end
 
-function save_ttn(ttn::TTNKit.TreeTensorNetwork,metadata_dict::Dict,actual_filename::String,densmat::Matrix{ComplexF64}=zeros(ComplexF64,1,1); kwargs...)
+function save_ttn(ttn::TTN.TreeTensorNetwork,metadata_dict::Dict,actual_filename::String,densmat::Matrix{ComplexF64}=zeros(ComplexF64,1,1); kwargs...)
 	if_gpu = kwargs[:if_gpu]
 	if_continuous_saving = kwargs[:if_continuous_saving]
 	if_redo = kwargs[:if_redo]
@@ -1344,7 +1344,7 @@ function save_ttn(ttn::TTNKit.TreeTensorNetwork,metadata_dict::Dict,actual_filen
 	end
 end
 
-function save_initial_ttn(ttn::TTNKit.TreeTensorNetwork,metadata::Dict; kwargs...)
+function save_initial_ttn(ttn::TTN.TreeTensorNetwork,metadata::Dict; kwargs...)
 	if_densmat = kwargs[:if_densmat]
 	if_gpu = kwargs[:if_gpu]
 	if_redo = get(kwargs, :if_redo, false)
@@ -1403,22 +1403,22 @@ function convert_data_separatewavefunc(filename::String)
 end
 
 
-mutable struct NRGVarObserver <: TTNKit.AbstractObserver
+mutable struct NRGVarObserver <: TTN.AbstractObserver
     var_tol::Float64
     nrg::Vector{Float64}
  
     NRGVarObserver(var_tol=0.0) = new(var_tol,[10000.0,1000.0])
 end
 
-function TTNKit.ITensorMPS.measure!(o::NRGVarObserver; kwargs...)
+function TTN.ITensorMPS.measure!(o::NRGVarObserver; kwargs...)
     nrgs = o.nrg
     var_tol = o.var_tol
     dmrg = kwargs[:sweep_handler]
-	println("Link dimension right now is ",TTNKit.maxlinkdim(dmrg.ttn)," while the maxdim is ",TTNKit.maxdim(dmrg))
+	println("Link dimension right now is ",TTN.maxlinkdim(dmrg.ttn)," while the maxdim is ",TTN.maxdim(dmrg))
     append!(o.nrg,[dmrg.current_energy])
 end
 
-function TTNKit.ITensorMPS.checkdone!(o::NRGVarObserver;kwargs...)
+function TTN.ITensorMPS.checkdone!(o::NRGVarObserver;kwargs...)
 	outputlevel = kwargs[:outputlevel]
 	sh = kwargs[:sweep_handler]
 	sweep_num = sh.current_sweep
@@ -1432,7 +1432,7 @@ function TTNKit.ITensorMPS.checkdone!(o::NRGVarObserver;kwargs...)
 	end
 end
 #
-mutable struct SavingNRGVarObserver <: TTNKit.ITensorMPS.AbstractObserver
+mutable struct SavingNRGVarObserver <: TTN.ITensorMPS.AbstractObserver
     file_path::String
 	var_tol::Float64
     nrg::Vector{Float64}
@@ -1441,7 +1441,7 @@ mutable struct SavingNRGVarObserver <: TTNKit.ITensorMPS.AbstractObserver
 	SavingNRGVarObserver(file_path::String,var_tol::Float64,nrg::Vector{Float64}) = new(file_path,var_tol,nrg)
 end
 #
-function TTNKit.ITensorMPS.measure!(o::SavingNRGVarObserver; kwargs...)
+function TTN.ITensorMPS.measure!(o::SavingNRGVarObserver; kwargs...)
     nrgs = o.nrg
     var_tol = o.var_tol
     dmrg = kwargs[:sweep_handler]
@@ -1453,12 +1453,12 @@ function TTNKit.ITensorMPS.measure!(o::SavingNRGVarObserver; kwargs...)
 	modify_data(wavefunc_update,add_wavefunc_to_filepath(o.file_path),"all_data")
 	
 	densmat_update::Dict{String,Any} = Dict([("densmat",density_matrix(dmrg.ttn))])
-	metadata_update = Dict([("observer",o),("maxlinkdim",TTNKit.maxlinkdim(dmrg.ttn))])
+	metadata_update = Dict([("observer",o),("maxlinkdim",TTN.maxlinkdim(dmrg.ttn))])
 	modify_data(metadata_update,o.file_path,"metadata")
 	modify_data(densmat_update,o.file_path,"all_data")
 end
 
-function TTNKit.ITensorMPS.checkdone!(o::SavingNRGVarObserver;kwargs...)
+function TTN.ITensorMPS.checkdone!(o::SavingNRGVarObserver;kwargs...)
 	outputlevel = kwargs[:outputlevel]
 	sh = kwargs[:sweep_handler]
 	sweep_num = sh.current_sweep
@@ -1472,7 +1472,7 @@ function TTNKit.ITensorMPS.checkdone!(o::SavingNRGVarObserver;kwargs...)
 	end
 end
 
-mutable struct SavingMeasurementsObserver <: TTNKit.ITensorMPS.AbstractObserver
+mutable struct SavingMeasurementsObserver <: TTN.ITensorMPS.AbstractObserver
 	measurement_functions::Vector{NamedTuple}
 	measurements::Dict{String,Any}
 	file_path::String
@@ -1482,7 +1482,7 @@ mutable struct SavingMeasurementsObserver <: TTNKit.ITensorMPS.AbstractObserver
     SavingMeasurementsObserver(measurement_functions,measurements,file_path="ttn.h5",var_tol=0.0) = new(measurement_functions,measurements,file_path,var_tol,[10000.0])
 end
 
-function TTNKit.ITensorMPS.measure!(o::SavingMeasurementsObserver; kwargs...)
+function TTN.ITensorMPS.measure!(o::SavingMeasurementsObserver; kwargs...)
     dmrg = kwargs[:sweep_handler]
     append!(o.nrg,[dmrg.current_energy])
 
@@ -1490,7 +1490,7 @@ function TTNKit.ITensorMPS.measure!(o::SavingMeasurementsObserver; kwargs...)
 	modify_data(wavefunc_update,add_wavefunc_to_filepath(o.file_path),"all_data")
 	
 	densmat_update::Dict{String,Any} = Dict([("densmat",density_matrix(dmrg.ttn))])
-	metadata_update = Dict([("observer",o),("maxlinkdim",TTNKit.maxlinkdim(dmrg.ttn))])
+	metadata_update = Dict([("observer",o),("maxlinkdim",TTN.maxlinkdim(dmrg.ttn))])
 	modify_data(metadata_update,o.file_path,"metadata")
 	modify_data(densmat_update,o.file_path,"all_data")
 
@@ -1501,7 +1501,7 @@ function TTNKit.ITensorMPS.measure!(o::SavingMeasurementsObserver; kwargs...)
 
 end
 
-function TTNKit.ITensorMPS.checkdone!(o::SavingMeasurementsObserver;kwargs...)
+function TTN.ITensorMPS.checkdone!(o::SavingMeasurementsObserver;kwargs...)
 	outputlevel = kwargs[:outputlevel]
 	sh = kwargs[:sweep_handler]
 	sweep_num = sh.current_sweep
@@ -1515,7 +1515,7 @@ function TTNKit.ITensorMPS.checkdone!(o::SavingMeasurementsObserver;kwargs...)
 	end
 end
 
-mutable struct SavingExcitedNRGVarObserver <: TTNKit.ITensorMPS.AbstractObserver
+mutable struct SavingExcitedNRGVarObserver <: TTN.ITensorMPS.AbstractObserver
     file_path::String
 	var_tol::Float64
 	nrg_level::Int64
@@ -1524,7 +1524,7 @@ mutable struct SavingExcitedNRGVarObserver <: TTNKit.ITensorMPS.AbstractObserver
     SavingExcitedNRGVarObserver(file_path="ttn.h5",var_tol=0.0,nrg_level=1) = new(file_path,var_tol,nrg_level,[10000.0,1000.0])
 end
 
-function TTNKit.ITensorMPS.measure!(o::SavingExcitedNRGVarObserver; kwargs...)
+function TTN.ITensorMPS.measure!(o::SavingExcitedNRGVarObserver; kwargs...)
     nrg_level = o.nrg_level
 	nrg_level > 0 ? string_part = "_$nrg_level" : string_part = ""
     dmrg = kwargs[:sweep_handler]
@@ -1533,11 +1533,11 @@ function TTNKit.ITensorMPS.measure!(o::SavingExcitedNRGVarObserver; kwargs...)
 	alldata_update::Dict{String,Any} = Dict([("ttn"*string_part,dmrg.ttn),("densmat"*string_part,density_matrix(dmrg.ttn))])
 	modify_data(alldata_update,o.file_path,"all_data")
 	
-	metadata_update = Dict([("observer"*string_part,o),("maxlinkdim"*string_part,TTNKit.maxlinkdim(dmrg.ttn))])
+	metadata_update = Dict([("observer"*string_part,o),("maxlinkdim"*string_part,TTN.maxlinkdim(dmrg.ttn))])
 	modify_data(metadata_update,o.file_path,"metadata")
 end
 
-function TTNKit.ITensorMPS.checkdone!(o::SavingExcitedNRGVarObserver;kwargs...)
+function TTN.ITensorMPS.checkdone!(o::SavingExcitedNRGVarObserver;kwargs...)
 	outputlevel = kwargs[:outputlevel]
 	sh = kwargs[:sweep_handler]
 	sweep_num = sh.current_sweep
@@ -1551,34 +1551,34 @@ function TTNKit.ITensorMPS.checkdone!(o::SavingExcitedNRGVarObserver;kwargs...)
 	end
 end
 
-mutable struct MemoryObserver <: TTNKit.ITensorMPS.AbstractObserver
+mutable struct MemoryObserver <: TTN.ITensorMPS.AbstractObserver
 	mem::Dict{String,Float64}
 
 	MemoryObserver() = new(Dict())
 end
 
-function TTNKit.ITensorMPS.measure!(o::MemoryObserver,memory_name::String,memory_value; kwargs...)
+function TTN.ITensorMPS.measure!(o::MemoryObserver,memory_name::String,memory_value; kwargs...)
 	o.mem[memory_name] = float(memory_value)
 end
 
-function TTNKit.ITensorMPS.measure!(o::MemoryObserver,memory_dict::Dict{String,Float64}; kwargs...)
+function TTN.ITensorMPS.measure!(o::MemoryObserver,memory_dict::Dict{String,Float64}; kwargs...)
 	for (key,value) in memory_dict
-		TTNKit.ITensorMPS.measure!(o,key,value; kwargs...)
+		TTN.ITensorMPS.measure!(o,key,value; kwargs...)
 	end
 end
 
-function TTNKit.ITensorMPS.checkdone!(o::MemoryObserver;kwargs...)
+function TTN.ITensorMPS.checkdone!(o::MemoryObserver;kwargs...)
 	return true
 end
 
-function TTNKit.ITensorMPS.measure!(os::Vector{TTNKit.ITensorMPS.AbstractObserver}; kwargs...)
+function TTN.ITensorMPS.measure!(os::Vector{TTN.ITensorMPS.AbstractObserver}; kwargs...)
 	for o in os
-		TTNKit.ITensorMPS.measure!(o; kwargs...)
+		TTN.ITensorMPS.measure!(o; kwargs...)
 	end
 end
 
-function TTNKit.ITensorMPS.checkdone!(os::Vector{TTNKit.ITensorMPS.AbstractObserver};kwargs...)
-	return all([TTNKit.ITensorMPS.checkdone!(o; kwargs...) for o in os])
+function TTN.ITensorMPS.checkdone!(os::Vector{TTN.ITensorMPS.AbstractObserver};kwargs...)
+	return all([TTN.ITensorMPS.checkdone!(o; kwargs...) for o in os])
 end
 
 function rerun_findGS(fileloc::String; kwargs...)
@@ -1670,10 +1670,10 @@ function get_rand_next_site(probabilities)
 end
 
 function find_path(ttn,starting_site; kwargs...)
-	net = TTNKit.network(ttn)
-	lat = TTNKit.physical_lattice(net)
+	net = TTN.network(ttn)
+	lat = TTN.physical_lattice(net)
 	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
-	#edge_length = Int(sqrt(TTNKit.number_of_sites(lat)))
+	#edge_length = Int(sqrt(TTN.number_of_sites(lat)))
 	path = [starting_site]
 	
 	if_periodic = get(kwargs, :periodic, false)
@@ -1682,7 +1682,7 @@ function find_path(ttn,starting_site; kwargs...)
 	path_length = get(kwargs, :path_length, Int(4*virt_edge_length))	
 	
 	
-	all_neighbors = TTNKit.nearest_neighbours(lat,collect(1:phys_edge_length*virt_edge_length); periodic=if_periodic)
+	all_neighbors = TTN.nearest_neighbours(lat,collect(1:phys_edge_length*virt_edge_length); periodic=if_periodic)
 	for i in 1:path_length
 		if i == 1
 			current_site_num = get_site_number(starting_site[2],starting_site[1],virt_edge_length,phys_edge_length)
@@ -1693,14 +1693,14 @@ function find_path(ttn,starting_site; kwargs...)
 		stopredo = get_stop_path_redo(path)
 		for (s1,s2) in all_neighbors
 			if s1 == current_site_num
-				if !(TTNKit.coordinate(lat,s2) in stopredo)
-					transition_prob = abs2.(TTNKit.correlation(ttn,"Adag","A",(s1),(s2)))
+				if !(TTN.coordinate(lat,s2) in stopredo)
+					transition_prob = abs2.(TTN.correlation(ttn,"Adag","A",(s1),(s2)))
 					append!(all_probs,[transition_prob])
 					append!(next_sites,[s2])
 				end
 			elseif s2 == current_site_num
-				if !(TTNKit.coordinate(lat,s1) in stopredo)
-					transition_prob = abs2.(TTNKit.correlation(ttn,"Adag","A",(s2),(s1)))
+				if !(TTN.coordinate(lat,s1) in stopredo)
+					transition_prob = abs2.(TTN.correlation(ttn,"Adag","A",(s2),(s1)))
 					append!(all_probs,[transition_prob])
 					append!(next_sites,[s1])
 				end
@@ -1718,7 +1718,7 @@ function find_path(ttn,starting_site; kwargs...)
 		elseif rand_path
 			next_site = next_sites[get_rand_next_site(all_probs)]
 		end
-		next_coord = TTNKit.coordinate(lat,next_site)
+		next_coord = TTN.coordinate(lat,next_site)
 		#println(next_coord)
 		append!(path,[next_coord])
 		global current_site_num = next_site
@@ -1822,16 +1822,16 @@ function get_all_sites_paths_and_plot(ttn; kwargs...)
 end
 
 function get_2part_corr(ttn,particle_count; kwargs...)
-	corr = sum(abs.(TTNKit.expect(ttn,"N * N - N")))/particle_count
+	corr = sum(abs.(TTN.expect(ttn,"N * N - N")))/particle_count
 	return corr
 end
 
-function c2(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+function c2(wavefunc::TTN.TreeTensorNetwork; kwargs...)
 	if_c3 = get(kwargs, :if_c3, false)
 	if_plot = get(kwargs, :if_plot, false)
 	
 	n1 = get_occupancy(wavefunc; kwargs...,if_plot=false)
-	n2 = real.(TTNKit.expect(wavefunc,"N * N")) ./ sum(n1)
+	n2 = real.(TTN.expect(wavefunc,"N * N")) ./ sum(n1)
 
 	if_plot ? plot_c2(n1,n2; kwargs...) : nothing
 
@@ -1851,11 +1851,11 @@ function plot_c2(n1::Matrix,n2::Matrix; kwargs...)
 	return
 end
 
-function c3(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+function c3(wavefunc::TTN.TreeTensorNetwork; kwargs...)
 	if_plot = get(kwargs, :if_plot, false)
 
 	n1,n2 = c2(wavefunc; if_c3=true,kwargs...,if_plot=false)
-	n3 = real.(TTNKit.expect(wavefunc,"N * N * N")) ./ sum(n1)
+	n3 = real.(TTN.expect(wavefunc,"N * N * N")) ./ sum(n1)
 
 	if_plot ? plot_c3(n1,n2,n3; kwargs...) : nothing
 
@@ -1871,11 +1871,11 @@ function plot_c3(n1::Matrix,n2::Matrix,n3::Matrix; kwargs...)
 	return
 end
 
-function c23(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+function c23(wavefunc::TTN.TreeTensorNetwork; kwargs...)
 	if_plot = get(kwargs, :if_plot, false)
 
 	n1,n2 = c2(wavefunc; if_c3=true,kwargs...,if_plot=false)
-	n3 = real.(TTNKit.expect(wavefunc,"N * N * N")) ./ sum(n1)
+	n3 = real.(TTN.expect(wavefunc,"N * N * N")) ./ sum(n1)
 
 	if_plot ? plot_c23(n1,n2,n3; kwargs...) : nothing
 
@@ -1891,12 +1891,12 @@ end
 function expected_position(ttn)
 	occ_mat = get_occupancy(ttn;if_plot=false)
 	num_particles = sum(occ_mat)
-	lat = TTNKit.physical_lattice(TTNKit.network(ttn))
+	lat = TTN.physical_lattice(TTN.network(ttn))
 	phys_edge,virt_edge = get_lattice_dims(ttn)
 	site_number_mat = zeros(virt_edge,phys_edge)
 	for i in 1:virt_edge
 		for j in 1:phys_edge
-			site_number_mat[i,j] = TTNKit.linear_ind(lat,(i,j))
+			site_number_mat[i,j] = TTN.linear_ind(lat,(i,j))
 		end
 	end
 	expected_site_number = sum(site_number_mat .* (occ_mat./num_particles))
@@ -1920,27 +1920,27 @@ function get_avg_occupancy(avg_count,edge_length,particle_count,u_strength,t_str
 end
 
 function rewrite_inds(tensor,ref_tensor)
-	num_layers = TTNKit.number_of_layers(TTNKit.network(tensor))
+	num_layers = TTN.number_of_layers(TTN.network(tensor))
 	for i in 1:num_layers
 		num_tensors = length(tensor.data[i])
 		for j in 1:num_tensors
-			old_inds = TTNKit.inds(tensor.data[i][j])
-			new_inds = TTNKit.inds(ref_tensor.data[i][j])
+			old_inds = TTN.inds(tensor.data[i][j])
+			new_inds = TTN.inds(ref_tensor.data[i][j])
 			#
 			for k in new_inds
 				matching = findfirst(x->x==k,old_inds)
 				if matching != nothing
-					tensor.data[i][j] = TTNKit.replaceinds(tensor.data[i][j],old_inds[matching],k)
+					tensor.data[i][j] = TTN.replaceinds(tensor.data[i][j],old_inds[matching],k)
 				end
 			end
 			#=
-			do_inds_match = [TTNKit.tags(old_inds[i1])==TTNKit.tags(new_inds[i1]) for i1 in 1:length(old_inds)]
+			do_inds_match = [TTN.tags(old_inds[i1])==TTN.tags(new_inds[i1]) for i1 in 1:length(old_inds)]
 			if all(do_inds_match)
-				tensor.data[i][j] = TTNKit.replaceinds(tensor.data[i][j],old_inds,new_inds)
+				tensor.data[i][j] = TTN.replaceinds(tensor.data[i][j],old_inds,new_inds)
 			else
 				nonmatching_sites = findall(x->x==false,do_inds_match)
-				nonmatching_old = [TTNKit.tags(old_inds[i1]) for i1 in nonmatching_sites]
-				nonmatching_new = [TTNKit.tags(new_inds[i1]) for i1 in nonmatching_sites]
+				nonmatching_old = [TTN.tags(old_inds[i1]) for i1 in nonmatching_sites]
+				nonmatching_new = [TTN.tags(new_inds[i1]) for i1 in nonmatching_sites]
 				println("Index Tags Don't Match")
 				display(nonmatching_old)
 				display(nonmatching_new)
@@ -1972,17 +1972,17 @@ function get_periodic_title_string(if_periodic)
 	end
 end
 
-function localinner(ttn1::TTNKit.TreeTensorNetwork{N, T}, old_ttn2::TTNKit.TreeTensorNetwork{N, T},nexttt=false) where{N<:TTNKit.BinaryNetwork,T}
+function localinner(ttn1::TTN.TreeTensorNetwork{N, T}, old_ttn2::TTN.TreeTensorNetwork{N, T},nexttt=false) where{N<:TTN.BinaryNetwork,T}
 
-    net = TTNKit.network(ttn1)
+    net = TTN.network(ttn1)
     
     ttn2 = rewrite_inds(copy(old_ttn2),ttn1)
 
     elT = promote_type(eltype(ttn1), eltype(ttn2))
     # check in case if symmetric the Top node for qn correspondence
-    if !(TTNKit.sectortype(net) == Int64)
-        fl1 = TTNKit.flux(ttn1[TTNKit.number_of_layers(net), 1])
-        fl2 = TTNKit.flux(ttn2[TTNKit.number_of_layers(net), 1])
+    if !(TTN.sectortype(net) == Int64)
+        fl1 = TTN.flux(ttn1[TTN.number_of_layers(net), 1])
+        fl2 = TTN.flux(ttn2[TTN.number_of_layers(net), 1])
         if fl1 != fl2
         	println("Flux issue")
         	return zero(elT)
@@ -1992,20 +1992,20 @@ function localinner(ttn1::TTNKit.TreeTensorNetwork{N, T}, old_ttn2::TTNKit.TreeT
     # contruct the network starting from the first layer upwards
     #ns = number_of_sites(net)
     
-    phys_lat = TTNKit.physical_lattice(net)
+    phys_lat = TTN.physical_lattice(net)
     if nexttt
 	    println(size(res))
     end
     res = map(phys_lat) do nd
-    	TTNKit.delta(TTNKit.hilbertspace(nd), TTNKit.prime(TTNKit.hilbertspace(nd)))
+    	TTN.delta(TTN.hilbertspace(nd), TTN.prime(TTN.hilbertspace(nd)))
     end
 
 
-    for ll in TTNKit.eachlayer(net)
-        nt = TTNKit.number_of_tensors(net,ll)
+    for ll in TTN.eachlayer(net)
+        nt = TTN.number_of_tensors(net,ll)
         res_new = Vector{T}(undef, nt)
-        for pp in TTNKit.eachindex(net, ll)
-            childs_idx = TTNKit.getindex.(TTNKit.child_nodes(net, (ll,pp)),2)
+        for pp in TTN.eachindex(net, ll)
+            childs_idx = TTN.getindex.(TTN.child_nodes(net, (ll,pp)),2)
             tn1 = ttn1[ll,pp]
             tn2 = ttn2[ll,pp]
             rpre1 = res[childs_idx[1]]
@@ -2016,7 +2016,7 @@ function localinner(ttn1::TTNKit.TreeTensorNetwork{N, T}, old_ttn2::TTNKit.TreeT
             	return res
             end
             #
-            res_new[pp] = TTNKit._dot_inner(tn1, tn2, rpre1, rpre2)
+            res_new[pp] = TTN._dot_inner(tn1, tn2, rpre1, rpre2)
         end
         res = res_new
     end
@@ -2024,7 +2024,7 @@ function localinner(ttn1::TTNKit.TreeTensorNetwork{N, T}, old_ttn2::TTNKit.TreeT
     length(res) == 1 || error("Tree Tensor Contraction don't leed to a single resulting tensor.")
     res = res[1]
     
-    sres = TTNKit.ITensorMPS.scalar(res)
+    sres = TTN.ITensorMPS.scalar(res)
 
     return abs2(sres)
 end
@@ -2267,28 +2267,28 @@ function get_part_counts_range_fillings(site_count,phi)
 	return part_counts,nu_values
 end
 
-function entanglement_spectrum(ttn::TTNKit.TreeTensorNetwork{N, TTNKit.ITensor}) where{N}
-    pos_right = (TTNKit.number_of_layers(ttn),1)
-    pos_left = (TTNKit.number_of_layers(ttn)-1,2)
-    net = TTNKit.network(ttn)
+function entanglement_spectrum(ttn::TTN.TreeTensorNetwork{N, TTN.ITensor}) where{N}
+    pos_right = (TTN.number_of_layers(ttn),1)
+    pos_left = (TTN.number_of_layers(ttn)-1,2)
+    net = TTN.network(ttn)
     # checking if pos_right is contained in the network
-    TTNKit.check_valid_position(net, pos_right)
+    TTN.check_valid_position(net, pos_right)
     # check if layer number is not physical
     @assert pos_right[1] > 0
     # check if pos_left is either in the child nodes/ or being the parent node
-    @assert (pos_left ∈ TTNKit.child_nodes(net, pos_right) || pos_left == TTNKit.parent_node(net, pos_left))
+    @assert (pos_left ∈ TTN.child_nodes(net, pos_right) || pos_left == TTN.parent_node(net, pos_left))
 
     # now move the orthogonality centrum
-    ttnc = TTNKit.move_ortho!(copy(ttn), pos_right)
+    ttnc = TTN.move_ortho!(copy(ttn), pos_right)
     T = ttnc[pos_right]
     
     # this only works for ITensorMPS...
     # getting the indices for decomposition, this only contains pos_left link
     if pos_left[1] == 0
         # pos_left is a physical site.. we need to filter differently
-        idx_left = TTNKit.inds(T; tags = "Site,n=$(pos_left[2])")
+        idx_left = TTN.inds(T; tags = "Site,n=$(pos_left[2])")
     else
-        idx_left = TTNKit.inds(T; tags = "Link,nl=$(pos_left[1]),np=$(pos_left[2])")
+        idx_left = TTN.inds(T; tags = "Link,nl=$(pos_left[1]),np=$(pos_left[2])")
     end
 
     U,S,V,spec = svd(T, idx_left)
@@ -2314,20 +2314,20 @@ function integrated_density(occs_diff::Matrix; kwargs...)
 	return edges,int_dens
 end
 
-function calculate_energy(wavefunc::TTNKit.TreeTensorNetwork,ham_op)
-	TTNKit.move_ortho!(wavefunc,(1,1))
-	net = TTNKit.network(wavefunc)
-	lat = TTNKit.physical_lattice(net)
-	ham_tpo = TTNKit.TPO(ham_op,lat)
-	ham_ptpo = TTNKit.ProjectedTensorProductOperator(wavefunc,ham_tpo)
+function calculate_energy(wavefunc::TTN.TreeTensorNetwork,ham_op)
+	TTN.move_ortho!(wavefunc,(1,1))
+	net = TTN.network(wavefunc)
+	lat = TTN.physical_lattice(net)
+	ham_tpo = TTN.TPO(ham_op,lat)
+	ham_ptpo = TTN.ProjectedTensorProductOperator(wavefunc,ham_tpo)
 	func = (action, T) -> eigsolve(action, T, 1,
 								:SR;
 								ishermitian=true,
 								tol=1e-14,
 								krylovdim=5,
 								maxiter=3)
-	sh = TTNKit.SimpleSweepHandler(wavefunc,ham_ptpo,func,1,[TTNKit.maxlinkdim(wavefunc)],[0.0],TTNKit.NoExpander())
-	sh = TTNKit.update!(sh,(1,1))
+	sh = TTN.SimpleSweepHandler(wavefunc,ham_ptpo,func,1,[TTN.maxlinkdim(wavefunc)],[0.0],TTN.NoExpander())
+	sh = TTN.update!(sh,(1,1))
 	nrg = sh.current_energy
 	return nrg
 end

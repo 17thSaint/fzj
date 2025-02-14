@@ -41,7 +41,7 @@ function get_magnetization(wavefunc,spin_value::Float64,direction::String; kwarg
 			=#
 			if spin_matrix_value != 0.0
 				if typeof(wavefunc) != MPS
-					part = round(TTNKit.correlation(wavefunc,"Adag","A",j,k) .* spin_matrix_value,digits=8)
+					part = round(TTN.correlation(wavefunc,"Adag","A",j,k) .* spin_matrix_value,digits=8)
 				else
 					part = round.(expect(wavefunc,"Cr$(j) * Anh$(k)") .* spin_matrix_value,digits=8)
 				end
@@ -103,7 +103,7 @@ function build_HH_net(num_layers::Int64; kwargs...)
 	particle_type = if_fermion ? "Fermion" : "Boson"
 	max_occ = get(kwargs,:max_occ,1)
 	
-	net = if_fermion ? TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, particle_type;conserve_nf=conserve_qns,conserve_nfparity=false) : TTNKit.BinaryRectangularNetwork(num_layers, TTNKit.ITensorNode, particle_type;conserve_qns=conserve_qns,dim=max_occ+1)
+	net = if_fermion ? TTN.BinaryRectangularNetwork(num_layers, TTN.ITensorNode, particle_type;conserve_nf=conserve_qns,conserve_nfparity=false) : TTN.BinaryRectangularNetwork(num_layers, TTN.ITensorNode, particle_type;conserve_qns=conserve_qns,dim=max_occ+1)
 	
 	return net
 end
@@ -124,7 +124,7 @@ function get_interaction_coords(given_site,inter_dist,lat,if_per,which_dir) # wr
     
 	phys_edge_length, virt_edge_length = size(lat)
 	#if typeof(given_site) == Int64
-	#	given_site = TTNKit.coordinate(lat,given_site)
+	#	given_site = TTN.coordinate(lat,given_site)
 	#end
 	if which_dir == "virt" || which_dir == "both" 
 		for shift in [-inter_dist % virt_edge_length,inter_dist % virt_edge_length] 
@@ -266,16 +266,16 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	display(long_range_strengths)
 	if_interaction = !all(long_range_strengths.==0)
 	
-	lat = TTNKit.physical_lattice(net)
+	lat = TTN.physical_lattice(net)
 	
 	hopping_old = get(kwargs, :hopping_old, false)
 	if if_hopping && hopping_old
 		if_periodic_phys ? nothing : centralflux_strength = 0.0
-		hopping = TTNKit.OpSum()
+		hopping = TTN.OpSum()
 		#
-		for (s1,s2) in TTNKit.nearest_neighbours(lat,collect(1:TTNKit.number_of_sites(lat)))
-			s1_coord = TTNKit.coordinate(lat,s1)
-			s2_coord = TTNKit.coordinate(lat,s2)
+		for (s1,s2) in TTN.nearest_neighbours(lat,collect(1:TTN.number_of_sites(lat)))
+			s1_coord = TTN.coordinate(lat,s1)
+			s2_coord = TTN.coordinate(lat,s2)
 
 			if any([s1_coord[1],s2_coord[1]] .> restricted_size[1])
 				continue
@@ -324,7 +324,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 		append!(resulting_ham,[hopping])
 	else
 	#if if_hopping
-		hopping = TTNKit.OpSum()
+		hopping = TTN.OpSum()
 		for s_phys in 1:restricted_size[1]
 			for s_synth in 1:restricted_size[2]
 				starting_site = [s_phys,s_synth]
@@ -368,14 +368,14 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 		if kwargs[:scaling] == "rydberg"
 			which_dir = "both"
 		end
-		interaction = TTNKit.OpSum()
+		interaction = TTN.OpSum()
 		for (idx,stren) in enumerate(long_range_strengths)
 			if stren == 0.0
 				continue
 			else
 				if idx == 1 && if_pfaffian
-					for j in TTNKit.eachindex(lat)
-						s_coord = TTNKit.coordinate(lat,j)
+					for j in TTN.eachindex(lat)
+						s_coord = TTN.coordinate(lat,j)
 						if s_coord[1] > restricted_size[1] || s_coord[2] > restricted_size[2]
 							continue
 						end
@@ -384,8 +384,8 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 					end
 					continue
 				else
-					for j in TTNKit.eachindex(lat)
-						s_coord = TTNKit.coordinate(lat,j)
+					for j in TTN.eachindex(lat)
+						s_coord = TTN.coordinate(lat,j)
 						if s_coord[1] > restricted_size[1] || s_coord[2] > restricted_size[2]
 							continue
 						end
@@ -407,7 +407,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	end
 	
 	if restricted_size != [phys_edge_length,virt_edge_length]
-		restrict_size = TTNKit.OpSum()
+		restrict_size = TTN.OpSum()
 		for i in restricted_size[1]+1:phys_edge_length
 			for j in 1:virt_edge_length
 				restrict_size += (1e10,"N",(i,j))
@@ -422,16 +422,16 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	end
 
 	if chem_strength != 0.0
-		chem = TTNKit.OpSum()
-		for i in TTNKit.eachindex(lat)
-			chem -= (chem_strength,"N",TTNKit.coordinate(lat,i))
+		chem = TTN.OpSum()
+		for i in TTN.eachindex(lat)
+			chem -= (chem_strength,"N",TTN.coordinate(lat,i))
 		end
 		append!(resulting_ham,[chem])
 	end
 
 	if if_pinning
 		vpinning::Float64 = 1E-6
-		pinning = TTNKit.OpSum()
+		pinning = TTN.OpSum()
 		pinning += (vpinning,"N",(1,1))
 
 		append!(resulting_ham,[pinning])
@@ -439,8 +439,8 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	
 	#=if if_pinning_pot
 		Vj = v_central(size(lat), vpinning)
-		pinning_pot = TTNKit.OpSum()
-		for p in TTNKit.coordinates(lat)
+		pinning_pot = TTN.OpSum()
+		for p in TTN.coordinates(lat)
 	    		pinning_pot += (Vj[p[1],p[2]], "N", p)
 		end
 		append!(resulting_ham,[pinning_pot])
@@ -487,10 +487,10 @@ function long_range_HH_ham_synthrect(net,t_strength,phi; kwargs...)
 	display(long_range_strengths)
 	if_interaction = !all(long_range_strengths.==0)
 	
-	lat = TTNKit.physical_lattice(net)
+	lat = TTN.physical_lattice(net)
 
 	if if_hopping
-		hopping = TTNKit.OpSum()
+		hopping = TTN.OpSum()
 		for s_phys in 1:restricted_size[2]
 			for s_synth in 1:restricted_size[1]
 				starting_site = [s_synth,s_phys]
@@ -534,14 +534,14 @@ function long_range_HH_ham_synthrect(net,t_strength,phi; kwargs...)
 		if kwargs[:scaling] == "rydberg"
 			which_dir = "both"
 		end
-		interaction = TTNKit.OpSum()
+		interaction = TTN.OpSum()
 		for (idx,stren) in enumerate(long_range_strengths)
 			if stren == 0.0
 				continue
 			else
 				if idx == 1 && if_pfaffian
-					for j in TTNKit.eachindex(lat)
-						s_coord = TTNKit.coordinate(lat,j)
+					for j in TTN.eachindex(lat)
+						s_coord = TTN.coordinate(lat,j)
 						if s_coord[1] > restricted_size[1] || s_coord[2] > restricted_size[2]
 							continue
 						end
@@ -550,8 +550,8 @@ function long_range_HH_ham_synthrect(net,t_strength,phi; kwargs...)
 					end
 					continue
 				else
-					for j in TTNKit.eachindex(lat)
-						s_coord = TTNKit.coordinate(lat,j)
+					for j in TTN.eachindex(lat)
+						s_coord = TTN.coordinate(lat,j)
 						if s_coord[1] > restricted_size[2] || s_coord[2] > restricted_size[1]
 							continue
 						end
@@ -573,7 +573,7 @@ function long_range_HH_ham_synthrect(net,t_strength,phi; kwargs...)
 	
 	# has not been checked from synth rectangle methods
 	#=if restricted_size != [virt_edge_length,phys_edge_length]
-		restrict_size = TTNKit.OpSum()
+		restrict_size = TTN.OpSum()
 		for i in restricted_size[1]+1:virt_edge_length
 			for j in 1:phys_edge_length
 				restrict_size += (1e10,"N",(i,j))
@@ -588,17 +588,17 @@ function long_range_HH_ham_synthrect(net,t_strength,phi; kwargs...)
 	end
 
 	if chem_strength != 0.0
-		chem = TTNKit.OpSum()
-		for i in TTNKit.eachindex(lat)
-			chem -= (chem_strength,"N",TTNKit.coordinate(lat,i))
+		chem = TTN.OpSum()
+		for i in TTN.eachindex(lat)
+			chem -= (chem_strength,"N",TTN.coordinate(lat,i))
 		end
 		append!(resulting_ham,[chem])
 	end
 	
 	if if_pinning_pot
 		Vj = v_central(size(lat), vpinning)
-		pinning_pot = TTNKit.OpSum()
-		for p in TTNKit.coordinates(lat)
+		pinning_pot = TTN.OpSum()
+		for p in TTN.coordinates(lat)
 	    		pinning_pot += (Vj[p[1],p[2]], "N", p)
 		end
 		append!(resulting_ham,[pinning_pot])
@@ -624,14 +624,14 @@ function long_range_HH_ham(metadata::Dict)
 	end
 end
 
-function get_densdens_corrs(ttn::TTNKit.TreeTensorNetwork,distances; kwargs...)
+function get_densdens_corrs(ttn::TTN.TreeTensorNetwork,distances; kwargs...)
 	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
 	direction = get(kwargs, :direction, "virt")
 	dim_dict = Dict([("virt",virt_edge_length),("phys",phys_edge_length)])
 	chosen_dim = dim_dict[direction]
 	other_direction = collect(keys(dim_dict))[findfirst(x -> x != direction,collect(keys(dim_dict)))]
 	other_dim = dim_dict[other_direction]
-	lat = TTNKit.physical_lattice(TTNKit.network(ttn))
+	lat = TTN.physical_lattice(TTN.network(ttn))
 	densdens_corr = zeros(length(distances),other_dim)
 	corr_errors = zeros(length(distances),other_dim)
 	for j in 1:length(distances)
@@ -647,16 +647,16 @@ function get_densdens_corrs(ttn::TTNKit.TreeTensorNetwork,distances; kwargs...)
 					end
 				end
 				if direction == "phys"
-					pos1 = TTNKit.linear_ind(lat,(k,i))
-					pos2 = TTNKit.linear_ind(lat,(k,next_site))
+					pos1 = TTN.linear_ind(lat,(k,i))
+					pos2 = TTN.linear_ind(lat,(k,next_site))
 				elseif direction == "virt"
-					pos1 = TTNKit.linear_ind(lat,(i,k))
-					pos2 = TTNKit.linear_ind(lat,(next_site,k))
+					pos1 = TTN.linear_ind(lat,(i,k))
+					pos2 = TTN.linear_ind(lat,(next_site,k))
 				else
 					println("Bad direction")
 					return
 				end
-				value = TTNKit.correlation(ttn,"N","N",pos1,pos2)
+				value = TTN.correlation(ttn,"N","N",pos1,pos2)
 				all_values[i] = real(value)
 			end
 			densdens_corr[j,k] = mean(all_values)
@@ -766,7 +766,7 @@ function radial_box_dist(ttn)
 	return full_rads,combined_vals
 end
 
-function bulk_density(ttn::TTNKit.TreeTensorNetwork,bulk_width_phys=1,bulk_width_virt=1; kwargs...)
+function bulk_density(ttn::TTN.TreeTensorNetwork,bulk_width_phys=1,bulk_width_virt=1; kwargs...)
 	if isnothing(ttn)
 		occ_mat = get(kwargs, :occ_mat, nothing)
 	else
@@ -821,17 +821,17 @@ function reorder_vector_to_matrix(left_moving,right_moving)
 	return right_moving_mat .+ left_moving_mat
 end
 
-function ttn_current_site(psi::TTNKit.TreeTensorNetwork,virt_site; kwargs...)
+function ttn_current_site(psi::TTN.TreeTensorNetwork,virt_site; kwargs...)
 	centralflux_strength = get(kwargs, :centralflux_strength, 0.0)
 	phys_length,virt_length = get_lattice_dims(psi)
 	phys_left = (virt_site-1)*phys_length + Int(phys_length/2)
 	coeff = im*2*pi*exp(im*2*pi*centralflux_strength/phys_length)
-	left_moving = conj(coeff)*TTNKit.correlation(psi,"Adag","A",phys_left,phys_left+1)
-	right_moving = coeff*TTNKit.correlation(psi,"Adag","A",phys_left+1,phys_left)
+	left_moving = conj(coeff)*TTN.correlation(psi,"Adag","A",phys_left,phys_left+1)
+	right_moving = coeff*TTN.correlation(psi,"Adag","A",phys_left+1,phys_left)
 	return right_moving + left_moving
 end
 
-function ttn_current(psi::TTNKit.TreeTensorNetwork; kwargs...)
+function ttn_current(psi::TTN.TreeTensorNetwork; kwargs...)
 	centralflux_strength = get(kwargs, :centralflux_strength, 0.0)
 	phys_length,virt_length = get_lattice_dims(psi)
 	position_pairs = get_position_pairs(phys_length,virt_length)
@@ -840,8 +840,8 @@ function ttn_current(psi::TTNKit.TreeTensorNetwork; kwargs...)
 	coeff = im*2*pi*exp(im*2*pi*centralflux_strength/phys_length)
 	for i in 1:length(position_pairs)
 		left_site,right_site = position_pairs[i]
-		left_moving[i] = TTNKit.correlation(psi,"Adag","A",left_site,right_site)
-		right_moving[i] = TTNKit.correlation(psi,"Adag","A",right_site,left_site)
+		left_moving[i] = TTN.correlation(psi,"Adag","A",left_site,right_site)
+		right_moving[i] = TTN.correlation(psi,"Adag","A",right_site,left_site)
 	end
 	total_current = coeff*sum(right_moving) + conj(coeff)*sum(left_moving)
 	return total_current,reorder_vector_to_matrix(conj(coeff) .* left_moving,coeff .* right_moving)
@@ -862,13 +862,13 @@ function find_dist(p1::Tuple{Int,Int}, p2::Tuple{Int,Int}, size::Tuple{Int,Int},
     return sqrt(dx^2 + dy^2),(dx,dy)
 end
 
-function physical_distance_correlation(psi::TTNKit.TreeTensorNetwork; kwargs...)
+function physical_distance_correlation(psi::TTN.TreeTensorNetwork; kwargs...)
 	if_plot = get(kwargs, :if_plot, false)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, true)
 	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
 	densmat = get(kwargs, :densmat, nothing)
 
-	lat = TTNKit.physical_lattice(TTNKit.network(psi))
+	lat = TTN.physical_lattice(TTN.network(psi))
 
 	phys_length,virt_length = get_lattice_dims(psi)
 	all_corrs = [[] for i in 1:virt_length]
@@ -879,12 +879,12 @@ function physical_distance_correlation(psi::TTNKit.TreeTensorNetwork; kwargs...)
 			#println("Doing site ",(j,s))
 			for jj=1:top#phys_length
 				if isnothing(densmat)
-					corr_val = TTNKit.correlation(psi,"Adag","A",(j,s),(jj,s))
-					corr_val /= sqrt(TTNKit.expect(psi,"N",(j,s)) * TTNKit.expect(psi,"N",(jj,s)))
+					corr_val = TTN.correlation(psi,"Adag","A",(j,s),(jj,s))
+					corr_val /= sqrt(TTN.expect(psi,"N",(j,s)) * TTN.expect(psi,"N",(jj,s)))
 					#corr_val += conj(corr_val)
 				else
-					corr_val = densmat[TTNKit.linear_ind(lat,(j,s)),TTNKit.linear_ind(lat,(jj,s))]
-					normalization = sqrt(densmat[TTNKit.linear_ind(lat,(j,s)),TTNKit.linear_ind(lat,(j,s))] * densmat[TTNKit.linear_ind(lat,(jj,s)),TTNKit.linear_ind(lat,(jj,s))]) 
+					corr_val = densmat[TTN.linear_ind(lat,(j,s)),TTN.linear_ind(lat,(jj,s))]
+					normalization = sqrt(densmat[TTN.linear_ind(lat,(j,s)),TTN.linear_ind(lat,(j,s))] * densmat[TTN.linear_ind(lat,(jj,s)),TTN.linear_ind(lat,(jj,s))]) 
 					corr_val /= normalization
 					#corr_val += conj(corr_val)
 				end
@@ -951,13 +951,13 @@ function correlation_length(dists,phys_correlations; kwargs...)
 	return corr_lengths
 end
 
-function distance_correlation(psi::TTNKit.TreeTensorNetwork; kwargs...)
+function distance_correlation(psi::TTN.TreeTensorNetwork; kwargs...)
 	if_plot = get(kwargs, :if_plot, true)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, true)
 	if_periodic_virt = get(kwargs, :if_periodic_virt, false)
 	densmat = get(kwargs, :densmat, nothing)
 
-	lat = TTNKit.physical_lattice(TTNKit.network(psi))
+	lat = TTN.physical_lattice(TTN.network(psi))
 
 	phys_length,virt_length = get_lattice_dims(psi)
 	all_corrs = []
@@ -966,9 +966,9 @@ function distance_correlation(psi::TTNKit.TreeTensorNetwork; kwargs...)
 		println(round(100*s/(virt_length),digits=2),"%")
 		for ss=1:virt_length, jj=1:phys_length
 			if isnothing(densmat)
-				corr_val = TTNKit.correlation(psi,"Adag","A",(s,j),(ss,jj)) + TTNKit.correlation(psi,"Adag","A",(ss,jj),(s,j))
+				corr_val = TTN.correlation(psi,"Adag","A",(s,j),(ss,jj)) + TTN.correlation(psi,"Adag","A",(ss,jj),(s,j))
 			else
-				corr_val = densmat[TTNKit.linear_ind(lat,(s,j)),TTNKit.linear_ind(lat,(ss,jj))]
+				corr_val = densmat[TTN.linear_ind(lat,(s,j)),TTN.linear_ind(lat,(ss,jj))]
 				corr_val += conj(corr_val)
 			end
 			dist_btw = find_dist((s,j),(ss,jj),(virt_length,phys_length),(if_periodic_virt,if_periodic_phys))
@@ -1003,7 +1003,7 @@ function plot_distance_correlation(dists,corrs,corr_errors; kwargs...)
 	title(title_string)
 end
 
-function momentum_occupation(psi::TTNKit.TreeTensorNetwork,p_count::Int,p_end::Real,direction="phys"; kwargs...)
+function momentum_occupation(psi::TTN.TreeTensorNetwork,p_count::Int,p_end::Real,direction="phys"; kwargs...)
 	if_neg = get(kwargs, :if_neg, true)
 	if_save_data = get(kwargs, :if_save_data, false)
 	if_plot = p_count != 1 ? get(kwargs, :if_plot, false) : false
@@ -1014,7 +1014,7 @@ function momentum_occupation(psi::TTNKit.TreeTensorNetwork,p_count::Int,p_end::R
 	creation = if_fermion ? "Cdag" : "Adag"
 	annihilation = if_fermion ? "C" : "A"
 
-	lat = TTNKit.physical_lattice(TTNKit.network(psi))
+	lat = TTN.physical_lattice(TTN.network(psi))
 
 	if if_neg
 		p_start = -p_end
@@ -1028,10 +1028,10 @@ function momentum_occupation(psi::TTNKit.TreeTensorNetwork,p_count::Int,p_end::R
 	for s=1:virt_length, j=1:phys_length
 		for ss=1:virt_length, jj=1:phys_length
 			if isnothing(densmat)
-				corr_val = TTNKit.correlation(psi,creation,annihilation,(s,j),(ss,jj))
+				corr_val = TTN.correlation(psi,creation,annihilation,(s,j),(ss,jj))
 				corr_val += conj(corr_val)
 			else
-				corr_val = densmat[TTNKit.linear_ind(lat,(s,j)),TTNKit.linear_ind(lat,(ss,jj))]
+				corr_val = densmat[TTN.linear_ind(lat,(s,j)),TTN.linear_ind(lat,(ss,jj))]
 				corr_val += conj(corr_val)
 			end
 			for (i,p) in enumerate(momenta)
@@ -1046,7 +1046,7 @@ function momentum_occupation(psi::TTNKit.TreeTensorNetwork,p_count::Int,p_end::R
 	return momenta,mom_occs
 end
 
-function momentum_occupation(psi::TTNKit.TreeTensorNetwork,p_count::Int,p_end::Real; kwargs...)
+function momentum_occupation(psi::TTN.TreeTensorNetwork,p_count::Int,p_end::Real; kwargs...)
 	if_neg = get(kwargs, :if_neg, true)
 	p_start = get(kwargs, :p_start, 0.0)
 	if_plot = get(kwargs, :if_plot, false)
@@ -1131,7 +1131,7 @@ function loop_sites(starting_site,which_quadrant,phys_length,virt_length; kwargs
 	end
 end
 
-function closed_loop(psi::TTNKit.TreeTensorNetwork, starting_site; kwargs...)
+function closed_loop(psi::TTN.TreeTensorNetwork, starting_site; kwargs...)
 	phys_length,virt_length = get_lattice_dims(psi)
 	which_direction = get(kwargs, :direction, 1)
 	loop_length = get(kwargs, :loop_length, 1)
@@ -1153,17 +1153,17 @@ function closed_loop(psi::TTNKit.TreeTensorNetwork, starting_site; kwargs...)
 	calced_values = zeros(length(sites_to_loop)) .* im
 	for (idx,s) in enumerate(sites_to_loop)
 		next_site = idx == length(sites_to_loop) ? sites_to_loop[1] : sites_to_loop[idx+1]
-		calced_values[idx] = TTNKit.correlation(psi,creation,annihilation,next_site,s)
+		calced_values[idx] = TTN.correlation(psi,creation,annihilation,next_site,s)
 	end
 
 	return angle(prod(calced_values)),calced_values,sites_to_loop
 end
 
-function cdw_structure_factor(rho,qvec::Tuple,psi::TTNKit.TreeTensorNetwork; kwargs...)
+function cdw_structure_factor(rho,qvec::Tuple,psi::TTN.TreeTensorNetwork; kwargs...)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
 	if_periodic_synth = get(kwargs, :if_periodic_synth, false)
 
-	lat = TTNKit.physical_lattice(TTNKit.network(psi))
+	lat = TTN.physical_lattice(TTN.network(psi))
 	phys_len,synth_len = size(lat)[1],size(lat)[2]
 
 	occs = get_occupancy(psi; if_plot=false,densmat=rho)
@@ -1172,11 +1172,11 @@ function cdw_structure_factor(rho,qvec::Tuple,psi::TTNKit.TreeTensorNetwork; kwa
 	for j in 1:phys_len
 		for s in 1:synth_len
 			p1 = (j,s)
-			p1_linear = TTNKit.linear_ind(lat,p1)
+			p1_linear = TTN.linear_ind(lat,p1)
 			for jj in 1:phys_len
 				for ss in 1:synth_len
 					p2 = (jj,ss)
-					p2_linear = TTNKit.linear_ind(lat,p2)
+					p2_linear = TTN.linear_ind(lat,p2)
 					dist = find_dist(p1, p2, (phys_len,synth_len), (if_periodic_phys,if_periodic_synth))[2]
 					struc_fact += occs[p1[1],p1[2]] * occs[p2[1],p2[2]] * exp(im * dot(qvec,dist))
 				end
@@ -1186,7 +1186,7 @@ function cdw_structure_factor(rho,qvec::Tuple,psi::TTNKit.TreeTensorNetwork; kwa
 	return struc_fact / sum(occs)
 end
 
-function cdw_struct_full(rho,psi::TTNKit.TreeTensorNetwork,howmany=100,qmax=3.0; kwargs...)
+function cdw_struct_full(rho,psi::TTN.TreeTensorNetwork,howmany=100,qmax=3.0; kwargs...)
 	if_plot = get(kwargs, :if_plot, true)
 
 	qs = range(-qmax,stop=qmax,length=howmany)
@@ -1209,7 +1209,7 @@ function cdw_struct_full(rho,psi::TTNKit.TreeTensorNetwork,howmany=100,qmax=3.0;
 	return struct_factor,qs
 end
 
-function distance_correlation(rho::Matrix,wavefunc::TTNKit.TreeTensorNetwork,Lx::Int64,Ly::Int64,direction::String="x")
+function distance_correlation(rho::Matrix,wavefunc::TTN.TreeTensorNetwork,Lx::Int64,Ly::Int64,direction::String="x")
     #=if layers % 2 == 0.0
 		Lx = Int(sqrt(2^layers))
 		Ly = Int(sqrt(2^layers))
@@ -1217,7 +1217,7 @@ function distance_correlation(rho::Matrix,wavefunc::TTNKit.TreeTensorNetwork,Lx:
 		Lx = Int(sqrt(2^(layers+1)))
 		Ly = Int(sqrt(2^(layers-1)))
 	end=#
-	lat = TTNKit.physical_lattice(TTNKit.network(wavefunc))
+	lat = TTN.physical_lattice(TTN.network(wavefunc))
 
     if direction == "x"
         len = Lx
@@ -1231,12 +1231,12 @@ function distance_correlation(rho::Matrix,wavefunc::TTNKit.TreeTensorNetwork,Lx:
 
     for x1 in 1:len
         for y1 in 1:other_len
-            s1 = direction == "x" ? TTNKit.linear_ind(lat,(x1,y1)) : TTNKit.linear_ind(lat,(y1,x1))
+            s1 = direction == "x" ? TTN.linear_ind(lat,(x1,y1)) : TTN.linear_ind(lat,(y1,x1))
             for x2 in 1:len-1
                 if x1 == x2
                     continue
                 end
-                s2 = direction == "x" ? TTNKit.linear_ind(lat,(x2,y1)) : TTNKit.linear_ind(lat,(y1,x2))
+                s2 = direction == "x" ? TTN.linear_ind(lat,(x2,y1)) : TTN.linear_ind(lat,(y1,x2))
                 dist_corrs[Int(abs(x1-x2))] += abs(rho[s1,s2])
                 corr_counts[Int(abs(x1-x2))] += 1
             end
@@ -1290,13 +1290,13 @@ function rydberg_2pcorr(rho::Matrix; kwargs...)
 	return dist_corrs
 end
 
-function rydberg_2pcorr(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
+function rydberg_2pcorr(wavefunc::TTN.TreeTensorNetwork; kwargs...)
 	if_plot = get(kwargs, :if_plot, true)
 
-	site_count = Int(2^TTNKit.number_of_layers(wavefunc))
-	coords = TTNKit.physical_coordinates(TTNKit.network(wavefunc))
+	site_count = Int(2^TTN.number_of_layers(wavefunc))
+	coords = TTN.physical_coordinates(TTN.network(wavefunc))
 
-	onsite_occs = abs.(TTNKit.expect(wavefunc,"N"))
+	onsite_occs = abs.(TTN.expect(wavefunc,"N"))
 
 	dist_corrs::Dict{Float64,Vector{Float64}} = Dict()
 	#dist_counts::Dict{Float64,Int64} = Dict()
@@ -1309,9 +1309,9 @@ function rydberg_2pcorr(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
 
 					dist_btw = round(sqrt((x2 - x1)^2 + (y2-y1)^2),digits=4)
 					if dist_btw in keys(dist_corrs)
-						append!(dist_corrs[dist_btw],[abs(TTNKit.correlation(wavefunc,"N","N",s1,s2))])
+						append!(dist_corrs[dist_btw],[abs(TTN.correlation(wavefunc,"N","N",s1,s2))])
 					else
-						dist_corrs[dist_btw] = [abs(TTNKit.correlation(wavefunc,"N","N",s1,s2))]
+						dist_corrs[dist_btw] = [abs(TTN.correlation(wavefunc,"N","N",s1,s2))]
 					end
 					
 					if (x1,y1) == (x2,y2)
@@ -1418,10 +1418,10 @@ end
     return flux_direction
 end=#
 
-function memory_usage(psi::TTNKit.TreeTensorNetwork)
+function memory_usage(psi::TTN.TreeTensorNetwork)
 	number_of_numbers = 0
-	net = TTNKit.network(psi)
-	nlayers = TTNKit.number_of_layers(net)
+	net = TTN.network(psi)
+	nlayers = TTN.number_of_layers(net)
 	for ll in 1:nlayers
 		for pp in 1:2^(nlayers-ll)
 			number_of_numbers += prod(size(psi[(ll,pp)]))
@@ -1496,7 +1496,7 @@ function get_normal_model_params(params_dict::Dict)
 	cutoff = get(params_dict, "cutoff", 1E-8)
 	evolve = get(params_dict, "evolve", true)
 	expander_fraction = get(params_dict, "expander_fraction", 0.1)
-	expan = TTNKit.DefaultExpander(expander_fraction)
+	expan = TTN.DefaultExpander(expander_fraction)
 	noise = get(params_dict, "noise", [0.0])
 	syms = get(params_dict, "syms", true)
 	nswps = get(params_dict, "num_sweeps", 100)
@@ -1700,7 +1700,7 @@ function run_synth_dims_generic(params_dict::Dict)
 
 			if count_found_states < es_count + 1 # found states less than asked for count means run for higher states
 				println("Not Enough States in Data File, Running for $(es_count - count_found_states + 1) more States")
-				ortho_states = Vector{TTNKit.TreeTensorNetwork}(undef,count_found_states)
+				ortho_states = Vector{TTN.TreeTensorNetwork}(undef,count_found_states)
 				ortho_states[1] = found_data[1]["ttn"]
 				for i in 2:count_found_states
 					ortho_states[i] = found_data[1]["ttn_$(i-1)"]
@@ -1711,9 +1711,9 @@ function run_synth_dims_generic(params_dict::Dict)
 
 			else # found states is less than or equal to asked for count means use found states
 				println("Found Data")
-				ortho_states = Vector{TTNKit.TreeTensorNetwork}(undef,es_count+1)
+				ortho_states = Vector{TTN.TreeTensorNetwork}(undef,es_count+1)
 				densmats = Vector{Matrix{ComplexF64}}(undef,es_count+1)
-				obss = Vector{TTNKit.AbstractObserver}(undef,es_count+1)
+				obss = Vector{TTN.AbstractObserver}(undef,es_count+1)
 				runtimes = zeros(es_count+1)
 				if_wavefunc ? ortho_states[1] = found_data[1]["ttn"] : nothing
 				densmats[1] = found_data[1]["densmat"]
