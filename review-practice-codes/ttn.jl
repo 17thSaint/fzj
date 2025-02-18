@@ -745,8 +745,8 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	etol = get(kwargs, :nrgtol, nothing)
 	if_continuous_saving::Bool = get(kwargs, :if_continuous_saving, false)
 	file_path::String = get(kwargs, :file_path, "")
-	measurements = kwargs[:measurements]
-	measurement_functions = kwargs[:measurement_functions]
+	measurements = get(kwargs,:measurements,[])
+	measurement_functions = get(kwargs,:measurement_functions,[])
 
 	# picking the observer
 	if isnothing(etol)
@@ -983,7 +983,7 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 	if if_sweep
 		for i in 1:sweep_iter
 			time_start::Float64 = time()
-			new_ttn::TTN.TreeTensorNetwork, new_ham, new_sp::TTN.AbstractSweepHandler, new_obs = do_sweep(ttn,ham,sweep_type; kwargs...,file_path = location * "/" * actual_filename)
+			new_ttn::TTN.TreeTensorNetwork, new_ham, new_sp::TTN.AbstractSweepHandler, new_obs = do_sweep(ttn,ham,sweep_type; kwargs...,file_path = actual_filename)
 			time_end::Float64 = time()
 			append!(times,[time_end - time_start])
 			#return sp.ttn, ham, sp
@@ -1306,6 +1306,10 @@ function save_ttn(ttn::TTN.TreeTensorNetwork,metadata_dict::Dict,actual_filename
 	if_redo = kwargs[:if_redo]
 	if_densmat = kwargs[:if_densmat]
 	location = kwargs[:location]
+
+	if occursin("cluster-data",actual_filename)
+		actual_filename = split(actual_filename,"/")[end]
+	end
 
 	if if_continuous_saving || if_redo
 		modify_data(metadata_dict,location * "/" * actual_filename,"metadata")

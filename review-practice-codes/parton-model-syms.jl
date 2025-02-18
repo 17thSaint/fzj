@@ -52,7 +52,7 @@ function patron_application!(ttn::TTN.TreeTensorNetwork, wf_coefs::Array, op_ins
         ttn.ortho_direction[pr[1]][pr[2]] = -1
     end
     # now move to the higher layers layer by layer, excluding the top node
-    TTN.ITensors.set_warn_order(20)
+    #TTN.ITensorMPS.set_warn_order(20)
     for ll in 2:TTN.number_of_layers(net)-1
         for p in 1:TTN.number_of_tensors(net, ll)
             pp = (ll, p)
@@ -173,7 +173,7 @@ function ttn_2d_mapping(size)
 end
 
 function construct_first_layer(mpo,mapping,net)
-    bEnvironment = Vector{ITensor}(undef, 1) 
+    bEnvironment = Vector{TTN.ITensor}(undef, 1) 
 
     bEnvironment = map(eachindex(net,1)) do pp
         chdnds = TTN.child_nodes(net, (1,pp))
@@ -205,7 +205,7 @@ function wf_mpo(wf, net, op_ins)
     
     rez_data = construct_first_layer(mpo,mapping,net)
     
-    remapped_mpo::Vector{ITensor} = []
+    remapped_mpo::Vector{TTN.ITensor} = []
     for i in 1:size(rez_data,1)
         for j in 1:size(rez_data[i],1)
             append!(remapped_mpo,[rez_data[i][j]])

@@ -644,13 +644,13 @@ end
 
 function make_qnset(op_string::String)
     if op_string == "A"
-        return [QN("Number",0)=>1,QN("Number",-1)=>1]
+        return [TTN.QN("Number",0)=>1,TTN.QN("Number",-1)=>1]
     elseif op_string == "Adag"
-        return [QN("Number",0)=>1,QN("Number",1)=>1]
+        return [TTN.QN("Number",0)=>1,TTN.QN("Number",1)=>1]
     elseif op_string == "N"
-        return [QN("Number",0)=>2]
+        return [TTN.QN("Number",0)=>2]
     elseif op_string == "2pt"
-        return [QN("Number",0)=>2,QN("Number",-1)=>1,QN("Number",1)=>1]
+        return [TTN.QN("Number",0)=>2,TTN.QN("Number",-1)=>1,TTN.QN("Number",1)=>1]
     else
         error("Invalid operator string")
     end
@@ -662,7 +662,7 @@ function ft_coeff(phys_site::Tuple{Int,Int},momentum::Vector{Float64},op_type::S
 end
 
 function ft_coeff(phys_site::TTN.Index,momentum::Vector{Float64},op_type::String,lx::Int,ly::Int)
-    index_tag = string(tags(phys_site))
+    index_tag = string(TTN.tags(phys_site))
     @assert occursin("Site",index_tag)
 
     lin_ind = parse(Int,match(r"n=(\d+)",index_tag)[1])
@@ -688,7 +688,7 @@ function construct_top_node_environments(ttn::TTN.TreeTensorNetwork, tpo::TTN.MP
     end
 	
 	for ll in Iterators.drop(TTN.eachlayer(net), 1)
-        #println("Constructing top node environments for layer $ll")
+        println("Constructing top node environments for layer $ll")
 		bEnvironment_new = Vector{Vector{TTN.ITensor}}(undef, TTN.number_of_tensors(net, ll))
 		for pp in eachindex(net, ll)
 			n_chds = TTN.number_of_child_nodes(net, (ll,pp))
@@ -703,15 +703,18 @@ function construct_top_node_environments(ttn::TTN.TreeTensorNetwork, tpo::TTN.MP
 					bEnvironment[chd[2]][TTN.index_of_child(net, cc)]
 				end
                 #println("At layer $ll and child $chd the tensorListBottom is")
-                #display(inds.(tensorListBottom))
-				tlist = vcat(Tn, tensorListBottom, prime(dag(Tn)))
-                #display(prod(prod.(TTN.ITensorMPS.dims.(tlist))))
-                #display(inds.(tlist))
-				opt_seq = ITensorMPS.optimal_contraction_sequence(tlist)
+                #display(TTN.inds.(tensorListBottom))
+                #display(TTN.tags.(TTN.inds(Tn)))
+                #display([TTN.tags.(in) for in in TTN.inds.(tensorListBottom)])
+				tlist = vcat(Tn, tensorListBottom, TTN.prime(TTN.dag(Tn)))
+                display(prod(prod.(TTN.ITensorMPS.dims.(tlist))))
+                #display(TTN.dims.(tlist))
+				opt_seq = TTN.optimal_contraction_sequence(tlist)
 				bEnvironment_new[pp][chd_idx] = contract(tlist; sequence = opt_seq)
                 #println("Now showing after contraction tags \n")
-                #display(inds(bEnvironment_new[pp][chd_idx]))
+                #display(TTN.inds(bEnvironment_new[pp][chd_idx]))
                 #display(prod(TTN.ITensorMPS.dims(bEnvironment_new[pp][chd_idx])))
+                #display(TTN.tags.(TTN.inds(bEnvironment_new[pp][chd_idx])))
 			end
 		end
 		bEnvironment = bEnvironment_new
@@ -724,9 +727,48 @@ function calculate_mpo_expectation(ttn::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapp
     println("Finished making environments")
     #display(inds.(topenvs))
 	T = ttn[TTN.number_of_layers(ttn), 1]
-	tlist = [T, topenvs..., prime(dag(T))]
-	opt_seq = ITensorMPS.optimal_contraction_sequence(tlist)
-	return scalar(contract(tlist; sequence = opt_seq))
+	tlist = [T, topenvs..., TTN.prime(TTN.dag(T))]
+	opt_seq = TTN.optimal_contraction_sequence(tlist)
+	return TTN.scalar(contract(tlist; sequence = opt_seq))
+end
+
+function zigzag_curve(lat::TTN.AbstractLattice)
+    return zigzag_curve(lat.dims[1],lat.dims[2])
+end
+
+function zigzag_curve(lx::Int,ly::Int)
+    curve::Vector{Int} = zeros(Int,ly*lx)
+    num_quadrants::Int = Int(lx*ly/4)
+
+    starting_point = (1,1)
+    for q in 1:num_quadrants
+        # add starting point
+        curve[4*(q-1) + 1] = linear_index(starting_point,lx,ly)
+
+        # move right one point
+        p2 = starting_point .+ (1,0)
+        curve[4*(q-1) + 2] = linear_index(p2,lx,ly)
+
+        # move diagonally up and left
+        p3 = p2 .+ (-1,1)
+        curve[4*(q-1) + 3] = linear_index(p3,lx,ly)
+
+        # move right one point
+        p4 = p3 .+ (1,0)
+        curve[4*(q-1) + 4] = linear_index(p4,lx,ly)
+
+        # reset starting point
+        isodd(q) && (starting_point = p4 .+ (1,-1))
+        if iseven(q)
+            if (q-2) % 4 == 0
+                starting_point = p4 .+ (-3,1)
+            elseif (q-2) % 4 == 2
+                starting_point = p4 .+ (1,-3)
+            end
+        end
+    end
+
+    return curve
 end
 
 function make_mpowrapper(mpo::TTN.MPO, lat::L; mapping::Vector{Int} = collect(eachindex(lat))) where{L}
@@ -742,9 +784,16 @@ function make_mpowrapper(mpo::TTN.MPO, lat::L; mapping::Vector{Int} = collect(ea
         #println("working on wrapping site $jj")
         sj_lat = idx_lat[jj]
         sj_mpo = idx_mpo[jj]
-        mpoc[idx] = replaceinds!(mpoc[jj], sj_mpo => sj_lat, prime(sj_mpo) => prime(sj_lat))
+        mpoc[idx] = TTN.replaceinds!(mpoc[jj], sj_mpo => sj_lat, TTN.prime(sj_mpo) => TTN.prime(sj_lat))
     end
-    return TTN.MPOWrapper{L, MPO, TTN.ITensorMPSBackend}(lat, mpoc, mapping)
+    return TTN.MPOWrapper{L, TTN.MPO}(lat, mpoc, mapping)
+end
+
+function easy_mpowrapper(mpo::TTN.MPO, lat::L; mapping::Vector{Int} = collect(eachindex(lat))) where{L}
+    @assert TTN.is_physical(lat)
+    @assert length(lat) == length(mpo)
+
+    return TTN.MPOWrapper{L, TTN.MPO}(lat, mpo, mapping)
 end
 
 function build_W_singlepoint(op_type::String,coeff::ComplexF64)
@@ -771,21 +820,23 @@ function build_W_singlepoint(op_type::String,coeff::ComplexF64)
     return M
 end
 
-function build_links_singlepoint(op_type::String,L::Int)
-    links = Vector{Index}(undef,L+1)
+function build_links_singlepoint(op_type::String,L::Int; kwargs...)
+    mapping = kwargs[:mapping]
+    links = Vector{TTN.Index}(undef,L+1)
     for i in 0:L
         qnset = make_qnset(op_type)
         if i == 0
             left_tag = "Start"
-            right_tag = string(i+1)
+            right_tag = string(mapping[i+1])
         elseif i == L
-            left_tag = string(i)
+            left_tag = string(mapping[i])
             right_tag = "End"
         else
-            left_tag = string(i)
-            right_tag = string(i+1)
+            #println("At link $i which is physical site $(mapping[i]) which has left tag $(string(mapping[i])) and right tag $(string(mapping[i+1]))")
+            left_tag = string(mapping[i])
+            right_tag = string(mapping[i+1])
         end
-        links[i+1] = Index(qnset; tags="Link,Left=$left_tag,Right=$right_tag")
+        links[i+1] = TTN.Index(qnset; tags="Link,Left=$left_tag,Right=$right_tag")
     end
     return links
 end
@@ -798,11 +849,13 @@ function single_point_mpo(wavefunc::TTN.TreeTensorNetwork,op_type::String; kwarg
     lat = TTN.physical_lattice(wavefunc.net)
     lx::Int,ly::Int = size(lat)
 
-    phys_sites = TTN.sites(wavefunc)
+    mapping = kwargs[:mapping]
 
-    links = build_links_singlepoint(op_type,length(phys_sites))
+    phys_sites = TTN.sites(wavefunc)[mapping]
 
-    tensor_train = Vector{ITensor}(undef,length(phys_sites))
+    links = build_links_singlepoint(op_type,length(phys_sites); mapping=mapping)
+
+    tensor_train = Vector{TTN.ITensor}(undef,length(phys_sites))
     for (idx,s) in enumerate(phys_sites)
         opl > 1 && println("Working on Physical Site $(TTN.tags(s))")
 
@@ -810,32 +863,32 @@ function single_point_mpo(wavefunc::TTN.TreeTensorNetwork,op_type::String; kwarg
 
         mat = build_W_singlepoint(op_type,coeff)
 
-        local_inds = [links[idx],dag(s),dag(links[idx+1]),prime(s)]
+        local_inds = [links[idx],TTN.dag(s),TTN.dag(links[idx+1]),TTN.prime(s)]
 
-        mit = ITensor(mat,local_inds)
+        mit = TTN.ITensor(mat,local_inds)
 
         if idx == 1
-			mit = mit * dag(onehot(links[1] => 1))
+			mit = mit * TTN.dag(TTN.onehot(links[1] => 1))
 		elseif idx == length(phys_sites)
-			mit = mit * (onehot(links[end] => 2))
+			mit = mit * (TTN.onehot(links[end] => 2))
 		end
         
         tensor_train[idx] = mit
     end
 
     if if_wrap
-        return make_mpowrapper(MPO(tensor_train),lat)
+        return make_mpowrapper(TTN.MPO(tensor_train),lat)
     else
-        return MPO(tensor_train)
+        return TTN.MPO(tensor_train)
     end
 end
 
 function set_single_prime(mpo::TTN.MPO)
     for t in mpo
-        for i in inds(t)
-            if plev(i) > 1
-                new_ind = setprime(i,1)
-                replaceinds!(t,i => new_ind)
+        for i in TTN.inds(t)
+            if TTN.plev(i) > 1
+                new_ind = TTN.setprime(i,1)
+                TTN.replaceinds!(t,i => new_ind)
             end
         end
     end
@@ -850,7 +903,7 @@ function two_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     annih = single_point_mpo(wavefunc,"A"; kwargs...,if_wrap=false)
     println("Made Annihilation")
 
-    rho = prime(creat) * annih
+    rho = TTN.prime(creat) * annih
 
     rho = set_single_prime(rho)
 
@@ -866,35 +919,23 @@ function four_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
 
     k1::Vector{Float64} = get(kwargs,:momentum1,[0.0,0.0])
     k2::Vector{Float64} = get(kwargs,:momentum2,[0.0,0.0])
+    mapping::Vector{Int} = get(kwargs,:mapping,collect(1:TTN.number_of_sites(wavefunc.net)))
 
-    creat1 = single_point_mpo(wavefunc,"Adag"; momentum=k1,if_wrap=false)
+    creat1 = single_point_mpo(wavefunc,"Adag"; momentum=k1,if_wrap=false,mapping=mapping)
     println("Made Creation 1")
-    creat2 = single_point_mpo(wavefunc,"Adag"; momentum=k2,if_wrap=false)
+    creat2 = single_point_mpo(wavefunc,"Adag"; momentum=k2,if_wrap=false,mapping=mapping)
     println("Made Creation 2")
-    annih1 = single_point_mpo(wavefunc,"A"; momentum=k2,if_wrap=false)
+    annih1 = single_point_mpo(wavefunc,"A"; momentum=k2,if_wrap=false,mapping=mapping)
     println("Made Annihilation 1")
-    annih2 = single_point_mpo(wavefunc,"A"; momentum=k1,if_wrap=false)
+    annih2 = single_point_mpo(wavefunc,"A"; momentum=k1,if_wrap=false,mapping=mapping)
     println("Made Annihilation 2")
 
-    fourpt = (prime(creat1) * creat2) * prime(prime(prime(annih1) * annih2))
+    #fourpt = (TTN.prime(creat1) * creat2) * TTN.prime(TTN.prime(TTN.prime(annih1) * annih2))
 
-    fourpt = set_single_prime(fourpt)
+    #fourpt = set_single_prime(fourpt)
 
-    if if_wrap
-        return make_mpowrapper(fourpt,TTN.physical_lattice(wavefunc.net))
-    else
-        return fourpt
-    end
-end
+    return apply(apply(creat1, creat2), apply(annih1, annih2))
 
-function reshape_mpo_to_matrix(mpo::TTN.MPO)
-    s1 = [siteinds(mpo)[i][1] for i in 1:4]
-    s2 = [siteinds(mpo)[i][2] for i in 1:4]
-    cm1 = combiner(s1)
-    cm2 = combiner(s2)
-    
-    rez = (contract(mpo) * cm1) * cm2
-    return Matrix(rez,inds(rez)[1],inds(rez)[2])
 end
 
 

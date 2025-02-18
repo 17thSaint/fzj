@@ -18,7 +18,7 @@ Depends on:
 include("../other-funcs/include-other-files.jl")
 include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","exact-diag/execute-ed.jl","exact-diag/observables.jl"])
 #include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
-include_other_files(["other-funcs/basic-2d-plottings.jl","review-practice-codes/plottings.jl","exact-diag/plottings.jl"])
+#include_other_files(["other-funcs/basic-2d-plottings.jl","review-practice-codes/plottings.jl","exact-diag/plottings.jl"])
 
 function plot_nrg_vs_intstren_fromdata_ttn(layers::Int64,which_strens::Union{String,Vector{Float64}}="all"; kwargs...)
     hanis = get(kwargs, :hopping_anisotropy, 1.0)
@@ -136,7 +136,7 @@ function plot_nrg_vs_intstren_fromdata_ed(lx::Int64,ly::Int64,which_strens::Unio
 end
 
 
-# look at finite size scaling of commensurate filling interaction strength spectrum
+#= look at finite size scaling of commensurate filling interaction strength spectrum
 if false
     eight_xs, eight_ys = plot_nrg_vs_intstren_fromdata_ttn(6; particles=8, if_gap=true,if_plot=false)
     four_xs, four_ys = plot_nrg_vs_intstren_fromdata_ed(4,8; particles=4, if_gap=true,if_plot=false)
@@ -565,10 +565,72 @@ if false
 
 end
 
-# do 4pt momentum MPO
+# test zigzag curve
 if false
-    fourpt = four_point_mpo(psi; momentum1 = [0.0,0.0], momentum2 = [0.0,0.0])
+    lx,ly = 8,4
+    zc = zigzag_curve(lx,ly)
+    display(zc)
+end=#
+
+# do 4pt momentum MPO
+if true
+    lx,ly,n = 4,4,4
+    layers = Int(log(2,lx*ly))
+    intstren = 0.0
+
+    #=dataloc = get_folder_location("cluster-data/synth-dims/torus")
+    pdict = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc)
+    display(all_files)
+
+    d,m = read_data(dataloc * "/" * all_files[1]; output_level=0)
+    psi = d["ttn"]
+    mom2 = [4/lx,0.0]
+    ks = [n/lx for n in 0:lx]
+    vals = zeros(Float64,length(ks))
+    kx = ks[1]=#
+    #for (idx,kx) in enumerate(ks)
+
+
+
+    #=
+    net = TTN.BinaryNetwork((lx,ly),"Boson"; conserve_qns=true)
+    psi = TTN.RandomTreeTensorNetwork(net)
+    zc = zigzag_curve(TTN.physical_lattice(net))
+    ihc = TTN.inverse_mapping(TTN.hilbert_curve(TTN.physical_lattice(net)))
+    fourpt = four_point_mpo(psi; momentum1 = [kx,0.0], momentum2 = mom2, if_wrap=true)
     val = real(calculate_mpo_expectation(psi,fourpt))
+    println("For kx = $kx, val = $val")
+    =#
+    #=all_dims = []
+    locs = []
+    for i in 1:lx*ly
+        local_ind = TTN.inds.(fourpt.data)[i]
+        link_inds = filter(x -> occursin("Link",string(TTN.tags(x))),local_ind)
+        append!(all_dims,[prod(TTN.dims(link_inds))])
+    end=#
+
+
+    net = BinaryNetwork((lx,ly), "Boson"; conserve_qns=true)
+    lat = physical_lattice(net)
+    psi = RandomTreeTensorNetwork(net)
+
+    #mapss = TTN.hilbert_curve(lat)
+    mapss = zigzag_curve(lat)
+
+    mom2 = [4/lx,0.0]
+    ks = [n/lx for n in 0:lx]
+    #vals = zeros(Float64,length(ks))
+    kx = ks[1]
+
+    nb_op = four_point_mpo(psi; momentum1 = [kx,0], momentum2=mom2, if_wrap=false, mapping = (mapss))
+    #nb_op_wrapped = make_mpowrapper(nb_op, lat; mapping=TTN.inverse_mapping(mapss))
+    nb_op_wrapped = easy_mpowrapper(nb_op, lat; mapping=(mapss))
+
+    val = calculate_mpo_expectation(psi, nb_op_wrapped)
+    println("For kx = $kx, val = $val")
+
+
 end
 
 

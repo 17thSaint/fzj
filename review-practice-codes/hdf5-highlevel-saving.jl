@@ -151,6 +151,33 @@ function HDF5.read(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, ex
     return TTN.DefaultExpander(p; min=min)
 end
 
+function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, measurement_functions::Vector{NamedTuple})
+    group = create_group(parent, name)
+
+    for (i, val) in enumerate(measurement_functions)
+        write(group, "measurement_$i", named_tuple_to_dict(val))
+    end
+end
+
+function HDF5.read(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, measurement_functions::Type{<:Vector{NamedTuple}})
+    group = open_group(parent, name)
+
+    measurement_functions = []
+
+    for i in 1:length(group)
+        local_subgroup = open_group(group, "measurement_$i")
+
+        measurement = Dict{String,Any}()
+        for key in keys(local_subgroup)
+            measurement[key] = read(local_subgroup, key)
+        end
+
+        append!(measurement_functions, [dict_to_symbols(measurement)])
+    end
+
+    return measurement_functions
+end
+
 
 
 

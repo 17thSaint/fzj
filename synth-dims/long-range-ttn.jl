@@ -3,7 +3,7 @@
 include("../review-practice-codes/ttn.jl")
 include("../other-funcs/basic-2d-stuff.jl")
 include("../review-practice-codes/observables.jl")
-include("../review-practice-codes/plottings.jl")
+#include("../review-practice-codes/plottings.jl")
 using Profile,MKL
 
 function spin_matrix_element(m1,m2,spin,direction::String)
@@ -1586,7 +1586,8 @@ function get_normal_model_params(params_dict::Dict)
 	save_data ? nothing : if_continuous_saving = false
 	es_count = get(params_dict, "es_count", 0)
 	
-	measurement_functions::Vector{NamedTuple} = construct_measurement_info(get(params_dict, "all_measurements", String[]))
+	all_measurements = get(params_dict, "all_measurements", String[])
+	measurement_functions::Vector{NamedTuple} = construct_measurement_info(all_measurements)
 	measurements::Dict{String,Any} = Dict()
 	for info_tuple in measurement_functions
 		measurements[info_tuple[:name]] = nothing
@@ -1666,12 +1667,14 @@ function get_normal_model_params(params_dict::Dict)
 						"mdim"=>mdim,
 						"num_sweeps"=>nswps,
 						"phi"=>alpha,
-						"measurements"=>measurements,
-						"measurement_functions"=>measurement_functions,
 						"output_level"=>0,
 						"location"=>loc,
 						"if_memobs"=>if_memobs)
 		
+	if length(all_measurements) > 0
+		model_paras_dict["measurements"] = measurements
+		model_paras_dict["measurement_functions"] = measurement_functions
+	end
 	filename = make_synthdims_filename(model_paras_dict)
 	model_paras_dict["name"] = "ttn-"*filename
 	
@@ -1691,6 +1694,7 @@ function run_synth_dims_generic(params_dict::Dict)
 		#
 	println(model_paras[:name])
 	filename_dict = get_params_dict_from_filename(model_paras[:name])
+	println("Location for data is $(model_paras[:location])")
 	if_exists,found_data = if_find_data ? check_data_exists(filename_dict,"ttn"; location=model_paras[:location],output_level=false) : (false,nothing)
 
 	if if_exists
@@ -1979,7 +1983,7 @@ if false
 	#for tw1 in tws
 	#for tw2 in tws
 		#("all_measurements",["densitydensity","occs"])
-		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",0),("expander_fraction",0.5),("particles",4),("layers",5),("mdim",100),("if_save_data",true),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",0),("expander_fraction",100),("particles",4),("layers",5),("mdim",300),("if_save_data",true),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		open_cores = get(params_dict, "open_cores", 5)

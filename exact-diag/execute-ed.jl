@@ -43,7 +43,7 @@ end
 
 
 include_other_files(["other-funcs/basic-2d-stuff.jl","other-funcs/basic-2d-observables.jl","exact-diag/two-dimensions.jl","exact-diag/observables.jl","exact-diag/hatsugai-mbcn.jl"])
-include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
+#include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
 
 function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     if hamilt_params["U"][2] == 0.0

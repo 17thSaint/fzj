@@ -127,7 +127,7 @@ function get_params_dict_from_filename(filename)
 	params_dict = Dict()
 	
 	file_type = split(filename,".")[end]
-	if file_type == "png" || file_type == "jld2" || file_type == "hdf5"
+	if file_type == "png" || file_type == "jld2" || file_type == "h5"
 		filename = join(split(filename,".")[1:end-1],".")
 	end
 	if split(filename,"-")[1] in ["virt","phys","Y","X"]
@@ -613,6 +613,7 @@ function write_data_hdf5(file_name::AbstractString,data::Dict,metadata::Dict; kw
 	data = check_dict(data)
 	metadata = check_dict(metadata)
 
+	#display(file_name)
 	h5open(file_name,"w") do f
 		g_alldata = create_group(f,"all_data")
 		for (datum_key,datum) in data
@@ -674,13 +675,13 @@ function modify_data_hdf5(key_to_modify::String, new_value, file_path, which_gro
 	output_level = get(kwargs, :output_level, 0)
 	
 	h5open(file_path,"r+") do f
-		g_datagroup = open_group(f,which_group)
+		g_datagroup = f[which_group]
 		if haskey(g_datagroup, key_to_modify)
-			delete!(g_datagroup, key_to_modify)
+			delete_object(g_datagroup, key_to_modify)
 			write(g_datagroup, key_to_modify, new_value)
-			output_level > 0 ? println("Value associated with key $key_to_modify has been modified.") : nothing
+			output_level > 0 && println("Value associated with key $key_to_modify has been modified.")
 		else
-			output_level > 0 ? println("Key $key_to_modify does not exist in the file. Making it") : nothing
+			output_level > 0 && println("Key $key_to_modify does not exist in the file. Making it")
 			write(g_datagroup, key_to_modify, new_value)
 		end
 	end
@@ -692,14 +693,14 @@ function modify_data_hdf5(to_modify_dict::Dict,file_path, which_group="all_data"
 	output_level = get(kwargs, :output_level, 0)
 
 	h5open(file_path,"r+") do f
-		g_datagroup = open_group(f,which_group)
+		g_datagroup = f[which_group]
 		for (k,v) in to_modify_dict
 			if haskey(g_datagroup, k)
-				delete!(g_datagroup, k)
+				delete_object(g_datagroup, k)
 				write(g_datagroup, k, v)
-				output_level > 0 ? println("Value associated with key $k has been modified.") : nothing
+				output_level > 0 && println("Value associated with key $k has been modified.")
 			else
-				output_level > 0 ? println("Key $k does not exist in the file. Making it") : nothing
+				output_level > 0 && println("Key $k does not exist in the file. Making it")
 				write(g_datagroup, k, v)
 			end
 		end
@@ -708,6 +709,16 @@ function modify_data_hdf5(to_modify_dict::Dict,file_path, which_group="all_data"
 	return split(file_path,"/")[end]
 end
 
+
+function read_data(file_name::String,location::String; kwargs...)
+	if occursin("jld2",file_name)
+		return read_data_jld2(file_name,location; kwargs...)
+	elseif occursin("h5",file_name)
+		return read_data_hdf5(location * "/" * file_name; kwargs...)
+	else
+		error("File Type not recognized")
+	end
+end
 
 function read_data(file_name; kwargs...)
 	if occursin("jld2",file_name)
@@ -721,13 +732,18 @@ function read_data(file_name; kwargs...)
 	end
 end
 
-function write_data(file_name,data,metadata; kwargs...)
+function write_data(file_name::String,data::Dict,location::String,metadata::Dict; kwargs...)
+	return write_data(location * "/" * file_name,data,metadata; kwargs...)
+end
+
+function write_data(file_name::String,data::Dict,metadata::Dict; kwargs...)
 	if occursin("jld2",file_name)
 		return write_data_jld2(file_name,data,metadata; kwargs...)
 	elseif occursin("h5",file_name)
 		return write_data_hdf5(file_name,data,metadata; kwargs...)
 	else
-		error("File Type not recognized")
+		#println("No file type recognized so doing HDF5")
+		return write_data_hdf5(file_name,data,metadata; kwargs...)
 	end
 end
 
