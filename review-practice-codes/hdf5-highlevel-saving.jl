@@ -146,9 +146,26 @@ function HDF5.read(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, ex
     group = open_group(parent, name)
 
     p = read(group, "p")
+    p == 0.0 && return HDF5.read(parent, name, TTN.NoExpander)
     min = read(group, "min")
 
     return TTN.DefaultExpander(p; min=min)
+end
+
+function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, expander::TTN.NoExpander)
+    group = create_group(parent, name)
+
+    write(group, "p", 0.0)
+end
+
+function HDF5.read(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, expander::Type{<:TTN.NoExpander})
+    group = open_group(parent, name)
+
+    return TTN.NoExpander()
+end
+
+function TTN._padding(j::TTN.Index{Vector{Pair{TTN.QN, Int}}}, jp::TTN.Index{Vector{Pair{TTN.QN, Int}}}, p::Int, min::Int; tags = "Padded", kwargs...)
+    return TTN._padding(j,jp,p; tags = "Padded", kwargs...)
 end
 
 function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, measurement_functions::Vector{NamedTuple})

@@ -573,65 +573,66 @@ if false
 end=#
 
 # do 4pt momentum MPO
-if true
-    lx,ly,n = 4,4,4
+if false
+    lx,ly,n = 8,4,4
     layers = Int(log(2,lx*ly))
     intstren = 0.0
 
-    #=dataloc = get_folder_location("cluster-data/synth-dims/torus")
+    dataloc = get_folder_location("cluster-data/synth-dims/torus")
+    pdict = Dict([("layers",layers),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc)
+    display(all_files)
+
+    #d,m = read_data(dataloc * "/" * all_files[1]; output_level=0)
+    #=psi = d["ttn"]
+    lat = TTN.physical_lattice(psi.net)
+
+
+
+    mapss = zigzag_curve(lx,ly)
+
+    mom2 = [0.5,0.0]
+    ks = [n/lx for n in 0:lx]
+    vals = zeros(Float64,length(ks))
+    for (idx,kx) in enumerate(ks)
+        fourpt = four_point_mpo(psi; momentum1 = [kx,0], momentum2 = mom2, mapping = mapss)
+        fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
+
+        fourpt_val = real(calculate_mpo_expectation(psi, fourpt_wrapped))
+        vals[idx] = fourpt_val
+    end
+
+    scatter([n-1 for n in 1:length(vals)-1],vals[1:end-1] ./ (lx*ly)^2)
+    xlabel("kx")
+    ylabel("Four Point Momentum")=#
+end
+
+# plot 4pt momentum
+if true
+    lx,ly,n = 8,4,4
+    layers = Int(log(2,lx*ly))
+    intstren = 100.0
+
+    dataloc = get_folder_location("cluster-data/synth-dims/torus")
     pdict = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc)
     display(all_files)
 
     d,m = read_data(dataloc * "/" * all_files[1]; output_level=0)
-    psi = d["ttn"]
-    mom2 = [4/lx,0.0]
-    ks = [n/lx for n in 0:lx]
-    vals = zeros(Float64,length(ks))
-    kx = ks[1]=#
-    #for (idx,kx) in enumerate(ks)
 
+    vals = m["fourpt_momentum"]
 
-
-    #=
-    net = TTN.BinaryNetwork((lx,ly),"Boson"; conserve_qns=true)
-    psi = TTN.RandomTreeTensorNetwork(net)
-    zc = zigzag_curve(TTN.physical_lattice(net))
-    ihc = TTN.inverse_mapping(TTN.hilbert_curve(TTN.physical_lattice(net)))
-    fourpt = four_point_mpo(psi; momentum1 = [kx,0.0], momentum2 = mom2, if_wrap=true)
-    val = real(calculate_mpo_expectation(psi,fourpt))
-    println("For kx = $kx, val = $val")
-    =#
-    #=all_dims = []
-    locs = []
-    for i in 1:lx*ly
-        local_ind = TTN.inds.(fourpt.data)[i]
-        link_inds = filter(x -> occursin("Link",string(TTN.tags(x))),local_ind)
-        append!(all_dims,[prod(TTN.dims(link_inds))])
-    end=#
-
-
-    net = BinaryNetwork((lx,ly), "Boson"; conserve_qns=true)
-    lat = physical_lattice(net)
-    psi = RandomTreeTensorNetwork(net)
-
-    #mapss = TTN.hilbert_curve(lat)
-    mapss = zigzag_curve(lat)
-
-    mom2 = [4/lx,0.0]
-    ks = [n/lx for n in 0:lx]
-    #vals = zeros(Float64,length(ks))
-    kx = ks[1]
-
-    nb_op = four_point_mpo(psi; momentum1 = [kx,0], momentum2=mom2, if_wrap=false, mapping = (mapss))
-    #nb_op_wrapped = make_mpowrapper(nb_op, lat; mapping=TTN.inverse_mapping(mapss))
-    nb_op_wrapped = easy_mpowrapper(nb_op, lat; mapping=(mapss))
-
-    val = calculate_mpo_expectation(psi, nb_op_wrapped)
-    println("For kx = $kx, val = $val")
-
+    moms = [n for n in 0:lx]
+    fig = figure()
+    ys = vals[:,1] ./ (lx*ly)^2
+    scatter(moms,ys)
+    xlabel("kx")
+    ylabel("Four Point Momentum")
+    ylim([0.0,1.1*maximum(ys)])
+        
 
 end
+    
 
 
 

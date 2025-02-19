@@ -1495,7 +1495,7 @@ function get_normal_model_params(params_dict::Dict)
 	nrgtol = get(params_dict, "nrgtol", 5E-5)
 	cutoff = get(params_dict, "cutoff", 1E-8)
 	evolve = get(params_dict, "evolve", true)
-	expander_fraction = get(params_dict, "expander_fraction", 0.1)
+	expander_fraction = get(params_dict, "expander_fraction", 0.0)
 	expan = TTN.DefaultExpander(expander_fraction)
 	noise = get(params_dict, "noise", [0.0])
 	syms = get(params_dict, "syms", true)
@@ -1983,7 +1983,7 @@ if false
 	#for tw1 in tws
 	#for tw2 in tws
 		#("all_measurements",["densitydensity","occs"])
-		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",0),("expander_fraction",100),("particles",4),("layers",5),("mdim",300),("if_save_data",true),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",0),("particles",2),("layers",4),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		open_cores = get(params_dict, "open_cores", 5)

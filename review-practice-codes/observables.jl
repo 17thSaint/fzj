@@ -707,13 +707,13 @@ function construct_top_node_environments(ttn::TTN.TreeTensorNetwork, tpo::TTN.MP
                 #display(TTN.tags.(TTN.inds(Tn)))
                 #display([TTN.tags.(in) for in in TTN.inds.(tensorListBottom)])
 				tlist = vcat(Tn, tensorListBottom, TTN.prime(TTN.dag(Tn)))
-                display(prod(prod.(TTN.ITensorMPS.dims.(tlist))))
+                #display(prod(prod.(TTN.ITensorMPS.dims.(tlist))))
                 #display(TTN.dims.(tlist))
 				opt_seq = TTN.optimal_contraction_sequence(tlist)
 				bEnvironment_new[pp][chd_idx] = contract(tlist; sequence = opt_seq)
                 #println("Now showing after contraction tags \n")
                 #display(TTN.inds(bEnvironment_new[pp][chd_idx]))
-                #display(prod(TTN.ITensorMPS.dims(bEnvironment_new[pp][chd_idx])))
+                #display(TTN.ITensorMPS.dims(bEnvironment_new[pp][chd_idx]))
                 #display(TTN.tags.(TTN.inds(bEnvironment_new[pp][chd_idx])))
 			end
 		end
@@ -759,11 +759,19 @@ function zigzag_curve(lx::Int,ly::Int)
 
         # reset starting point
         isodd(q) && (starting_point = p4 .+ (1,-1))
+
+        haystack = 8 .* [1,2,3,4]
         if iseven(q)
-            if (q-2) % 4 == 0
-                starting_point = p4 .+ (-3,1)
-            elseif (q-2) % 4 == 2
-                starting_point = p4 .+ (1,-3)
+            if q in haystack
+                renorm_val = Int(q/8)
+                isodd(renorm_val) && (starting_point = p4 .+ (-7,1))
+                iseven(renorm_val) && (starting_point = p4 .+ (1,-7))
+            else
+                if (q-2) % 4 == 0
+                    starting_point = p4 .+ (-3,1)
+                elseif (q-2) % 4 == 2
+                    starting_point = p4 .+ (1,-3)
+                end
             end
         end
     end
@@ -842,7 +850,6 @@ function build_links_singlepoint(op_type::String,L::Int; kwargs...)
 end
 
 function single_point_mpo(wavefunc::TTN.TreeTensorNetwork,op_type::String; kwargs...)
-    if_wrap::Bool = get(kwargs,:if_wrap,true)
     opl::Int = get(kwargs,:opl,1)
     mom::Vector{Float64} = get(kwargs,:momentum,[0.0,0.0])
 
@@ -876,63 +883,37 @@ function single_point_mpo(wavefunc::TTN.TreeTensorNetwork,op_type::String; kwarg
         tensor_train[idx] = mit
     end
 
-    if if_wrap
-        return make_mpowrapper(TTN.MPO(tensor_train),lat)
-    else
-        return TTN.MPO(tensor_train)
-    end
-end
-
-function set_single_prime(mpo::TTN.MPO)
-    for t in mpo
-        for i in TTN.inds(t)
-            if TTN.plev(i) > 1
-                new_ind = TTN.setprime(i,1)
-                TTN.replaceinds!(t,i => new_ind)
-            end
-        end
-    end
-    return mpo
+    return TTN.MPO(tensor_train)
 end
 
 function two_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
-    if_wrap::Bool = get(kwargs,:if_wrap,true)
-
-    creat = single_point_mpo(wavefunc,"Adag"; kwargs...,if_wrap=false)
-    println("Made Creation")
-    annih = single_point_mpo(wavefunc,"A"; kwargs...,if_wrap=false)
-    println("Made Annihilation")
-
-    rho = TTN.prime(creat) * annih
-
-    rho = set_single_prime(rho)
-
-    if if_wrap
-        return make_mpowrapper(rho,TTN.physical_lattice(wavefunc.net))
-    else
-        return rho
-    end
-end
-
-function four_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
-    if_wrap::Bool = get(kwargs,:if_wrap,true)
 
     k1::Vector{Float64} = get(kwargs,:momentum1,[0.0,0.0])
     k2::Vector{Float64} = get(kwargs,:momentum2,[0.0,0.0])
     mapping::Vector{Int} = get(kwargs,:mapping,collect(1:TTN.number_of_sites(wavefunc.net)))
 
-    creat1 = single_point_mpo(wavefunc,"Adag"; momentum=k1,if_wrap=false,mapping=mapping)
+    creat = single_point_mpo(wavefunc,"Adag"; momentum=k1,mapping=mapping)
+    println("Made Creation")
+    annih = single_point_mpo(wavefunc,"A"; momentum=k2,mapping=mapping)
+    println("Made Annihilation")
+
+    return apply(creat,annih)
+end
+
+function four_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
+
+    k1::Vector{Float64} = get(kwargs,:momentum1,[0.0,0.0])
+    k2::Vector{Float64} = get(kwargs,:momentum2,[0.0,0.0])
+    mapping::Vector{Int} = get(kwargs,:mapping,collect(1:TTN.number_of_sites(wavefunc.net)))
+
+    creat1 = single_point_mpo(wavefunc,"Adag"; momentum=k1,mapping=mapping)
     println("Made Creation 1")
-    creat2 = single_point_mpo(wavefunc,"Adag"; momentum=k2,if_wrap=false,mapping=mapping)
+    creat2 = single_point_mpo(wavefunc,"Adag"; momentum=k2,mapping=mapping)
     println("Made Creation 2")
-    annih1 = single_point_mpo(wavefunc,"A"; momentum=k2,if_wrap=false,mapping=mapping)
+    annih1 = single_point_mpo(wavefunc,"A"; momentum=k2,mapping=mapping)
     println("Made Annihilation 1")
-    annih2 = single_point_mpo(wavefunc,"A"; momentum=k1,if_wrap=false,mapping=mapping)
+    annih2 = single_point_mpo(wavefunc,"A"; momentum=k1,mapping=mapping)
     println("Made Annihilation 2")
-
-    #fourpt = (TTN.prime(creat1) * creat2) * TTN.prime(TTN.prime(TTN.prime(annih1) * annih2))
-
-    #fourpt = set_single_prime(fourpt)
 
     return apply(apply(creat1, creat2), apply(annih1, annih2))
 

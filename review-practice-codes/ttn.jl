@@ -748,6 +748,9 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	measurements = get(kwargs,:measurements,[])
 	measurement_functions = get(kwargs,:measurement_functions,[])
 
+	eigsolve_krylovdim = 15#get(kwargs, :eigsolve_krylovdim, TTN.DEFAULT_KRYLOVDIM_DMRG)
+	eigsolve_verbosity = 0#get(kwargs, :eigsolve_verbosity, TTN.DEFAULT_VERBOSITY_DMRG)
+
 	# picking the observer
 	if isnothing(etol)
 		observer = NoObserver()
@@ -777,14 +780,14 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 		#println("Before starting DMRG the bond dim is ",TTN.maxlinkdim(ttn))
 		#get_occupancy(ttn; plot_title="Before DMRG")
 		if isnothing(psi_ortho)
-			sp::TTN.AbstractSweepHandler = TTN.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff)
+			sp::TTN.AbstractSweepHandler = TTN.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff, eigsolve_krylovdim=eigsolve_krylovdim, eigsolve_verbosity=eigsolve_verbosity)
 		else
 			# prep the orthogonal states before starting DMRG
 			for ortho_state in psi_ortho
 				TTN.move_ortho!(ortho_state,ttn.ortho_center)
 			end
 		
-			sp = TTN.dmrg(ttn,psi_ortho,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff, weight=weight, if_old_excited=if_old_excited)
+			sp = TTN.dmrg(ttn,psi_ortho,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff, weight=weight, if_old_excited=if_old_excited, eigsolve_krylovdim=eigsolve_krylovdim, eigsolve_verbosity=eigsolve_verbosity)
 		end
 	elseif sweep_type == "simple"
 		proj_tpo = TTN.ProjectedTensorProductOperator(ttn,ham)
