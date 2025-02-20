@@ -19,7 +19,7 @@ include_other_files(["other-funcs/basic-2d-stuff.jl","review-practice-codes/ttn.
 
 #### Generic Plotting
 
-function plot_occupancy(exp_occ; kwargs...)
+#=function plot_occupancy(exp_occ; kwargs...)
     fix_colorbar = get(kwargs, :fix_colorbar, false)
 	data_dict = get(kwargs, :data_dict, nothing)
 	if !isnothing(data_dict)
@@ -41,7 +41,7 @@ function plot_occupancy(exp_occ; kwargs...)
 		save_figure(fig_name; kwargs...)
 	end
 	return
-end
+end=#
 
 # needs testing
 function plot_occupancy_3d(exp_occ; kwargs...)

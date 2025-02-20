@@ -273,20 +273,21 @@ function synthetic_current(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     return currents
 end
 
-function check_nrg_convergence(metadata::Dict,if_perfect::Bool=true)
-    nrg_tol::Float64 = metadata["nrgtol"]
+function check_nrg_convergence(metadata::Dict,if_perfect::Bool=true; kwargs...)
+    nrg_tol::Float64 = get(metadata,"nrgtol",5e-5)
+    key_type::String = get(kwargs,:key_type,"observer")
 
     if_perfect ? nothing : nrg_tol *= 10
 
     all_nrgs::Dict{String,Array{Float64,1}} = Dict()
-    all_nrgs["0"] = metadata["observer"].nrg
+    all_nrgs["0"] = key_type == "observer" ? metadata[key_type].nrg : metadata[key_type]
 
-    found_excited_nrg::Bool = haskey(metadata,"observer_1")
+    found_excited_nrg::Bool = haskey(metadata,"$(key_type)_1")
     next_nrg_level::Int = 1
     while found_excited_nrg
-        all_nrgs[string(next_nrg_level)] = metadata["observer_$(next_nrg_level)"].nrg
+        all_nrgs[string(next_nrg_level)] = key_type == "observer" ? metadata["$(key_type)_$(next_nrg_level)"].nrg : metadata["$(key_type)_$(next_nrg_level)"]
         next_nrg_level += 1
-        found_excited_nrg = haskey(metadata,"observer_$(next_nrg_level)")
+        found_excited_nrg = haskey(metadata,"$(key_type)_$(next_nrg_level)")
     end
 
     if_converged::Dict{String,Bool} = Dict()
@@ -712,7 +713,7 @@ function construct_top_node_environments(ttn::TTN.TreeTensorNetwork, tpo::TTN.MP
 				opt_seq = TTN.optimal_contraction_sequence(tlist)
 				bEnvironment_new[pp][chd_idx] = contract(tlist; sequence = opt_seq)
                 #println("Now showing after contraction tags \n")
-                #display(TTN.inds(bEnvironment_new[pp][chd_idx]))
+                #display(TTN.dims(bEnvironment_new[pp][chd_idx]))
                 #display(TTN.ITensorMPS.dims(bEnvironment_new[pp][chd_idx]))
                 #display(TTN.tags.(TTN.inds(bEnvironment_new[pp][chd_idx])))
 			end

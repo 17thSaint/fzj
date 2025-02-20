@@ -18,7 +18,7 @@ Depends on:
 include("../other-funcs/include-other-files.jl")
 include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","exact-diag/execute-ed.jl","exact-diag/observables.jl"])
 #include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
-#include_other_files(["other-funcs/basic-2d-plottings.jl","review-practice-codes/plottings.jl","exact-diag/plottings.jl"])
+include_other_files(["other-funcs/basic-2d-plottings.jl","review-practice-codes/plottings.jl","exact-diag/plottings.jl"])
 
 function plot_nrg_vs_intstren_fromdata_ttn(layers::Int64,which_strens::Union{String,Vector{Float64}}="all"; kwargs...)
     hanis = get(kwargs, :hopping_anisotropy, 1.0)
@@ -574,62 +574,148 @@ end=#
 
 # do 4pt momentum MPO
 if false
-    lx,ly,n = 8,4,4
+    lx,ly,n = 8,8,8
     layers = Int(log(2,lx*ly))
     intstren = 0.0
+
+    dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
+    pdict = Dict([("layers",layers),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc)
+    display(all_files)
+
+    for f in all_files
+        d,m = read_data(dataloc * "/" * f; output_level=0)
+        !haskey(d,"ttn") && continue
+        psi = d["ttn"]
+        #get_occupancy(psi; if_plot=true,plot_title="$(m["onsite_strength"])")
+        lat = TTN.physical_lattice(psi.net)
+
+
+
+        mapss = zigzag_curve(ly,lx)
+
+        ks = [n/lx for n in 0:lx]
+        vals = zeros(Float64,length(ks),length(ks))
+        for (idx,kx) in enumerate(ks)
+            for (idx2,k2) in enumerate(ks)
+                println("Working on kx = $kx, k2 = $k2")
+                fourpt = four_point_mpo(psi; momentum1 = [kx,0], momentum2 = [k2,0], mapping = mapss)
+                fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
+
+                fourpt_val = real(calculate_mpo_expectation(psi, fourpt_wrapped))
+                vals[idx,idx2] = fourpt_val
+            end
+        end
+
+        display(vals)
+        #fourpt_dict = Dict([("fourpt_momentum",vals)])
+        #modify_data(fourpt_dict,joinpath(dataloc,f),"metadata")
+
+        xs = [n for n in 0:lx]
+        ys = vals[1,:] ./ (lx*ly)^2
+        scatter(xs,ys,label="$(m["onsite_strength"])")
+        xlabel("kx")
+        ylabel("Four Point Momentum")
+        legend()
+    end
+end
+
+# plot 4pt momentum
+if true
+    lx,ly,n = 8,8,8
+    layers = Int(log(2,lx*ly))
+    #intstren = 100.0
 
     dataloc = get_folder_location("cluster-data/synth-dims/torus")
     pdict = Dict([("layers",layers),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc)
     display(all_files)
 
-    #d,m = read_data(dataloc * "/" * all_files[1]; output_level=0)
-    #=psi = d["ttn"]
-    lat = TTN.physical_lattice(psi.net)
+    f = all_files[1]
+    #for f in all_files
+        d,m = read_data(dataloc * "/" * f; output_level=0)
 
+        #get_occupancy(d["densmat"]; plot_title="ULR=$(m["onsite_strength"])")
 
+        #!haskey(m,"twopt_momentum") && continue
+        #!haskey(m,"fourpt_momentum") && continue
 
-    mapss = zigzag_curve(lx,ly)
+        #twopt_vals = m["twopt_momentum"]
 
-    mom2 = [0.5,0.0]
-    ks = [n/lx for n in 0:lx]
-    vals = zeros(Float64,length(ks))
-    for (idx,kx) in enumerate(ks)
-        fourpt = four_point_mpo(psi; momentum1 = [kx,0], momentum2 = mom2, mapping = mapss)
-        fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
+        #=fig = figure()
+        imshow(twopt_vals,origin="lower",extent=[0,lx,0,lx],vmin=0.0)
+        colorbar()
+        xlabel("kx")
+        ylabel("k2")
+        title("2-Point Momentum at ULR=$(m["onsite_strength"])")=#
 
-        fourpt_val = real(calculate_mpo_expectation(psi, fourpt_wrapped))
-        vals[idx] = fourpt_val
-    end
+        fourpt_vals = m["fourpt_momentum"]
+        #plot(1:length(fourpt_vals),fourpt_vals,"-p",label="$(m["onsite_strength"])")
+        #scatter(m["onsite_strength"],fourpt_vals[5,5],c="b")
+        #xlabel("Interaction Strength")
+        #ylabel("Fourpt at (4,4)")
 
-    scatter([n-1 for n in 1:length(vals)-1],vals[1:end-1] ./ (lx*ly)^2)
-    xlabel("kx")
-    ylabel("Four Point Momentum")=#
+        plot(0:lx,fourpt_vals[:,5] ./ (lx*ly)^4,"-p",label="$(m["onsite_strength"])")
+        xlabel("Momentum")
+        ylabel("Four Point Momentum")
+
+        #=fig = figure()
+        imshow(fourpt_vals,origin="lower",extent=[0,lx,0,lx],vmin=0.0)
+        colorbar()
+        xlabel("kx")
+        ylabel("k2")
+        title("4-Point Momentum at ULR=$(m["onsite_strength"])")=#
+    #end
+        
+
 end
 
-# plot 4pt momentum
-if true
-    lx,ly,n = 8,4,4
+# testing 4pt momentum on known density wave
+if false
+    lx,ly,n = 4,4,2
     layers = Int(log(2,lx*ly))
-    intstren = 100.0
 
-    dataloc = get_folder_location("cluster-data/synth-dims/torus")
-    pdict = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
-    all_files = find_data_file(pdict,"ttn",dataloc)
-    display(all_files)
+    stren = 100000.0
+    params_dict = Dict([("hopping_anisotropy",1.0),("particles",n),("layers",layers),("mdim",200),("expander_fraction",100),("if_save_data",false),("alpha",0.0),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+    psi, hamilthere, obs, rho, rt = run_synth_dims_generic(params_dict)
 
-    d,m = read_data(dataloc * "/" * all_files[1]; output_level=0)
+    get_occupancy(psi; if_plot=true,plot_title="")
 
-    vals = m["fourpt_momentum"]
+    lat = TTN.physical_lattice(psi.net)
+    mapss = zigzag_curve(lx,ly)
 
-    moms = [n for n in 0:lx]
+    ks = [n/lx for n in 0:lx]
+    twopt_vals = zeros(Float64,length(ks),length(ks))
+    fourpt_vals = zeros(Float64,length(ks),length(ks))
+    for (idx,kx) in enumerate(ks)
+        for (idx2,k2) in enumerate(ks)
+            println("Working on kx = $kx, k2 = $k2")
+
+            fourpt = four_point_mpo(psi; momentum1 = [kx,0], momentum2 = [k2,0], mapping = mapss)
+            fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
+            fourpt_val = real(calculate_mpo_expectation(psi, fourpt_wrapped))
+            fourpt_vals[idx,idx2] = fourpt_val
+
+            twopt = two_point_mpo(psi; momentum1 = [kx,0], momentum2 = [k2,0], mapping = mapss)
+            twopt_wrapped = easy_mpowrapper(twopt, lat; mapping=mapss)
+            twopt_val = real(calculate_mpo_expectation(psi, twopt_wrapped))
+            twopt_vals[idx,idx2] = twopt_val
+        end
+    end
+
     fig = figure()
-    ys = vals[:,1] ./ (lx*ly)^2
-    scatter(moms,ys)
+    imshow(twopt_vals,origin="lower",extent=[0,lx,0,lx])
     xlabel("kx")
-    ylabel("Four Point Momentum")
-    ylim([0.0,1.1*maximum(ys)])
-        
+    ylabel("k2")
+    colorbar()
+    title("2pt Momentum at ULR=$stren")
+
+    fig = figure()
+    imshow(fourpt_vals,origin="lower",extent=[0,lx,0,lx])
+    xlabel("kx")
+    ylabel("k2")
+    colorbar()
+    title("4pt Momentum at ULR=$stren")
 
 end
     
