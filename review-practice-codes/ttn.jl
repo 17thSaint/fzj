@@ -4,7 +4,7 @@ using LsqFit
 
 include("../other-funcs/include-other-files.jl")
 
-include_other_files(["review-practice-codes/parton-model-syms.jl","other-funcs/data-storage-funcs.jl"])
+include_other_files(["review-practice-codes/parton-model-syms.jl","other-funcs/data-storage-funcs.jl","review-practice-codes/overwriting-ttn.jl"])
 
 thetax_1,thetay_1 = 0.2, 0.12
 thetax_2,thetay_2 = 0.64,0.56
@@ -755,6 +755,7 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	if isnothing(etol)
 		observer = NoObserver()
 	elseif if_continuous_saving
+		file_path = make_sure_file_type(file_path,"h5")
 		if isnothing(psi_ortho)
 			if length(measurements) > 0
 				observer = SavingMeasurementsObserver(measurement_functions,measurements,file_path,etol)
@@ -762,7 +763,7 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 				observer = SavingNRGVarObserver(file_path,etol)
 			end
 		else
-			SavingExcitedNRGVarObserver(file_path,etol,length(psi_ortho))
+			observer = SavingExcitedNRGVarObserver(file_path,etol,length(psi_ortho))
 		end
 	else
 		observer = NRGVarObserver(etol)
@@ -770,6 +771,8 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	if if_memobs
 		observer = vcat(observer,MemoryObserver())
 	end
+
+	
 	
 	# slowly grow bond dim to optimize more efficiently
 	if max_dim > 50 && !if_redo
@@ -787,7 +790,7 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 				TTN.move_ortho!(ortho_state,ttn.ortho_center)
 			end
 		
-			sp = TTN.dmrg(ttn,psi_ortho,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff, weight=weight, if_old_excited=if_old_excited, eigsolve_krylovdim=eigsolve_krylovdim, eigsolve_verbosity=eigsolve_verbosity)
+			sp = TTN.dmrg(ttn,psi_ortho,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl, observer=observer, cutoff=cutoff, weight=weight, if_old_excited=if_old_excited, eigsolve_krylovdim=eigsolve_krylovdim, eigsolve_verbosity=eigsolve_verbosity)
 		end
 	elseif sweep_type == "simple"
 		proj_tpo = TTN.ProjectedTensorProductOperator(ttn,ham)
@@ -1298,6 +1301,8 @@ function save_excited_ttn(ttn::TTN.TreeTensorNetwork,metadata::Dict,actual_filen
 	wavefunc_dict::Dict{String,Any} = if_gpu ? Dict([("ttn_$es_number",back2cpu(ttn))]) : Dict([("ttn_$es_number",ttn)])
 	densmat_dict::Dict{String,Any} = Dict([("densmat_$es_number",densmat)])
 
+	actual_filename = make_sure_file_type(actual_filename,"h5")
+
 	modify_data(wavefunc_dict,metadata["location"] * "/wavefunc" * actual_filename,"all_data")
 	modify_data(densmat_dict,metadata["location"] * "/" * actual_filename,"all_data")
 	modify_data(metadata,metadata["location"] * "/" * actual_filename,"metadata")
@@ -1529,6 +1534,7 @@ mutable struct SavingExcitedNRGVarObserver <: TTN.ITensorMPS.AbstractObserver
     nrg::Vector{Float64}
  
     SavingExcitedNRGVarObserver(file_path="ttn.h5",var_tol=0.0,nrg_level=1) = new(file_path,var_tol,nrg_level,[10000.0,1000.0])
+	SavingExcitedNRGVarObserver(file_path::String,var_tol::Float64,nrg_level::Int,nrgs::Vector{Float64}) = new(file_path,var_tol,nrg_level,nrgs)
 end
 
 function TTN.ITensorMPS.measure!(o::SavingExcitedNRGVarObserver; kwargs...)

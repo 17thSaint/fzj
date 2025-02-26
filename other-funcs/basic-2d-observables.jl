@@ -152,6 +152,10 @@ function pairdist_ellipticalness(pairdist::Matrix{Float64}; kwargs...)
     return ellipticalness,x_avg,y_avg,x_var,y_var,xy_var
 end
 
+function ft_coeff(phys_site::Tuple{Int,Int},momentum::Vector{Float64},op_type::String)
+    dag_sign::Int = op_type == "Adag" ? -1 : 1
+    return exp(2*pi*im*dag_sign*dot(momentum,phys_site))
+end
 
 
 

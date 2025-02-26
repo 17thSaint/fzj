@@ -709,7 +709,7 @@ function n_particle_basis(N::Int64,Lx::Int64,Ly::Int64; kwargs...)
 
     if if_find_existing
         metadata_dict = Dict([("Lx",Lx),("Ly",Ly),("N",N)])
-        if_exists,data = check_data_exists(metadata_dict,"basis"; location=dataloc,output_level=output_level)
+        if_exists,data = check_data_exists(metadata_dict,"basis"; location=dataloc,output_level=output_level,file_type="jld2")
         if if_exists
             output_level > 0 ? println("Found existing file with basis data") : nothing
             output_level > 0 ? println("Basis has ",size(data[1]["full_basis"],2)," states") : nothing

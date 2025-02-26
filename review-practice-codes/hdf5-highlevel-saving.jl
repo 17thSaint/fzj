@@ -19,6 +19,8 @@ function HDF5.read(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, ob
         return read_SNVO(group, SavingNRGVarObserver)
     elseif observer_type == "SavingMeasurementsObserver"
         return read_SMO(group, SavingMeasurementsObserver)
+    elseif observer_type == "SavingExcitedNRGVarObserver"
+        return read_SENVO(group, SavingExcitedNRGVarObserver)
     else
         error("Observer type $observer_type not recognized")
     end
@@ -76,6 +78,33 @@ function read_SMO(group::HDF5.Group, observer::Type{<:SavingMeasurementsObserver
 	measurements = read(group, "measurements")
 	
 	return SavingMeasurementsObserver(measurement_functions, measurements, file_path, var_tol, nrg)
+end
+
+function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, observer::SavingExcitedNRGVarObserver)
+    group = create_group(parent, name)
+    
+    file_path = observer.file_path
+    var_tol = observer.var_tol
+    nrg_level = observer.nrg_level
+    nrg = observer.nrg
+
+    write(group, "file_path", file_path)
+    write(group, "var_tol", var_tol)
+    write(group, "nrg_level", nrg_level)
+    write(group, "nrg", nrg)
+
+    attributes(group)["type"] = "SavingExcitedNRGVarObserver"
+end
+
+function read_SENVO(group::HDF5.Group, observer::Type{<:SavingExcitedNRGVarObserver})
+    #group = open_group(parent, name)
+    
+    file_path = read(group, "file_path")
+    var_tol = read(group, "var_tol")
+    nrg_level = read(group, "nrg_level")
+    nrg = read(group, "nrg")
+    
+    return SavingExcitedNRGVarObserver(file_path, var_tol, nrg_level, nrg)
 end
 
 function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, ham_op::TTN.ITensorMPS.Sum{TTN.ITensorMPS.Scaled{ComplexF64, TTN.ITensorMPS.Prod{TTN.ITensorMPS.Op}}})

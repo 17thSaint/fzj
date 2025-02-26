@@ -641,6 +641,23 @@ function ft_density_matrix(rho::Matrix{ComplexF64},momentum::Vector{Float64},lx:
     return result
 end
 
+function two_point_densmat(rho::Matrix{ComplexF64},lx::Int,ly::Int)
+    moms = [n/lx for n in 0:lx]
+
+    result::Vector{Float64} = zeros(Float64,lx+1)
+
+    for (idx,k1) in enumerate(moms)
+        result[idx] = real(ft_density_matrix(rho,[k1,0.0],lx,ly))
+    end
+
+    return result
+end
+
+function normalize_four_point(fourpt::Matrix,twopt::Vector)
+    norm_mat = twopt * transpose(twopt)
+    return fourpt ./ norm_mat
+end
+
 
 
 function make_qnset(op_string::String)
@@ -657,11 +674,6 @@ function make_qnset(op_string::String)
     end
 end
 
-function ft_coeff(phys_site::Tuple{Int,Int},momentum::Vector{Float64},op_type::String)
-    dag_sign::Int = op_type == "Adag" ? -1 : 1
-    return exp(2*pi*im*dag_sign*dot(momentum,phys_site))
-end
-
 function ft_coeff(phys_site::TTN.Index,momentum::Vector{Float64},op_type::String,lx::Int,ly::Int)
     index_tag = string(TTN.tags(phys_site))
     @assert occursin("Site",index_tag)
@@ -669,6 +681,59 @@ function ft_coeff(phys_site::TTN.Index,momentum::Vector{Float64},op_type::String
     lin_ind = parse(Int,match(r"n=(\d+)",index_tag)[1])
     coord_label = coordinate(lin_ind,lx,ly)
     return ft_coeff(coord_label,momentum,op_type)
+end
+
+function construct_top_node_environments(ttn1::TTN.TreeTensorNetwork, ttn2::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper)
+    # need to do some checks at the start
+    TTN.move_ortho!(ttn2,(TTN.number_of_layers(ttn2),1))
+    TTN.move_ortho!(ttn1,(TTN.number_of_layers(ttn1),1))
+
+    net = ttn1.net
+
+    mapping = tpo.mapping
+    ham = tpo.data
+
+    bEnvironment = map(eachindex(net,1)) do pp
+        chdnds = TTN.child_nodes(net, (1,pp))
+        map(1:TTN.number_of_child_nodes(net, (1,pp))) do nn
+            ham[TTN.inverse_mapping(mapping)[chdnds[nn][2]]]
+        end
+    end
+
+    for ll in Iterators.drop(TTN.eachlayer(net), 1)
+        println("Constructing top node environments for layer $ll")
+		bEnvironment_new = Vector{Vector{TTN.ITensor}}(undef, TTN.number_of_tensors(net, ll))
+		for pp in eachindex(net, ll)
+			n_chds = TTN.number_of_child_nodes(net, (ll,pp))
+			bEnvironment_new[pp] = Vector{TTN.ITensor}(undef, n_chds)
+		
+			for chd in TTN.child_nodes(net, (ll,pp))
+                #println("Making environment for child $chd")
+				chd_idx = TTN.index_of_child(net, chd)
+				Tn1 = ttn1[chd]
+                Tn2 = ttn2[chd]
+				
+				tensorListBottom = map(TTN.child_nodes(net, chd)) do cc
+					bEnvironment[chd[2]][TTN.index_of_child(net, cc)]
+				end
+                #println("At layer $ll and child $chd the tensorListBottom is")
+                #display(TTN.inds.(tensorListBottom))
+                #display(TTN.tags.(TTN.inds(Tn)))
+                #display([TTN.tags.(in) for in in TTN.inds.(tensorListBottom)])
+				tlist = vcat(Tn1, tensorListBottom, TTN.prime(TTN.dag(Tn2)))
+                #display(prod(prod.(TTN.ITensorMPS.dims.(tlist))))
+                #display(TTN.dims.(tlist))
+				opt_seq = TTN.optimal_contraction_sequence(tlist)
+				bEnvironment_new[pp][chd_idx] = contract(tlist; sequence = opt_seq)
+                #println("Now showing after contraction tags \n")
+                #display(TTN.dims(bEnvironment_new[pp][chd_idx]))
+                #display(TTN.ITensorMPS.dims(bEnvironment_new[pp][chd_idx]))
+                #display(TTN.tags.(TTN.inds(bEnvironment_new[pp][chd_idx])))
+			end
+		end
+		bEnvironment = bEnvironment_new
+	end
+	return only(bEnvironment)
 end
 
 function construct_top_node_environments(ttn::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper)
@@ -721,6 +786,17 @@ function construct_top_node_environments(ttn::TTN.TreeTensorNetwork, tpo::TTN.MP
 		bEnvironment = bEnvironment_new
 	end
 	return only(bEnvironment)
+end
+
+function calculate_mpo_expectation(ttn1::TTN.TreeTensorNetwork, ttn2::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper)
+	topenvs = construct_top_node_environments(ttn1, ttn2, tpo)
+    println("Finished making environments")
+    #display(inds.(topenvs))
+	T1 = ttn1[TTN.number_of_layers(ttn1), 1]
+    T2 = ttn2[TTN.number_of_layers(ttn2), 1]
+	tlist = [T1, topenvs..., TTN.prime(TTN.dag(T2))]
+	opt_seq = TTN.optimal_contraction_sequence(tlist)
+	return TTN.scalar(contract(tlist; sequence = opt_seq))
 end
 
 function calculate_mpo_expectation(ttn::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper)
@@ -901,6 +977,37 @@ function two_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     return apply(creat,annih)
 end
 
+function two_point(wavefunc::TTN.TreeTensorNetwork,momentum1::Vector{Float64},momentum2::Vector{Float64}; kwargs...)
+    lat = TTN.physical_lattice(wavefunc.net)
+    lx,ly = size(lat)
+    mapss = zigzag_curve(lx,ly)
+
+    twop = two_point_mpo(wavefunc; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss)
+    twop_wrapped = easy_mpowrapper(twop, lat; mapping=mapss)
+    return real(calculate_mpo_expectation(wavefunc, twop_wrapped)) / (lx*ly)
+end
+
+function two_point(wavefuncs::Vector,momentum1::Vector{Float64},momentum2::Vector{Float64}; kwargs...)
+
+    lat = TTN.physical_lattice(wavefuncs[1].net)
+    lx,ly = size(lat)
+    mapss = zigzag_curve(lx,ly)
+
+    twop = two_point_mpo(wavefuncs[1]; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss)
+    twop_wrapped = easy_mpowrapper(twop, lat; mapping=mapss)
+
+    mat::Matrix{ComplexF64} = zeros(Float64,length(wavefuncs),length(wavefuncs))
+    for i in 1:length(wavefuncs)
+        for j in 1:length(wavefuncs)
+            mat[i,j] = calculate_mpo_expectation(wavefuncs[i], wavefuncs[j], twop_wrapped)
+        end 
+    end
+
+    #display(mat)
+
+    return eigvals(mat ./ (lx*ly))
+end
+
 function four_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
 
     k1::Vector{Float64} = get(kwargs,:momentum1,[0.0,0.0])
@@ -908,17 +1015,52 @@ function four_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     mapping::Vector{Int} = get(kwargs,:mapping,collect(1:TTN.number_of_sites(wavefunc.net)))
 
     creat1 = single_point_mpo(wavefunc,"Adag"; momentum=k1,mapping=mapping)
-    println("Made Creation 1")
+    #println("Made Creation 1")
     creat2 = single_point_mpo(wavefunc,"Adag"; momentum=k2,mapping=mapping)
-    println("Made Creation 2")
+    #println("Made Creation 2")
     annih1 = single_point_mpo(wavefunc,"A"; momentum=k2,mapping=mapping)
-    println("Made Annihilation 1")
+    #println("Made Annihilation 1")
     annih2 = single_point_mpo(wavefunc,"A"; momentum=k1,mapping=mapping)
-    println("Made Annihilation 2")
+    #println("Made Annihilation 2")
+    println("Made Suboperators")
 
     return apply(apply(creat1, creat2), apply(annih1, annih2))
 
 end
+
+function four_point(wavefunc::TTN.TreeTensorNetwork,momentum1::Vector{Float64},momentum2::Vector{Float64}; kwargs...)
+    lat = TTN.physical_lattice(wavefunc.net)
+    lx,ly = size(lat)
+    mapss = zigzag_curve(lx,ly)
+
+    fourpt = four_point_mpo(wavefunc; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss)
+    fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
+    return real(calculate_mpo_expectation(wavefunc, fourpt_wrapped)) / (lx*ly)^2
+end
+
+function four_point(wavefuncs::Vector,momentum1::Vector{Float64},momentum2::Vector{Float64}; kwargs...)
+
+    lat = TTN.physical_lattice(wavefuncs[1].net)
+    lx,ly = size(lat)
+    mapss = zigzag_curve(lx,ly)
+
+    fourpt = four_point_mpo(wavefuncs[1]; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss)
+    fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
+
+    mat::Matrix{Float64} = zeros(Float64,length(wavefuncs),length(wavefuncs))
+    for i in 1:length(wavefuncs)
+        for j in 1:length(wavefuncs)
+            mat[i,j] = real(calculate_mpo_expectation(wavefuncs[i], wavefuncs[j], fourpt_wrapped))
+            mat[j,i] = mat[i,j]
+        end 
+    end
+
+    #display(mat)
+
+    return eigvals(mat ./ (lx*ly)^2)
+end
+
+
 
 
 

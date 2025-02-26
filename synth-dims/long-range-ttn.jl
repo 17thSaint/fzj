@@ -1503,6 +1503,7 @@ function get_normal_model_params(params_dict::Dict)
 	if_old_excited = get(params_dict, "if_old_excited", false)
 	if_memobs = get(params_dict, "if_memobs", false)
 	output_level = get(params_dict, "output_level", 1)
+	seed_ttn = get(params_dict, "seed_ttn", nothing)
 
 
 	# Lattice/TTN Parameters
@@ -1631,6 +1632,7 @@ function get_normal_model_params(params_dict::Dict)
 						"syms"=>syms,
 						"cutoff"=>cutoff,
 						"if_pfaffian"=>if_pfaffian,
+						"seed_ttn"=>seed_ttn,
 						"twist_angle"=>twist_angle,
 						"if_continuous_saving"=>if_continuous_saving,
 						"output_level"=>output_level,
@@ -1973,8 +1975,8 @@ if false
 	#anises = [0.01,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.6,0.8,0.9,1.1,1.3,1.5,1.7,1.9,2.0,2.5,3.0,3.5,4.0,6.0,8.0,9.0,10.0,15.0,20.0,25.0,30.0,40.0,50.0,70.0,90.0,100.0,1000.0,10000.0]
 	#anises = range(1.0,5.0,length=10)
 	#strens = [0.0,0.25,0.5,0.75,1.0,1.5,2.0,5.0,10.0,20.0,50.0,100.0,300.0,1000.0]
-	#args_dict = make_args_dict(ARGS)
-	stren = 0.0#strens[idx]args_dict["onsite_strength"]
+	args_dict = make_args_dict(ARGS)
+	stren = args_dict["onsite_strength"]
 	#alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
 	#strens = [0.0,0.5,1.0,1.5,2.0]#range(0.1,0.5,length=3)
 	#for (idx,anis) in enumerate(anises)
@@ -1983,7 +1985,10 @@ if false
 	#for tw1 in tws
 	#for tw2 in tws
 		#("all_measurements",["densitydensity","occs"])
-		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",0),("particles",2),("layers",4),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+		
+		#d,m = read_data("../cluster-data/synth-dims/torus/ttn-if_periodic_phys-true-onsite_strength-0.0-lr-0-particles-4-alpha-0.0-layers-4-hopping_anisotropy-1.0.h5")
+		#st = d["ttn"]
+		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",2),("particles",4),("layers",5),("mdim",500),("if_save_data",true),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		open_cores = get(params_dict, "open_cores", 5)

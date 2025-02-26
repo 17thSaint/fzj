@@ -205,7 +205,7 @@ function change_numparticles_metadata(filename)
 	end
 end
 
-function find_data_file(params_dict,calc_type,location="/home/patrick/fzj/main-git/cluster-data"; kwargs...)
+function find_data_file(params_dict,calc_type,location::String="/home/patrick/fzj/main-git/cluster-data"; kwargs...)
 	file_type = get(kwargs, :file_type, "h5")
 	if_exact::Bool = get(kwargs,:if_exact,false)
 	og_loc = pwd()
@@ -269,6 +269,14 @@ function find_data_file(params_dict,calc_type,location="/home/patrick/fzj/main-g
 	
 	cd(og_loc)
 	return file_choices
+end
+
+function find_data_file(params_dict::Dict,calc_type::String,locations::Vector{String}; kwargs...)
+	all_files::Vector{String} = String[]
+	for location in locations
+		append!(all_files,(location * "/") .* find_data_file(params_dict,calc_type,location; kwargs...))
+	end
+	return all_files
 end
 
 function make_sure_file_type(file_name,desired_type)
