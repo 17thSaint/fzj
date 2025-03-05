@@ -700,7 +700,7 @@ if false
 end
 
 # testing 4pt momentum on known density wave
-if true
+if false
     lx,ly,n = 4,4,2
     layers = Int(log(2,lx*ly))
 
@@ -708,34 +708,33 @@ if true
     params_dict = Dict([("hopping_anisotropy",1.0),("es_count",1),("cutoff",1e-10),("particles",n),("layers",layers),("mdim",200),("expander_fraction",100),("if_save_data",false),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
     psi, hamilthere, obs, rho, rt = run_synth_dims_generic(params_dict)
 
-    lat = TTN.physical_lattice(psi[1].net)
-    mapss = zigzag_curve(lx,ly)
+    #lat = TTN.physical_lattice(psi[1].net)
+    #mapss = zigzag_curve(lx,ly)
 
     fig = figure()
     ks = [n/lx for n in 0:lx]
-    twopt_vals1 = zeros(Float64,length(ks))
-    twopt_vals2 = zeros(Float64,length(ks))
+    fourpt_vals1 = zeros(Float64,length(ks))
+    fourpt_vals2 = zeros(Float64,length(ks))
     for (idx,kx) in enumerate(ks)
         println("Working on kx = $kx")
 
-        #=fourpt = four_point_mpo(psi; momentum1 = [kx,0], momentum2 = [0.5,0], mapping = mapss)
-        fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
-        fourpt_val = real(calculate_mpo_expectation(psi, fourpt_wrapped))
-        fourpt_vals[idx] = fourpt_val=#
+        fourpt_val = real.(four_point([psi[1],psi[2]], [kx,0], [kx,0]))
+        fourpt_vals1[idx] = fourpt_val[1]
+        fourpt_vals2[idx] = fourpt_val[2]
 
-        twopt_val = real.(two_point([psi[1],psi[2]], [kx,0], [kx,0]))
-        twopt_vals1[idx] = twopt_val[1]
-        twopt_vals2[idx] = twopt_val[2]
+        #twopt_val = real.(two_point([psi[1],psi[2]], [kx,0], [kx,0]))
+        #twopt_vals1[idx] = twopt_val[1]
+        #twopt_vals2[idx] = twopt_val[2]
 
         if idx == 1
-            scatter(kx*lx,twopt_val[1],c="b",label="TTN MPO 1")
-            scatter(kx*lx,twopt_val[2],c="g",label="TTN MPO 2")
+            scatter(kx*lx,fourpt_val[1],c="b",label="TTN MPO 1")
+            scatter(kx*lx,fourpt_val[2],c="g",label="TTN MPO 2")
         else
-            scatter(kx*lx,twopt_val[1],c="b")
-            scatter(kx*lx,twopt_val[2],c="g")
+            scatter(kx*lx,fourpt_val[1],c="b")
+            scatter(kx*lx,fourpt_val[2],c="g")
         end
         xlabel("Momentum k, k' = k")
-        ylabel("Two Point Momentum")
+        ylabel("Four Point Momentum")
     end
 
 end
@@ -795,21 +794,21 @@ end
 
 # test 4pt momentum with ED
 if true
-    #lx,ly,n = 4,4,2
-    #stren = 0.0
+    lx,ly,n = 6,4,3
+    stren = 0.0
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",stren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
     states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
 
-    ed_rho = density_matrix(states[1],lattice_params)
+    #ed_rho = density_matrix(states[1],lattice_params)
 
     #fig = figure()
-    #ks = [n/lx for n in 0:lx]
+    ks = [n/lx for n in 0:lx]
     vals1 = zeros(Float64,length(ks))
     vals2 = zeros(Float64,length(ks))
     for (idx,kx) in enumerate(ks)
-        #val = ft_fourpt(states[1],[kx,0],[0.5,0],lattice_params)
+        val = abs.(ft_fourpt(states[1:2],[kx,0],[0.5,0],lattice_params))
         
-        val = real.(ft_twopt(states[1:2],[kx,0],[kx,0.0],lattice_params))
+        #val = real.(ft_twopt(states[1:2],[kx,0],[kx,0.0],lattice_params))
         vals1[idx] = val[1]
         vals2[idx] = val[2]
 
@@ -822,7 +821,7 @@ if true
             scatter(kx*lx,val[2],c="m")
         end
     end
-
+    title("Four point direct $(lx)x$(ly) N=$n ULR=$stren")
 end
 
 

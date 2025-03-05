@@ -736,8 +736,9 @@ function construct_top_node_environments(ttn1::TTN.TreeTensorNetwork, ttn2::TTN.
 	return only(bEnvironment)
 end
 
-function construct_top_node_environments(ttn::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper)
-	
+function construct_top_node_environments(ttn::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper; kwargs...)
+    opl::Int = get(kwargs,:opl,1)
+
 	net = ttn.net
 
 	n_sites = TTN.number_of_sites(net)
@@ -754,7 +755,7 @@ function construct_top_node_environments(ttn::TTN.TreeTensorNetwork, tpo::TTN.MP
     end
 	
 	for ll in Iterators.drop(TTN.eachlayer(net), 1)
-        println("Constructing top node environments for layer $ll")
+        opl > 0 && println("Constructing top node environments for layer $ll")
 		bEnvironment_new = Vector{Vector{TTN.ITensor}}(undef, TTN.number_of_tensors(net, ll))
 		for pp in eachindex(net, ll)
 			n_chds = TTN.number_of_child_nodes(net, (ll,pp))
@@ -799,9 +800,10 @@ function calculate_mpo_expectation(ttn1::TTN.TreeTensorNetwork, ttn2::TTN.TreeTe
 	return TTN.scalar(contract(tlist; sequence = opt_seq))
 end
 
-function calculate_mpo_expectation(ttn::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper)
-	topenvs = construct_top_node_environments(ttn, tpo)
-    println("Finished making environments")
+function calculate_mpo_expectation(ttn::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper; kwargs...)
+    opl::Int = get(kwargs,:opl,1)
+	topenvs = construct_top_node_environments(ttn, tpo; kwargs...)
+    opl > 0 && println("Finished making environments")
     #display(inds.(topenvs))
 	T = ttn[TTN.number_of_layers(ttn), 1]
 	tlist = [T, topenvs..., TTN.prime(TTN.dag(T))]
@@ -1047,17 +1049,77 @@ function four_point(wavefuncs::Vector,momentum1::Vector{Float64},momentum2::Vect
     fourpt = four_point_mpo(wavefuncs[1]; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss)
     fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
 
-    mat::Matrix{Float64} = zeros(Float64,length(wavefuncs),length(wavefuncs))
+    mat::Matrix{ComplexF64} = zeros(Float64,length(wavefuncs),length(wavefuncs))
     for i in 1:length(wavefuncs)
         for j in 1:length(wavefuncs)
-            mat[i,j] = real(calculate_mpo_expectation(wavefuncs[i], wavefuncs[j], fourpt_wrapped))
-            mat[j,i] = mat[i,j]
+            mat[i,j] = calculate_mpo_expectation(wavefuncs[i], wavefuncs[j], fourpt_wrapped)
         end 
     end
 
-    #display(mat)
+    display(mat)
 
     return eigvals(mat ./ (lx*ly)^2)
+end
+
+
+function four_point_mpo_real(wavefunc::TTN.TreeTensorNetwork,s1::Int,s2::Int,s3::Int,s4::Int; kwargs...)
+
+    #mapping::Vector{Int} = get(kwargs,:mapping,collect(1:TTN.number_of_sites(wavefunc.net)))
+
+    phys_sites = TTN.sites(wavefunc)
+
+    os_creat1 = OpSum()
+    os_creat1 += "Adag",s1
+    creat1 = TTN.MPO(os_creat1,phys_sites)
+
+    os_creat2 = OpSum()
+    os_creat2 += "Adag",s2
+    creat2 = TTN.MPO(os_creat2,phys_sites)
+
+    os_annih1 = OpSum()
+    os_annih1 += "A",s3
+    annih1 = TTN.MPO(os_annih1,phys_sites)
+
+    os_annih2 = OpSum()
+    os_annih2 += "A",s4
+    annih2 = TTN.MPO(os_annih2,phys_sites)
+
+    println("Made Suboperators")
+
+    term1 = apply(apply(creat1,annih1),apply(creat2,annih2))
+    if s2 == s3
+        term2 = apply(creat1,annih2)
+        term1 -= term2
+    end
+    return term1
+
+end
+
+function four_point_real(wavefunc::TTN.TreeTensorNetwork, momentum1::Vector{Float64}, momentum2::Vector{Float64}; kwargs...)
+
+    lat = TTN.physical_lattice(wavefunc.net)
+    lx,ly = size(lat)
+    mapss = zigzag_curve(lx,ly)
+
+    rez::ComplexF64 = 0.0
+    for s1 in 1:lx*ly
+        coeff1::ComplexF64 = ft_coeff(coordinate(s1,lx,ly),momentum1,"Adag")
+        for s2 in 1:lx*ly
+            println("Working on site $(s1) and $(s2)")
+            coeff2::ComplexF64 = ft_coeff(coordinate(s2,lx,ly),momentum2,"Adag")
+            for s3 in 1:lx*ly
+                coeff3::ComplexF64 = ft_coeff(coordinate(s3,lx,ly),momentum2,"A")
+                for s4 in 1:lx*ly
+                    coeff4::ComplexF64 = ft_coeff(coordinate(s4,lx,ly),momentum1,"A")
+                    fourpt = four_point_mpo_real(wavefunc,s1,s2,s3,s4; mapping = mapss)
+                    fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
+                    rez += (coeff1 * coeff2 * coeff3 * coeff4) * calculate_mpo_expectation(wavefunc, fourpt_wrapped; opl=0)
+                end
+            end
+        end
+    end
+
+    return rez / (lx*ly)^2
 end
 
 
