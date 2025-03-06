@@ -417,12 +417,12 @@ function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwarg
 
 		stren = -t_strength_synth
 		flux_direction == "synth" ? stren *= exp(im*2*pi*(phi*s1[1])) : nothing
-		return round(stren,digits=10)
+		return stren
 	elseif s1[2] == s2[2] # Physical Dimension Hopping
 
 		stren = -t_strength_phys
 		flux_direction == "phys" ? stren *= exp(im*2*pi*(phi*s1[2])) : nothing
-		return round(stren,digits=10)
+		return stren
 	else
 		return 0.0
 	end

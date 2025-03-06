@@ -354,7 +354,6 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 						coeff = get_inter_coeff(starting_site,ending_site,t_strength,phi,phys_edge_length,virt_edge_length; kwargs...)
 						twist == 1 ? coeff *= exp(im*twist_angle[which_axis]*2*pi) : nothing
 						twist == 2 ? coeff *= exp(-im*twist_angle[which_axis]*2*pi) : nothing
-						coeff = round(coeff,digits=8)
 						hopping += (coeff,"Adag",Tuple(starting_site),"A",Tuple(ending_site))
 						hopping += (conj(coeff),"Adag",Tuple(ending_site),"A",Tuple(starting_site))
 						twist = 0
