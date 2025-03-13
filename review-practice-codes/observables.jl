@@ -683,6 +683,15 @@ function ft_coeff(phys_site::TTN.Index,momentum::Vector{Float64},op_type::String
     return ft_coeff(coord_label,momentum,op_type)
 end
 
+function ft_coeff_alberto(phys_site::TTN.Index,momentum::Vector{Float64},op_type::String,lx::Int,ly::Int,alpha::Float64)
+    index_tag = string(TTN.tags(phys_site))
+    @assert occursin("Site",index_tag)
+
+    lin_ind = parse(Int,match(r"n=(\d+)",index_tag)[1])
+    coord_label = coordinate(lin_ind,lx,ly)
+    return ft_coeff_alberto(coord_label,momentum,op_type,ly,alpha)
+end
+
 function construct_top_node_environments(ttn1::TTN.TreeTensorNetwork, ttn2::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper)
     # need to do some checks at the start
     TTN.move_ortho!(ttn2,(TTN.number_of_layers(ttn2),1))
@@ -934,6 +943,7 @@ function single_point_mpo(wavefunc::TTN.TreeTensorNetwork,op_type::String; kwarg
 
     lat = TTN.physical_lattice(wavefunc.net)
     lx::Int,ly::Int = size(lat)
+    alpha = 0.25
 
     mapping = kwargs[:mapping]
 
@@ -945,7 +955,7 @@ function single_point_mpo(wavefunc::TTN.TreeTensorNetwork,op_type::String; kwarg
     for (idx,s) in enumerate(phys_sites)
         opl > 1 && println("Working on Physical Site $(TTN.tags(s))")
 
-        coeff::ComplexF64 = ft_coeff(s,mom,op_type,lx,ly)
+        coeff::ComplexF64 = ft_coeff_alberto(s,mom,op_type,lx,ly,alpha)
 
         mat = build_W_singlepoint(op_type,coeff)
 

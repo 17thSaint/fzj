@@ -6,8 +6,8 @@ This file contains GPU testing and benchmarking on TTNs
 =#
 ######################################################
 
-using Pkg
-Pkg.activate(".")
+#using Pkg
+#Pkg.activate(".")
 
 using TTN
 include("../other-funcs/include-other-files.jl")
@@ -301,7 +301,7 @@ function benchmark_model_params(args_dict::Dict{String,Any})
     return model_paras
 end
 
-#args_dict = Dict([("benchmark_type","cpu"),("model","J1J2"),("min_mdim",50),("max_mdim",60),("count_mdim",2),("if_save_data",false)])
+#=args_dict = Dict([("benchmark_type","cpu"),("model","J1J2"),("min_mdim",50),("max_mdim",60),("count_mdim",2),("if_save_data",false)])
 args_dict = make_args_dict(ARGS)
 
 # make model parameters
@@ -332,11 +332,11 @@ allmdims = zeros(Float64,length(mdims))
 for (idx,mdim) in enumerate(mdims)
     localobs,allmdims[idx] = run_benchmark(benchmark_type,mdim,net,tpo,filepath)
     alltimes[idx] = localobs.sweep_times[end]
-end
+end=#
 
 
-#= plot benchmarking results
-if false
+# plot benchmarking results
+if true
     using PyPlot,LaTeXStrings
     layers = 6
     lx,ly = Int(sqrt(2^layers)),Int(sqrt(2^layers))
@@ -352,22 +352,31 @@ if false
         alltimes = []
         allmdims = []
         for (k,v) in d
-            push!(alltimes,v)
+            if typeof(v) == Float64
+                push!(alltimes,v)
+            else
+                push!(alltimes,v[end])
+            end
             push!(allmdims,parse(Float64,k))
         end
         scatter(allmdims,alltimes,label="CPU",color="r")
     end
 
     gpu_files = filter(x -> occursin("gpu",x),all_files)
+    col = "g"
     for (idx,f) in enumerate(gpu_files)
         d,m = read_data(joinpath(dataloc,f))
         alltimes = []
         allmdims = []
         for (k,v) in d
-            push!(alltimes,v)
+            if typeof(v) == Float64
+                push!(alltimes,v)
+            else
+                push!(alltimes,v[end])
+            end
             push!(allmdims,parse(Float64,k))
         end
-        scatter(allmdims,alltimes,label="GPU",color="g")
+        scatter(allmdims,alltimes,label="GPU",color=col)
     end
 
     xlabel("Max Bond Dimension")
@@ -376,7 +385,7 @@ if false
     legend()
     xscale("log")
     yscale("log")
-end=#
+end
 
 #=dataloc = get_folder_location("cluster-data/gpu-benchmarking")
 for f in all_files

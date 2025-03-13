@@ -573,20 +573,21 @@ if false
 end=#
 
 # do 4pt momentum MPO
-if false
-    lx,ly,n = 8,8,4
+if true
+    lx,ly,n = 8,4,4
     layers = Int(log(2,lx*ly))
     intstren = 0.0
 
-    dataloc = get_folder_location("cluster-data/synth-dims/torus")
+    dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
     pdict = Dict([("layers",layers),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc)
     filter!(x -> !occursin("if_synth_rectangle",x),all_files)
     display(all_files)
 
-    for f in all_files
+    #for f in all_files
+        f = all_files[end]
         d,m = read_data(dataloc * "/" * f; output_level=0)
-        !haskey(d,"ttn") && continue
+        #!haskey(d,"ttn") && continue
         #haskey(m,"fourpt_momentum") && continue
         psi = d["ttn"]
         #get_occupancy(psi; if_plot=true,plot_title="$(m["onsite_strength"])")
@@ -594,14 +595,14 @@ if false
 
 
 
-        mapss = zigzag_curve(ly,lx)
+        mapss = zigzag_curve(lx,ly)
 
         ks = [n/lx for n in 0:lx]
         vals = zeros(Float64,length(ks),length(ks))
         for (idx,kx) in enumerate(ks)
             for (idx2,k2) in enumerate(ks)
                 println("Working on kx = $kx, k2 = $k2")
-                fourpt = four_point_mpo(psi; momentum1 = [kx,0], momentum2 = [k2,0], mapping = mapss)
+                fourpt = four_point_mpo(psi; momentum1 = [kx,0], momentum2 = [k2,0.0], mapping = mapss)
                 fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
 
                 fourpt_val = real(calculate_mpo_expectation(psi, fourpt_wrapped))
@@ -619,7 +620,7 @@ if false
         xlabel("kx")
         ylabel("Four Point Momentum")
         legend()=#
-    end
+    #end
 end
 
 # plot 4pt momentum
@@ -793,7 +794,7 @@ if false
 end
 
 # test 4pt momentum with ED
-if true
+if false
     lx,ly,n = 6,4,3
     stren = 0.0
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",stren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
