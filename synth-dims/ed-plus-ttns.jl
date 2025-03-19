@@ -602,22 +602,18 @@ if false
         ks = [n/ly for n in 1:lx]
         mp = [0.0,4/ly]
         fourpt_vals = zeros(Float64,length(ks))
-        twopt_vals_m = zeros(Float64,length(ks))
-        twopt_vals_mp = zeros(Float64,length(ks)) .+ (16*real(two_point(psi,mp,mp)))
+        twopt_vals_mp = real(two_point(psi,mp,mp))
         for (idx,ky) in enumerate(ks)
             println("Working on ky = $ky")
-            fourpt_val = real.(four_point(psi,[0.0,ky],mp))
-            twopt_m = 16*real(two_point(psi,[0.0,ky],[0,ky]))
-            fourpt_vals[idx] = fourpt_val
-            twopt_vals_m[idx] = twopt_m
+            fourpt_val = real(four_point(psi,[0.0,ky],mp))
+            twopt_m = real(two_point(psi,[0.0,ky],[0,ky]))
+            fourpt_vals[idx] = fourpt_val / (twopt_m * twopt_vals_mp)
         end
 
         #display(vals)
         fig = figure()
-        scatter(ks .* ly,fourpt_vals,c="b",label="4pt")
-        scatter(ks .* ly,twopt_vals_m,c="r",label="2pt m")
-        plot(ks .* ly,twopt_vals_mp,c="g",label="2pt mp")
-        xlabel("Momentum k = m / Ly, m' = $(Int(mp[2]*lx))")
+        scatter(ks .* ly,fourpt_vals,c="b",label="GS1")
+        xlabel("Momentum k = m / Ly, m' = $(Int(mp[2]*ly))")
         ylabel("Four Point Momentum")
         title("Four Point Momentum for $(lx)x$(ly) N=$n ULR=$(m["onsite_strength"])")
     #end
@@ -794,7 +790,7 @@ if false
 end
 
 # test 4pt momentum with ED
-if false
+if true
     #lx,ly,n = 8,4,4
     stren = 300.0
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",stren),("lr","all"),("filling",0.5),("nev",3),("if_find_data",true),("if_save_data",false)])
@@ -813,8 +809,10 @@ if false
         fourpt_val = abs(ft_fourpt_alberto(states[1],kk,mp,lattice_params))
         twopt_val_k = abs(ft_twopt_alberto(states[1],kk,kk,lattice_params))
 
-        scatter(ky*ly,fourpt_val,c="b",label="4pt")
-        scatter(ky*ly,twopt_val_k,c="r",label="2pt m")
+        scatter(ky*ly,fourpt_val / (twopt_val_k * twopt_vals_mp),c="b",label="4pt")
+
+        #scatter(ky*ly,fourpt_val,c="b",label="4pt")
+        #scatter(ky*ly,twopt_val_k,c="r",label="2pt m")
         
         
         #vals1[idx] = val
