@@ -1565,7 +1565,7 @@ function get_normal_model_params(params_dict::Dict)
 	twist_angle = [get(params_dict, "tw1", 0.0),get(params_dict, "tw2", 0.0)]
 
 	if isnothing(alpha)
-		filling = get(params_dict, "filling", 1.0)
+		filling = get(params_dict, "filling", 0.5)
 		phys_shift,synth_shift = !if_periodic_phys,!if_periodic_synth
 		alpha = num_particles/(filling*(phys_edge_length - phys_shift)*(synth_edge_length - synth_shift))
 		filling == 0.0 ? alpha = 0.0 : nothing

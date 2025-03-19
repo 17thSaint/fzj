@@ -352,31 +352,30 @@ if true
         alltimes = []
         allmdims = []
         for (k,v) in d
-            if typeof(v) == Float64
-                push!(alltimes,v)
-            else
-                push!(alltimes,v[end])
-            end
+            push!(alltimes,v)
             push!(allmdims,parse(Float64,k))
         end
         scatter(allmdims,alltimes,label="CPU",color="r")
     end
 
     gpu_files = filter(x -> occursin("gpu",x),all_files)
-    col = "g"
     for (idx,f) in enumerate(gpu_files)
         d,m = read_data(joinpath(dataloc,f))
         alltimes = []
         allmdims = []
+        which_gpu = " Desktop"
+        col = "g"
         for (k,v) in d
             if typeof(v) == Float64
                 push!(alltimes,v)
             else
                 push!(alltimes,v[end])
+                which_gpu = " A100"
+                col = "b"
             end
             push!(allmdims,parse(Float64,k))
         end
-        scatter(allmdims,alltimes,label="GPU",color=col)
+        scatter(allmdims,alltimes,label="GPU"*which_gpu,color=col)
     end
 
     xlabel("Max Bond Dimension")

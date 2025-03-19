@@ -644,6 +644,29 @@ function write_data_hdf5(file_name::AbstractString,data::Dict,metadata::Dict; kw
 
 end
 
+function write_data_hdf5(file_name::AbstractString,data::Dict; kwargs...)
+
+	file_name = prep_file(file_name,"h5")
+	data = check_dict(data)
+	metadata = check_dict(metadata)
+
+	#display(file_name)
+	h5open(file_name,"w") do f
+		g_alldata = create_group(f,"all_data")
+		for (datum_key,datum) in data
+			isnothing(datum) && continue
+			#println("Working on $datum_key of type $(typeof(datum))")
+			write(g_alldata, datum_key, datum)
+		end
+	end
+
+	# this line deletes the attributes of the group, stupid
+	#save(file_name, load(file_name))
+	println("Data Added, File Closed: $file_name")
+	return file_name
+
+end
+
 function read_data_hdf5(file_name; kwargs...)
 	file_name = make_sure_file_type(file_name,"h5")
 	
@@ -752,6 +775,17 @@ function write_data(file_name::String,data::Dict,metadata::Dict; kwargs...)
 	else
 		#println("No file type recognized so doing HDF5")
 		return write_data_hdf5(file_name,data,metadata; kwargs...)
+	end
+end
+
+function write_data(file_name::String,data::Dict; kwargs...)
+	if occursin("jld2",file_name)
+		return write_data_jld2(file_name,data; kwargs...)
+	elseif occursin("h5",file_name)
+		return write_data_hdf5(file_name,data; kwargs...)
+	else
+		#println("No file type recognized so doing HDF5")
+		return write_data_hdf5(file_name,data; kwargs...)
 	end
 end
 

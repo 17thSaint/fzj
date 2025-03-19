@@ -923,6 +923,82 @@ function ft_fourpt_numop(wavefunc::Vector{ComplexF64},momentum::Vector{Float64},
 end
 
 
+function ft_fourpt_alberto(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
+    lx::Int64 = lattice_params["Lx"]
+    ly::Int64 = lattice_params["Ly"]
+
+    m = Int(momentum1[2] * ly)
+    mp = Int(momentum2[2] * ly)
+
+    fourpt::ComplexF64 = 0.0
+    for y1 in 1:ly
+        coord1 = [m,y1]
+        s1 = linear_index(coord1,lx,ly)
+        coeff1::ComplexF64 = ft_coeff_alberto(coord1,momentum1,"Adag",ly,m)
+        for y2 in 1:ly
+            coord2 = [mp,y2]
+            s2 = linear_index(coord2,lx,ly)
+            coeff2::ComplexF64 = ft_coeff_alberto(coord2,momentum2,"Adag",ly,mp)
+            #println("Working on y1=$(y1) y2=$(y2)")
+            for y3 in 1:ly
+                coord3 = [mp,y3]
+                s3 = linear_index(coord3,lx,ly)
+                coeff3::ComplexF64 = ft_coeff_alberto(coord3,momentum2,"A",ly,mp)
+                for y4 in 1:ly
+                    coord4 = [m,y4]
+                    s4 = linear_index(coord4,lx,ly)
+                    coeff4::ComplexF64 = ft_coeff_alberto(coord4,momentum1,"A",ly,m)
+
+                    coeff::ComplexF64 = coeff1 * coeff2 * coeff3 * coeff4
+
+                    
+
+                    big_operator = four_point_operator(s1,s2,s3,s4,lattice_params)
+                    
+                    expectval = (conj(transpose(psi)) * (big_operator * psi))
+                    if round(expectval,digits=10) != 0.0
+                        println("Non-zero expectation value = $(round(expectval,digits=10))")
+                        println("At $y1 $y2 $y3 $y4 coeffs are: $(round(coeff1,digits=5)), $(round(coeff2,digits=5)), $(round(coeff3,digits=5)), $(round(coeff4,digits=5))")
+                    end
+                    fourpt += coeff * expectval
+                end
+            end
+        end
+    end
+
+    return fourpt
+end
+
+function ft_twopt_alberto(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
+    lx::Int64 = lattice_params["Lx"]
+    ly::Int64 = lattice_params["Ly"]
+
+    m = Int(momentum1[2] * ly)
+    mp = Int(momentum2[2] * ly)
+
+    fourpt::ComplexF64 = 0.0
+            
+    for y3 in 1:ly
+        coord3 = [m,y3]
+        s3 = linear_index(coord3,lx,ly)
+        coeff3::ComplexF64 = ft_coeff_alberto(coord3,momentum1,"Adag",ly,m)
+        for y4 in 1:ly
+            coord4 = [m,y4]
+            s4 = linear_index(coord4,lx,ly)
+            println("Working on s1=$(s3) s2=$(s4)")
+            coeff4::ComplexF64 = ft_coeff_alberto(coord4,momentum2,"A",ly,mp)
+
+            coeff::ComplexF64 = coeff3 * coeff4
+
+            big_operator = two_point_operator(s3,s4,lattice_params)
+            
+            fourpt += coeff * (conj(transpose(psi)) * (big_operator * psi))
+        end
+    end
+
+    return fourpt
+end
+
 
 
 

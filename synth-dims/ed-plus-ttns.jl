@@ -15,6 +15,7 @@ Depends on:
 =#
 ######################################################
 
+using JLD2
 include("../other-funcs/include-other-files.jl")
 include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","exact-diag/execute-ed.jl","exact-diag/observables.jl"])
 #include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
@@ -573,7 +574,7 @@ if false
 end=#
 
 # do 4pt momentum MPO
-if true
+if false
     lx,ly,n = 8,4,4
     layers = Int(log(2,lx*ly))
     intstren = 0.0
@@ -590,6 +591,7 @@ if true
         #!haskey(d,"ttn") && continue
         #haskey(m,"fourpt_momentum") && continue
         psi = d["ttn"]
+        #psi2 = d["ttn_1"]
         #get_occupancy(psi; if_plot=true,plot_title="$(m["onsite_strength"])")
         lat = TTN.physical_lattice(psi.net)
 
@@ -597,29 +599,27 @@ if true
 
         mapss = zigzag_curve(lx,ly)
 
-        ks = [n/lx for n in 0:lx]
-        vals = zeros(Float64,length(ks),length(ks))
-        for (idx,kx) in enumerate(ks)
-            for (idx2,k2) in enumerate(ks)
-                println("Working on kx = $kx, k2 = $k2")
-                fourpt = four_point_mpo(psi; momentum1 = [kx,0], momentum2 = [k2,0.0], mapping = mapss)
-                fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
-
-                fourpt_val = real(calculate_mpo_expectation(psi, fourpt_wrapped))
-                vals[idx,idx2] = fourpt_val
-            end
+        ks = [n/ly for n in 1:lx]
+        mp = [0.0,4/ly]
+        fourpt_vals = zeros(Float64,length(ks))
+        twopt_vals_m = zeros(Float64,length(ks))
+        twopt_vals_mp = zeros(Float64,length(ks)) .+ (16*real(two_point(psi,mp,mp)))
+        for (idx,ky) in enumerate(ks)
+            println("Working on ky = $ky")
+            fourpt_val = real.(four_point(psi,[0.0,ky],mp))
+            twopt_m = 16*real(two_point(psi,[0.0,ky],[0,ky]))
+            fourpt_vals[idx] = fourpt_val
+            twopt_vals_m[idx] = twopt_m
         end
 
-        display(vals)
-        #fourpt_dict = Dict([("fourpt_momentum",vals)])
-        #modify_data(fourpt_dict,joinpath(dataloc,f),"metadata")
-
-        #=xs = [n for n in 0:lx]
-        ys = vals[1,:] ./ (lx*ly)^2
-        scatter(xs,ys,label="$(m["onsite_strength"])")
-        xlabel("kx")
+        #display(vals)
+        fig = figure()
+        scatter(ks .* ly,fourpt_vals,c="b",label="4pt")
+        scatter(ks .* ly,twopt_vals_m,c="r",label="2pt m")
+        plot(ks .* ly,twopt_vals_mp,c="g",label="2pt mp")
+        xlabel("Momentum k = m / Ly, m' = $(Int(mp[2]*lx))")
         ylabel("Four Point Momentum")
-        legend()=#
+        title("Four Point Momentum for $(lx)x$(ly) N=$n ULR=$(m["onsite_strength"])")
     #end
 end
 
@@ -795,32 +795,41 @@ end
 
 # test 4pt momentum with ED
 if false
-    lx,ly,n = 6,4,3
-    stren = 0.0
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",stren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+    #lx,ly,n = 8,4,4
+    stren = 300.0
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",stren),("lr","all"),("filling",0.5),("nev",3),("if_find_data",true),("if_save_data",false)])
     states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
 
     #ed_rho = density_matrix(states[1],lattice_params)
 
-    #fig = figure()
-    ks = [n/lx for n in 0:lx]
-    vals1 = zeros(Float64,length(ks))
-    vals2 = zeros(Float64,length(ks))
-    for (idx,kx) in enumerate(ks)
-        val = abs.(ft_fourpt(states[1:2],[kx,0],[0.5,0],lattice_params))
-        
-        #val = real.(ft_twopt(states[1:2],[kx,0],[kx,0.0],lattice_params))
-        vals1[idx] = val[1]
-        vals2[idx] = val[2]
+    fig = figure()
+    #ks = [n/ly for n in 1:lx]
+    ed_fourpt_vals = zeros(Float64,length(ks))
+    twopts_kp = zeros(Float64,length(ks)) .+ real(ft_twopt(states[1],mp,mp,lattice_params))
+    plot(ks .* ly,twopts_kp,c="g",label="2pt mp")
+    twopts_kk = zeros(Float64,length(ks))
+    for (idx,ky) in enumerate(ks)
+        kk = [0.0,ky]
+        fourpt_val = abs(ft_fourpt_alberto(states[1],kk,mp,lattice_params))
+        twopt_val_k = abs(ft_twopt_alberto(states[1],kk,kk,lattice_params))
 
-        if idx == 1
-            scatter(kx*lx,val[1],c="r",label="ED Direct 1")
-            scatter(kx*lx,val[2],c="m",label="ED Direct 2")
+        scatter(ky*ly,fourpt_val,c="b",label="4pt")
+        scatter(ky*ly,twopt_val_k,c="r",label="2pt m")
+        
+        
+        #vals1[idx] = val
+        #vals2[idx] = val[2]
+
+        #=if idx == 1
+            scatter(ky*ly,val,c="r",label="ED Direct 1")
+            #scatter(kx*lx,val[1],c="r",label="ED Direct 1")
+            #scatter(kx*lx,val[2],c="m",label="ED Direct 2")
             legend()
         else
-            scatter(kx*lx,val[1],c="r")
-            scatter(kx*lx,val[2],c="m")
-        end
+            scatter(ky*ly,val,c="r")
+            #scatter(kx*lx,val[1],c="r")
+            #scatter(kx*lx,val[2],c="m")
+        end=#
     end
     title("Four point direct $(lx)x$(ly) N=$n ULR=$stren")
 end

@@ -157,16 +157,19 @@ function ft_coeff(phys_site::Tuple{Int,Int},momentum::Vector{Float64},op_type::S
     return exp(2*pi*im*dag_sign*dot(momentum,phys_site))
 end
 
-function ft_coeff_alberto(phys_site::Tuple{Int,Int},momentum::Vector{Float64},op_type::String,Ly::Int,alpha::Float64)
-    lb::Float64 = 1/sqrt(2*pi*alpha)
-    val::ComplexF64 = exp(2*pi*im*momentum[1]*phys_site[2]) * exp(-((phys_site[1] - 2*pi*momentum[1])^2) / (2*(lb^2))) / sqrt(Ly * lb * sqrt(pi))
-    if op_type == "A"
+function ft_coeff_alberto(phys_site::Tuple{Int,Int},momentum::Vector{Float64},op_type::String,Ly::Int,m::Int)
+
+    dag_sign::Int = op_type == "Adag" ? -1 : 1
+    val::ComplexF64 = exp(dag_sign*2*pi*im*momentum[2]*phys_site[2]) / sqrt(Ly)
+    if m == phys_site[1]
         return val
-    elseif op_type == "Adag"
-        return conj(val)
     else
-        error("Invalid operator type.")
+        return val * 0.0000000001
     end
+end
+
+function ft_coeff_alberto(phys_site::Vector{Int},momentum::Vector{Float64},op_type::String,Ly::Int,m::Int)
+    return ft_coeff_alberto((phys_site[1],phys_site[2]),momentum,op_type,Ly,m)
 end
 
 

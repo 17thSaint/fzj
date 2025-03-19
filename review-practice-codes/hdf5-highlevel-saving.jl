@@ -21,6 +21,8 @@ function HDF5.read(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, ob
         return read_SMO(group, SavingMeasurementsObserver)
     elseif observer_type == "SavingExcitedNRGVarObserver"
         return read_SENVO(group, SavingExcitedNRGVarObserver)
+    elseif observer_type == "NRGVarObserver"
+        return read_NVO(group, NRGVarObserver)
     else
         error("Observer type $observer_type not recognized")
     end
@@ -48,6 +50,27 @@ function read_SNVO(group::HDF5.Group, observer::Type{<:SavingNRGVarObserver})
 	nrg = read(group, "nrg")
 	
 	return SavingNRGVarObserver(file_path, var_tol, nrg)
+end
+
+function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, observer::NRGVarObserver)
+	group = create_group(parent, name)
+	
+	var_tol = observer.var_tol
+	nrg = observer.nrg
+
+	write(group, "var_tol", var_tol)
+	write(group, "nrg", nrg)
+
+    attributes(group)["type"] = "NRGVarObserver"
+end
+
+function read_NVO(group::HDF5.Group, observer::Type{<:NRGVarObserver})
+	#group = open_group(parent, name)
+	
+	var_tol = read(group, "var_tol")
+	nrg = read(group, "nrg")
+	
+	return NRGVarObserver(file_path, var_tol, nrg)
 end
 
 function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, observer::SavingMeasurementsObserver)

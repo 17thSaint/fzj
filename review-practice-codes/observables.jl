@@ -683,13 +683,13 @@ function ft_coeff(phys_site::TTN.Index,momentum::Vector{Float64},op_type::String
     return ft_coeff(coord_label,momentum,op_type)
 end
 
-function ft_coeff_alberto(phys_site::TTN.Index,momentum::Vector{Float64},op_type::String,lx::Int,ly::Int,alpha::Float64)
+function ft_coeff_alberto(phys_site::TTN.Index,momentum::Vector{Float64},op_type::String,ly::Int,m::Int)
     index_tag = string(TTN.tags(phys_site))
     @assert occursin("Site",index_tag)
 
     lin_ind = parse(Int,match(r"n=(\d+)",index_tag)[1])
     coord_label = coordinate(lin_ind,lx,ly)
-    return ft_coeff_alberto(coord_label,momentum,op_type,ly,alpha)
+    return ft_coeff_alberto(coord_label,momentum,op_type,ly,m)
 end
 
 function construct_top_node_environments(ttn1::TTN.TreeTensorNetwork, ttn2::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper)
@@ -943,7 +943,7 @@ function single_point_mpo(wavefunc::TTN.TreeTensorNetwork,op_type::String; kwarg
 
     lat = TTN.physical_lattice(wavefunc.net)
     lx::Int,ly::Int = size(lat)
-    alpha = 0.25
+    m = Int(mom[2] * ly)
 
     mapping = kwargs[:mapping]
 
@@ -955,7 +955,7 @@ function single_point_mpo(wavefunc::TTN.TreeTensorNetwork,op_type::String; kwarg
     for (idx,s) in enumerate(phys_sites)
         opl > 1 && println("Working on Physical Site $(TTN.tags(s))")
 
-        coeff::ComplexF64 = ft_coeff_alberto(s,mom,op_type,lx,ly,alpha)
+        coeff::ComplexF64 = ft_coeff_alberto(s,mom,op_type,ly,m)
 
         mat = build_W_singlepoint(op_type,coeff)
 
@@ -1047,7 +1047,7 @@ function four_point(wavefunc::TTN.TreeTensorNetwork,momentum1::Vector{Float64},m
 
     fourpt = four_point_mpo(wavefunc; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss)
     fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
-    return real(calculate_mpo_expectation(wavefunc, fourpt_wrapped)) / (lx*ly)^2
+    return real(calculate_mpo_expectation(wavefunc, fourpt_wrapped))
 end
 
 function four_point(wavefuncs::Vector,momentum1::Vector{Float64},momentum2::Vector{Float64}; kwargs...)
@@ -1068,7 +1068,7 @@ function four_point(wavefuncs::Vector,momentum1::Vector{Float64},momentum2::Vect
 
     display(mat)
 
-    return eigvals(mat ./ (lx*ly)^2)
+    return eigvals(mat)
 end
 
 
