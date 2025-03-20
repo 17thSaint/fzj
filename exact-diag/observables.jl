@@ -581,8 +581,10 @@ function fourpoint_alberto(psi::Vector{ComplexF64},lattice_params::Dict; kwargs.
         occs = get_occupancy(psi,lattice_params; if_plot=false)
     end
 
-    center_site::Vector{Int64} = [Int64(ceil(lattice_params["Lx"]/2)),Int64(ceil(lattice_params["Ly"]/2))]
+    center_site::Vector{Int64} = [5,3]#[Int64(ceil(lattice_params["Lx"]/2)),Int64(ceil(lattice_params["Ly"]/2))]
     center_linear::Int = linear_index(center_site,lattice_params["Lx"],lattice_params["Ly"])
+
+    println("Center site is $(center_site) with linear index $(center_linear)")
 
     rez::Matrix{Float64} = zeros(Float64,lattice_params["Ly"],lattice_params["Lx"])
     for j in 1:lattice_params["Lx"]
@@ -727,16 +729,71 @@ function entanglement_entropy(rho_A::Matrix{ComplexF64}; tolerance=1e-8)
 end
 
 
-function four_point_operator(site1::Int64,site2::Int64,site3::Int64,site4::Int64,lattice_params::Dict)
+function four_point_operator_old(site1::Int64,site2::Int64,site3::Int64,site4::Int64,lattice_params::Dict)
     
-    mat1 = buildHopping(lattice_params,site1,site3)
-    mat2 = buildHopping(lattice_params,site2,site4)
+    mat1 = buildHopping(lattice_params,site3,site1)
+    mat2 = buildHopping(lattice_params,site4,site2)
 
     result = mat1 * mat2
 
-    site2 == site3 && (result -= buildHopping(lattice_params,site1,site4))
+    site2 == site3 && (result -= buildHopping(lattice_params,site4,site1))
 
     return result
+end
+
+function four_point_operator(site1::Int64,site2::Int64,site3::Int64,site4::Int64,lattice_params::Dict)
+    full_basis = lattice_params["full_basis"]
+    N = lattice_params["N"]
+
+    dubhop = spzeros(Float64,size(full_basis)[2],size(full_basis)[2])
+
+    site3 == site4 && (return dubhop)
+
+    for j in 1:size(full_basis)[2]
+        this_basis_state = full_basis[:,j]
+        #println("Working on basis state $this_basis_state")
+
+        if site3 in this_basis_state && site4 in this_basis_state
+            coeff::Float64 = 1.0
+            #println("Working on basis state $this_basis_state")
+            #println("Hopping from sites $site3 and $site4 to sites $site1 and $site2 using basis state $this_basis_state")
+            
+            output_state = zeros(Int64,length(this_basis_state)) + this_basis_state
+            
+            n4 = length(filter(x->x==site4,output_state))
+            deleteat!(output_state,findfirst(x->x==site4,output_state))
+            coeff *= sqrt(n4)
+
+            n3 = length(filter(x->x==site3,output_state))
+            deleteat!(output_state,findfirst(x->x==site3,output_state))
+            coeff *= sqrt(n3)
+
+            n2 = length(filter(x->x==site2,output_state))
+            push!(output_state,site2)
+            coeff *= sqrt(n2+1)
+            
+            push!(output_state,site1)
+            n1 = length(filter(x->x==site1,output_state))
+            coeff *= sqrt(n1+1)
+
+            sort!(output_state,rev=true)
+            #println("Output state is $output_state with coeff $coeff")
+            
+            if length(unique(output_state)) < N
+                #println("Error: output state $output_state has double occupancy")
+                continue
+            end
+            if length(output_state) > N
+                error("Too long output state: $output_state")
+                #continue
+            end
+            bind = find_basis_index(output_state)
+            dubhop[j,bind] += coeff
+
+        end
+    end
+
+    return dubhop
 end
 
 function ft_fourpt(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
@@ -924,42 +981,43 @@ end
 
 
 function ft_fourpt_alberto(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
-    lx::Int64 = lattice_params["Lx"]
-    ly::Int64 = lattice_params["Ly"]
+    Lx::Int64 = lattice_params["Lx"]
+    Ly::Int64 = lattice_params["Ly"]
 
-    m = Int(momentum1[2] * ly)
-    mp = Int(momentum2[2] * ly)
+    m = Int(momentum1[2] * Ly)
+    mp = Int(momentum2[2] * Ly)
+    alpha = 1/Ly
 
     fourpt::ComplexF64 = 0.0
-    for y1 in 1:ly
+    for y1 in 1:Ly
         coord1 = [m,y1]
-        s1 = linear_index(coord1,lx,ly)
-        coeff1::ComplexF64 = ft_coeff_alberto(coord1,momentum1,"Adag",ly,m)
-        for y2 in 1:ly
+        s1 = linear_index(coord1,Lx,Ly)
+        coeff1::ComplexF64 = ft_coeff_alberto(coord1,momentum1,"Adag",Lx,Ly,m,alpha)
+        for y2 in 1:Ly
             coord2 = [mp,y2]
-            s2 = linear_index(coord2,lx,ly)
-            coeff2::ComplexF64 = ft_coeff_alberto(coord2,momentum2,"Adag",ly,mp)
-            #println("Working on y1=$(y1) y2=$(y2)")
-            for y3 in 1:ly
+            s2 = linear_index(coord2,Lx,Ly)
+            coeff2::ComplexF64 = ft_coeff_alberto(coord2,momentum2,"Adag",Lx,Ly,mp,alpha)
+            println("Working on y1=$(y1) y2=$(y2)")
+            for y3 in 1:Ly
                 coord3 = [mp,y3]
-                s3 = linear_index(coord3,lx,ly)
-                coeff3::ComplexF64 = ft_coeff_alberto(coord3,momentum2,"A",ly,mp)
-                for y4 in 1:ly
+                s3 = linear_index(coord3,Lx,Ly)
+                coeff3::ComplexF64 = ft_coeff_alberto(coord3,momentum2,"A",Lx,Ly,mp,alpha)
+                for y4 in 1:Ly
                     coord4 = [m,y4]
-                    s4 = linear_index(coord4,lx,ly)
-                    coeff4::ComplexF64 = ft_coeff_alberto(coord4,momentum1,"A",ly,m)
+                    s4 = linear_index(coord4,Lx,Ly)
+                    coeff4::ComplexF64 = ft_coeff_alberto(coord4,momentum1,"A",Lx,Ly,mp,alpha)
 
                     coeff::ComplexF64 = coeff1 * coeff2 * coeff3 * coeff4
 
-                    
+                    #println("Working on s1=$(s1) s2=$(s2) s3=$(s3) s4=$(s4)")
 
                     big_operator = four_point_operator(s1,s2,s3,s4,lattice_params)
                     
                     expectval = (conj(transpose(psi)) * (big_operator * psi))
-                    if round(expectval,digits=10) != 0.0
+                    #=if round(expectval,digits=10) != 0.0
                         println("Non-zero expectation value = $(round(expectval,digits=10))")
                         println("At $y1 $y2 $y3 $y4 coeffs are: $(round(coeff1,digits=5)), $(round(coeff2,digits=5)), $(round(coeff3,digits=5)), $(round(coeff4,digits=5))")
-                    end
+                    end=#
                     fourpt += coeff * expectval
                 end
             end

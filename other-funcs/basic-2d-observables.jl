@@ -153,11 +153,11 @@ function pairdist_ellipticalness(pairdist::Matrix{Float64}; kwargs...)
 end
 
 function ft_coeff(phys_site::Tuple{Int,Int},momentum::Vector{Float64},op_type::String)
-    dag_sign::Int = op_type == "Adag" ? -1 : 1
+    dag_sign::Int = op_type == "Adag" ? 1 : -1
     return exp(2*pi*im*dag_sign*dot(momentum,phys_site))
 end
 
-function ft_coeff_alberto(phys_site::Tuple{Int,Int},momentum::Vector{Float64},op_type::String,Ly::Int,m::Int)
+function ft_coeff_alberto(phys_site::Tuple{Int,Int},momentum::Vector{Float64},op_type::String,Lx::Int,Ly::Int,m::Int,alpha::Float64)
 
     dag_sign::Int = op_type == "Adag" ? 1 : -1
     val::ComplexF64 = exp(dag_sign*2*pi*im*momentum[2]*phys_site[2]) / sqrt(Ly)
@@ -166,13 +166,13 @@ function ft_coeff_alberto(phys_site::Tuple{Int,Int},momentum::Vector{Float64},op
     else
         return val * 0.0000000001
     end
-    #=lb = 1 / sqrt(2*pi*0.25)
-    val *= exp(-(mod(phys_site[1]-m,8))^2 / (2*lb^2)) / sqrt(sqrt(pi)*lb^2)
+    #=lb = 1 / sqrt(2*pi*alpha)
+    val *= exp(-(mod(phys_site[1]-m,Lx))^2 / (2*lb^2)) / sqrt(sqrt(pi)*lb^2)
     return val=#
 end
 
-function ft_coeff_alberto(phys_site::Vector{Int},momentum::Vector{Float64},op_type::String,Ly::Int,m::Int)
-    return ft_coeff_alberto((phys_site[1],phys_site[2]),momentum,op_type,Ly,m)
+function ft_coeff_alberto(phys_site::Vector{Int},momentum::Vector{Float64},op_type::String,Lx::Int,Ly::Int,m::Int,alpha::Float64)
+    return ft_coeff_alberto((phys_site[1],phys_site[2]),momentum,op_type,Lx,Ly,m,alpha)
 end
 
 

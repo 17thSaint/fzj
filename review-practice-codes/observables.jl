@@ -407,7 +407,8 @@ function fourpoint_alberto(psi::TTN.TreeTensorNetwork; kwargs...)
 
     lx,ly = get_lattice_dims(psi)
 
-    center_site::Vector{Int64} = [Int64(ceil(lx/2)),Int64(ceil(ly/2))]
+    center_site::Vector{Int64} = [5,3]#[Int64(ceil(lx/2)),Int64(ceil(ly/2))]
+    println("Center site is $(center_site)")
     center_linear::Int64 = linear_index(center_site,lx,ly)
 
     rez::Matrix{Float64} = zeros(Float64,ly,lx)
@@ -683,13 +684,13 @@ function ft_coeff(phys_site::TTN.Index,momentum::Vector{Float64},op_type::String
     return ft_coeff(coord_label,momentum,op_type)
 end
 
-function ft_coeff_alberto(phys_site::TTN.Index,momentum::Vector{Float64},op_type::String,ly::Int,m::Int)
+function ft_coeff_alberto(phys_site::TTN.Index,momentum::Vector{Float64},op_type::String,Lx::Int,Ly::Int,m::Int,alpha::Float64)
     index_tag = string(TTN.tags(phys_site))
     @assert occursin("Site",index_tag)
 
     lin_ind = parse(Int,match(r"n=(\d+)",index_tag)[1])
-    coord_label = coordinate(lin_ind,lx,ly)
-    return ft_coeff_alberto(coord_label,momentum,op_type,ly,m)
+    coord_label = coordinate(lin_ind,Lx,Ly)
+    return ft_coeff_alberto(coord_label,momentum,op_type,Lx,Ly,m,alpha)
 end
 
 function construct_top_node_environments(ttn1::TTN.TreeTensorNetwork, ttn2::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper)
@@ -944,6 +945,7 @@ function single_point_mpo(wavefunc::TTN.TreeTensorNetwork,op_type::String; kwarg
     lat = TTN.physical_lattice(wavefunc.net)
     lx::Int,ly::Int = size(lat)
     m = Int(mom[2] * ly)
+    alpha = 1 / ly
 
     mapping = kwargs[:mapping]
 
@@ -955,7 +957,7 @@ function single_point_mpo(wavefunc::TTN.TreeTensorNetwork,op_type::String; kwarg
     for (idx,s) in enumerate(phys_sites)
         opl > 1 && println("Working on Physical Site $(TTN.tags(s))")
 
-        coeff::ComplexF64 = ft_coeff_alberto(s,mom,op_type,ly,m)
+        coeff::ComplexF64 = ft_coeff_alberto(s,mom,op_type,lx,ly,m,alpha)
 
         mat = build_W_singlepoint(op_type,coeff)
 
