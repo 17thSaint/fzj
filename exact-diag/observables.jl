@@ -216,6 +216,7 @@ function make_density_correlations(wavefunc::Vector{ComplexF64},lattice_params::
 
     for s in 1:Lsynth
         for j in 1:Lphys
+            println("Working on site $(j) $(s)")
             nhat_first = density_operator(lattice_params,(j,s))
             for ss in 1:Lsynth
                 for jj in 1:Lphys
@@ -741,13 +742,53 @@ function four_point_operator_old(site1::Int64,site2::Int64,site3::Int64,site4::I
     return result
 end
 
+function four_point_operator_singlebasis(site1::Int64,site2::Int64,site3::Int64,site4::Int64,this_basis_state)
+    coeff::Float64 = 1.0
+    N = length(this_basis_state)
+    #println("Working on basis state $this_basis_state")
+    #println("Hopping from sites $site3 and $site4 to sites $site1 and $site2 using basis state $this_basis_state")
+    
+    output_state = zeros(Int64,length(this_basis_state)) + this_basis_state
+    
+    n4 = length(filter(x->x==site4,output_state))
+    deleteat!(output_state,findfirst(x->x==site4,output_state))
+    coeff *= sqrt(n4)
+
+    n3 = length(filter(x->x==site3,output_state))
+    deleteat!(output_state,findfirst(x->x==site3,output_state))
+    coeff *= sqrt(n3)
+
+    n2 = length(filter(x->x==site2,output_state))
+    push!(output_state,site2)
+    coeff *= sqrt(n2+1)
+    
+    n1 = length(filter(x->x==site1,output_state))
+    push!(output_state,site1)
+    coeff *= sqrt(n1+1)
+
+    sort!(output_state,rev=true)
+    #println("Output state is $output_state with coeff $coeff")
+    
+    if length(unique(output_state)) < N
+        #println("Error: output state $output_state has double occupancy")
+        return nothing,0.0
+    end
+    if length(output_state) > N
+        error("Too long output state: $output_state")
+        #continue
+    end
+
+    return output_state,coeff
+end
+
 function four_point_operator(site1::Int64,site2::Int64,site3::Int64,site4::Int64,lattice_params::Dict)
     full_basis = lattice_params["full_basis"]
     N = lattice_params["N"]
 
-    dubhop = spzeros(Float64,size(full_basis)[2],size(full_basis)[2])
+    dubhop = spzeros(Int64,size(full_basis)[2],size(full_basis)[2])
 
     site3 == site4 && (return dubhop)
+    site1 == site2 && (return dubhop)
 
     for j in 1:size(full_basis)[2]
         this_basis_state = full_basis[:,j]
@@ -772,8 +813,8 @@ function four_point_operator(site1::Int64,site2::Int64,site3::Int64,site4::Int64
             push!(output_state,site2)
             coeff *= sqrt(n2+1)
             
-            push!(output_state,site1)
             n1 = length(filter(x->x==site1,output_state))
+            push!(output_state,site1)
             coeff *= sqrt(n1+1)
 
             sort!(output_state,rev=true)
@@ -1005,7 +1046,7 @@ function ft_fourpt_alberto(psi::Vector{ComplexF64},momentum1::Vector{Float64},mo
                 for y4 in 1:Ly
                     coord4 = [m,y4]
                     s4 = linear_index(coord4,Lx,Ly)
-                    coeff4::ComplexF64 = ft_coeff_alberto(coord4,momentum1,"A",Lx,Ly,mp,alpha)
+                    coeff4::ComplexF64 = ft_coeff_alberto(coord4,momentum1,"A",Lx,Ly,m,alpha)
 
                     coeff::ComplexF64 = coeff1 * coeff2 * coeff3 * coeff4
 
@@ -1028,23 +1069,24 @@ function ft_fourpt_alberto(psi::Vector{ComplexF64},momentum1::Vector{Float64},mo
 end
 
 function ft_twopt_alberto(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
-    lx::Int64 = lattice_params["Lx"]
-    ly::Int64 = lattice_params["Ly"]
+    Lx::Int64 = lattice_params["Lx"]
+    Ly::Int64 = lattice_params["Ly"]
 
     m = Int(momentum1[2] * ly)
     mp = Int(momentum2[2] * ly)
+    alpha = 1/Ly
 
     fourpt::ComplexF64 = 0.0
             
     for y3 in 1:ly
         coord3 = [m,y3]
         s3 = linear_index(coord3,lx,ly)
-        coeff3::ComplexF64 = ft_coeff_alberto(coord3,momentum1,"Adag",ly,m)
+        coeff3::ComplexF64 = ft_coeff_alberto(coord3,momentum1,"Adag",Lx,Ly,m,alpha)
         for y4 in 1:ly
             coord4 = [m,y4]
             s4 = linear_index(coord4,lx,ly)
             println("Working on s1=$(s3) s2=$(s4)")
-            coeff4::ComplexF64 = ft_coeff_alberto(coord4,momentum2,"A",ly,mp)
+            coeff4::ComplexF64 = ft_coeff_alberto(coord4,momentum2,"A",Lx,Ly,mp,alpha)
 
             coeff::ComplexF64 = coeff3 * coeff4
 

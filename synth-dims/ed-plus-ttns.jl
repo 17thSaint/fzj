@@ -600,31 +600,31 @@ if false
 
         ks = [n/ly for n in 1:lx]
         mp = [0.0,4/ly]
-        fourpt_vals = zeros(Float64,length(ks),length(ks))
+        fourpt_vals = zeros(Float64,length(ks))
         #twopt_vals_mp = real(two_point(psi,mp,mp))
-        for (idx2,k2) in enumerate(ks)
+        #for (idx2,k2) in enumerate(ks)
         for (idx,ky) in enumerate(ks)
             #println("Working on ky = $ky")
             #fourpt_mpo = four_point_mpo(psi; momentum1=[0.0,ky],momentum2=[0.0,ky], mapping=mapss)
-            fourpt_val = abs(four_point(psi,[0.0,ky],[0.0,k2]))
+            fourpt_val = abs(four_point(psi,[0.0,ky],mp))
             #twopt_m = real(two_point(psi,[0.0,ky],[0,ky]))
-            fourpt_vals[idx,idx2] = fourpt_val
+            fourpt_vals[idx] = fourpt_val
             #fourpt_vals[idx] = fourpt_val / (twopt_m * twopt_vals_mp)
         end
-        end
+        #end
 
-        imshow(fourpt_vals,origin="lower",extent=[1,lx,1,lx])
+        #=imshow(fourpt_vals,origin="lower",extent=[1,lx,1,lx])
         colorbar()
         xlabel("m")
         ylabel("m'")
-        title("Four Point Momentum for $(lx)x$(ly) N=$n ULR=$(m["onsite_strength"])")
+        title("Four Point Momentum for $(lx)x$(ly) N=$n ULR=$(m["onsite_strength"])")=#
 
-        #=display(vals)
+        #display(vals)
         fig = figure()
         scatter(ks .* ly,fourpt_vals,c="b",label="GS1")
         xlabel("Momentum k = m / Ly, m' = $(Int(mp[2]*ly))")
         ylabel("Four Point Momentum")
-        title("Four Point Momentum for $(lx)x$(ly) N=$n ULR=$(m["onsite_strength"])")=#
+        title("Four Point Momentum for $(lx)x$(ly) N=$n ULR=$(m["onsite_strength"])")
     #end
 end
 
@@ -798,26 +798,71 @@ if false
 
 end
 
+# 4pt momentum m = m' ranging strength showing that it is nonzero
+if false
+    lx,ly,n = 4,4,4
+    strens = range(0.0,200.0,length=30)
+    for (idx,stren) in enumerate(strens)
+        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_check_fluxes",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",stren),("lr","all"),("filling",0.5),("nev",3),("if_find_data",true),("if_save_data",false)])
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
+        xx = 1
+        avg_val = 0.0
+        nonzero_count = 0
+        for y1 in 1:ly
+            cor1 = [xx,y1]
+            lin1 = linear_index(cor1,lx,ly)
+            for y2 in 1:ly
+                cor2 = [xx,y2]
+                lin2 = linear_index(cor2,lx,ly)
+                println("Working on $cor1, $cor2")
+                for y3 in 1:ly
+                    cor3 = [xx,y3]
+                    lin3 = linear_index(cor3,lx,ly)
+                    for y4 in 1:ly
+                        cor4 = [xx,y4]
+                        lin4 = linear_index(cor4,lx,ly)
+                        thisop = four_point_operator(lin1,lin2,lin3,lin4,lattice_params)
+                        expval = (conj(transpose(states[1])) * (thisop * states[1]))
+                        if abs(expval) > 1e-10
+                            nonzero_count += 1
+                            avg_val += abs(expval)
+                            #println("For $cor1, $cor2, $cor3, $cor4, the expectation value is $(abs(expval))")
+                        end
+                    end
+                end
+            end
+        end
+
+        scatter(stren,avg_val / nonzero_count,c="b")
+        xlabel("Interaction Strength")
+        ylabel("Four Point m=m' Coefficient")
+        yscale("log")
+    end
+
+end
+
 # test 4pt momentum with ED
 if true
-    lx,ly,n = 4,4,4
-    stren = 0.0
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_check_fluxes",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",stren),("lr","all"),("filling",0.5),("nev",3),("if_find_data",true),("if_save_data",false)])
-    #states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
-    #lattice_params,hamilt_params,running_args = get_normal_model_params_ed(pdict)    
+    lx,ly,n = 8,4,4
+    stren = 300.0
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("flux_direction","y"),("if_check_fluxes",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",stren),("lr","all"),("filling",0.5),("nev",3),("if_find_data",true),("if_save_data",false)])
+    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
+    #lattice_params,hamilt_params,running_args = get_normal_model_params_ed(pdict)
+    #full_basis = n_particle_basis(lattice_params; output_level=running_args.output_level,dataloc=running_args.basis_dataloc)   
+    #lattice_params["full_basis"] = full_basis
 
-    #ed_rho = density_matrix(states[1],lattice_params)
 
     #fig = figure()
     ks = [n/ly for n in 1:lx]
     ed_fourpt_vals = zeros(Float64,length(ks))
-    #twopts_kp = zeros(Float64,length(ks)) .+ real(ft_twopt(states[1],mp,mp,lattice_params))
+    mp = [0.0,4/ly]
+    #twopt_vals_mp = abs(ft_twopt_alberto(states[1],mp,mp,lattice_params))
     #plot(ks .* ly,twopts_kp,c="g",label="2pt mp")
     #twopts_kk = zeros(Float64,length(ks))
     for (idx,ky) in enumerate(ks)
         #ky = 1/ly
         kk = [0.0,ky]
-        fourpt_val = abs(ft_fourpt_alberto(states[1],kk,[0.0,3/ly],lattice_params))
+        fourpt_val = abs(ft_fourpt_alberto(states[1],kk,mp,lattice_params))
         #twopt_val_k = abs(ft_twopt_alberto(states[1],kk,kk,lattice_params))
 
         #scatter(ky*ly,fourpt_val / (twopt_val_k * twopt_vals_mp),c="b",label="4pt")
@@ -843,6 +888,56 @@ if true
     title("Four point direct $(lx)x$(ly) N=$n ULR=$stren")
 end
 
+# test 4pt real space 
+if false
+    lx,ly,n = 8,4,4
+    stren = 0.0
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("flux_direction","y"),("if_check_fluxes",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",stren),("lr","all"),("filling",0.5),("nev",4),("if_find_data",true),("if_save_data",false)])
+    #states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
+    #lattice_params,hamilt_params,running_args = get_normal_model_params_ed(pdict)
+    #full_basis = n_particle_basis(lattice_params; output_level=running_args.output_level,dataloc=running_args.basis_dataloc)   
+    #lattice_params["full_basis"] = full_basis
+
+
+    coord1 = [1,0] .+ 1
+    coord2 = [0,0] .+ 1
+    coord3 = [3,2] .+ 1
+    coord4 = [0,1] .+ 1
+    lin1 = linear_index(coord1,lx,ly)
+    lin2 = linear_index(coord2,lx,ly)
+    lin3 = linear_index(coord3,lx,ly)
+    lin4 = linear_index(coord4,lx,ly)
+
+
+
+    #=expvals = zeros(ComplexF64,lx*ly,lx*ly,lx*ly,lx*ly)
+    for lin1 in 1:lx*ly
+        coord1 = coordinate(lin1,lx,ly) .- 1
+        for lin2 in 1:lx*ly
+            coord2 = coordinate(lin2,lx,ly) .- 1
+            for lin3 in 1:lx*ly
+                coord3 = coordinate(lin3,lx,ly) .- 1
+                for lin4 in 1:lx*ly
+                    coord4 = coordinate(lin4,lx,ly) .- 1=#
+                    thisop = four_point_operator(lin1,lin2,lin3,lin4,lattice_params)
+                    expval = (conj(transpose(states[1])) * (thisop * states[1]))
+                    println("For $coord1, $coord2, $coord3, $coord4, the expectation value is $(expval)")
+                    #=expvals[lin1,lin2,lin3,lin4] = expval
+                end
+            end
+        end
+    end=#
+
+
+    #=data = Dict([("fourpt",expvals)])
+    file_name = "fourpt-realspace-$(lx)x$(ly)-N-$n-ULR-$stren.h5"
+    h5open(file_name,"w") do f
+        g_alldata = create_group(f,"all_data")
+        for (datum_key,datum) in data
+            write(g_alldata, datum_key, datum)
+        end
+    end=#
+end
 
 
 

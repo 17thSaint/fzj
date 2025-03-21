@@ -167,7 +167,7 @@ function ft_coeff_alberto(phys_site::Tuple{Int,Int},momentum::Vector{Float64},op
         return val * 0.0000000001
     end
     #=lb = 1 / sqrt(2*pi*alpha)
-    val *= exp(-(mod(phys_site[1]-m,Lx))^2 / (2*lb^2)) / sqrt(sqrt(pi)*lb^2)
+    val *= exp(-(phys_site[1]-m)^2 / (2*lb^2)) / sqrt(sqrt(pi)*lb^2)
     return val=#
 end
 

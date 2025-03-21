@@ -8,4 +8,4 @@
 #SBATCH --mem=32G
 #SBATCH --gres=gpu:a100:1
 
-srun julia gpu-benchmarking.jl "benchmark_type" "gpu" "model" "J1J2" "min_mdim" 50 "max_mdim" 60 "count_mdim" 2 "lx" 4
+srun julia gpu-benchmarking.jl "benchmark_type" "gpu" "model" "HH" "min_mdim" 20 "max_mdim" 50 "count_mdim" 2 "lx" 8

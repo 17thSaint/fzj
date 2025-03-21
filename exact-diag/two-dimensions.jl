@@ -757,7 +757,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
     
     if_periodic_x = lattice_params["if_periodic_x"]
     if_periodic_y = lattice_params["if_periodic_y"]
-    if_per = (if_periodic_x,if_periodic_y)
+    #if_per = (if_periodic_x,if_periodic_y)
     Lx = lattice_params["Lx"]
     Ly = lattice_params["Ly"]
     Ls = (Lx,Ly)
@@ -766,7 +766,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
     tx = hamilt_params["tx"]
     ty = hamilt_params["ty"]
     alpha = hamilt_params["alpha"]
-    flux_direction = hamilt_params["flux_direction"]
+    #flux_direction = hamilt_params["flux_direction"]
     U = hamilt_params["U"]
     interaction_cutoff = hamilt_params["interaction_cutoff"]
     which_dir = hamilt_params["which_dir"]
@@ -802,7 +802,9 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
             coeff = did > 2 ? -ty : -tx
 
             # flux attachment
-            coeff *= exp(im*dot(alpha,dir)*dot(starting_site,abs.(reverse(dir)))*2*pi)
+            coeff *= exp(im*dot(alpha,dir)*dot(starting_site .- 1,abs.(reverse(dir)))*2*pi)
+
+            #println("Hopping from ",starting_site," to ",next_site," with coeff ",coeff)
             
             # boundary condition twisting
             coeff *= exp(im*2*pi*dot(twist_angle ./ (Lx,Ly),dir))
