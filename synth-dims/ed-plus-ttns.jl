@@ -574,50 +574,44 @@ if false
 end=#
 
 # do 4pt momentum MPO
-if false
+if true
     lx,ly,n = 8,4,4
     layers = Int(log(2,lx*ly))
-    intstren = 0.0
+    intstren = 300.0
 
-    dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
-    pdict = Dict([("layers",layers),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
-    #pdict = Dict([("particles",n),("expander_fraction",100),("flux_direction","synth"),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",intstren),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
+    #=pdict_ttn = Dict([("particles",n),("cutoff",0.0),("if_check_fluxes",false),("max_occ",1),("expander_fraction",100),("flux_direction","synth"),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_results = run_synth_dims_generic(pdict_ttn)
+    psi = all_results[1]=#
+
+    dataloc = get_folder_location("cluster-data/synth-dims/torus")
+    pdict = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc)
     filter!(x -> !occursin("if_synth_rectangle",x),all_files)
     display(all_files)
+    f = all_files[1]
+    d,m = read_data(dataloc * "/" * f; output_level=0)
+    #psi = d["ttn"]
+    
+    fourpt_vals = m["fourpt_momentum"]
+    imshow(fourpt_vals,origin="lower",vmin=0.0,extent=[1,lx,1,lx])
+    colorbar()
+    xlabel("m'")
+    ylabel("m")
+    title("TTN Four Point Momentum for $(lx)x$(ly) N=$n ULR=$intstren")
 
-    #for f in all_files
-        f = all_files[1]
-        d,m = read_data(dataloc * "/" * f; output_level=0)
-        #!haskey(d,"ttn") && continue
-        #haskey(m,"fourpt_momentum") && continue
-        psi = d["ttn"]
-        #TTN.move_ortho!(psi,(layers,1))
-        #psi2 = d["ttn_1"]
-        #get_occupancy(psi; if_plot=true,plot_title="$(m["onsite_strength"])")
-        #all_results = run_synth_dims_generic(pdict)
-        #psi = all_results[1]
-        lat = TTN.physical_lattice(psi.net)
+    #=ks = [n/ly for n in 1:lx]
+    mp = [0.0,2/ly]
+    fourpt_vals = zeros(Float64,length(ks))
+    for (idx,ky) in enumerate(ks)
+        fourpt_vals[idx] = four_point(psi,mp,[0.0,ky])
+    end=#
 
-        mapss = zigzag_curve(lx,ly)
-
-        ks = [n/ly for n in 1:lx]
-        mp = [0.0,4/ly]
-        twopt_vals = zeros(Float64,length(ks))
-        real_twopt_vals = zeros(Float64,length(ks))
-        for (idx,ky) in enumerate(ks)
-            twopt_vals[idx] = two_point(psi,mp,[0.0,ky])
-            scatter(ky *ly,twopt_vals[idx],c="b")
-            #real_twopt_vals[idx] = abs(two_point_real(psi, mp, [0.0,ky]))
-            #scatter(ky *ly,real_twopt_vals[idx],c="g")
-        end
-
-        #display(vals)
-        #fig = figure()
-        #scatter(ks .* ly,fourpt_vals,c="b",label="Real")
-        xlabel("Momentum k = m / Ly, m' = $(Int(mp[2]*ly))")
-        ylabel("Two Point Momentum")
-        title("Two Point Momentum for $(lx)x$(ly) N=$n")
+    #display(vals)
+    #=fig = figure()
+    scatter(ks .* ly,fourpt_vals[4,:],c="b",label="MPO")
+    xlabel("Momentum k = m / Ly, m' = $(Int(mp[2]*ly))")
+    ylabel("Four Point Momentum")
+    title("Four Point Momentum for $(lx)x$(ly) N=$n")=#
 
 
     #end
@@ -839,27 +833,31 @@ if false
 end
 
 # test 4pt momentum with ED
-if false
-    lx,ly,n = 8,4,4
-    intstren = 300.0
+if true
+    #lx,ly,n = 8,4,4
+    #intstren = 300.0
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("flux_direction","y"),("if_check_fluxes",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
     states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
-    #=lattice_params,hamilt_params,running_args = get_normal_model_params_ed(pdict)
-    full_basis = n_particle_basis(lattice_params; output_level=running_args.output_level,dataloc=running_args.basis_dataloc)   
-    lattice_params["full_basis"] = full_basis=#
 
 
     #fig = figure()
     ks = [n/ly for n in 1:lx]
-    ed_fourpt_vals = zeros(Float64,length(ks))
-    mp = [0.0,4/ly]
+    ed_fourpt_vals = zeros(Float64,length(ks),length(ks))
     for (idx,ky) in enumerate(ks)
-        ed_fourpt_vals[idx] = abs(ft_fourpt_alberto(states[1],mp,[0.0,ky],lattice_params))
-        scatter(ky*ly,ed_fourpt_vals[idx],c="b")
+        for (idx2,ky2) in enumerate(ks)
+            println("Working on ky = $ky, ky2 = $ky2")
+            ed_fourpt_vals[idx,idx2] = abs(ft_fourpt_alberto(states[1],[0.0,ky],[0.0,ky2],lattice_params))
+        end
     end
-    xlabel("Momentum k = n / Ly, m' = $(Int(mp[2]*ly))")
-    ylabel("Four Point Momentum")
+    fig = figure()
+    imshow(ed_fourpt_vals,origin="lower",vmin=0.0,extent=[1,lx,1,lx])
+    colorbar()
+    xlabel("m'")
+    ylabel("m")
     title("ED 4pt Momentum $(lx)x$(ly) N=$n ULR=$intstren")
+    #xlabel("Momentum k = n / Ly, m' = $(Int(mp[2]*ly))")
+    #ylabel("Four Point Momentum")
+    #title("ED 4pt Momentum $(lx)x$(ly) N=$n ULR=$intstren")
 end
 
 # test 2pt momentum with ED
@@ -915,69 +913,58 @@ end
 
 # compare ED TTN ground states
 if false
-    s1c = (2,1)
-    s2c = (2,1)
-    s1l = linear_index(s1c,lx,ly)
-    s2l = linear_index(s2c,lx,ly)
-
-    ed_hoppingcorr = abs(hopping_probability(states[1],s1c,s2c,lattice_params))
-    println("ED Hopping Probability = ",ed_hoppingcorr)
-
-    ttn_hoppingcorr = abs(TTN.correlation(psi,"Adag","A",s1c,s2c))
-    println("TTN Hopping Probability = ",ttn_hoppingcorr)
-
-    s1_revlin = lx*ly - s1l + 1
-    s2_revlin = lx*ly - s2l + 1
-    s1_revcorr = coordinate(s1_revlin,lx,ly)
-    s2_revcorr = coordinate(s2_revlin,lx,ly)
-    ttn_revhopcorr = abs(TTN.correlation(psi,"Adag","A",s1_revcorr,s2_revcorr))
-    println("TTN Reverse Hopping Probability = ",ttn_revhopcorr)
-end
-
-# test sum rule using ED
-if false
-    lx,ly,n = 4,4,2
-    intstren = 0.0
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_pinning",true),("flux_direction","y"),("if_check_fluxes",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
-    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
-
-    sumval = 0.0*im
-    ks = [n/lx for n in 1:lx]
-    for (idx,kx) in enumerate(ks)
-        for (idx2,ky) in enumerate(ks)
-            for kx2 in ks
-                for ky2 in ks
-                    println("Working on kx = $kx, ky = $ky, kx2 = $kx2, ky2 = $ky2")
-                    global sumval += ftfull_fourpt(states[1],[kx,ky],[kx2,ky2],lattice_params)
-                end
-            end
-        end
-    end
-
-    println("Final Sum value is ",sumval)
-end
-
-# test sum rule using TTNs
-if true
-    lx,ly,n = 4,4,2
+    lx,ly,n = 4,4,3
     layers = Int(log(2,lx*ly))
     intstren = 0.0
-    pdict = Dict([("particles",n),("if_check_fluxes",false),("max_occ",1),("expander_fraction",100),("flux_direction","synth"),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",1000000.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
-    all_results = run_synth_dims_generic(pdict)
 
-    sumval = 0.0*im
-    ks = [n/lx for n in 1:lx]
-    for (idx,kx) in enumerate(ks)
-        for (idx2,ky) in enumerate(ks)
-            for kx2 in ks
-                for ky2 in ks
-                    global sumval += four_point(all_results[1],[kx,ky],[kx2,ky2])
-                end
-            end
-        end
-    end
+    #=pdict_ttn = Dict([("particles",n),("cutoff",0.0),("es_count",1),("if_check_fluxes",false),("max_occ",1),("expander_fraction",100),("flux_direction","synth"),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_results = run_synth_dims_generic(pdict_ttn)
+    psi1 = all_results[1][1]
+    psi2 = all_results[1][2]
 
-    println("Final Sum value is ",sumval)
+    pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("flux_direction","y"),("if_check_fluxes",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
+    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict_ed; output_level=1)=#
+
+    rho_ttn1 = all_results[end-1][1]
+    rho_ttn2 = all_results[end-1][2]
+
+    rho_ed1 = density_matrix(states[1],lattice_params)
+    rho_ed2 = density_matrix(states[2],lattice_params)
+
+    #=println("ED Gap is ",nrgs[2] - nrgs[1])
+    println("TTN Gap is ",all_results[3][2].nrg[end] - all_results[3][1].nrg[end])
+    println("GS1 NRG Diff = ",nrgs[1] - all_results[3][1].nrg[end])
+    println("GS2 NRG Diff = ",nrgs[2] - all_results[3][2].nrg[end])
+
+    occs_ttn1 = get_occupancy(psi1; if_plot=true,plot_title="TTN GS1")
+    occs_ttn2 = get_occupancy(psi2; if_plot=true,plot_title="TTN GS2")
+    occs_ed1 = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="ED GS1")
+    occs_ed2 = get_occupancy(states[2],lattice_params; if_plot=true,plot_title="ED GS2")=#
+
+    # this makes the shape the same, I have no idea why
+    #rho_ttn1 = reverse(reverse(rho_ttn1,dims=1),dims=2)
+    #rho_ttn2 = reverse(reverse(rho_ttn2,dims=1),dims=2)
+
+    fig = figure()
+    imshow(abs.(rho_ttn1),origin="lower",vmin=0.0)
+    colorbar()
+    title("TTN GS1")
+
+    fig = figure()
+    imshow(abs.(rho_ttn2),origin="lower",vmin=0.0)
+    colorbar()
+    title("TTN GS2")
+
+    fig = figure()
+    imshow(abs.(rho_ed1),origin="lower",vmin=0.0)
+    colorbar()
+    title("ED GS1")
+
+    fig = figure()
+    imshow(abs.(rho_ed2),origin="lower",vmin=0.0)
+    colorbar()
+    title("ED GS2")
+
 end
 
 

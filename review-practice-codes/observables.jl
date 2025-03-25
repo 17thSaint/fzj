@@ -968,8 +968,7 @@ function single_point_mpo(wavefunc::TTN.TreeTensorNetwork,op_type::String; kwarg
     for (idx,s) in enumerate(phys_sites)
         opl > 1 && println("Working on Physical Site $(TTN.tags(s))")
 
-        #coeff::ComplexF64 = ft_coeff_alberto(s,mom,op_type,Lx,Ly,m,alpha)
-        coeff = ft_coeff(s,mom,op_type,Lx,Ly)
+        coeff::ComplexF64 = ft_coeff_alberto(s,mom,op_type,Lx,Ly,m,alpha)
 
         mat = build_W_singlepoint(op_type,coeff,hilbdim)
 

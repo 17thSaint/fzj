@@ -1044,7 +1044,7 @@ function ft_fourpt_alberto(psi::Vector{ComplexF64},momentum1::Vector{Float64},mo
             coord2 = [mp,y2]
             s2 = linear_index(coord2,Lx,Ly)
             coeff2::ComplexF64 = ft_coeff_alberto(coord2,momentum2,"Adag",Lx,Ly,mp,alpha)
-            println("Working on y1=$(y1) y2=$(y2)")
+            #println("Working on y1=$(y1) y2=$(y2)")
             for y3 in 1:Ly
                 coord3 = [mp,y3]
                 s3 = linear_index(coord3,Lx,Ly)
@@ -1062,8 +1062,8 @@ function ft_fourpt_alberto(psi::Vector{ComplexF64},momentum1::Vector{Float64},mo
                     
                     expectval = (conj(transpose(psi)) * (big_operator * psi))
 
-                    println("At $y1 $y2 $y3 $y4 coeff is: $(round(coeff,digits=10))")
-                    println("expectation value = $(round(expectval,digits=10))")
+                    #println("At $y1 $y2 $y3 $y4 coeff is: $(round(coeff,digits=10))")
+                    #println("expectation value = $(round(expectval,digits=10))")
 
                     fourpt += coeff * expectval
                 end
@@ -1139,73 +1139,6 @@ function ft_twopt_alberto(wavefuncs::Vector{Vector{ComplexF64}},momentum1::Vecto
 
     return eigvals(twopt)
 end
-
-function ftfull_twopt(wavefunc::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
-    Lx::Int64 = lattice_params["Lx"]
-    Ly::Int64 = lattice_params["Ly"]
-
-    twopt::ComplexF64 = 0.0
-            
-    for s1 in 1:Lx*Ly
-        coord1 = coordinate(s1,Lx,Ly)
-        coeff1::ComplexF64 = ft_coeff(coord1,momentum1,"Adag") / sqrt(Lx*Ly)
-        for s2 in 1:Lx*Ly
-            coord2 = coordinate(s2,Lx,Ly)
-            println("Working on c1=$(coord1) c2=$(coord2)")
-
-            coeff2::ComplexF64 = ft_coeff(coord2,momentum2,"A") / sqrt(Lx*Ly)
-
-            coeff::ComplexF64 = coeff1 * coeff2
-            
-            local_exppart = hopping_probability(wavefunc,coord1,coord2,lattice_params)
-            local_twopt = coeff * local_exppart
-            #println("At site $coord3 and $coord4, expectation value is $(round(local_exppart,digits=8))")
-            twopt += local_twopt
-        end
-    end
-
-    return twopt
-end
-
-function ftfull_fourpt(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
-    Lx::Int64 = lattice_params["Lx"]
-    Ly::Int64 = lattice_params["Ly"]
-
-    fourpt::ComplexF64 = 0.0
-    for s1 in 1:Lx*Ly
-        coord1 = coordinate(s1,Lx,Ly)
-        coeff1::ComplexF64 = ft_coeff(coord1,momentum1,"Adag")
-        for s2 in 1:Lx*Ly
-            coord2 = coordinate(s2,Lx,Ly)
-            coeff2::ComplexF64 = ft_coeff(coord2,momentum2,"Adag")
-            #println("Working on s1=$(s1) s2=$(s2)")
-            for s3 in 1:Lx*Ly
-                coord3 = coordinate(s3,Lx,Ly)
-                coeff3::ComplexF64 = ft_coeff(coord3,momentum2,"A")
-                for s4 in 1:Lx*Ly
-                    coord4 = coordinate(s4,Lx,Ly)
-                    coeff4::ComplexF64 = ft_coeff(coord4,momentum1,"A")
-
-                    coeff::ComplexF64 = coeff1 * coeff2 * coeff3 * coeff4
-
-                    #println("Working on s1=$(s1) s2=$(s2) s3=$(s3) s4=$(s4)")
-
-                    big_operator = four_point_operator(s1,s2,s3,s4,lattice_params)
-                    
-                    expectval = (conj(transpose(psi)) * (big_operator * psi))
-
-                    #println("At $s1 $s2 $s3 $s4 coeff is: $(round(coeff,digits=10))")
-                    #println("expectation value = $(round(expectval,digits=10))")
-
-                    fourpt += coeff * expectval
-                end
-            end
-        end
-    end
-
-    return fourpt
-end
-
 
 
 

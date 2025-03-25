@@ -416,12 +416,12 @@ function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwarg
 	if s1[1] == s2[1] # Synthetic Dimension Hopping
 
 		stren = -t_strength_synth
-		flux_direction == "synth" ? stren *= exp(im*2*pi*(phi*(s1[1]-0))) : nothing
+		flux_direction == "synth" ? stren *= exp(im*2*pi*(phi*(s1[1]-1))) : nothing
 		return stren
 	elseif s1[2] == s2[2] # Physical Dimension Hopping
 
 		stren = -t_strength_phys
-		flux_direction == "phys" ? stren *= exp(im*2*pi*(phi*(s1[2]-0))) : nothing
+		flux_direction == "phys" ? stren *= exp(im*2*pi*(phi*(s1[2]-1))) : nothing
 		return stren
 	else
 		return 0.0
@@ -1601,7 +1601,12 @@ function rerun_findGS(fileloc::String; kwargs...)
 	filename = breakdown_fileloc[end]
 	dataloc = join(breakdown_fileloc[1:end-1],"/")
 	data,metadata_old = read_data(filename,dataloc)
-	metadata_old["seed_ttn"] = data["ttn"]
+	if haskey(data,"ttn") && !isnothing(data["ttn"])
+		metadata_old["seed_ttn"] = data["ttn"]
+	else
+		data_wavefunc,metadata_wavefunc = read_data("wavefunc"*filename,dataloc)
+		metadata_old["seed_ttn"] = data_wavefunc["ttn"]
+	end
 	metadata_old["if_redo"] = true
 	metadata_old["location"] = dataloc
 
