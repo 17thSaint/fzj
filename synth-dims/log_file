@@ -1,0 +1,2793 @@
+pgi8cluster22: Using Ethernet for MPI communication.
+pgi8cluster22: Using Ethernet for MPI communication.
+The latest version of Julia in the `release` channel is 1.11.4+0.x64.linux.gnu. You currently have `1.11.3+0.x64.linux.gnu` installed. Run:
+
+  juliaup update
+
+in your terminal shell to install Julia 1.11.4+0.x64.linux.gnu and update the `release` channel to that version.
+  Activating project at `/local/geraghty/synth-dims`
+Input is not true or false, Input = gpu
+Input is not true or false, Input = HH
+Benchmarking HH model on gpu with 8x8 lattice from 50 to 1000 with 51 points
+CUDA runtime 12.6, artifact installation
+CUDA driver 12.6
+NVIDIA driver 550.127.8
+
+CUDA libraries: 
+- CUBLAS: 12.6.4
+- CURAND: 10.3.7
+- CUFFT: 11.3.0
+- CUSOLVER: 11.7.1
+- CUSPARSE: 12.5.4
+- CUPTI: 2024.3.2 (API 24.0.0)
+- NVML: 12.0.0+550.127.8
+
+Julia packages: 
+- CUDA: 5.5.2
+- CUDA_Driver_jll: 0.10.4+0
+- CUDA_Runtime_jll: 0.15.5+0
+
+Toolchain:
+- Julia: 1.11.3
+- LLVM: 16.0.6
+
+1 device:
+  0: NVIDIA A100 80GB PCIe (sm_80, 79.135 GiB / 80.000 GiB available)
+Data Added, File Closed: /local/geraghty/cluster-data/gpu-benchmarking/gpu-benchmarking-data-model-HH-layers-6-startmdim-50-endmdim-1000-countmdim-51.h5
+Finished sweep 1. Needed Time 133.343s
+	Current energy: -113.047778264963341.
+
+Finished sweep 2. Needed Time 116.855s
+	Current energy: -115.559657796796756.
+
+Finished sweep 3. Needed Time 117.909s
+	Current energy: -116.194463733487282.
+
+Finished sweep 4. Needed Time 117.897s
+	Current energy: -116.261332011761269.
+
+Finished sweep 5. Needed Time 117.730s
+	Current energy: -116.267263738437933.
+
+Finished gpu initialization
+Finished sweep 1. Needed Time 158.944s
+	Current energy: -112.810513337149743.
+
+Finished sweep 2. Needed Time 160.142s
+	Current energy: -116.653292346723873.
+
+Finished sweep 3. Needed Time 161.140s
+	Current energy: -116.785354211165867.
+
+Finished sweep 4. Needed Time 159.542s
+	Current energy: -116.797863407249849.
+
+Finished sweep 5. Needed Time 160.339s
+	Current energy: -116.803927961932374.
+
+Finished sweep 6. Needed Time 160.465s
+	Current energy: -116.817752865181319.
+
+Finished sweep 7. Needed Time 160.739s
+	Current energy: -117.312690913950291.
+
+Finished sweep 8. Needed Time 160.989s
+	Current energy: -117.421742568240219.
+
+Finished sweep 9. Needed Time 160.736s
+	Current energy: -117.439754678155879.
+
+Finished sweep 10. Needed Time 159.898s
+	Current energy: -117.453192170907599.
+
+Finished sweep 11. Needed Time 160.457s
+	Current energy: -117.488471954131825.
+
+Finished sweep 12. Needed Time 160.766s
+	Current energy: -117.518408848137753.
+
+Finished sweep 13. Needed Time 161.010s
+	Current energy: -117.523180123006739.
+
+Finished sweep 14. Needed Time 161.217s
+	Current energy: -117.524517913138581.
+
+Finished sweep 15. Needed Time 160.715s
+	Current energy: -117.525182301433659.
+
+Finished sweep 16. Needed Time 160.317s
+	Current energy: -117.525577803867094.
+
+Finished sweep 17. Needed Time 160.664s
+	Current energy: -117.525823980593032.
+
+Finished sweep 18. Needed Time 160.871s
+	Current energy: -117.525989334208944.
+
+Finished sweep 19. Needed Time 161.368s
+	Current energy: -117.526109966715538.
+
+GPU: mdim = 50, time = 152.92211694717406
+Finished sweep 1. Needed Time 179.193s
+	Current energy: -120.185414081700301.
+
+Finished sweep 2. Needed Time 177.842s
+	Current energy: -122.247747494120858.
+
+Finished sweep 3. Needed Time 178.864s
+	Current energy: -122.372819855685137.
+
+Finished sweep 4. Needed Time 179.200s
+	Current energy: -122.387362029535822.
+
+Finished sweep 5. Needed Time 179.275s
+	Current energy: -122.395030052862197.
+
+Finished sweep 6. Needed Time 179.792s
+	Current energy: -122.398608009702158.
+
+Finished sweep 7. Needed Time 179.281s
+	Current energy: -122.402539673122689.
+
+Finished sweep 8. Needed Time 179.079s
+	Current energy: -122.406886359653242.
+
+Finished sweep 9. Needed Time 178.342s
+	Current energy: -122.409951815250665.
+
+Finished sweep 10. Needed Time 178.237s
+	Current energy: -122.411062196894335.
+
+Finished sweep 11. Needed Time 179.244s
+	Current energy: -122.411455612688641.
+
+Finished sweep 12. Needed Time 179.419s
+	Current energy: -122.411675181951196.
+
+Finished sweep 13. Needed Time 179.865s
+	Current energy: -122.411813516944136.
+
+Finished sweep 14. Needed Time 180.440s
+	Current energy: -122.411897014460294.
+
+Finished sweep 15. Needed Time 178.389s
+	Current energy: -122.411945626455449.
+
+Finished sweep 16. Needed Time 179.061s
+	Current energy: -122.411974051285924.
+
+Finished sweep 17. Needed Time 179.096s
+	Current energy: -122.411991235641295.
+
+Finished sweep 18. Needed Time 179.165s
+	Current energy: -122.412002099083395.
+
+Finished sweep 19. Needed Time 179.350s
+	Current energy: -122.412009277507835.
+
+GPU: mdim = 69, time = 170.64169365167618
+Finished sweep 1. Needed Time 223.462s
+	Current energy: -121.596441146271005.
+
+Finished sweep 2. Needed Time 224.028s
+	Current energy: -123.324253618585558.
+
+Finished sweep 3. Needed Time 221.385s
+	Current energy: -123.457300173370385.
+
+Finished sweep 4. Needed Time 220.791s
+	Current energy: -123.468528121295094.
+
+Finished sweep 5. Needed Time 220.846s
+	Current energy: -123.471598386818485.
+
+Finished sweep 6. Needed Time 220.945s
+	Current energy: -123.472698765615021.
+
+Finished sweep 7. Needed Time 220.804s
+	Current energy: -123.473147078458496.
+
+Finished sweep 8. Needed Time 221.289s
+	Current energy: -123.473352273737333.
+
+Finished sweep 9. Needed Time 221.568s
+	Current energy: -123.473459987590203.
+
+Finished sweep 10. Needed Time 222.516s
+	Current energy: -123.473524578919708.
+
+Finished sweep 11. Needed Time 220.616s
+	Current energy: -123.473567802422650.
+
+Finished sweep 12. Needed Time 220.957s
+	Current energy: -123.473599259147647.
+
+Finished sweep 13. Needed Time 221.561s
+	Current energy: -123.473623733403514.
+
+Finished sweep 14. Needed Time 221.735s
+	Current energy: -123.473643881147140.
+
+Finished sweep 15. Needed Time 222.443s
+	Current energy: -123.473661274921042.
+
+Finished sweep 16. Needed Time 222.749s
+	Current energy: -123.473676888068155.
+
+Finished sweep 17. Needed Time 222.518s
+	Current energy: -123.473691363006154.
+
+Finished sweep 18. Needed Time 223.449s
+	Current energy: -123.473705176535361.
+
+Finished sweep 19. Needed Time 223.994s
+	Current energy: -123.473718746106272.
+
+GPU: mdim = 88, time = 211.4610962510109
+Finished sweep 1. Needed Time 238.222s
+	Current energy: -115.910705201880063.
+
+Finished sweep 2. Needed Time 238.496s
+	Current energy: -117.491583978739925.
+
+Finished sweep 3. Needed Time 239.522s
+	Current energy: -117.541225327491816.
+
+Finished sweep 4. Needed Time 240.029s
+	Current energy: -117.557932145395426.
+
+Finished sweep 5. Needed Time 241.005s
+	Current energy: -117.575709991059213.
+
+Finished sweep 6. Needed Time 241.343s
+	Current energy: -117.598883373202654.
+
+Finished sweep 7. Needed Time 241.345s
+	Current energy: -117.697508290374799.
+
+Finished sweep 8. Needed Time 242.336s
+	Current energy: -117.775318291314093.
+
+Finished sweep 9. Needed Time 238.154s
+	Current energy: -117.787173478740755.
+
+Finished sweep 10. Needed Time 239.013s
+	Current energy: -117.790010050635317.
+
+Finished sweep 11. Needed Time 239.093s
+	Current energy: -117.791494395741069.
+
+Finished sweep 12. Needed Time 239.999s
+	Current energy: -117.792984403425251.
+
+Finished sweep 13. Needed Time 240.718s
+	Current energy: -117.794137569921133.
+
+Finished sweep 14. Needed Time 240.586s
+	Current energy: -117.794656569075826.
+
+Finished sweep 15. Needed Time 241.414s
+	Current energy: -117.794892913445324.
+
+Finished sweep 16. Needed Time 241.612s
+	Current energy: -117.795031518783162.
+
+Finished sweep 17. Needed Time 241.825s
+	Current energy: -117.795125053958131.
+
+Finished sweep 18. Needed Time 240.994s
+	Current energy: -117.795193240990869.
+
+Finished sweep 19. Needed Time 235.181s
+	Current energy: -117.795246571097977.
+
+GPU: mdim = 107, time = 228.64901965856552
+Finished sweep 1. Needed Time 247.317s
+	Current energy: -119.551527623002158.
+
+Finished sweep 2. Needed Time 247.854s
+	Current energy: -121.818611924436695.
+
+Finished sweep 3. Needed Time 247.251s
+	Current energy: -121.911540577421263.
+
+Finished sweep 4. Needed Time 248.066s
+	Current energy: -121.929613761178445.
+
+Finished sweep 5. Needed Time 248.215s
+	Current energy: -121.935025283718204.
+
+Finished sweep 6. Needed Time 248.862s
+	Current energy: -121.937603928838513.
+
+Finished sweep 7. Needed Time 249.048s
+	Current energy: -121.939916674221095.
+
+Finished sweep 8. Needed Time 248.996s
+	Current energy: -121.944750024229975.
+
+Finished sweep 9. Needed Time 246.995s
+	Current energy: -122.031821020401466.
+
+Finished sweep 10. Needed Time 246.533s
+	Current energy: -122.277549477084790.
+
+Finished sweep 11. Needed Time 247.255s
+	Current energy: -122.332389578683589.
+
+Finished sweep 12. Needed Time 248.153s
+	Current energy: -122.343077795537397.
+
+Finished sweep 13. Needed Time 247.794s
+	Current energy: -122.345711157488452.
+
+Finished sweep 14. Needed Time 249.113s
+	Current energy: -122.346701463520731.
+
+Finished sweep 15. Needed Time 248.413s
+	Current energy: -122.347168101114178.
+
+Finished sweep 16. Needed Time 249.397s
+	Current energy: -122.347404133463982.
+
+Finished sweep 17. Needed Time 249.388s
+	Current energy: -122.347534036579432.
+
+Finished sweep 18. Needed Time 249.978s
+	Current energy: -122.347611617440506.
+
+Finished sweep 19. Needed Time 250.406s
+	Current energy: -122.347659943433484.
+
+GPU: mdim = 126, time = 236.56136050224305
+Finished sweep 1. Needed Time 227.267s
+	Current energy: -122.526106903003466.
+
+Finished sweep 2. Needed Time 228.307s
+	Current energy: -123.971399888583818.
+
+Finished sweep 3. Needed Time 228.848s
+	Current energy: -124.298995758258400.
+
+Finished sweep 4. Needed Time 229.029s
+	Current energy: -124.316048168794566.
+
+Finished sweep 5. Needed Time 229.761s
+	Current energy: -124.320866168653424.
+
+Finished sweep 6. Needed Time 230.119s
+	Current energy: -124.322407110210463.
+
+Finished sweep 7. Needed Time 230.250s
+	Current energy: -124.323108554367735.
+
+Finished sweep 8. Needed Time 230.751s
+	Current energy: -124.323532590825565.
+
+Finished sweep 9. Needed Time 231.578s
+	Current energy: -124.323842675037071.
+
+Finished sweep 10. Needed Time 230.796s
+	Current energy: -124.324076056988488.
+
+Finished sweep 11. Needed Time 231.396s
+	Current energy: -124.324242750876138.
+
+Finished sweep 12. Needed Time 231.602s
+	Current energy: -124.324355567545140.
+
+Finished sweep 13. Needed Time 232.466s
+	Current energy: -124.324430020262312.
+
+Finished sweep 14. Needed Time 232.627s
+	Current energy: -124.324479176409753.
+
+Finished sweep 15. Needed Time 228.665s
+	Current energy: -124.324512087184004.
+
+Finished sweep 16. Needed Time 228.538s
+	Current energy: -124.324534543974153.
+
+Finished sweep 17. Needed Time 229.439s
+	Current energy: -124.324550168485672.
+
+Finished sweep 18. Needed Time 229.563s
+	Current energy: -124.324561235431005.
+
+Finished sweep 19. Needed Time 230.334s
+	Current energy: -124.324569197114698.
+
+GPU: mdim = 145, time = 219.21283025741576
+Finished sweep 1. Needed Time 240.464s
+	Current energy: -121.533877106897108.
+
+Finished sweep 2. Needed Time 241.331s
+	Current energy: -123.362954507369622.
+
+Finished sweep 3. Needed Time 240.375s
+	Current energy: -123.673631529987446.
+
+Finished sweep 4. Needed Time 241.536s
+	Current energy: -123.792976371175058.
+
+Finished sweep 5. Needed Time 241.755s
+	Current energy: -123.892888899882848.
+
+Finished sweep 6. Needed Time 242.251s
+	Current energy: -123.909224976428291.
+
+Finished sweep 7. Needed Time 240.644s
+	Current energy: -123.913719425181981.
+
+Finished sweep 8. Needed Time 238.514s
+	Current energy: -123.917966903115996.
+
+Finished sweep 9. Needed Time 239.395s
+	Current energy: -124.222957184744061.
+
+Finished sweep 10. Needed Time 239.868s
+	Current energy: -124.380102687751659.
+
+Finished sweep 11. Needed Time 240.565s
+	Current energy: -124.386025213598543.
+
+Finished sweep 12. Needed Time 240.484s
+	Current energy: -124.387727672888104.
+
+Finished sweep 13. Needed Time 241.073s
+	Current energy: -124.388599768351867.
+
+Finished sweep 14. Needed Time 240.476s
+	Current energy: -124.389088766884697.
+
+Finished sweep 15. Needed Time 242.145s
+	Current energy: -124.389408635422058.
+
+Finished sweep 16. Needed Time 241.254s
+	Current energy: -124.389663656716777.
+
+Finished sweep 17. Needed Time 241.529s
+	Current energy: -124.389891925448381.
+
+Finished sweep 18. Needed Time 241.848s
+	Current energy: -124.390094945474985.
+
+Finished sweep 19. Needed Time 242.350s
+	Current energy: -124.390261752575356.
+
+GPU: mdim = 164, time = 229.5179275035858
+Finished sweep 1. Needed Time 269.736s
+	Current energy: -119.012197577004585.
+
+Finished sweep 2. Needed Time 269.158s
+	Current energy: -121.569506275669625.
+
+Finished sweep 3. Needed Time 270.181s
+	Current energy: -121.968428815171762.
+
+Finished sweep 4. Needed Time 270.291s
+	Current energy: -121.996510575169637.
+
+Finished sweep 5. Needed Time 271.085s
+	Current energy: -122.001957270524841.
+
+Finished sweep 6. Needed Time 271.312s
+	Current energy: -122.004043893327605.
+
+Finished sweep 7. Needed Time 272.156s
+	Current energy: -122.005158371125603.
+
+Finished sweep 8. Needed Time 271.875s
+	Current energy: -122.005873059992382.
+
+Finished sweep 9. Needed Time 273.083s
+	Current energy: -122.006357308341038.
+
+Finished sweep 10. Needed Time 273.070s
+	Current energy: -122.006677093953087.
+
+Finished sweep 11. Needed Time 272.715s
+	Current energy: -122.006882653622796.
+
+Finished sweep 12. Needed Time 273.678s
+	Current energy: -122.007016065112111.
+
+Finished sweep 13. Needed Time 273.752s
+	Current energy: -122.007105482740059.
+
+Finished sweep 14. Needed Time 273.634s
+	Current energy: -122.007167424035586.
+
+Finished sweep 15. Needed Time 274.376s
+	Current energy: -122.007212047742414.
+
+Finished sweep 16. Needed Time 274.702s
+	Current energy: -122.007245810831222.
+
+Finished sweep 17. Needed Time 275.333s
+	Current energy: -122.007272673874340.
+
+Finished sweep 18. Needed Time 269.399s
+	Current energy: -122.007295002775876.
+
+Finished sweep 19. Needed Time 270.036s
+	Current energy: -122.007314173317312.
+
+GPU: mdim = 183, time = 259.15281850099564
+Finished sweep 1. Needed Time 282.268s
+	Current energy: -116.892215974404735.
+
+Finished sweep 2. Needed Time 282.838s
+	Current energy: -118.677801529696893.
+
+Finished sweep 3. Needed Time 283.839s
+	Current energy: -118.832561803500582.
+
+Finished sweep 4. Needed Time 283.949s
+	Current energy: -118.893958530188570.
+
+Finished sweep 5. Needed Time 284.198s
+	Current energy: -118.903076922166832.
+
+Finished sweep 6. Needed Time 284.664s
+	Current energy: -118.905713136985256.
+
+Finished sweep 7. Needed Time 284.291s
+	Current energy: -118.906761965377896.
+
+Finished sweep 8. Needed Time 285.453s
+	Current energy: -118.907256907237596.
+
+Finished sweep 9. Needed Time 285.376s
+	Current energy: -118.907517415514505.
+
+Finished sweep 10. Needed Time 284.054s
+	Current energy: -118.907673582873798.
+
+Finished sweep 11. Needed Time 281.238s
+	Current energy: -118.907779636610258.
+
+Finished sweep 12. Needed Time 282.311s
+	Current energy: -118.907858655885292.
+
+Finished sweep 13. Needed Time 283.052s
+	Current energy: -118.907921422303502.
+
+Finished sweep 14. Needed Time 283.323s
+	Current energy: -118.907973396298601.
+
+Finished sweep 15. Needed Time 283.516s
+	Current energy: -118.908017094560392.
+
+Finished sweep 16. Needed Time 283.456s
+	Current energy: -118.908053199163533.
+
+Finished sweep 17. Needed Time 284.644s
+	Current energy: -118.908081810713838.
+
+Finished sweep 18. Needed Time 284.690s
+	Current energy: -118.908103463492651.
+
+Finished sweep 19. Needed Time 285.490s
+	Current energy: -118.908119297065056.
+
+GPU: mdim = 202, time = 270.33401144742965
+Finished sweep 1. Needed Time 286.408s
+	Current energy: -115.061100406867382.
+
+Finished sweep 2. Needed Time 284.960s
+	Current energy: -116.580126130705764.
+
+Finished sweep 3. Needed Time 282.471s
+	Current energy: -116.894318510299911.
+
+Finished sweep 4. Needed Time 283.958s
+	Current energy: -116.986480167474852.
+
+Finished sweep 5. Needed Time 283.516s
+	Current energy: -117.113812599781440.
+
+Finished sweep 6. Needed Time 284.311s
+	Current energy: -117.153361573813257.
+
+Finished sweep 7. Needed Time 283.602s
+	Current energy: -117.160054428377791.
+
+Finished sweep 8. Needed Time 284.525s
+	Current energy: -117.192077015371595.
+
+Finished sweep 9. Needed Time 284.963s
+	Current energy: -117.588860478539871.
+
+Finished sweep 10. Needed Time 284.665s
+	Current energy: -117.597744503375651.
+
+Finished sweep 11. Needed Time 285.450s
+	Current energy: -117.599824669021658.
+
+Finished sweep 12. Needed Time 284.856s
+	Current energy: -117.601093189497149.
+
+Finished sweep 13. Needed Time 284.030s
+	Current energy: -117.601959989551872.
+
+Finished sweep 14. Needed Time 285.262s
+	Current energy: -117.602550108443026.
+
+Finished sweep 15. Needed Time 284.594s
+	Current energy: -117.602945053251560.
+
+Finished sweep 16. Needed Time 285.152s
+	Current energy: -117.603223649820478.
+
+Finished sweep 17. Needed Time 285.041s
+	Current energy: -117.603434791127484.
+
+Finished sweep 18. Needed Time 284.912s
+	Current energy: -117.603592472170902.
+
+Finished sweep 19. Needed Time 286.136s
+	Current energy: -117.603706083973591.
+
+GPU: mdim = 221, time = 271.153272151947
+Finished sweep 1. Needed Time 249.719s
+	Current energy: -108.718699172176102.
+
+Finished sweep 2. Needed Time 251.611s
+	Current energy: -110.266072652855314.
+
+Finished sweep 3. Needed Time 251.409s
+	Current energy: -110.507870586662960.
+
+Finished sweep 4. Needed Time 253.062s
+	Current energy: -110.642909649171841.
+
+Finished sweep 5. Needed Time 253.590s
+	Current energy: -110.681783608944286.
+
+Finished sweep 6. Needed Time 252.914s
+	Current energy: -110.703927605954860.
+
+Finished sweep 7. Needed Time 254.024s
+	Current energy: -111.059001863518773.
+
+Finished sweep 8. Needed Time 254.370s
+	Current energy: -111.071413640121051.
+
+Finished sweep 9. Needed Time 253.019s
+	Current energy: -111.073134169716624.
+
+Finished sweep 10. Needed Time 251.273s
+	Current energy: -111.074296920239405.
+
+Finished sweep 11. Needed Time 252.725s
+	Current energy: -111.075737673810806.
+
+Finished sweep 12. Needed Time 253.911s
+	Current energy: -111.078068424882133.
+
+Finished sweep 13. Needed Time 253.966s
+	Current energy: -111.083197970089216.
+
+Finished sweep 14. Needed Time 256.577s
+	Current energy: -111.091398103632045.
+
+Finished sweep 15. Needed Time 256.512s
+	Current energy: -111.099286059326843.
+
+Finished sweep 16. Needed Time 256.288s
+	Current energy: -111.112901249947981.
+
+Finished sweep 17. Needed Time 256.358s
+	Current energy: -111.212313403640081.
+
+Finished sweep 18. Needed Time 256.872s
+	Current energy: -111.410501442423154.
+
+Finished sweep 19. Needed Time 257.205s
+	Current energy: -111.435398839256791.
+
+GPU: mdim = 240, time = 241.93289705514908
+Finished sweep 1. Needed Time 249.934s
+	Current energy: -122.988993993272928.
+
+Finished sweep 2. Needed Time 249.111s
+	Current energy: -125.029447062688703.
+
+Finished sweep 3. Needed Time 251.898s
+	Current energy: -125.400071746022789.
+
+Finished sweep 4. Needed Time 252.077s
+	Current energy: -125.440714720169922.
+
+Finished sweep 5. Needed Time 252.716s
+	Current energy: -125.454031697705986.
+
+Finished sweep 6. Needed Time 249.101s
+	Current energy: -125.458522501091736.
+
+Finished sweep 7. Needed Time 254.076s
+	Current energy: -125.460213720208017.
+
+Finished sweep 8. Needed Time 250.738s
+	Current energy: -125.461046947612544.
+
+Finished sweep 9. Needed Time 249.983s
+	Current energy: -125.461542416560860.
+
+Finished sweep 10. Needed Time 250.303s
+	Current energy: -125.461884484056455.
+
+Finished sweep 11. Needed Time 256.777s
+	Current energy: -125.462154740643783.
+
+Finished sweep 12. Needed Time 256.104s
+	Current energy: -125.462388249722792.
+
+Finished sweep 13. Needed Time 255.488s
+	Current energy: -125.462588040108386.
+
+Finished sweep 14. Needed Time 255.804s
+	Current energy: -125.462743277291267.
+
+Finished sweep 15. Needed Time 256.321s
+	Current energy: -125.462851270603707.
+
+Finished sweep 16. Needed Time 256.075s
+	Current energy: -125.462921597444847.
+
+Finished sweep 17. Needed Time 251.953s
+	Current energy: -125.462967131785831.
+
+Finished sweep 18. Needed Time 250.495s
+	Current energy: -125.462997821548015.
+
+Finished sweep 19. Needed Time 248.281s
+	Current energy: -125.463019821521058.
+
+GPU: mdim = 259, time = 240.53838140964507
+Finished sweep 1. Needed Time 250.009s
+	Current energy: -123.080637022460849.
+
+Finished sweep 2. Needed Time 250.999s
+	Current energy: -124.176488303610554.
+
+Finished sweep 3. Needed Time 251.214s
+	Current energy: -124.311200313436643.
+
+Finished sweep 4. Needed Time 252.335s
+	Current energy: -124.382647207133786.
+
+Finished sweep 5. Needed Time 251.850s
+	Current energy: -124.594673540017538.
+
+Finished sweep 6. Needed Time 251.906s
+	Current energy: -124.856883098957624.
+
+Finished sweep 7. Needed Time 252.660s
+	Current energy: -124.862304519121409.
+
+Finished sweep 8. Needed Time 252.094s
+	Current energy: -124.863479742639981.
+
+Finished sweep 9. Needed Time 253.496s
+	Current energy: -124.864001295000079.
+
+Finished sweep 10. Needed Time 253.407s
+	Current energy: -124.864289901117630.
+
+Finished sweep 11. Needed Time 254.057s
+	Current energy: -124.864467025884053.
+
+Finished sweep 12. Needed Time 258.460s
+	Current energy: -124.864580732488605.
+
+Finished sweep 13. Needed Time 258.780s
+	Current energy: -124.864658046450543.
+
+Finished sweep 14. Needed Time 260.138s
+	Current energy: -124.864714340297226.
+
+Finished sweep 15. Needed Time 259.818s
+	Current energy: -124.864757374743618.
+
+Finished sweep 16. Needed Time 260.531s
+	Current energy: -124.864791177238146.
+
+Finished sweep 17. Needed Time 261.367s
+	Current energy: -124.864818238825961.
+
+Finished sweep 18. Needed Time 261.913s
+	Current energy: -124.864840348793351.
+
+Finished sweep 19. Needed Time 262.199s
+	Current energy: -124.864858821732042.
+
+GPU: mdim = 278, time = 243.53728404045106
+Finished sweep 1. Needed Time 294.242s
+	Current energy: -112.585468528635104.
+
+Finished sweep 2. Needed Time 295.293s
+	Current energy: -113.966579076583400.
+
+Finished sweep 3. Needed Time 296.204s
+	Current energy: -114.076172360684311.
+
+Finished sweep 4. Needed Time 297.327s
+	Current energy: -114.193553930419242.
+
+Finished sweep 5. Needed Time 297.661s
+	Current energy: -114.449997674018576.
+
+Finished sweep 6. Needed Time 298.634s
+	Current energy: -114.629772332911344.
+
+Finished sweep 7. Needed Time 299.197s
+	Current energy: -114.639599147522873.
+
+Finished sweep 8. Needed Time 299.557s
+	Current energy: -114.646601554616126.
+
+Finished sweep 9. Needed Time 300.814s
+	Current energy: -114.656831944687355.
+
+Finished sweep 10. Needed Time 301.272s
+	Current energy: -114.700960638275177.
+
+Finished sweep 11. Needed Time 301.621s
+	Current energy: -114.951573223391833.
+
+Finished sweep 12. Needed Time 302.174s
+	Current energy: -115.018420406484580.
+
+Finished sweep 13. Needed Time 303.134s
+	Current energy: -115.028571079988410.
+
+Finished sweep 14. Needed Time 303.836s
+	Current energy: -115.031688095183725.
+
+Finished sweep 15. Needed Time 304.534s
+	Current energy: -115.033155793045154.
+
+Finished sweep 16. Needed Time 306.123s
+	Current energy: -115.033863210588635.
+
+Finished sweep 17. Needed Time 308.087s
+	Current energy: -115.034226201113043.
+
+Finished sweep 18. Needed Time 307.734s
+	Current energy: -115.034435380774340.
+
+Finished sweep 19. Needed Time 295.495s
+	Current energy: -115.034571272201589.
+
+GPU: mdim = 297, time = 286.42791883945466
+Finished sweep 1. Needed Time 256.514s
+	Current energy: -108.534479562510157.
+
+Finished sweep 2. Needed Time 256.171s
+	Current energy: -109.497406574166860.
+
+Finished sweep 3. Needed Time 256.658s
+	Current energy: -110.183827695137438.
+
+Finished sweep 4. Needed Time 257.347s
+	Current energy: -110.280917694612896.
+
+Finished sweep 5. Needed Time 258.020s
+	Current energy: -110.381151292686440.
+
+Finished sweep 6. Needed Time 258.914s
+	Current energy: -110.450731826744303.
+
+Finished sweep 7. Needed Time 260.132s
+	Current energy: -110.637647066693773.
+
+Finished sweep 8. Needed Time 260.696s
+	Current energy: -111.549126743969865.
+
+Finished sweep 9. Needed Time 261.625s
+	Current energy: -111.574856722597133.
+
+Finished sweep 10. Needed Time 262.394s
+	Current energy: -111.579527532130044.
+
+Finished sweep 11. Needed Time 263.670s
+	Current energy: -111.581332371980011.
+
+Finished sweep 12. Needed Time 266.272s
+	Current energy: -111.582147610683805.
+
+Finished sweep 13. Needed Time 263.305s
+	Current energy: -111.582537762584252.
+
+Finished sweep 14. Needed Time 256.089s
+	Current energy: -111.582737940943517.
+
+Finished sweep 15. Needed Time 256.411s
+	Current energy: -111.582853441326478.
+
+Finished sweep 16. Needed Time 257.180s
+	Current energy: -111.582928169010131.
+
+Finished sweep 17. Needed Time 257.847s
+	Current energy: -111.582980002793974.
+
+Finished sweep 18. Needed Time 258.617s
+	Current energy: -111.583017084050965.
+
+Finished sweep 19. Needed Time 259.302s
+	Current energy: -111.583044222763036.
+
+GPU: mdim = 316, time = 247.02193545103074
+Finished sweep 1. Needed Time 292.516s
+	Current energy: -113.863509133550082.
+
+Finished sweep 2. Needed Time 293.258s
+	Current energy: -115.269584801767408.
+
+Finished sweep 3. Needed Time 294.041s
+	Current energy: -115.325422764031657.
+
+Finished sweep 4. Needed Time 295.420s
+	Current energy: -115.701857206854896.
+
+Finished sweep 5. Needed Time 296.497s
+	Current energy: -115.753310217257251.
+
+Finished sweep 6. Needed Time 298.546s
+	Current energy: -115.768081124862093.
+
+Finished sweep 7. Needed Time 302.335s
+	Current energy: -115.798926893833325.
+
+Finished sweep 8. Needed Time 299.987s
+	Current energy: -116.024708011927089.
+
+Finished sweep 9. Needed Time 293.539s
+	Current energy: -116.136478823514366.
+
+Finished sweep 10. Needed Time 294.256s
+	Current energy: -116.150981360061124.
+
+Finished sweep 11. Needed Time 295.167s
+	Current energy: -116.154483519672894.
+
+Finished sweep 12. Needed Time 296.441s
+	Current energy: -116.155626898337886.
+
+Finished sweep 13. Needed Time 298.376s
+	Current energy: -116.156141278532260.
+
+Finished sweep 14. Needed Time 301.201s
+	Current energy: -116.156430458381749.
+
+Finished sweep 15. Needed Time 301.240s
+	Current energy: -116.156620958421286.
+
+Finished sweep 16. Needed Time 293.071s
+	Current energy: -116.156759732090933.
+
+Finished sweep 17. Needed Time 294.075s
+	Current energy: -116.156861382580743.
+
+Finished sweep 18. Needed Time 294.854s
+	Current energy: -116.156931433988717.
+
+Finished sweep 19. Needed Time 296.241s
+	Current energy: -116.156979127093294.
+
+GPU: mdim = 335, time = 282.3170044541359
+Finished sweep 1. Needed Time 307.791s
+	Current energy: -115.332248614319496.
+
+Finished sweep 2. Needed Time 309.843s
+	Current energy: -117.107669624298978.
+
+Finished sweep 3. Needed Time 311.606s
+	Current energy: -117.251917420725178.
+
+Finished sweep 4. Needed Time 313.301s
+	Current energy: -117.529341871599357.
+
+Finished sweep 5. Needed Time 316.107s
+	Current energy: -117.705873326720635.
+
+Finished sweep 6. Needed Time 314.113s
+	Current energy: -117.718761411155356.
+
+Finished sweep 7. Needed Time 309.545s
+	Current energy: -117.740139462267052.
+
+Finished sweep 8. Needed Time 310.796s
+	Current energy: -117.948494777130847.
+
+Finished sweep 9. Needed Time 312.607s
+	Current energy: -118.112705461971089.
+
+Finished sweep 10. Needed Time 315.561s
+	Current energy: -118.130624367753413.
+
+Finished sweep 11. Needed Time 313.635s
+	Current energy: -118.134846284907212.
+
+Finished sweep 12. Needed Time 309.958s
+	Current energy: -118.136292275186946.
+
+Finished sweep 13. Needed Time 311.230s
+	Current energy: -118.136963931515581.
+
+Finished sweep 14. Needed Time 312.959s
+	Current energy: -118.137341299713242.
+
+Finished sweep 15. Needed Time 315.676s
+	Current energy: -118.137571673266677.
+
+Finished sweep 16. Needed Time 314.281s
+	Current energy: -118.137723085440825.
+
+Finished sweep 17. Needed Time 309.656s
+	Current energy: -118.137828207986701.
+
+Finished sweep 18. Needed Time 310.942s
+	Current energy: -118.137903139404827.
+
+Finished sweep 19. Needed Time 312.205s
+	Current energy: -118.137957428086338.
+
+GPU: mdim = 354, time = 297.3455956935883
+Finished sweep 1. Needed Time 299.671s
+	Current energy: -122.533023564412460.
+
+Finished sweep 2. Needed Time 301.366s
+	Current energy: -123.808222284752006.
+
+Finished sweep 3. Needed Time 303.416s
+	Current energy: -123.883839988630427.
+
+Finished sweep 4. Needed Time 300.637s
+	Current energy: -124.310811527603633.
+
+Finished sweep 5. Needed Time 301.513s
+	Current energy: -124.318626069475911.
+
+Finished sweep 6. Needed Time 303.279s
+	Current energy: -124.320299635843710.
+
+Finished sweep 7. Needed Time 305.321s
+	Current energy: -124.321076858925494.
+
+Finished sweep 8. Needed Time 304.976s
+	Current energy: -124.321500814714739.
+
+Finished sweep 9. Needed Time 300.897s
+	Current energy: -124.321752644209582.
+
+Finished sweep 10. Needed Time 302.407s
+	Current energy: -124.321909449043787.
+
+Finished sweep 11. Needed Time 304.267s
+	Current energy: -124.322009236996777.
+
+Finished sweep 12. Needed Time 307.740s
+	Current energy: -124.322073841449949.
+
+Finished sweep 13. Needed Time 300.117s
+	Current energy: -124.322116400460658.
+
+Finished sweep 14. Needed Time 301.815s
+	Current energy: -124.322144963180321.
+
+Finished sweep 15. Needed Time 303.362s
+	Current energy: -124.322164585991544.
+
+Finished sweep 16. Needed Time 306.038s
+	Current energy: -124.322178466945360.
+
+Finished sweep 17. Needed Time 304.659s
+	Current energy: -124.322188615441604.
+
+Finished sweep 18. Needed Time 302.967s
+	Current energy: -124.322196287029413.
+
+Finished sweep 19. Needed Time 303.061s
+	Current energy: -124.322202266162520.
+
+GPU: mdim = 373, time = 288.6070016503334
+Finished sweep 1. Needed Time 310.749s
+	Current energy: -119.684070935901559.
+
+Finished sweep 2. Needed Time 312.547s
+	Current energy: -121.225168959064050.
+
+Finished sweep 3. Needed Time 316.302s
+	Current energy: -121.346070671548063.
+
+Finished sweep 4. Needed Time 310.596s
+	Current energy: -121.700666457137174.
+
+Finished sweep 5. Needed Time 312.961s
+	Current energy: -121.706205086944536.
+
+Finished sweep 6. Needed Time 317.156s
+	Current energy: -121.708107709042807.
+
+Finished sweep 7. Needed Time 310.769s
+	Current energy: -121.709518170998365.
+
+Finished sweep 8. Needed Time 313.185s
+	Current energy: -121.711227567843068.
+
+Finished sweep 9. Needed Time 315.870s
+	Current energy: -121.715825991430890.
+
+Finished sweep 10. Needed Time 311.431s
+	Current energy: -121.865811128857302.
+
+Finished sweep 11. Needed Time 313.825s
+	Current energy: -122.149810873208637.
+
+Finished sweep 12. Needed Time 315.638s
+	Current energy: -122.172888760932949.
+
+Finished sweep 13. Needed Time 311.214s
+	Current energy: -122.178153422128034.
+
+Finished sweep 14. Needed Time 313.699s
+	Current energy: -122.179905570330931.
+
+Finished sweep 15. Needed Time 315.354s
+	Current energy: -122.180660204217787.
+
+Finished sweep 16. Needed Time 312.049s
+	Current energy: -122.181060811780938.
+
+Finished sweep 17. Needed Time 314.480s
+	Current energy: -122.181297459901430.
+
+Finished sweep 18. Needed Time 314.776s
+	Current energy: -122.181447892328436.
+
+Finished sweep 19. Needed Time 311.631s
+	Current energy: -122.181549228412280.
+
+GPU: mdim = 392, time = 298.45358579158784
+Finished sweep 1. Needed Time 218.704s
+	Current energy: -123.328278434166094.
+
+Finished sweep 2. Needed Time 220.493s
+	Current energy: -124.428766133241879.
+
+Finished sweep 3. Needed Time 222.071s
+	Current energy: -124.839599415946552.
+
+Finished sweep 4. Needed Time 219.185s
+	Current energy: -125.018956645454608.
+
+Finished sweep 5. Needed Time 221.084s
+	Current energy: -125.040543411901311.
+
+Finished sweep 6. Needed Time 223.129s
+	Current energy: -125.052030259344377.
+
+Finished sweep 7. Needed Time 225.791s
+	Current energy: -125.062591885841030.
+
+Finished sweep 8. Needed Time 218.911s
+	Current energy: -125.074207637392306.
+
+Finished sweep 9. Needed Time 220.831s
+	Current energy: -125.086789095648982.
+
+Finished sweep 10. Needed Time 222.638s
+	Current energy: -125.098801522840432.
+
+Finished sweep 11. Needed Time 225.624s
+	Current energy: -125.109404983490833.
+
+Finished sweep 12. Needed Time 218.924s
+	Current energy: -125.120065355025801.
+
+Finished sweep 13. Needed Time 220.779s
+	Current energy: -125.136928246738677.
+
+Finished sweep 14. Needed Time 222.780s
+	Current energy: -125.191120080026366.
+
+Finished sweep 15. Needed Time 224.985s
+	Current energy: -125.319199113143952.
+
+Finished sweep 16. Needed Time 219.066s
+	Current energy: -125.437035542803912.
+
+Finished sweep 17. Needed Time 220.872s
+	Current energy: -125.608048161061490.
+
+Finished sweep 18. Needed Time 223.234s
+	Current energy: -125.657428321990892.
+
+Finished sweep 19. Needed Time 223.146s
+	Current energy: -125.674491823444413.
+
+GPU: mdim = 411, time = 211.24908640384675
+Finished sweep 1. Needed Time 296.551s
+	Current energy: -123.102064074923902.
+
+Finished sweep 2. Needed Time 299.353s
+	Current energy: -124.403016338491511.
+
+Finished sweep 3. Needed Time 299.002s
+	Current energy: -124.424399901980848.
+
+Finished sweep 4. Needed Time 298.515s
+	Current energy: -124.777305383292273.
+
+Finished sweep 5. Needed Time 299.028s
+	Current energy: -125.040297982911667.
+
+Finished sweep 6. Needed Time 298.272s
+	Current energy: -125.074208908388556.
+
+Finished sweep 7. Needed Time 299.756s
+	Current energy: -125.095874996855429.
+
+Finished sweep 8. Needed Time 297.517s
+	Current energy: -125.145466057388376.
+
+Finished sweep 9. Needed Time 299.420s
+	Current energy: -125.277350367925493.
+
+Finished sweep 10. Needed Time 297.792s
+	Current energy: -125.324638157330284.
+
+Finished sweep 11. Needed Time 300.066s
+	Current energy: -125.334453420946986.
+
+Finished sweep 12. Needed Time 297.860s
+	Current energy: -125.337821226277583.
+
+Finished sweep 13. Needed Time 300.435s
+	Current energy: -125.339370575969980.
+
+Finished sweep 14. Needed Time 298.220s
+	Current energy: -125.340185412555840.
+
+Finished sweep 15. Needed Time 301.549s
+	Current energy: -125.340660267310568.
+
+Finished sweep 16. Needed Time 297.490s
+	Current energy: -125.340941498900918.
+
+Finished sweep 17. Needed Time 299.794s
+	Current energy: -125.341105589201845.
+
+Finished sweep 18. Needed Time 298.463s
+	Current energy: -125.341205791911918.
+
+Finished sweep 19. Needed Time 297.961s
+	Current energy: -125.341271893424747.
+
+GPU: mdim = 430, time = 284.5711273431778
+Finished sweep 1. Needed Time 326.214s
+	Current energy: -120.229028652142318.
+
+Finished sweep 2. Needed Time 327.472s
+	Current energy: -121.066011057171494.
+
+Finished sweep 3. Needed Time 328.749s
+	Current energy: -121.220745267767313.
+
+Finished sweep 4. Needed Time 326.563s
+	Current energy: -121.270260432431499.
+
+Finished sweep 5. Needed Time 328.133s
+	Current energy: -121.695582168805757.
+
+Finished sweep 6. Needed Time 328.523s
+	Current energy: -121.729052631204354.
+
+Finished sweep 7. Needed Time 327.366s
+	Current energy: -121.734812711231669.
+
+Finished sweep 8. Needed Time 328.301s
+	Current energy: -121.758566535370690.
+
+Finished sweep 9. Needed Time 327.377s
+	Current energy: -122.112408441160568.
+
+Finished sweep 10. Needed Time 328.020s
+	Current energy: -122.189295311544569.
+
+Finished sweep 11. Needed Time 328.563s
+	Current energy: -122.201101271889414.
+
+Finished sweep 12. Needed Time 327.161s
+	Current energy: -122.204653711801157.
+
+Finished sweep 13. Needed Time 328.635s
+	Current energy: -122.205977950694589.
+
+Finished sweep 14. Needed Time 327.584s
+	Current energy: -122.206572610910072.
+
+Finished sweep 15. Needed Time 327.054s
+	Current energy: -122.206878473092289.
+
+Finished sweep 16. Needed Time 328.789s
+	Current energy: -122.207049476700064.
+
+Finished sweep 17. Needed Time 326.460s
+	Current energy: -122.207154240654802.
+
+Finished sweep 18. Needed Time 327.911s
+	Current energy: -122.207223954755932.
+
+Finished sweep 19. Needed Time 328.558s
+	Current energy: -122.207273599085795.
+
+GPU: mdim = 449, time = 312.13962465524673
+Finished sweep 1. Needed Time 319.870s
+	Current energy: -114.438549852723440.
+
+Finished sweep 2. Needed Time 321.434s
+	Current energy: -115.714510512116490.
+
+Finished sweep 3. Needed Time 321.952s
+	Current energy: -116.194747594795089.
+
+Finished sweep 4. Needed Time 322.914s
+	Current energy: -116.353894176109250.
+
+Finished sweep 5. Needed Time 321.391s
+	Current energy: -116.727866368418461.
+
+Finished sweep 6. Needed Time 324.324s
+	Current energy: -116.794864008381381.
+
+Finished sweep 7. Needed Time 323.031s
+	Current energy: -116.849032176994371.
+
+Finished sweep 8. Needed Time 322.786s
+	Current energy: -117.126447538231076.
+
+Finished sweep 9. Needed Time 323.362s
+	Current energy: -117.195905699834498.
+
+Finished sweep 10. Needed Time 321.708s
+	Current energy: -117.204924462604566.
+
+Finished sweep 11. Needed Time 323.696s
+	Current energy: -117.207279905839698.
+
+Finished sweep 12. Needed Time 321.515s
+	Current energy: -117.208161600806392.
+
+Finished sweep 13. Needed Time 322.762s
+	Current energy: -117.208598711910753.
+
+Finished sweep 14. Needed Time 322.086s
+	Current energy: -117.208851485243557.
+
+Finished sweep 15. Needed Time 323.711s
+	Current energy: -117.209005960287996.
+
+Finished sweep 16. Needed Time 321.043s
+	Current energy: -117.209103537424056.
+
+Finished sweep 17. Needed Time 322.891s
+	Current energy: -117.209167309256756.
+
+Finished sweep 18. Needed Time 322.276s
+	Current energy: -117.209210573189850.
+
+Finished sweep 19. Needed Time 323.557s
+	Current energy: -117.209240992110281.
+
+GPU: mdim = 468, time = 307.12715460062026
+Finished sweep 1. Needed Time 302.745s
+	Current energy: -122.520947413296341.
+
+Finished sweep 2. Needed Time 302.973s
+	Current energy: -123.353985219797991.
+
+Finished sweep 3. Needed Time 301.200s
+	Current energy: -123.469905775098411.
+
+Finished sweep 4. Needed Time 301.099s
+	Current energy: -123.794639916783481.
+
+Finished sweep 5. Needed Time 301.297s
+	Current energy: -123.941191668630182.
+
+Finished sweep 6. Needed Time 301.489s
+	Current energy: -123.945135619307422.
+
+Finished sweep 7. Needed Time 302.188s
+	Current energy: -123.946199374737901.
+
+Finished sweep 8. Needed Time 301.134s
+	Current energy: -123.946691100407861.
+
+Finished sweep 9. Needed Time 301.609s
+	Current energy: -123.946964554939214.
+
+Finished sweep 10. Needed Time 301.090s
+	Current energy: -123.947132010204328.
+
+Finished sweep 11. Needed Time 301.070s
+	Current energy: -123.947241270451570.
+
+Finished sweep 12. Needed Time 301.315s
+	Current energy: -123.947316424220475.
+
+Finished sweep 13. Needed Time 301.270s
+	Current energy: -123.947370611188120.
+
+Finished sweep 14. Needed Time 301.530s
+	Current energy: -123.947411182389089.
+
+Finished sweep 15. Needed Time 302.528s
+	Current energy: -123.947442287125284.
+
+Finished sweep 16. Needed Time 301.320s
+	Current energy: -123.947466398936996.
+
+Finished sweep 17. Needed Time 301.411s
+	Current energy: -123.947485171069133.
+
+Finished sweep 18. Needed Time 300.900s
+	Current energy: -123.947499840724248.
+
+Finished sweep 19. Needed Time 301.004s
+	Current energy: -123.947511381558385.
+
+GPU: mdim = 487, time = 287.2046595931053
+Finished sweep 1. Needed Time 316.107s
+	Current energy: -117.893719783935310.
+
+Finished sweep 2. Needed Time 315.990s
+	Current energy: -119.847949883627791.
+
+Finished sweep 3. Needed Time 316.402s
+	Current energy: -119.864365973848308.
+
+Finished sweep 4. Needed Time 316.857s
+	Current energy: -120.090743468227785.
+
+Finished sweep 5. Needed Time 317.852s
+	Current energy: -120.318025113879955.
+
+Finished sweep 6. Needed Time 317.422s
+	Current energy: -120.601319473939938.
+
+Finished sweep 7. Needed Time 317.908s
+	Current energy: -120.742791794181869.
+
+Finished sweep 8. Needed Time 316.565s
+	Current energy: -120.756607088269917.
+
+Finished sweep 9. Needed Time 316.433s
+	Current energy: -120.759982124747125.
+
+Finished sweep 10. Needed Time 316.541s
+	Current energy: -120.761142371718719.
+
+Finished sweep 11. Needed Time 316.232s
+	Current energy: -120.761661528600754.
+
+Finished sweep 12. Needed Time 316.004s
+	Current energy: -120.761944777890690.
+
+Finished sweep 13. Needed Time 316.694s
+	Current energy: -120.762121525960410.
+
+Finished sweep 14. Needed Time 316.676s
+	Current energy: -120.762241804047235.
+
+Finished sweep 15. Needed Time 316.718s
+	Current energy: -120.762327762569555.
+
+Finished sweep 16. Needed Time 316.087s
+	Current energy: -120.762390537702842.
+
+Finished sweep 17. Needed Time 316.667s
+	Current energy: -120.762436849013909.
+
+Finished sweep 18. Needed Time 316.161s
+	Current energy: -120.762471314386843.
+
+Finished sweep 19. Needed Time 316.396s
+	Current energy: -120.762497274309766.
+
+GPU: mdim = 506, time = 301.567338848114
+Finished sweep 1. Needed Time 331.551s
+	Current energy: -119.532595745302146.
+
+Finished sweep 2. Needed Time 333.375s
+	Current energy: -121.265863311159734.
+
+Finished sweep 3. Needed Time 333.977s
+	Current energy: -121.598213705467785.
+
+Finished sweep 4. Needed Time 333.727s
+	Current energy: -121.739937186088966.
+
+Finished sweep 5. Needed Time 332.823s
+	Current energy: -121.749446484527127.
+
+Finished sweep 6. Needed Time 331.289s
+	Current energy: -121.896964731853529.
+
+Finished sweep 7. Needed Time 330.083s
+	Current energy: -122.191501356648970.
+
+Finished sweep 8. Needed Time 328.567s
+	Current energy: -122.213234814860172.
+
+Finished sweep 9. Needed Time 328.935s
+	Current energy: -122.218076357275407.
+
+Finished sweep 10. Needed Time 329.205s
+	Current energy: -122.219766977727616.
+
+Finished sweep 11. Needed Time 329.265s
+	Current energy: -122.220584759537644.
+
+Finished sweep 12. Needed Time 328.861s
+	Current energy: -122.221069948977899.
+
+Finished sweep 13. Needed Time 329.391s
+	Current energy: -122.221388530821969.
+
+Finished sweep 14. Needed Time 329.979s
+	Current energy: -122.221602700852102.
+
+Finished sweep 15. Needed Time 329.179s
+	Current energy: -122.221750310626447.
+
+Finished sweep 16. Needed Time 329.825s
+	Current energy: -122.221859253313923.
+
+Finished sweep 17. Needed Time 329.922s
+	Current energy: -122.221945523246035.
+
+Finished sweep 18. Needed Time 330.585s
+	Current energy: -122.222016679025685.
+
+Finished sweep 19. Needed Time 328.871s
+	Current energy: -122.222075077586638.
+
+GPU: mdim = 525, time = 314.7902567028999
+Finished sweep 1. Needed Time 345.485s
+	Current energy: -116.760590849003066.
+
+Finished sweep 2. Needed Time 346.799s
+	Current energy: -118.150603492673213.
+
+Finished sweep 3. Needed Time 347.393s
+	Current energy: -118.183061690620377.
+
+Finished sweep 4. Needed Time 345.949s
+	Current energy: -118.186865881186662.
+
+Finished sweep 5. Needed Time 346.680s
+	Current energy: -118.188029546788925.
+
+Finished sweep 6. Needed Time 345.933s
+	Current energy: -118.188530988560984.
+
+Finished sweep 7. Needed Time 346.633s
+	Current energy: -118.188780834173400.
+
+Finished sweep 8. Needed Time 347.106s
+	Current energy: -118.188919382412806.
+
+Finished sweep 9. Needed Time 345.993s
+	Current energy: -118.189002263907852.
+
+Finished sweep 10. Needed Time 346.720s
+	Current energy: -118.189055211688853.
+
+Finished sweep 11. Needed Time 346.726s
+	Current energy: -118.189091484396471.
+
+Finished sweep 12. Needed Time 346.121s
+	Current energy: -118.189117943421692.
+
+Finished sweep 13. Needed Time 347.148s
+	Current energy: -118.189138140213345.
+
+Finished sweep 14. Needed Time 346.190s
+	Current energy: -118.189154000426555.
+
+Finished sweep 15. Needed Time 346.793s
+	Current energy: -118.189166678193402.
+
+Finished sweep 16. Needed Time 347.667s
+	Current energy: -118.189176941986275.
+
+Finished sweep 17. Needed Time 346.049s
+	Current energy: -118.189185341665819.
+
+Finished sweep 18. Needed Time 347.502s
+	Current energy: -118.189192289012126.
+
+Finished sweep 19. Needed Time 346.652s
+	Current energy: -118.189198091783013.
+
+GPU: mdim = 544, time = 330.12014784812925
+Finished sweep 1. Needed Time 327.519s
+	Current energy: -122.647312890468129.
+
+Finished sweep 2. Needed Time 329.804s
+	Current energy: -123.669386526189612.
+
+Finished sweep 3. Needed Time 329.120s
+	Current energy: -123.692780477146187.
+
+Finished sweep 4. Needed Time 329.703s
+	Current energy: -124.199258321910420.
+
+Finished sweep 5. Needed Time 329.078s
+	Current energy: -124.341326144021806.
+
+Finished sweep 6. Needed Time 329.841s
+	Current energy: -124.388982529811287.
+
+Finished sweep 7. Needed Time 328.819s
+	Current energy: -124.511051971979128.
+
+Finished sweep 8. Needed Time 329.472s
+	Current energy: -124.593187041354710.
+
+Finished sweep 9. Needed Time 328.584s
+	Current energy: -124.607134997641609.
+
+Finished sweep 10. Needed Time 329.663s
+	Current energy: -124.611070581862791.
+
+Finished sweep 11. Needed Time 329.044s
+	Current energy: -124.612661596881765.
+
+Finished sweep 12. Needed Time 329.642s
+	Current energy: -124.613475603505222.
+
+Finished sweep 13. Needed Time 328.491s
+	Current energy: -124.613990415283936.
+
+Finished sweep 14. Needed Time 329.944s
+	Current energy: -124.614384828042319.
+
+Finished sweep 15. Needed Time 327.909s
+	Current energy: -124.614706062884324.
+
+Finished sweep 16. Needed Time 329.159s
+	Current energy: -124.614950803110702.
+
+Finished sweep 17. Needed Time 328.371s
+	Current energy: -124.615124714041045.
+
+Finished sweep 18. Needed Time 329.364s
+	Current energy: -124.615243233052979.
+
+Finished sweep 19. Needed Time 328.471s
+	Current energy: -124.615323055285558.
+
+GPU: mdim = 563, time = 313.4190905451775
+Finished sweep 1. Needed Time 346.614s
+	Current energy: -118.984571188099551.
+
+Finished sweep 2. Needed Time 348.049s
+	Current energy: -120.473234927402387.
+
+Finished sweep 3. Needed Time 347.679s
+	Current energy: -121.109647650168867.
+
+Finished sweep 4. Needed Time 348.024s
+	Current energy: -121.829299136185000.
+
+Finished sweep 5. Needed Time 347.817s
+	Current energy: -122.290112019735986.
+
+Finished sweep 6. Needed Time 348.007s
+	Current energy: -122.337309401757452.
+
+Finished sweep 7. Needed Time 347.884s
+	Current energy: -122.349423505872096.
+
+Finished sweep 8. Needed Time 347.953s
+	Current energy: -122.352827279557943.
+
+Finished sweep 9. Needed Time 347.709s
+	Current energy: -122.354010658647979.
+
+Finished sweep 10. Needed Time 348.062s
+	Current energy: -122.354540161927147.
+
+Finished sweep 11. Needed Time 348.171s
+	Current energy: -122.354825749709747.
+
+Finished sweep 12. Needed Time 348.142s
+	Current energy: -122.354997039197087.
+
+Finished sweep 13. Needed Time 348.421s
+	Current energy: -122.355104658761761.
+
+Finished sweep 14. Needed Time 348.673s
+	Current energy: -122.355174156892474.
+
+Finished sweep 15. Needed Time 348.096s
+	Current energy: -122.355220750922314.
+
+Finished sweep 16. Needed Time 346.416s
+	Current energy: -122.355253365976708.
+
+Finished sweep 17. Needed Time 345.747s
+	Current energy: -122.355277106266627.
+
+Finished sweep 18. Needed Time 346.208s
+	Current energy: -122.355294940720611.
+
+Finished sweep 19. Needed Time 345.897s
+	Current energy: -122.355308669436468.
+
+GPU: mdim = 582, time = 331.02011889219284
+Finished sweep 1. Needed Time 330.396s
+	Current energy: -122.825661729665214.
+
+Finished sweep 2. Needed Time 332.143s
+	Current energy: -124.853110253152138.
+
+Finished sweep 3. Needed Time 332.543s
+	Current energy: -124.899741004971318.
+
+Finished sweep 4. Needed Time 333.167s
+	Current energy: -124.904071027828991.
+
+Finished sweep 5. Needed Time 332.944s
+	Current energy: -124.905388362726981.
+
+Finished sweep 6. Needed Time 332.153s
+	Current energy: -124.905992437369207.
+
+Finished sweep 7. Needed Time 333.068s
+	Current energy: -124.906317572164738.
+
+Finished sweep 8. Needed Time 332.892s
+	Current energy: -124.906506812972211.
+
+Finished sweep 9. Needed Time 332.728s
+	Current energy: -124.906622055864702.
+
+Finished sweep 10. Needed Time 332.688s
+	Current energy: -124.906695185838245.
+
+Finished sweep 11. Needed Time 333.093s
+	Current energy: -124.906743518944992.
+
+Finished sweep 12. Needed Time 333.774s
+	Current energy: -124.906776697331694.
+
+Finished sweep 13. Needed Time 333.510s
+	Current energy: -124.906800246287759.
+
+Finished sweep 14. Needed Time 332.736s
+	Current energy: -124.906817481544351.
+
+Finished sweep 15. Needed Time 332.927s
+	Current energy: -124.906830428958472.
+
+Finished sweep 16. Needed Time 333.123s
+	Current energy: -124.906840375999479.
+
+Finished sweep 17. Needed Time 333.671s
+	Current energy: -124.906848170685095.
+
+Finished sweep 18. Needed Time 333.874s
+	Current energy: -124.906854389270109.
+
+Finished sweep 19. Needed Time 334.396s
+	Current energy: -124.906859433431890.
+
+GPU: mdim = 601, time = 317.121988093853
+Finished sweep 1. Needed Time 332.495s
+	Current energy: -123.031589018586828.
+
+Finished sweep 2. Needed Time 333.583s
+	Current energy: -123.913692052637458.
+
+Finished sweep 3. Needed Time 334.839s
+	Current energy: -124.263887002026138.
+
+Finished sweep 4. Needed Time 335.159s
+	Current energy: -124.384834000684407.
+
+Finished sweep 5. Needed Time 334.884s
+	Current energy: -124.388062229983433.
+
+Finished sweep 6. Needed Time 333.863s
+	Current energy: -124.388868337858398.
+
+Finished sweep 7. Needed Time 333.834s
+	Current energy: -124.389231959472198.
+
+Finished sweep 8. Needed Time 335.036s
+	Current energy: -124.389420642118552.
+
+Finished sweep 9. Needed Time 336.146s
+	Current energy: -124.389526821149772.
+
+Finished sweep 10. Needed Time 334.607s
+	Current energy: -124.389590992676858.
+
+Finished sweep 11. Needed Time 334.462s
+	Current energy: -124.389632246595625.
+
+Finished sweep 12. Needed Time 334.297s
+	Current energy: -124.389660157431180.
+
+Finished sweep 13. Needed Time 335.060s
+	Current energy: -124.389679778828082.
+
+Finished sweep 14. Needed Time 335.137s
+	Current energy: -124.389693973240014.
+
+Finished sweep 15. Needed Time 333.830s
+	Current energy: -124.389704486856971.
+
+Finished sweep 16. Needed Time 333.789s
+	Current energy: -124.389712451360253.
+
+Finished sweep 17. Needed Time 334.981s
+	Current energy: -124.389718620455980.
+
+Finished sweep 18. Needed Time 335.488s
+	Current energy: -124.389723495671859.
+
+Finished sweep 19. Needed Time 334.643s
+	Current energy: -124.389727413702332.
+
+GPU: mdim = 620, time = 318.6345500588417
+Finished sweep 1. Needed Time 342.843s
+	Current energy: -122.621393747398812.
+
+Finished sweep 2. Needed Time 344.854s
+	Current energy: -123.474782466906348.
+
+Finished sweep 3. Needed Time 344.801s
+	Current energy: -123.722572911656016.
+
+Finished sweep 4. Needed Time 344.997s
+	Current energy: -123.973419355834309.
+
+Finished sweep 5. Needed Time 345.084s
+	Current energy: -123.977227091477019.
+
+Finished sweep 6. Needed Time 344.622s
+	Current energy: -123.978264003144560.
+
+Finished sweep 7. Needed Time 345.197s
+	Current energy: -123.978959446698738.
+
+Finished sweep 8. Needed Time 344.204s
+	Current energy: -123.979726298849641.
+
+Finished sweep 9. Needed Time 345.441s
+	Current energy: -123.981486913281202.
+
+Finished sweep 10. Needed Time 344.676s
+	Current energy: -124.117319904813215.
+
+Finished sweep 11. Needed Time 345.312s
+	Current energy: -124.463069510983701.
+
+Finished sweep 12. Needed Time 344.944s
+	Current energy: -124.483682488281843.
+
+Finished sweep 13. Needed Time 345.024s
+	Current energy: -124.488669282457167.
+
+Finished sweep 14. Needed Time 345.181s
+	Current energy: -124.490378327934891.
+
+Finished sweep 15. Needed Time 343.979s
+	Current energy: -124.491111378076752.
+
+Finished sweep 16. Needed Time 345.015s
+	Current energy: -124.491519872535008.
+
+Finished sweep 17. Needed Time 344.644s
+	Current energy: -124.491801022120498.
+
+Finished sweep 18. Needed Time 345.826s
+	Current energy: -124.492032984050809.
+
+Finished sweep 19. Needed Time 346.257s
+	Current energy: -124.492263704966845.
+
+GPU: mdim = 639, time = 328.4774743437767
+Finished sweep 1. Needed Time 366.380s
+	Current energy: -122.638496358451164.
+
+Finished sweep 2. Needed Time 370.851s
+	Current energy: -123.649781628951374.
+
+Finished sweep 3. Needed Time 371.079s
+	Current energy: -124.005761842123775.
+
+Finished sweep 4. Needed Time 369.857s
+	Current energy: -124.341367148857046.
+
+Finished sweep 5. Needed Time 369.972s
+	Current energy: -124.404573200882453.
+
+Finished sweep 6. Needed Time 370.883s
+	Current energy: -124.542952503589092.
+
+Finished sweep 7. Needed Time 368.579s
+	Current energy: -124.614635448610926.
+
+Finished sweep 8. Needed Time 370.110s
+	Current energy: -124.626666714396634.
+
+Finished sweep 9. Needed Time 369.277s
+	Current energy: -124.630219234223631.
+
+Finished sweep 10. Needed Time 369.967s
+	Current energy: -124.631547011642013.
+
+Finished sweep 11. Needed Time 370.936s
+	Current energy: -124.632169412257255.
+
+Finished sweep 12. Needed Time 369.505s
+	Current energy: -124.632524322369292.
+
+Finished sweep 13. Needed Time 369.967s
+	Current energy: -124.632765262601296.
+
+Finished sweep 14. Needed Time 370.900s
+	Current energy: -124.632950937365621.
+
+Finished sweep 15. Needed Time 370.114s
+	Current energy: -124.633099909636570.
+
+Finished sweep 16. Needed Time 369.931s
+	Current energy: -124.633213523015314.
+
+Finished sweep 17. Needed Time 373.103s
+	Current energy: -124.633294442230934.
+
+Finished sweep 18. Needed Time 369.758s
+	Current energy: -124.633350789279646.
+
+Finished sweep 19. Needed Time 369.259s
+	Current energy: -124.633390754839240.
+
+GPU: mdim = 658, time = 352.41734914779664
+Finished sweep 1. Needed Time 370.839s
+	Current energy: -122.238152184068269.
+
+Finished sweep 2. Needed Time 372.315s
+	Current energy: -123.148088774943247.
+
+Finished sweep 3. Needed Time 372.015s
+	Current energy: -123.231237239012103.
+
+Finished sweep 4. Needed Time 372.168s
+	Current energy: -123.697595600551196.
+
+Finished sweep 5. Needed Time 371.726s
+	Current energy: -123.889007926162236.
+
+Finished sweep 6. Needed Time 372.098s
+	Current energy: -123.962330698137606.
+
+Finished sweep 7. Needed Time 371.897s
+	Current energy: -124.106893588011843.
+
+Finished sweep 8. Needed Time 371.685s
+	Current energy: -124.145688480070064.
+
+Finished sweep 9. Needed Time 371.907s
+	Current energy: -124.152854049391664.
+
+Finished sweep 10. Needed Time 371.767s
+	Current energy: -124.155321774600196.
+
+Finished sweep 11. Needed Time 368.545s
+	Current energy: -124.156415567514770.
+
+Finished sweep 12. Needed Time 366.976s
+	Current energy: -124.157009341371435.
+
+Finished sweep 13. Needed Time 367.140s
+	Current energy: -124.157362956371841.
+
+Finished sweep 14. Needed Time 367.491s
+	Current energy: -124.157576736096019.
+
+Finished sweep 15. Needed Time 367.862s
+	Current energy: -124.157710011519185.
+
+Finished sweep 16. Needed Time 366.726s
+	Current energy: -124.157796759580663.
+
+Finished sweep 17. Needed Time 367.245s
+	Current energy: -124.157855503618123.
+
+Finished sweep 18. Needed Time 367.364s
+	Current energy: -124.157896615004091.
+
+Finished sweep 19. Needed Time 366.948s
+	Current energy: -124.157926153598879.
+
+GPU: mdim = 677, time = 352.13255070447923
+Finished sweep 1. Needed Time 375.498s
+	Current energy: -122.446765213605957.
+
+Finished sweep 2. Needed Time 376.652s
+	Current energy: -123.222452567861197.
+
+Finished sweep 3. Needed Time 376.752s
+	Current energy: -123.249032552486099.
+
+Finished sweep 4. Needed Time 378.011s
+	Current energy: -123.804411107900549.
+
+Finished sweep 5. Needed Time 376.937s
+	Current energy: -123.914414185098479.
+
+Finished sweep 6. Needed Time 376.460s
+	Current energy: -124.036170058523027.
+
+Finished sweep 7. Needed Time 376.940s
+	Current energy: -124.135854145709061.
+
+Finished sweep 8. Needed Time 377.728s
+	Current energy: -124.151295047797959.
+
+Finished sweep 9. Needed Time 376.390s
+	Current energy: -124.155367170254507.
+
+Finished sweep 10. Needed Time 376.663s
+	Current energy: -124.156938912803881.
+
+Finished sweep 11. Needed Time 376.743s
+	Current energy: -124.157651911455261.
+
+Finished sweep 12. Needed Time 376.939s
+	Current energy: -124.158041785502689.
+
+Finished sweep 13. Needed Time 377.447s
+	Current energy: -124.158280143479502.
+
+Finished sweep 14. Needed Time 376.151s
+	Current energy: -124.158433858143979.
+
+Finished sweep 15. Needed Time 376.722s
+	Current energy: -124.158536991733413.
+
+Finished sweep 16. Needed Time 377.136s
+	Current energy: -124.158608266931566.
+
+Finished sweep 17. Needed Time 377.313s
+	Current energy: -124.158658669956310.
+
+Finished sweep 18. Needed Time 376.581s
+	Current energy: -124.158695117955475.
+
+Finished sweep 19. Needed Time 376.510s
+	Current energy: -124.158722028339028.
+
+GPU: mdim = 696, time = 358.88661135435103
+Finished sweep 1. Needed Time 341.978s
+	Current energy: -122.522008493351663.
+
+Finished sweep 2. Needed Time 343.814s
+	Current energy: -124.217330487083075.
+
+Finished sweep 3. Needed Time 343.849s
+	Current energy: -124.269371992939085.
+
+Finished sweep 4. Needed Time 343.115s
+	Current energy: -124.275513354683696.
+
+Finished sweep 5. Needed Time 343.874s
+	Current energy: -124.277677614033280.
+
+Finished sweep 6. Needed Time 343.950s
+	Current energy: -124.278790588727219.
+
+Finished sweep 7. Needed Time 344.320s
+	Current energy: -124.279453429153875.
+
+Finished sweep 8. Needed Time 343.863s
+	Current energy: -124.279883697495293.
+
+Finished sweep 9. Needed Time 344.197s
+	Current energy: -124.280176922238340.
+
+Finished sweep 10. Needed Time 343.276s
+	Current energy: -124.280380470386476.
+
+Finished sweep 11. Needed Time 344.113s
+	Current energy: -124.280522640356324.
+
+Finished sweep 12. Needed Time 344.128s
+	Current energy: -124.280623366369497.
+
+Finished sweep 13. Needed Time 343.201s
+	Current energy: -124.280696387932778.
+
+Finished sweep 14. Needed Time 344.071s
+	Current energy: -124.280750878333137.
+
+Finished sweep 15. Needed Time 343.591s
+	Current energy: -124.280792426382590.
+
+Finished sweep 16. Needed Time 343.893s
+	Current energy: -124.280824786504851.
+
+Finished sweep 17. Needed Time 344.422s
+	Current energy: -124.280850424966289.
+
+Finished sweep 18. Needed Time 343.549s
+	Current energy: -124.280870981087190.
+
+Finished sweep 19. Needed Time 343.950s
+	Current energy: -124.280887642351118.
+
+GPU: mdim = 715, time = 327.4010464906693
+Finished sweep 1. Needed Time 378.810s
+	Current energy: -120.146930022752315.
+
+Finished sweep 2. Needed Time 379.380s
+	Current energy: -121.520257185777439.
+
+Finished sweep 3. Needed Time 379.521s
+	Current energy: -121.543363590103084.
+
+Finished sweep 4. Needed Time 378.666s
+	Current energy: -121.547691126581512.
+
+Finished sweep 5. Needed Time 379.559s
+	Current energy: -121.549870123600243.
+
+Finished sweep 6. Needed Time 379.092s
+	Current energy: -121.551699291292081.
+
+Finished sweep 7. Needed Time 379.127s
+	Current energy: -121.554271673968486.
+
+Finished sweep 8. Needed Time 379.091s
+	Current energy: -121.562280372814101.
+
+Finished sweep 9. Needed Time 379.040s
+	Current energy: -121.600503394621853.
+
+Finished sweep 10. Needed Time 379.100s
+	Current energy: -121.638345916851478.
+
+Finished sweep 11. Needed Time 379.457s
+	Current energy: -121.649327224337952.
+
+Finished sweep 12. Needed Time 379.029s
+	Current energy: -121.652614790226025.
+
+Finished sweep 13. Needed Time 379.027s
+	Current energy: -121.653922382765913.
+
+Finished sweep 14. Needed Time 378.831s
+	Current energy: -121.654518844273781.
+
+Finished sweep 15. Needed Time 378.832s
+	Current energy: -121.654817580884369.
+
+Finished sweep 16. Needed Time 379.035s
+	Current energy: -121.654981382693109.
+
+Finished sweep 17. Needed Time 378.853s
+	Current energy: -121.655079435228672.
+
+Finished sweep 18. Needed Time 379.033s
+	Current energy: -121.655143044241612.
+
+Finished sweep 19. Needed Time 379.239s
+	Current energy: -121.655187051796887.
+
+GPU: mdim = 734, time = 361.04131385087965
+Finished sweep 1. Needed Time 392.363s
+	Current energy: -115.734401532511001.
+
+Finished sweep 2. Needed Time 392.577s
+	Current energy: -116.401667279337673.
+
+Finished sweep 3. Needed Time 392.796s
+	Current energy: -117.178974812946493.
+
+Finished sweep 4. Needed Time 392.946s
+	Current energy: -117.243764217728611.
+
+Finished sweep 5. Needed Time 392.458s
+	Current energy: -117.249439166199124.
+
+Finished sweep 6. Needed Time 392.347s
+	Current energy: -117.250907255473479.
+
+Finished sweep 7. Needed Time 392.221s
+	Current energy: -117.251527761041899.
+
+Finished sweep 8. Needed Time 392.576s
+	Current energy: -117.251844007144854.
+
+Finished sweep 9. Needed Time 392.790s
+	Current energy: -117.252022813784649.
+
+Finished sweep 10. Needed Time 392.548s
+	Current energy: -117.252131656081005.
+
+Finished sweep 11. Needed Time 392.233s
+	Current energy: -117.252201666721646.
+
+Finished sweep 12. Needed Time 392.420s
+	Current energy: -117.252248855081518.
+
+Finished sweep 13. Needed Time 392.898s
+	Current energy: -117.252281934968863.
+
+Finished sweep 14. Needed Time 392.553s
+	Current energy: -117.252305892433398.
+
+Finished sweep 15. Needed Time 392.903s
+	Current energy: -117.252323776212464.
+
+Finished sweep 16. Needed Time 392.276s
+	Current energy: -117.252337467324296.
+
+Finished sweep 17. Needed Time 392.405s
+	Current energy: -117.252348182107909.
+
+Finished sweep 18. Needed Time 392.739s
+	Current energy: -117.252356730662839.
+
+Finished sweep 19. Needed Time 392.886s
+	Current energy: -117.252363680033326.
+
+GPU: mdim = 753, time = 373.9002413988113
+Finished sweep 1. Needed Time 391.420s
+	Current energy: -118.922819685904315.
+
+Finished sweep 2. Needed Time 392.110s
+	Current energy: -119.872597285441955.
+
+Finished sweep 3. Needed Time 392.645s
+	Current energy: -120.245950318831504.
+
+Finished sweep 4. Needed Time 392.708s
+	Current energy: -120.374985493328197.
+
+Finished sweep 5. Needed Time 392.943s
+	Current energy: -120.741835553735484.
+
+Finished sweep 6. Needed Time 392.830s
+	Current energy: -120.784459899445366.
+
+Finished sweep 7. Needed Time 393.410s
+	Current energy: -120.791930615341414.
+
+Finished sweep 8. Needed Time 392.549s
+	Current energy: -120.794605757289290.
+
+Finished sweep 9. Needed Time 392.611s
+	Current energy: -120.796111993541686.
+
+Finished sweep 10. Needed Time 393.756s
+	Current energy: -120.797296974445558.
+
+Finished sweep 11. Needed Time 392.249s
+	Current energy: -120.798561034988026.
+
+Finished sweep 12. Needed Time 393.043s
+	Current energy: -120.800621363595667.
+
+Finished sweep 13. Needed Time 392.656s
+	Current energy: -120.806884764891151.
+
+Finished sweep 14. Needed Time 393.659s
+	Current energy: -120.831198008612375.
+
+Finished sweep 15. Needed Time 392.076s
+	Current energy: -120.860915354876866.
+
+Finished sweep 16. Needed Time 392.676s
+	Current energy: -120.872486987090383.
+
+Finished sweep 17. Needed Time 392.649s
+	Current energy: -120.876302454894343.
+
+Finished sweep 18. Needed Time 393.243s
+	Current energy: -120.877769679970314.
+
+Finished sweep 19. Needed Time 393.013s
+	Current energy: -120.878441177629369.
+
+GPU: mdim = 772, time = 374.03313314914703
+Finished sweep 1. Needed Time 400.443s
+	Current energy: -122.733943093765191.
+
+Finished sweep 2. Needed Time 397.878s
+	Current energy: -124.230247761496926.
+
+Finished sweep 3. Needed Time 398.774s
+	Current energy: -124.278872486939960.
+
+Finished sweep 4. Needed Time 398.998s
+	Current energy: -124.284964828096037.
+
+Finished sweep 5. Needed Time 398.754s
+	Current energy: -124.287025537581243.
+
+Finished sweep 6. Needed Time 398.866s
+	Current energy: -124.288034109722417.
+
+Finished sweep 7. Needed Time 398.589s
+	Current energy: -124.288604258578587.
+
+Finished sweep 8. Needed Time 398.871s
+	Current energy: -124.288955213554544.
+
+Finished sweep 9. Needed Time 398.550s
+	Current energy: -124.289184680911575.
+
+Finished sweep 10. Needed Time 398.993s
+	Current energy: -124.289341489280886.
+
+Finished sweep 11. Needed Time 397.825s
+	Current energy: -124.289454761799860.
+
+Finished sweep 12. Needed Time 398.058s
+	Current energy: -124.289540924327326.
+
+Finished sweep 13. Needed Time 398.214s
+	Current energy: -124.289608875220125.
+
+Finished sweep 14. Needed Time 397.904s
+	Current energy: -124.289663204447535.
+
+Finished sweep 15. Needed Time 397.523s
+	Current energy: -124.289706811934366.
+
+Finished sweep 16. Needed Time 397.457s
+	Current energy: -124.289741473743106.
+
+Finished sweep 17. Needed Time 397.633s
+	Current energy: -124.289768880047717.
+
+Finished sweep 18. Needed Time 397.559s
+	Current energy: -124.289790484058742.
+
+Finished sweep 19. Needed Time 397.927s
+	Current energy: -124.289807539710054.
+
+GPU: mdim = 791, time = 379.40913825035096
+Finished sweep 1. Needed Time 411.384s
+	Current energy: -122.112764785040440.
+
+Finished sweep 2. Needed Time 411.672s
+	Current energy: -123.032203038796041.
+
+Finished sweep 3. Needed Time 411.929s
+	Current energy: -123.996965237261676.
+
+Finished sweep 4. Needed Time 411.870s
+	Current energy: -124.030317081211763.
+
+Finished sweep 5. Needed Time 411.427s
+	Current energy: -124.083556982933302.
+
+Finished sweep 6. Needed Time 412.100s
+	Current energy: -124.189124620234509.
+
+Finished sweep 7. Needed Time 411.521s
+	Current energy: -124.207327844144913.
+
+Finished sweep 8. Needed Time 411.579s
+	Current energy: -124.211101781471498.
+
+Finished sweep 9. Needed Time 411.961s
+	Current energy: -124.212356279997763.
+
+Finished sweep 10. Needed Time 411.145s
+	Current energy: -124.212912231740930.
+
+Finished sweep 11. Needed Time 411.695s
+	Current energy: -124.213211007694909.
+
+Finished sweep 12. Needed Time 412.319s
+	Current energy: -124.213388643739876.
+
+Finished sweep 13. Needed Time 412.504s
+	Current energy: -124.213500386262226.
+
+Finished sweep 14. Needed Time 411.761s
+	Current energy: -124.213574747580935.
+
+Finished sweep 15. Needed Time 411.730s
+	Current energy: -124.213627319743281.
+
+Finished sweep 16. Needed Time 411.654s
+	Current energy: -124.213666103100650.
+
+Finished sweep 17. Needed Time 411.520s
+	Current energy: -124.213695036683177.
+
+Finished sweep 18. Needed Time 411.486s
+	Current energy: -124.213716469406179.
+
+Finished sweep 19. Needed Time 411.703s
+	Current energy: -124.213732291052608.
+
+GPU: mdim = 810, time = 392.1232066988945
+Finished sweep 1. Needed Time 426.293s
+	Current energy: -119.638696387671544.
+
+Finished sweep 2. Needed Time 426.701s
+	Current energy: -120.606939730076391.
+
+Finished sweep 3. Needed Time 426.363s
+	Current energy: -120.864907904366319.
+
+Finished sweep 4. Needed Time 426.920s
+	Current energy: -121.098577553145446.
+
+Finished sweep 5. Needed Time 426.720s
+	Current energy: -121.459280489584046.
+
+Finished sweep 6. Needed Time 426.503s
+	Current energy: -121.539971902828796.
+
+Finished sweep 7. Needed Time 426.469s
+	Current energy: -121.550693418476286.
+
+Finished sweep 8. Needed Time 426.779s
+	Current energy: -121.554671193179288.
+
+Finished sweep 9. Needed Time 426.590s
+	Current energy: -121.557969165434059.
+
+Finished sweep 10. Needed Time 426.593s
+	Current energy: -121.565312460061989.
+
+Finished sweep 11. Needed Time 426.964s
+	Current energy: -121.600764350720780.
+
+Finished sweep 12. Needed Time 426.206s
+	Current energy: -121.643136516600720.
+
+Finished sweep 13. Needed Time 426.733s
+	Current energy: -121.655408767314853.
+
+Finished sweep 14. Needed Time 425.953s
+	Current energy: -121.658825050760527.
+
+Finished sweep 15. Needed Time 426.372s
+	Current energy: -121.660081291702923.
+
+Finished sweep 16. Needed Time 426.458s
+	Current energy: -121.660679672727980.
+
+Finished sweep 17. Needed Time 426.810s
+	Current energy: -121.660999536316595.
+
+Finished sweep 18. Needed Time 426.615s
+	Current energy: -121.661182745738600.
+
+Finished sweep 19. Needed Time 426.246s
+	Current energy: -121.661294535699994.
+
+GPU: mdim = 829, time = 406.2172724962235
+Finished sweep 1. Needed Time 436.244s
+	Current energy: -122.324272124448683.
+
+Finished sweep 2. Needed Time 435.780s
+	Current energy: -123.470929274638578.
+
+Finished sweep 3. Needed Time 435.515s
+	Current energy: -123.494627715714927.
+
+Finished sweep 4. Needed Time 436.063s
+	Current energy: -123.499153461759249.
+
+Finished sweep 5. Needed Time 436.081s
+	Current energy: -123.503642397746546.
+
+Finished sweep 6. Needed Time 436.011s
+	Current energy: -123.534266378265428.
+
+Finished sweep 7. Needed Time 435.742s
+	Current energy: -123.633431686567761.
+
+Finished sweep 8. Needed Time 435.643s
+	Current energy: -123.658013570933420.
+
+Finished sweep 9. Needed Time 436.021s
+	Current energy: -123.662816791677258.
+
+Finished sweep 10. Needed Time 436.389s
+	Current energy: -123.664338251283738.
+
+Finished sweep 11. Needed Time 435.527s
+	Current energy: -123.664976276240623.
+
+Finished sweep 12. Needed Time 436.413s
+	Current energy: -123.665286774805764.
+
+Finished sweep 13. Needed Time 436.820s
+	Current energy: -123.665462531447503.
+
+Finished sweep 14. Needed Time 436.365s
+	Current energy: -123.665572297162385.
+
+Finished sweep 15. Needed Time 436.252s
+	Current energy: -123.665642985377758.
+
+Finished sweep 16. Needed Time 436.501s
+	Current energy: -123.665690074888019.
+
+Finished sweep 17. Needed Time 436.412s
+	Current energy: -123.665722914946954.
+
+Finished sweep 18. Needed Time 436.754s
+	Current energy: -123.665746685759657.
+
+Finished sweep 19. Needed Time 436.205s
+	Current energy: -123.665764390117673.
+
+GPU: mdim = 848, time = 415.356391954422
+Finished sweep 1. Needed Time 401.675s
+	Current energy: -108.892445544729384.
+
+Finished sweep 2. Needed Time 402.208s
+	Current energy: -109.754290443287275.
+
+Finished sweep 3. Needed Time 401.941s
+	Current energy: -109.768128217590387.
+
+Finished sweep 4. Needed Time 401.826s
+	Current energy: -110.053456670359139.
+
+Finished sweep 5. Needed Time 401.831s
+	Current energy: -110.315946821301523.
+
+Finished sweep 6. Needed Time 401.277s
+	Current energy: -110.473962891421422.
+
+Finished sweep 7. Needed Time 401.777s
+	Current energy: -110.483157086890571.
+
+Finished sweep 8. Needed Time 403.369s
+	Current energy: -110.484761500861936.
+
+Finished sweep 9. Needed Time 400.477s
+	Current energy: -110.485299734510633.
+
+Finished sweep 10. Needed Time 401.120s
+	Current energy: -110.485555779309792.
+
+Finished sweep 11. Needed Time 401.933s
+	Current energy: -110.485700170028039.
+
+Finished sweep 12. Needed Time 401.820s
+	Current energy: -110.485789216703694.
+
+Finished sweep 13. Needed Time 401.349s
+	Current energy: -110.485846074661225.
+
+Finished sweep 14. Needed Time 402.393s
+	Current energy: -110.485883161892417.
+
+Finished sweep 15. Needed Time 401.780s
+	Current energy: -110.485908158404754.
+
+Finished sweep 16. Needed Time 401.768s
+	Current energy: -110.485925748296040.
+
+Finished sweep 17. Needed Time 401.831s
+	Current energy: -110.485938716253045.
+
+Finished sweep 18. Needed Time 402.327s
+	Current energy: -110.485948701087239.
+
+Finished sweep 19. Needed Time 402.137s
+	Current energy: -110.485956658369389.
+
+GPU: mdim = 867, time = 382.7513177037239
+Finished sweep 1. Needed Time 416.969s
+	Current energy: -107.446219896519523.
+
+Finished sweep 2. Needed Time 416.953s
+	Current energy: -108.464433809401044.
+
+Finished sweep 3. Needed Time 416.695s
+	Current energy: -108.698892359724042.
+
+Finished sweep 4. Needed Time 417.075s
+	Current energy: -108.935165193513782.
+
+Finished sweep 5. Needed Time 417.180s
+	Current energy: -109.167229567552994.
+
+Finished sweep 6. Needed Time 417.410s
+	Current energy: -109.190943993055939.
+
+Finished sweep 7. Needed Time 417.293s
+	Current energy: -109.193857914118780.
+
+Finished sweep 8. Needed Time 417.578s
+	Current energy: -109.194678495984249.
+
+Finished sweep 9. Needed Time 417.522s
+	Current energy: -109.195012537709829.
+
+Finished sweep 10. Needed Time 416.993s
+	Current energy: -109.195186318928876.
+
+Finished sweep 11. Needed Time 416.854s
+	Current energy: -109.195295298066227.
+
+Finished sweep 12. Needed Time 416.596s
+	Current energy: -109.195373970886422.
+
+Finished sweep 13. Needed Time 417.221s
+	Current energy: -109.195436521173235.
+
+Finished sweep 14. Needed Time 417.129s
+	Current energy: -109.195488084055668.
+
+Finished sweep 15. Needed Time 417.169s
+	Current energy: -109.195529771763617.
+
+Finished sweep 16. Needed Time 417.204s
+	Current energy: -109.195562093406252.
+
+Finished sweep 17. Needed Time 416.914s
+	Current energy: -109.195586346619322.
+
+Finished sweep 18. Needed Time 416.932s
+	Current energy: -109.195604349622982.
+
+Finished sweep 19. Needed Time 416.699s
+	Current energy: -109.195617833520473.
+
+GPU: mdim = 886, time = 397.25430665016177
+Finished sweep 1. Needed Time 326.617s
+	Current energy: -98.449997747520186.
+
+Finished sweep 2. Needed Time 326.631s
+	Current energy: -98.902285694512770.
+
+Finished sweep 3. Needed Time 327.006s
+	Current energy: -99.291584308268696.
+
+Finished sweep 4. Needed Time 326.932s
+	Current energy: -99.429721763248693.
+
+Finished sweep 5. Needed Time 326.665s
+	Current energy: -99.859002497498750.
+
+Finished sweep 6. Needed Time 326.838s
+	Current energy: -99.991677463814156.
+
+Finished sweep 7. Needed Time 326.664s
+	Current energy: -100.189012415634807.
+
+Finished sweep 8. Needed Time 326.401s
+	Current energy: -100.240651761270840.
+
+Finished sweep 9. Needed Time 326.865s
+	Current energy: -100.396067716154604.
+
+Finished sweep 10. Needed Time 327.043s
+	Current energy: -100.439604605615557.
+
+Finished sweep 11. Needed Time 326.913s
+	Current energy: -100.444031039799043.
+
+Finished sweep 12. Needed Time 326.829s
+	Current energy: -100.444865222004978.
+
+Finished sweep 13. Needed Time 327.263s
+	Current energy: -100.445139932070092.
+
+Finished sweep 14. Needed Time 326.599s
+	Current energy: -100.445273692506575.
+
+Finished sweep 15. Needed Time 326.549s
+	Current energy: -100.445354916591569.
+
+Finished sweep 16. Needed Time 327.002s
+	Current energy: -100.445409093945131.
+
+Finished sweep 17. Needed Time 327.199s
+	Current energy: -100.445445806828744.
+
+Finished sweep 18. Needed Time 325.461s
+	Current energy: -100.445470625191774.
+
+Finished sweep 19. Needed Time 325.271s
+	Current energy: -100.445487558617700.
+
+GPU: mdim = 905, time = 311.29070965051653
+Finished sweep 1. Needed Time 516.841s
+	Current energy: -118.811797195341470.
+
+Finished sweep 2. Needed Time 516.410s
+	Current energy: -119.856093479441384.
+
+Finished sweep 3. Needed Time 516.200s
+	Current energy: -120.351697011765452.
+
+Finished sweep 4. Needed Time 516.575s
+	Current energy: -120.707014937461452.
+
+Finished sweep 5. Needed Time 516.343s
+	Current energy: -120.792206854751711.
+
+Finished sweep 6. Needed Time 516.695s
+	Current energy: -120.801375444671109.
+
+Finished sweep 7. Needed Time 516.915s
+	Current energy: -120.804727112775794.
+
+Finished sweep 8. Needed Time 516.633s
+	Current energy: -120.807517078077538.
+
+Finished sweep 9. Needed Time 520.100s
+	Current energy: -120.812317048076181.
+
+Finished sweep 10. Needed Time 517.202s
+	Current energy: -120.829872326282484.
+
+Finished sweep 11. Needed Time 516.576s
+	Current energy: -120.864607991993694.
+
+Finished sweep 12. Needed Time 517.203s
+	Current energy: -120.881209880682178.
+
+Finished sweep 13. Needed Time 516.460s
+	Current energy: -120.886223379010090.
+
+Finished sweep 14. Needed Time 516.941s
+	Current energy: -120.887979656781141.
+
+Finished sweep 15. Needed Time 517.386s
+	Current energy: -120.888705015334736.
+
+Finished sweep 16. Needed Time 517.223s
+	Current energy: -120.889046782553990.
+
+Finished sweep 17. Needed Time 516.811s
+	Current energy: -120.889231166078588.
+
+Finished sweep 18. Needed Time 517.012s
+	Current energy: -120.889341067723706.
+
+Finished sweep 19. Needed Time 516.186s
+	Current energy: -120.889411719415008.
+
+GPU: mdim = 924, time = 492.2831302523613
+Finished sweep 1. Needed Time 498.463s
+	Current energy: -123.464697500574403.
+
+Finished sweep 2. Needed Time 499.864s
+	Current energy: -123.972827631804890.
+
+Finished sweep 3. Needed Time 499.003s
+	Current energy: -124.403601268427181.
+
+Finished sweep 4. Needed Time 498.272s
+	Current energy: -124.423505860724603.
+
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+slurmstepd: error: *** STEP 72166.0 ON pgi8cluster22 CANCELLED AT 2025-03-24T18:53:40 ***
+slurmstepd: error: *** JOB 72166 ON pgi8cluster22 CANCELLED AT 2025-03-24T18:53:40 ***

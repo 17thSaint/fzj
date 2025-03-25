@@ -301,7 +301,7 @@ function benchmark_model_params(args_dict::Dict{String,Any})
     return model_paras
 end
 
-#args_dict = Dict([("benchmark_type","cpu"),("model","J1J2"),("min_mdim",50),("max_mdim",60),("count_mdim",2),("if_save_data",false)])
+#=args_dict = Dict([("benchmark_type","cpu"),("model","J1J2"),("min_mdim",50),("max_mdim",60),("count_mdim",2),("if_save_data",false)])
 args_dict = make_args_dict(ARGS)
 
 # make model parameters
@@ -332,10 +332,10 @@ allmdims = zeros(Float64,length(mdims))
 for (idx,mdim) in enumerate(mdims)
     localobs,allmdims[idx] = run_benchmark(benchmark_type,mdim,net,tpo,filepath)
     alltimes[idx] = localobs.sweep_times[end]
-end
+end=#
 
 
-#= plot benchmarking results
+# plot benchmarking results
 if true
     using PyPlot,LaTeXStrings
     layers = 6
@@ -370,8 +370,13 @@ if true
                 push!(alltimes,v)
             else
                 push!(alltimes,v[end])
-                which_gpu = " A100"
+                which_gpu = " A100 Multi-CPU"
                 col = "b"
+
+                if m["count_mdim"] == 51
+                    which_gpu = " A100 1CPU"
+                    col = "k"
+                end
             end
             push!(allmdims,parse(Float64,k))
         end
@@ -380,7 +385,7 @@ if true
 
     h100_times = [198.87454857826233, 265.86777238845826, 280.11588940620425, 306.8766342163086, 322.31804299354553, 286.09227719306944, 310.1168940067291, 373.2427127838135, 346.71673998832705, 318.8797718048096, 302.0222489833832, 352.215061378479, 386.3397141933441, 396.3376505851746, 391.7669888019562, 402.23571157455444, 404.59406418800353, 397.2337389945984, 434.29764280319216, 442.1614262104034, 427.78434977531435, 417.5367869853973, 428.7551634311676, 445.4978229999542, 402.9635287761688, 322.4677674293518, 463.43472800254824, 432.6612326145172, 452.6140230178833, 328.6008199691772, 473.66247539520265, 360.0862644195557, 449.306504201889, 361.0193250179291, 399.866454410553, 476.1155910015106, 485.3418007850647, 433.2053366184235, 470.3154815673828, 481.42112321853637, 528.8874010086059, 542.0552119731904, 508.9100049972534, 548.6776924133301, 474.28850717544555, 510.1942920207977, 493.6719464302063, 560.277167224884]
     h100_mdims = range(50,stop=1000,length=50)[1:48]
-    scatter(h100_mdims,h100_times,label="GPU H100",color="k")
+    scatter(h100_mdims,h100_times,label="GPU H100",color="m")
 
     xlabel("Max Bond Dimension")
     ylabel("Time (s)")
@@ -388,7 +393,7 @@ if true
     legend()
     xscale("log")
     yscale("log")
-end=#
+end
 
 #=dataloc = get_folder_location("cluster-data/gpu-benchmarking")
 for f in all_files

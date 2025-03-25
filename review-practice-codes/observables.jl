@@ -14,30 +14,14 @@ include("../other-funcs/include-other-files.jl")
 include_other_files(["review-practice-codes/ttn.jl"])
 
 function get_occupancy(ttn::TTN.TreeTensorNetwork; kwargs...)
-	densmat = get(kwargs, :densmat, nothing)
 
-	if isnothing(densmat)
-		exp_occ = abs.(TTN.expect(ttn,"N"))
-	else
-		lat = TTN.physical_lattice(TTN.network(ttn))
-		phys_length,virt_length = get_lattice_dims(ttn)
-		exp_occ = zeros(phys_length,virt_length)
-		for j in 1:phys_length
-			for s in 1:virt_length
-				linear_index = TTN.linear_ind(lat,(j,s))
-				exp_occ[j,s] = abs(densmat[linear_index,linear_index])
-			end
-		end
-	end
+	exp_occ = abs.(TTN.expect(ttn,"N"))
 	
-	if_save_data = get(kwargs, :if_save_data, false)
-	if_save_fig = get(kwargs, :if_save_fig, false)
 	if_plot = get(kwargs, :if_plot, true)
 	
-	if_save_data ? save_occupancy(exp_occ; kwargs...) : nothing
-	if_plot	|| if_save_fig ? plot_occupancy(exp_occ; kwargs...) : nothing
+	if_plot && plot_occupancy(transpose(exp_occ); kwargs...)
 		
-	return exp_occ
+	return transpose(exp_occ)
 end
 
 function get_occupancy(densmat::Matrix; kwargs...)
@@ -659,7 +643,9 @@ function normalize_four_point(fourpt::Matrix,twopt::Vector)
     return fourpt ./ norm_mat
 end
 
-
+function local_hilbert_space_dimension(ttn::TTN.TreeTensorNetwork)
+    return minimum(TTN.dims(ttn[1,1]))
+end
 
 function make_qnset(op_string::String)
     if op_string == "A"
@@ -825,26 +811,26 @@ function zigzag_curve(lat::TTN.AbstractLattice)
     return zigzag_curve(lat.dims[1],lat.dims[2])
 end
 
-function zigzag_curve(lx::Int,ly::Int)
-    curve::Vector{Int} = zeros(Int,ly*lx)
-    num_quadrants::Int = Int(lx*ly/4)
+function zigzag_curve(lx::Int,Ly::Int)
+    curve::Vector{Int} = zeros(Int,Ly*lx)
+    num_quadrants::Int = Int(lx*Ly/4)
 
     starting_point = (1,1)
     for q in 1:num_quadrants
         # add starting point
-        curve[4*(q-1) + 1] = linear_index(starting_point,lx,ly)
+        curve[4*(q-1) + 1] = linear_index(starting_point,lx,Ly)
 
         # move right one point
         p2 = starting_point .+ (1,0)
-        curve[4*(q-1) + 2] = linear_index(p2,lx,ly)
+        curve[4*(q-1) + 2] = linear_index(p2,lx,Ly)
 
         # move diagonally up and left
         p3 = p2 .+ (-1,1)
-        curve[4*(q-1) + 3] = linear_index(p3,lx,ly)
+        curve[4*(q-1) + 3] = linear_index(p3,lx,Ly)
 
         # move right one point
         p4 = p3 .+ (1,0)
-        curve[4*(q-1) + 4] = linear_index(p4,lx,ly)
+        curve[4*(q-1) + 4] = linear_index(p4,lx,Ly)
 
         # reset starting point
         isodd(q) && (starting_point = p4 .+ (1,-1))
@@ -893,22 +879,46 @@ function easy_mpowrapper(mpo::TTN.MPO, lat::L; mapping::Vector{Int} = collect(ea
     return TTN.MPOWrapper{L, TTN.MPO}(lat, mpo, mapping)
 end
 
-function build_W_singlepoint(op_type::String,coeff::ComplexF64)
+function a_matrix(hilbdim::Int)
+    mat = zeros(Float64,hilbdim,hilbdim)
+    for i in 1:(hilbdim-1)
+        mat[i,i+1] = sqrt(i)
+    end
+    return mat
+end
+
+function adag_matrix(hilbdim::Int)
+    mat = zeros(Float64,hilbdim,hilbdim)
+    for i in 2:hilbdim
+        mat[i,i-1] = sqrt(i-1)
+    end
+    return mat
+end
+
+function n_matrix(hilbdim::Int)
+    mat = zeros(Float64,hilbdim,hilbdim)
+    for i in 1:hilbdim
+        mat[i,i] = i-1
+    end
+    return mat
+end
+
+function build_W_singlepoint(op_type::String,coeff::ComplexF64,hilbdim::Int)
     if op_type == "A"
-        mat = [0.0 0.0; 1.0 0.0]
+        mat = adag_matrix(hilbdim)
     elseif op_type == "Adag"
-        mat = [0.0 1.0; 0.0 0.0]
+        mat = a_matrix(hilbdim)
     elseif op_type == "N"
-        mat = [1.0 0.0; 0.0 0.0]
+        mat = n_matrix(hilbdim)
     else
         error("Invalid operator type")
     end
 
-    A11 = I(2)
-    A12 = zeros(2,2)
+    A11 = I(hilbdim)
+    A12 = zeros(hilbdim,hilbdim)
     A21 = coeff * mat
-    A22 = I(2)
-    M = Array{ComplexF64, 4}(undef, 2,2,2,2)
+    A22 = I(hilbdim)
+    M = Array{ComplexF64, 4}(undef, 2,hilbdim,2,hilbdim)
     M[1,:,1,:] = A11
     M[1,:,2,:] = A21
     M[2,:,1,:] = A12
@@ -942,10 +952,11 @@ function single_point_mpo(wavefunc::TTN.TreeTensorNetwork,op_type::String; kwarg
     opl::Int = get(kwargs,:opl,1)
     mom::Vector{Float64} = get(kwargs,:momentum,[0.0,0.0])
 
+    hilbdim = local_hilbert_space_dimension(wavefunc)
     lat = TTN.physical_lattice(wavefunc.net)
-    lx::Int,ly::Int = size(lat)
-    m = Int(mom[2] * ly)
-    alpha = 1 / ly
+    Lx::Int,Ly::Int = size(lat)
+    m = Int(mom[2] * Ly)
+    alpha = 1 / Ly
 
     mapping = kwargs[:mapping]
 
@@ -957,9 +968,10 @@ function single_point_mpo(wavefunc::TTN.TreeTensorNetwork,op_type::String; kwarg
     for (idx,s) in enumerate(phys_sites)
         opl > 1 && println("Working on Physical Site $(TTN.tags(s))")
 
-        coeff::ComplexF64 = ft_coeff_alberto(s,mom,op_type,lx,ly,m,alpha)
+        #coeff::ComplexF64 = ft_coeff_alberto(s,mom,op_type,Lx,Ly,m,alpha)
+        coeff = ft_coeff(s,mom,op_type,Lx,Ly)
 
-        mat = build_W_singlepoint(op_type,coeff)
+        mat = build_W_singlepoint(op_type,coeff,hilbdim)
 
         local_inds = [links[idx],TTN.dag(s),TTN.dag(links[idx+1]),TTN.prime(s)]
 
@@ -993,19 +1005,19 @@ end
 
 function two_point(wavefunc::TTN.TreeTensorNetwork,momentum1::Vector{Float64},momentum2::Vector{Float64}; kwargs...)
     lat = TTN.physical_lattice(wavefunc.net)
-    lx,ly = size(lat)
-    mapss = zigzag_curve(lx,ly)
+    Lx,Ly = size(lat)
+    mapss = zigzag_curve(Lx,Ly)
 
     twop = two_point_mpo(wavefunc; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss)
     twop_wrapped = easy_mpowrapper(twop, lat; mapping=mapss)
-    return real(calculate_mpo_expectation(wavefunc, twop_wrapped)) / (lx*ly)
+    return abs(calculate_mpo_expectation(wavefunc, twop_wrapped))
 end
 
 function two_point(wavefuncs::Vector,momentum1::Vector{Float64},momentum2::Vector{Float64}; kwargs...)
 
     lat = TTN.physical_lattice(wavefuncs[1].net)
-    lx,ly = size(lat)
-    mapss = zigzag_curve(lx,ly)
+    Lx,Ly = size(lat)
+    mapss = zigzag_curve(Lx,Ly)
 
     twop = two_point_mpo(wavefuncs[1]; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss)
     twop_wrapped = easy_mpowrapper(twop, lat; mapping=mapss)
@@ -1019,7 +1031,7 @@ function two_point(wavefuncs::Vector,momentum1::Vector{Float64},momentum2::Vecto
 
     #display(mat)
 
-    return eigvals(mat ./ (lx*ly))
+    return eigvals(mat)
 end
 
 function four_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
@@ -1027,6 +1039,8 @@ function four_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     k1::Vector{Float64} = get(kwargs,:momentum1,[0.0,0.0])
     k2::Vector{Float64} = get(kwargs,:momentum2,[0.0,0.0])
     mapping::Vector{Int} = get(kwargs,:mapping,collect(1:TTN.number_of_sites(wavefunc.net)))
+
+    #println("Momenta are $(k1[2]) and $(k2[2])")
 
     creat1 = single_point_mpo(wavefunc,"Adag"; momentum=k1,mapping=mapping)
     #println("Made Creation 1")
@@ -1044,19 +1058,19 @@ end
 
 function four_point(wavefunc::TTN.TreeTensorNetwork,momentum1::Vector{Float64},momentum2::Vector{Float64}; kwargs...)
     lat = TTN.physical_lattice(wavefunc.net)
-    lx,ly = size(lat)
-    mapss = zigzag_curve(lx,ly)
+    Lx,Ly = size(lat)
+    mapss = zigzag_curve(Lx,Ly)
 
     fourpt = four_point_mpo(wavefunc; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss)
     fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
-    return real(calculate_mpo_expectation(wavefunc, fourpt_wrapped))
+    return abs(calculate_mpo_expectation(wavefunc, fourpt_wrapped))
 end
 
 function four_point(wavefuncs::Vector,momentum1::Vector{Float64},momentum2::Vector{Float64}; kwargs...)
 
     lat = TTN.physical_lattice(wavefuncs[1].net)
-    lx,ly = size(lat)
-    mapss = zigzag_curve(lx,ly)
+    Lx,Ly = size(lat)
+    mapss = zigzag_curve(Lx,Ly)
 
     fourpt = four_point_mpo(wavefuncs[1]; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss)
     fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
@@ -1096,13 +1110,9 @@ function four_point_mpo_real(wavefunc::TTN.TreeTensorNetwork,s1::Int,s2::Int,s3:
     os_annih2 += "A",s4
     annih2 = TTN.MPO(os_annih2,phys_sites)
 
-    println("Made Suboperators")
+    #println("Made Suboperators")
 
-    term1 = apply(apply(creat1,annih1),apply(creat2,annih2))
-    if s2 == s3
-        term2 = apply(creat1,annih2)
-        term1 -= term2
-    end
+    term1 = apply(apply(creat1,creat2),apply(annih1,annih2))
     return term1
 
 end
@@ -1110,28 +1120,113 @@ end
 function four_point_real(wavefunc::TTN.TreeTensorNetwork, momentum1::Vector{Float64}, momentum2::Vector{Float64}; kwargs...)
 
     lat = TTN.physical_lattice(wavefunc.net)
-    lx,ly = size(lat)
-    mapss = zigzag_curve(lx,ly)
+    Lx,Ly = size(lat)
+    alpha = 1/Ly
+    mapss = zigzag_curve(Lx,Ly)
+
+    mval = Int(momentum1[2] * Ly)
+    mval2 = Int(momentum2[2] * Ly)
+
+    if mval > Lx || mval2 > Lx
+        error("Momentum out of bounds: m=$mval mp=$mval2 Lx=$Lx")
+    elseif mval2 == 0 || mval == 0
+        error("Momentum cannot be zero: m=$mval mp=$mval2")
+    end
 
     rez::ComplexF64 = 0.0
-    for s1 in 1:lx*ly
-        coeff1::ComplexF64 = ft_coeff(coordinate(s1,lx,ly),momentum1,"Adag")
-        for s2 in 1:lx*ly
+    for s1 in 1:Ly
+        coeff1::ComplexF64 = ft_coeff_alberto([mval,s1],momentum1,"Adag",Lx,Ly,mval,alpha)
+        lin1 = linear_index([mval,s1],Lx,Ly)
+        for s2 in 1:Ly
             println("Working on site $(s1) and $(s2)")
-            coeff2::ComplexF64 = ft_coeff(coordinate(s2,lx,ly),momentum2,"Adag")
-            for s3 in 1:lx*ly
-                coeff3::ComplexF64 = ft_coeff(coordinate(s3,lx,ly),momentum2,"A")
-                for s4 in 1:lx*ly
-                    coeff4::ComplexF64 = ft_coeff(coordinate(s4,lx,ly),momentum1,"A")
-                    fourpt = four_point_mpo_real(wavefunc,s1,s2,s3,s4; mapping = mapss)
+            coeff2::ComplexF64 = ft_coeff_alberto([mval2,s2],momentum2,"Adag",Lx,Ly,mval2,alpha)
+            lin2 = linear_index([mval2,s2],Lx,Ly)
+            for s3 in 1:Ly
+                coeff3::ComplexF64 = ft_coeff_alberto([mval2,s3],momentum2,"A",Lx,Ly,mval2,alpha)
+                lin3 = linear_index([mval2,s3],Lx,Ly)
+                for s4 in 1:Ly
+                    lin4 = linear_index([mval,s4],Lx,Ly)
+                    coeff4::ComplexF64 = ft_coeff_alberto([mval,s4],momentum1,"A",Lx,Ly,mval,alpha)
+
+                    fourpt = four_point_mpo_real(wavefunc,lin1,lin2,lin3,lin4; mapping = mapss)
                     fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
-                    rez += (coeff1 * coeff2 * coeff3 * coeff4) * calculate_mpo_expectation(wavefunc, fourpt_wrapped; opl=0)
+
+                    coeff = coeff1 * coeff2 * coeff3 * coeff4
+                    local_exppart = calculate_mpo_expectation(wavefunc, fourpt_wrapped; opl=0)
+
+                    println("At $s1 $s2 $s3 $s4 coeff is: $(round(coeff,digits=10))")
+                    println("expectation value = $(round(local_exppart,digits=10))")
+
+                    rez += coeff * local_exppart
                 end
             end
         end
     end
 
-    return rez / (lx*ly)^2
+    return rez
+end
+
+function two_point_mpo_real(wavefunc::TTN.TreeTensorNetwork,s1::Int,s2::Int; kwargs...)
+
+    #mapping::Vector{Int} = get(kwargs,:mapping,collect(1:TTN.number_of_sites(wavefunc.net)))
+
+    phys_sites = TTN.sites(wavefunc)
+
+    os_creat1 = OpSum()
+    os_creat1 += "Adag",s1
+    creat1 = TTN.MPO(os_creat1,phys_sites)
+
+    os_annih1 = OpSum()
+    os_annih1 += "A",s2
+    annih1 = TTN.MPO(os_annih1,phys_sites)
+
+    #println("Made Suboperators")
+
+    term1 = apply(creat1,annih1)
+    return term1
+
+end
+
+function two_point_real(wavefunc::TTN.TreeTensorNetwork, momentum1::Vector{Float64}, momentum2::Vector{Float64}; kwargs...)
+
+    lat = TTN.physical_lattice(wavefunc.net)
+    Lx,Ly = size(lat)
+    alpha = 1/Ly
+    mapss = zigzag_curve(Lx,Ly)
+
+    mval = Int(momentum1[2] * Ly)
+    mval2 = Int(momentum2[2] * Ly)
+
+    if mval > Lx || mval2 > Lx
+        error("Momentum out of bounds: m=$mval mp=$mval2 Lx=$Lx")
+    elseif mval2 == 0 || mval == 0
+        error("Momentum cannot be zero: m=$mval mp=$mval2")
+    end
+
+    rez::ComplexF64 = 0.0
+    for s1 in 1:Ly
+        coord1 = [mval,s1]
+        coeff1::ComplexF64 = ft_coeff_alberto(coord1,momentum1,"Adag",Lx,Ly,mval,alpha)
+        lin1 = linear_index(coord1,Lx,Ly)
+        for s2 in 1:Ly
+            println("Working on site $(s1) and $(s2)")
+            coord2 = [mval2,s2]
+            coeff2::ComplexF64 = ft_coeff_alberto(coord2,momentum2,"A",Lx,Ly,mval2,alpha)
+            lin2 = linear_index(coord2,Lx,Ly)
+
+            twopt = two_point_mpo_real(wavefunc,lin1,lin2; mapping = mapss)
+            twopt_wrapped = easy_mpowrapper(twopt, lat; mapping=mapss)
+
+            local_exppart = calculate_mpo_expectation(wavefunc, twopt_wrapped; opl=0)
+            local_rez = (coeff1 * coeff2) * local_exppart
+
+            #println("At site $coord1 and $coord2: expectation is $(round(local_exppart, digits=8))")
+
+            rez += local_rez
+        end
+    end
+
+    return rez
 end
 
 

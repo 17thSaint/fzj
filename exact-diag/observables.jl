@@ -941,7 +941,7 @@ function ft_fourpt(wavefuncs::Vector{Vector{ComplexF64}},momentum1::Vector{Float
 end
 
 function two_point_operator(site1::Int64,site2::Int64,lattice_params::Dict)
-    mat1 = buildHopping(lattice_params,site1,site2)
+    mat1 = buildHopping(lattice_params,site2,site1)
     return mat1
 end
 
@@ -959,6 +959,7 @@ function ft_twopt(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::
             coeff2::ComplexF64 = ft_coeff(coord2,momentum2,"A")
             println("Working on s1=$(s1) s2=$(s2)")
             big_operator = two_point_operator(s1,s2,lattice_params)
+
             twopt += coeff1 * coeff2 * (conj(transpose(psi)) * (big_operator * psi))
         end
     end
@@ -1027,6 +1028,11 @@ function ft_fourpt_alberto(psi::Vector{ComplexF64},momentum1::Vector{Float64},mo
 
     m = Int(momentum1[2] * Ly)
     mp = Int(momentum2[2] * Ly)
+    if mp > Lx || m > Lx
+        error("Momentum out of bounds: m=$m mp=$mp Lx=$Lx")
+    elseif mp == 0 || m == 0
+        error("Momentum cannot be zero: m=$m mp=$mp")
+    end
     alpha = 1/Ly
 
     fourpt::ComplexF64 = 0.0
@@ -1055,10 +1061,10 @@ function ft_fourpt_alberto(psi::Vector{ComplexF64},momentum1::Vector{Float64},mo
                     big_operator = four_point_operator(s1,s2,s3,s4,lattice_params)
                     
                     expectval = (conj(transpose(psi)) * (big_operator * psi))
-                    #=if round(expectval,digits=10) != 0.0
-                        println("Non-zero expectation value = $(round(expectval,digits=10))")
-                        println("At $y1 $y2 $y3 $y4 coeffs are: $(round(coeff1,digits=5)), $(round(coeff2,digits=5)), $(round(coeff3,digits=5)), $(round(coeff4,digits=5))")
-                    end=#
+
+                    println("At $y1 $y2 $y3 $y4 coeff is: $(round(coeff,digits=10))")
+                    println("expectation value = $(round(expectval,digits=10))")
+
                     fourpt += coeff * expectval
                 end
             end
@@ -1068,38 +1074,98 @@ function ft_fourpt_alberto(psi::Vector{ComplexF64},momentum1::Vector{Float64},mo
     return fourpt
 end
 
-function ft_twopt_alberto(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
+function ft_twopt_alberto(wavefunc::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
     Lx::Int64 = lattice_params["Lx"]
     Ly::Int64 = lattice_params["Ly"]
 
-    m = Int(momentum1[2] * ly)
-    mp = Int(momentum2[2] * ly)
+    mval = Int(momentum1[2] * Ly)
+    mval2 = Int(momentum2[2] * Ly)
     alpha = 1/Ly
 
-    fourpt::ComplexF64 = 0.0
+    twopt::ComplexF64 = 0.0
             
     for y3 in 1:ly
-        coord3 = [m,y3]
-        s3 = linear_index(coord3,lx,ly)
-        coeff3::ComplexF64 = ft_coeff_alberto(coord3,momentum1,"Adag",Lx,Ly,m,alpha)
+        coord3 = (mval,y3)
+        coeff3::ComplexF64 = ft_coeff_alberto(coord3,momentum1,"Adag",Lx,Ly,mval,alpha)
         for y4 in 1:ly
-            coord4 = [m,y4]
-            s4 = linear_index(coord4,lx,ly)
-            println("Working on s1=$(s3) s2=$(s4)")
-            coeff4::ComplexF64 = ft_coeff_alberto(coord4,momentum2,"A",Lx,Ly,mp,alpha)
+            coord4 = (mval2,y4)
+            println("Working on y1=$(y3) y2=$(y4)")
+            coeff4::ComplexF64 = ft_coeff_alberto(coord4,momentum2,"A",Lx,Ly,mval2,alpha)
 
             coeff::ComplexF64 = coeff3 * coeff4
-
-            big_operator = two_point_operator(s3,s4,lattice_params)
             
-            fourpt += coeff * (conj(transpose(psi)) * (big_operator * psi))
+            local_exppart = hopping_probability(wavefunc,Tuple(coord3),Tuple(coord4),lattice_params)
+            local_twopt = coeff * local_exppart
+            #println("At site $coord3 and $coord4, expectation value is $(round(local_exppart,digits=8))")
+            twopt += local_twopt
         end
     end
 
-    return fourpt
+    return twopt
 end
 
+function ft_twopt_alberto(wavefuncs::Vector{Vector{ComplexF64}},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
+    Lx::Int64 = lattice_params["Lx"]
+    Ly::Int64 = lattice_params["Ly"]
 
+    mval = Int(momentum1[2] * Ly)
+    mval2 = Int(momentum2[2] * Ly)
+    alpha = 1/Ly
+
+    twopt::Matrix{ComplexF64} = zeros(ComplexF64,length(wavefuncs),length(wavefuncs))
+            
+    for y3 in 1:ly
+        coord3 = (mval,y3)
+        coeff3::ComplexF64 = ft_coeff_alberto(coord3,momentum1,"Adag",Lx,Ly,mval,alpha)
+        lin1 = linear_index(coord3,Lx,Ly)
+        for y4 in 1:ly
+            coord4 = (mval2,y4)
+            lin2 = linear_index(coord4,Lx,Ly)
+            println("Working on y1=$(y3) y2=$(y4)")
+            coeff4::ComplexF64 = ft_coeff_alberto(coord4,momentum2,"A",Lx,Ly,mval2,alpha)
+
+            coeff::ComplexF64 = coeff3 * coeff4
+            big_operator = two_point_operator(lin1,lin2,lattice_params)
+            for i in 1:length(wavefuncs)
+                for j in 1:length(wavefuncs)
+                    local_exppart = adjoint(wavefuncs[j]) * (big_operator * wavefuncs[i])
+                    local_twopt = coeff * local_exppart
+                    #println("At site $coord3 and $coord4, expectation value is $(round(local_exppart,digits=8))")
+                    twopt[i,j] += local_twopt
+                end
+            end
+        end
+    end
+
+    return eigvals(twopt)
+end
+
+function ftfull_twopt(wavefunc::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
+    Lx::Int64 = lattice_params["Lx"]
+    Ly::Int64 = lattice_params["Ly"]
+
+    twopt::ComplexF64 = 0.0
+            
+    for s1 in 1:lx*ly
+        coord1 = coordinate(s1,lx,ly)
+        coeff1::ComplexF64 = ft_coeff(coord1,momentum1,"Adag") / sqrt(Lx*Ly)
+        for s2 in 1:lx*ly
+            coord2 = coordinate(s2,lx,ly)
+            println("Working on c1=$(coord1) c2=$(coord2)")
+
+            coeff2::ComplexF64 = ft_coeff(coord2,momentum2,"A") / sqrt(Lx*Ly)
+
+            coeff::ComplexF64 = coeff1 * coeff2
+            
+            local_exppart = hopping_probability(wavefunc,coord1,coord2,lattice_params)
+            local_twopt = coeff * local_exppart
+            #println("At site $coord3 and $coord4, expectation value is $(round(local_exppart,digits=8))")
+            twopt += local_twopt
+        end
+    end
+
+    return twopt
+end
 
 
 

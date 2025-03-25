@@ -581,12 +581,13 @@ if false
 
     dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
     pdict = Dict([("layers",layers),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    #pdict = Dict([("particles",n),("expander_fraction",100),("flux_direction","synth"),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",intstren),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
     all_files = find_data_file(pdict,"ttn",dataloc)
     filter!(x -> !occursin("if_synth_rectangle",x),all_files)
     display(all_files)
 
     #for f in all_files
-        f = all_files[end]
+        f = all_files[1]
         d,m = read_data(dataloc * "/" * f; output_level=0)
         #!haskey(d,"ttn") && continue
         #haskey(m,"fourpt_momentum") && continue
@@ -594,38 +595,77 @@ if false
         #TTN.move_ortho!(psi,(layers,1))
         #psi2 = d["ttn_1"]
         #get_occupancy(psi; if_plot=true,plot_title="$(m["onsite_strength"])")
+        #all_results = run_synth_dims_generic(pdict)
+        #psi = all_results[1]
         lat = TTN.physical_lattice(psi.net)
 
         mapss = zigzag_curve(lx,ly)
 
         ks = [n/ly for n in 1:lx]
         mp = [0.0,4/ly]
-        fourpt_vals = zeros(Float64,length(ks))
-        #twopt_vals_mp = real(two_point(psi,mp,mp))
-        #for (idx2,k2) in enumerate(ks)
+        twopt_vals = zeros(Float64,length(ks))
+        real_twopt_vals = zeros(Float64,length(ks))
         for (idx,ky) in enumerate(ks)
-            #println("Working on ky = $ky")
-            #fourpt_mpo = four_point_mpo(psi; momentum1=[0.0,ky],momentum2=[0.0,ky], mapping=mapss)
-            fourpt_val = abs(four_point(psi,[0.0,ky],mp))
-            #twopt_m = real(two_point(psi,[0.0,ky],[0,ky]))
-            fourpt_vals[idx] = fourpt_val
-            #fourpt_vals[idx] = fourpt_val / (twopt_m * twopt_vals_mp)
+            twopt_vals[idx] = two_point(psi,mp,[0.0,ky])
+            scatter(ky *ly,twopt_vals[idx],c="b")
+            #real_twopt_vals[idx] = abs(two_point_real(psi, mp, [0.0,ky]))
+            #scatter(ky *ly,real_twopt_vals[idx],c="g")
         end
-        #end
-
-        #=imshow(fourpt_vals,origin="lower",extent=[1,lx,1,lx])
-        colorbar()
-        xlabel("m")
-        ylabel("m'")
-        title("Four Point Momentum for $(lx)x$(ly) N=$n ULR=$(m["onsite_strength"])")=#
 
         #display(vals)
-        fig = figure()
-        scatter(ks .* ly,fourpt_vals,c="b",label="GS1")
+        #fig = figure()
+        #scatter(ks .* ly,fourpt_vals,c="b",label="Real")
         xlabel("Momentum k = m / Ly, m' = $(Int(mp[2]*ly))")
-        ylabel("Four Point Momentum")
-        title("Four Point Momentum for $(lx)x$(ly) N=$n ULR=$(m["onsite_strength"])")
+        ylabel("Two Point Momentum")
+        title("Two Point Momentum for $(lx)x$(ly) N=$n")
+
+
     #end
+end
+
+# do 2pt momentum MPO
+if false
+    lx,ly,n = 4,4,2
+    layers = Int(log(2,lx*ly))
+    intstren = 0.0
+
+    
+    #=dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
+    pdict = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc)
+    filter!(x -> !occursin("if_synth_rectangle",x),all_files)
+    display(all_files)
+    f = all_files[1]
+    d,m = read_data(dataloc * "/" * f; output_level=0)
+    psi = d["ttn"]=#
+    
+    pdict = Dict([("particles",n),("es_count",1),("if_pinning",true),("if_check_fluxes",false),("max_occ",1),("expander_fraction",100),("flux_direction","synth"),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",1000000.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
+    #all_results = run_synth_dims_generic(pdict)
+    psi1 = all_results[1][1]
+    psi2 = all_results[1][2]
+
+    ks = [2/ly]#[n/ly for n in 1:lx]
+    mp = [0.0,2/ly]
+
+    twopt_vals = two_point([psi1,psi2],mp,mp)
+
+    #=twopt_vals = zeros(Float64,length(ks))
+    real_twopt_vals = zeros(Float64,length(ks))
+    for (idx,ky) in enumerate(ks)
+        #fourpt_vals[idx] = four_point(psi,mp,[0.0,ky])
+        real_twopt_vals[idx] = abs(two_point_real(psi, mp, [0.0,ky]))
+    end
+
+    #scatter(ks .* ly,fourpt_vals,c="b",label="MPO")
+    scatter(ks .* ly,real_twopt_vals,c="g",label="Real")
+    legend()
+    xlabel("Momentum k = m / Ly, m' = $(Int(mp[2]*ly))")
+    ylabel("Two Point Momentum")
+    title("Two Point Momentum for $(lx)x$(ly) N=$n")=#
+
+    rho_ttn1 = all_results[end-1][1]
+    rho_ttn2 = all_results[end-1][2]
+
 end
 
 # plot 4pt momentum
@@ -798,147 +838,138 @@ if false
 
 end
 
-# 4pt momentum m = m' ranging strength showing that it is nonzero
-if false
-    lx,ly,n = 4,4,4
-    strens = range(0.0,200.0,length=30)
-    for (idx,stren) in enumerate(strens)
-        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_check_fluxes",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",stren),("lr","all"),("filling",0.5),("nev",3),("if_find_data",true),("if_save_data",false)])
-        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
-        xx = 1
-        avg_val = 0.0
-        nonzero_count = 0
-        for y1 in 1:ly
-            cor1 = [xx,y1]
-            lin1 = linear_index(cor1,lx,ly)
-            for y2 in 1:ly
-                cor2 = [xx,y2]
-                lin2 = linear_index(cor2,lx,ly)
-                println("Working on $cor1, $cor2")
-                for y3 in 1:ly
-                    cor3 = [xx,y3]
-                    lin3 = linear_index(cor3,lx,ly)
-                    for y4 in 1:ly
-                        cor4 = [xx,y4]
-                        lin4 = linear_index(cor4,lx,ly)
-                        thisop = four_point_operator(lin1,lin2,lin3,lin4,lattice_params)
-                        expval = (conj(transpose(states[1])) * (thisop * states[1]))
-                        if abs(expval) > 1e-10
-                            nonzero_count += 1
-                            avg_val += abs(expval)
-                            #println("For $cor1, $cor2, $cor3, $cor4, the expectation value is $(abs(expval))")
-                        end
-                    end
-                end
-            end
-        end
-
-        scatter(stren,avg_val / nonzero_count,c="b")
-        xlabel("Interaction Strength")
-        ylabel("Four Point m=m' Coefficient")
-        yscale("log")
-    end
-
-end
-
 # test 4pt momentum with ED
-if true
+if false
     lx,ly,n = 8,4,4
-    stren = 300.0
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("flux_direction","y"),("if_check_fluxes",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",stren),("lr","all"),("filling",0.5),("nev",3),("if_find_data",true),("if_save_data",false)])
+    intstren = 300.0
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("flux_direction","y"),("if_check_fluxes",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
     states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
-    #lattice_params,hamilt_params,running_args = get_normal_model_params_ed(pdict)
-    #full_basis = n_particle_basis(lattice_params; output_level=running_args.output_level,dataloc=running_args.basis_dataloc)   
-    #lattice_params["full_basis"] = full_basis
+    #=lattice_params,hamilt_params,running_args = get_normal_model_params_ed(pdict)
+    full_basis = n_particle_basis(lattice_params; output_level=running_args.output_level,dataloc=running_args.basis_dataloc)   
+    lattice_params["full_basis"] = full_basis=#
 
 
     #fig = figure()
     ks = [n/ly for n in 1:lx]
     ed_fourpt_vals = zeros(Float64,length(ks))
     mp = [0.0,4/ly]
-    #twopt_vals_mp = abs(ft_twopt_alberto(states[1],mp,mp,lattice_params))
-    #plot(ks .* ly,twopts_kp,c="g",label="2pt mp")
-    #twopts_kk = zeros(Float64,length(ks))
     for (idx,ky) in enumerate(ks)
-        #ky = 1/ly
-        kk = [0.0,ky]
-        fourpt_val = abs(ft_fourpt_alberto(states[1],kk,mp,lattice_params))
-        #twopt_val_k = abs(ft_twopt_alberto(states[1],kk,kk,lattice_params))
-
-        #scatter(ky*ly,fourpt_val / (twopt_val_k * twopt_vals_mp),c="b",label="4pt")
-
-        scatter(ky*ly,fourpt_val,c="b",label="4pt")
-        #scatter(ky*ly,twopt_val_k,c="r",label="2pt m")
-        
-        
-        #vals1[idx] = val
-        #vals2[idx] = val[2]
-
-        #=if idx == 1
-            scatter(ky*ly,val,c="r",label="ED Direct 1")
-            #scatter(kx*lx,val[1],c="r",label="ED Direct 1")
-            #scatter(kx*lx,val[2],c="m",label="ED Direct 2")
-            legend()
-        else
-            scatter(ky*ly,val,c="r")
-            #scatter(kx*lx,val[1],c="r")
-            #scatter(kx*lx,val[2],c="m")
-        end=#
+        ed_fourpt_vals[idx] = abs(ft_fourpt_alberto(states[1],mp,[0.0,ky],lattice_params))
+        scatter(ky*ly,ed_fourpt_vals[idx],c="b")
     end
-    title("Four point direct $(lx)x$(ly) N=$n ULR=$stren")
+    xlabel("Momentum k = n / Ly, m' = $(Int(mp[2]*ly))")
+    ylabel("Four Point Momentum")
+    title("ED 4pt Momentum $(lx)x$(ly) N=$n ULR=$intstren")
 end
 
-# test 4pt real space 
+# test 2pt momentum with ED
+if false
+    println("Starting ED")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_pinning",true),("flux_direction","y"),("if_check_fluxes",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
+    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
+
+    #=ed_twopt_vals = zeros(Float64,length(ks))
+    for (idx,ky) in enumerate(ks)
+        ed_twopt_vals[idx] = abs(ft_twopt_alberto(states[1],mp,[0.0,ky],lattice_params))
+    end
+    scatter(ks .* ly,ed_twopt_vals,c="r",label="ED")
+    legend()=#
+
+    #ed_twopt_vals = ft_twopt_alberto(states[1:2],mp,mp,lattice_params)
+
+    #rho_ed1 = density_matrix(states[1],lattice_params)
+    #rho_ed2 = density_matrix(states[2],lattice_params)
+end
+
+# compare 4pt momentum max_occs MPO
 if false
     lx,ly,n = 8,4,4
-    stren = 0.0
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("flux_direction","y"),("if_check_fluxes",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",stren),("lr","all"),("filling",0.5),("nev",4),("if_find_data",true),("if_save_data",false)])
-    #states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
-    #lattice_params,hamilt_params,running_args = get_normal_model_params_ed(pdict)
-    #full_basis = n_particle_basis(lattice_params; output_level=running_args.output_level,dataloc=running_args.basis_dataloc)   
-    #lattice_params["full_basis"] = full_basis
+    layers = Int(log(2,lx*ly))
 
+    dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
+    pdict = Dict([("layers",layers),("particles",n),("onsite_strength",0.0),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc)
+    display(all_files)
 
-    coord1 = [1,0] .+ 1
-    coord2 = [0,0] .+ 1
-    coord3 = [3,2] .+ 1
-    coord4 = [0,1] .+ 1
-    lin1 = linear_index(coord1,lx,ly)
-    lin2 = linear_index(coord2,lx,ly)
-    lin3 = linear_index(coord3,lx,ly)
-    lin4 = linear_index(coord4,lx,ly)
+    ho_dataloc = get_folder_location("cluster-data/synth-dims/torus")
+    higherocc_filename = "ttn-if_periodic_phys-true-onsite_strength-1000.0-lr-0-particles-4-if_gpu-true-max_occ-2-alpha-0.25-if_periodic_synth-true-layers-5-hopping_anisotropy-1.0.h5"
+    working_files = [joinpath(dataloc,all_files[1]),joinpath(ho_dataloc,higherocc_filename)]
 
-
-
-    #=expvals = zeros(ComplexF64,lx*ly,lx*ly,lx*ly,lx*ly)
-    for lin1 in 1:lx*ly
-        coord1 = coordinate(lin1,lx,ly) .- 1
-        for lin2 in 1:lx*ly
-            coord2 = coordinate(lin2,lx,ly) .- 1
-            for lin3 in 1:lx*ly
-                coord3 = coordinate(lin3,lx,ly) .- 1
-                for lin4 in 1:lx*ly
-                    coord4 = coordinate(lin4,lx,ly) .- 1=#
-                    thisop = four_point_operator(lin1,lin2,lin3,lin4,lattice_params)
-                    expval = (conj(transpose(states[1])) * (thisop * states[1]))
-                    println("For $coord1, $coord2, $coord3, $coord4, the expectation value is $(expval)")
-                    #=expvals[lin1,lin2,lin3,lin4] = expval
-                end
-            end
+    ks = [n/ly for n in 1:lx]
+    mp = [0.0,4/ly]
+    col = "b"
+    for f in working_files
+        d,m = read_data(f)
+        psi = d["ttn"]
+        fourpt_vals = zeros(Float64,length(ks))
+        for (idx,ky) in enumerate(ks)
+            fourpt_vals[idx] = four_point(psi,mp,[0.0,ky])
         end
-    end=#
-
-
-    #=data = Dict([("fourpt",expvals)])
-    file_name = "fourpt-realspace-$(lx)x$(ly)-N-$n-ULR-$stren.h5"
-    h5open(file_name,"w") do f
-        g_alldata = create_group(f,"all_data")
-        for (datum_key,datum) in data
-            write(g_alldata, datum_key, datum)
-        end
-    end=#
+        scatter(ks .* ly,fourpt_vals,c="b",label="MaxOcc=$(m["max_occ"])")
+        xlabel("Momentum k = n / Lx, m' = $(Int(mp[2]*ly))")
+        ylabel("Four Point Momentum")
+        title("TTN 4pt Momentum $(lx)x$(ly) N=$n range Maximum Occupancy")
+        global col = "r"
+    end
 end
 
+# compare ED TTN ground states
+if false
+    s1c = (2,1)
+    s2c = (2,1)
+    s1l = linear_index(s1c,lx,ly)
+    s2l = linear_index(s2c,lx,ly)
+
+    ed_hoppingcorr = abs(hopping_probability(states[1],s1c,s2c,lattice_params))
+    println("ED Hopping Probability = ",ed_hoppingcorr)
+
+    ttn_hoppingcorr = abs(TTN.correlation(psi,"Adag","A",s1c,s2c))
+    println("TTN Hopping Probability = ",ttn_hoppingcorr)
+
+    s1_revlin = lx*ly - s1l + 1
+    s2_revlin = lx*ly - s2l + 1
+    s1_revcorr = coordinate(s1_revlin,lx,ly)
+    s2_revcorr = coordinate(s2_revlin,lx,ly)
+    ttn_revhopcorr = abs(TTN.correlation(psi,"Adag","A",s1_revcorr,s2_revcorr))
+    println("TTN Reverse Hopping Probability = ",ttn_revhopcorr)
+end
+
+# test sum rule using ED
+if false
+    lx,ly,n = 4,4,2
+    intstren = 0.0
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_pinning",true),("flux_direction","y"),("if_check_fluxes",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
+    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
+
+    sumval = 0.0*im
+    ks = [n/lx for n in 1:lx]
+    for (idx,kx) in enumerate(ks)
+        for (idx2,ky) in enumerate(ks)
+            global sumval += ftfull_twopt(states[1],[kx,ky],[kx,ky],lattice_params)
+        end
+    end
+
+    println("Final Sum value is ",sumval)
+end
+
+# test sum rule using TTNs
+if true
+    lx,ly,n = 4,4,2
+    layers = Int(log(2,lx*ly))
+    intstren = 0.0
+    pdict = Dict([("particles",n),("if_check_fluxes",false),("max_occ",1),("expander_fraction",100),("flux_direction","synth"),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",1000000.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_results = run_synth_dims_generic(pdict)
+
+    sumval = 0.0*im
+    ks = [n/lx for n in 1:lx]
+    for (idx,kx) in enumerate(ks)
+        for (idx2,ky) in enumerate(ks)
+            global sumval += two_point(all_results[1],[kx,ky],[kx,ky])
+        end
+    end
+
+    println("Final Sum value is ",sumval)
+end
 
 
 
