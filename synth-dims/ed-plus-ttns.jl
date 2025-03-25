@@ -945,7 +945,12 @@ if false
     ks = [n/lx for n in 1:lx]
     for (idx,kx) in enumerate(ks)
         for (idx2,ky) in enumerate(ks)
-            global sumval += ftfull_twopt(states[1],[kx,ky],[kx,ky],lattice_params)
+            for kx2 in ks
+                for ky2 in ks
+                    println("Working on kx = $kx, ky = $ky, kx2 = $kx2, ky2 = $ky2")
+                    global sumval += ftfull_fourpt(states[1],[kx,ky],[kx2,ky2],lattice_params)
+                end
+            end
         end
     end
 
@@ -964,7 +969,11 @@ if true
     ks = [n/lx for n in 1:lx]
     for (idx,kx) in enumerate(ks)
         for (idx2,ky) in enumerate(ks)
-            global sumval += two_point(all_results[1],[kx,ky],[kx,ky])
+            for kx2 in ks
+                for ky2 in ks
+                    global sumval += four_point(all_results[1],[kx,ky],[kx2,ky2])
+                end
+            end
         end
     end
 

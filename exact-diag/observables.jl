@@ -1146,11 +1146,11 @@ function ftfull_twopt(wavefunc::Vector{ComplexF64},momentum1::Vector{Float64},mo
 
     twopt::ComplexF64 = 0.0
             
-    for s1 in 1:lx*ly
-        coord1 = coordinate(s1,lx,ly)
+    for s1 in 1:Lx*Ly
+        coord1 = coordinate(s1,Lx,Ly)
         coeff1::ComplexF64 = ft_coeff(coord1,momentum1,"Adag") / sqrt(Lx*Ly)
-        for s2 in 1:lx*ly
-            coord2 = coordinate(s2,lx,ly)
+        for s2 in 1:Lx*Ly
+            coord2 = coordinate(s2,Lx,Ly)
             println("Working on c1=$(coord1) c2=$(coord2)")
 
             coeff2::ComplexF64 = ft_coeff(coord2,momentum2,"A") / sqrt(Lx*Ly)
@@ -1167,6 +1167,44 @@ function ftfull_twopt(wavefunc::Vector{ComplexF64},momentum1::Vector{Float64},mo
     return twopt
 end
 
+function ftfull_fourpt(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
+    Lx::Int64 = lattice_params["Lx"]
+    Ly::Int64 = lattice_params["Ly"]
+
+    fourpt::ComplexF64 = 0.0
+    for s1 in 1:Lx*Ly
+        coord1 = coordinate(s1,Lx,Ly)
+        coeff1::ComplexF64 = ft_coeff(coord1,momentum1,"Adag")
+        for s2 in 1:Lx*Ly
+            coord2 = coordinate(s2,Lx,Ly)
+            coeff2::ComplexF64 = ft_coeff(coord2,momentum2,"Adag")
+            #println("Working on s1=$(s1) s2=$(s2)")
+            for s3 in 1:Lx*Ly
+                coord3 = coordinate(s3,Lx,Ly)
+                coeff3::ComplexF64 = ft_coeff(coord3,momentum2,"A")
+                for s4 in 1:Lx*Ly
+                    coord4 = coordinate(s4,Lx,Ly)
+                    coeff4::ComplexF64 = ft_coeff(coord4,momentum1,"A")
+
+                    coeff::ComplexF64 = coeff1 * coeff2 * coeff3 * coeff4
+
+                    #println("Working on s1=$(s1) s2=$(s2) s3=$(s3) s4=$(s4)")
+
+                    big_operator = four_point_operator(s1,s2,s3,s4,lattice_params)
+                    
+                    expectval = (conj(transpose(psi)) * (big_operator * psi))
+
+                    #println("At $s1 $s2 $s3 $s4 coeff is: $(round(coeff,digits=10))")
+                    #println("expectation value = $(round(expectval,digits=10))")
+
+                    fourpt += coeff * expectval
+                end
+            end
+        end
+    end
+
+    return fourpt
+end
 
 
 
