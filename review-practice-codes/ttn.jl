@@ -51,14 +51,7 @@ function get_lattice_dims_from_layers(layers::Int; kwargs...)
 end
 
 function back2cpu(ttn::TTN.TreeTensorNetwork)
-	datagpu = deepcopy(ttn.data)
-	datac = map(datagpu) do layerdata
-		map(T -> TTN.cpu(T), layerdata)
-	end
-	ortho_centerc = deepcopy(ttn.ortho_center)
-	netc = deepcopy(ttn.net)
-	ortho_directionc = deepcopy(ttn.ortho_direction)
-	return TreeTensorNetwork(datac, ortho_directionc, ortho_centerc, netc)
+	return cpu(ttn)
 end
 
 function get_site_count(ttn)
@@ -979,10 +972,6 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 	println("Added States")
 	
 	ham::TTN.AbstractTensorProductOperator = TTN.TPO(ham_operator,lat)
-	if if_gpu
-		println("Doing GPU Ham TPO")
-		ham = TTN.gpu(ham,ttn)
-	end
 	println("Built Hamiltonian")
 	sp = 0.0
 	times::Vector{Float64} = []
@@ -1319,6 +1308,8 @@ function save_ttn(ttn::TTN.TreeTensorNetwork,metadata_dict::Dict,actual_filename
 		actual_filename = split(actual_filename,"/")[end]
 	end
 
+	actual_filename = make_sure_file_type(actual_filename,"h5")
+
 	if if_continuous_saving || if_redo
 		modify_data(metadata_dict,location * "/" * actual_filename,"metadata")
 		if if_densmat
@@ -1338,18 +1329,18 @@ function save_ttn(ttn::TTN.TreeTensorNetwork,metadata_dict::Dict,actual_filename
 	else
 		if if_densmat
 			if if_gpu
-				write_data("wavefunc"*actual_filename,Dict([("ttn",back2cpu(ttn))]),location)
+				write_data("wavefunc"*actual_filename,Dict([("ttn",back2cpu(ttn))]),location,metadata_dict)
 				write_data(actual_filename,Dict([("densmat",densmat)]),location,metadata_dict)
 			else
-				write_data("wavefunc"*actual_filename,Dict([("ttn",ttn)]),location)
+				write_data("wavefunc"*actual_filename,Dict([("ttn",ttn)]),location,metadata_dict)
 				write_data(actual_filename,Dict([("densmat",densmat)]),location,metadata_dict)
 			end
 		else
 			if if_gpu
-				write_data("wavefunc"*actual_filename,Dict([("ttn",back2cpu(ttn))]),location)
+				write_data("wavefunc"*actual_filename,Dict([("ttn",back2cpu(ttn))]),location,metadata_dict)
 				write_data(actual_filename,Dict(),location,metadata_dict)
 			else
-				write_data("wavefunc"*actual_filename,Dict([("ttn",ttn)]),location)
+				write_data("wavefunc"*actual_filename,Dict([("ttn",ttn)]),location,metadata_dict)
 				write_data(actual_filename,Dict(),location,metadata_dict)
 			end
 		end
@@ -1420,6 +1411,7 @@ mutable struct NRGVarObserver <: TTN.AbstractObserver
     nrg::Vector{Float64}
  
     NRGVarObserver(var_tol=0.0) = new(var_tol,[10000.0,1000.0])
+	NRGVarObserver(var_tol::Float64,nrg::Vector{Float64}) = new(var_tol,nrg)
 end
 
 function TTN.ITensorMPS.measure!(o::NRGVarObserver; kwargs...)
@@ -1461,7 +1453,7 @@ function TTN.ITensorMPS.measure!(o::SavingNRGVarObserver; kwargs...)
     append!(o.nrg,[dmrg.current_energy])
 
 	#modify_data("ttn",dmrg.ttn,o.file_path,"all_data")
-	wavefunc_update::Dict{String,Any} = Dict([("ttn",dmrg.ttn)])
+	wavefunc_update::Dict{String,Any} = Dict([("ttn",cpu(dmrg.ttn))])
 	modify_data(wavefunc_update,add_wavefunc_to_filepath(o.file_path),"all_data")
 	
 	densmat_update::Dict{String,Any} = Dict([("densmat",density_matrix(dmrg.ttn))])
@@ -1600,11 +1592,16 @@ function rerun_findGS(fileloc::String; kwargs...)
 	breakdown_fileloc = split(fileloc,"/")
 	filename = breakdown_fileloc[end]
 	dataloc = join(breakdown_fileloc[1:end-1],"/")
-	data,metadata_old = read_data(filename,dataloc)
+	data,metadata_old = read_data(fileloc)
 	if haskey(data,"ttn") && !isnothing(data["ttn"])
 		metadata_old["seed_ttn"] = data["ttn"]
 	else
-		data_wavefunc,metadata_wavefunc = read_data("wavefunc"*filename,dataloc)
+		rez = read_data(joinpath(dataloc,"wavefunc"*filename))
+		if typeof(rez) == Tuple
+			data_wavefunc = rez
+		else
+			data_wavefunc,mm = rez
+		end
 		metadata_old["seed_ttn"] = data_wavefunc["ttn"]
 	end
 	metadata_old["if_redo"] = true
@@ -1617,13 +1614,13 @@ function rerun_findGS(fileloc::String; kwargs...)
 	end
 
 	ham_op = metadata_old["ham"]
-	ttn_net = metadata_old["net"]
+	ttn_net = metadata_old["seed_ttn"].net
 	model_paras = dict_to_symbols(metadata_old)
 	layers = metadata_old["layers"]
 	num_particles = metadata_old["particles"]
 	og_ttn, hamilt, dm_sp, rezobs, runtime, dens = find_ground_state(layers,num_particles; ham_op=ham_op,ttn_net=ttn_net,model_paras...,metadata=metadata_old)
 
-	return dm_sp.ttn,dens,rezobs
+	return dm_sp.ttn, hamilt, rezobs, dens, runtime
 end
 
 function plot_grid(virt_edge_length,phys_edge_length)

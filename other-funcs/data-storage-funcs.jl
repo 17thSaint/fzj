@@ -800,6 +800,7 @@ function modify_data(key_to_modify::String,new_value,file_path,which_group="all_
 end
 
 function modify_data(to_modify_dict::Dict,file_path,which_group="all_data"; kwargs...)
+	display(file_path)
 	if occursin("jld2",file_path)
 		return modify_data_jld2(to_modify_dict,file_path,which_group; kwargs...)
 	elseif occursin("h5",file_path)

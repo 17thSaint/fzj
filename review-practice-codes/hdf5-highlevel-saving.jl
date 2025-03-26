@@ -70,7 +70,7 @@ function read_NVO(group::HDF5.Group, observer::Type{<:NRGVarObserver})
 	var_tol = read(group, "var_tol")
 	nrg = read(group, "nrg")
 	
-	return NRGVarObserver(file_path, var_tol, nrg)
+	return NRGVarObserver(var_tol, nrg)
 end
 
 function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, observer::SavingMeasurementsObserver)
@@ -246,6 +246,7 @@ function HDF5.read(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, me
 
     return measurement_functions
 end
+
 
 
 

@@ -1492,7 +1492,7 @@ function make_synthdims_filename(model_parameters::Dict)
 		filename_dict["max_occ"] = model_parameters["max_occ"]
 	end
 
-	return make_parameters_filename(filename_dict)
+	return make_parameters_filename(filename_dict)*".h5"
 end
 
 function get_normal_model_params(params_dict::Dict)

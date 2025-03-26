@@ -577,7 +577,7 @@ end=#
 if true
     lx,ly,n = 8,4,4
     layers = Int(log(2,lx*ly))
-    intstren = 300.0
+    intstren = 0.0
 
     #=pdict_ttn = Dict([("particles",n),("cutoff",0.0),("if_check_fluxes",false),("max_occ",1),("expander_fraction",100),("flux_direction","synth"),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
     all_results = run_synth_dims_generic(pdict_ttn)
@@ -592,12 +592,22 @@ if true
     d,m = read_data(dataloc * "/" * f; output_level=0)
     #psi = d["ttn"]
     
-    fourpt_vals = m["fourpt_momentum"]
-    imshow(fourpt_vals,origin="lower",vmin=0.0,extent=[1,lx,1,lx])
+    fourpt_vals_1 = m["fourpt_momentum"]
+    fourpt_vals_2 = m["fourpt_momentum_1"]
+    
+    fig = figure()
+    imshow(fourpt_vals_1,origin="lower",vmin=0.0,extent=[1,lx,1,lx])
     colorbar()
     xlabel("m'")
     ylabel("m")
-    title("TTN Four Point Momentum for $(lx)x$(ly) N=$n ULR=$intstren")
+    title("TTN 4pt Momentum GS1 for $(lx)x$(ly) N=$n ULR=$intstren")
+
+    fig = figure()
+    imshow(fourpt_vals_2,origin="lower",vmin=0.0,extent=[1,lx,1,lx])
+    colorbar()
+    xlabel("m'")
+    ylabel("m")
+    title("TTN 4pt Momentum GS2 for $(lx)x$(ly) N=$n ULR=$intstren")
 
     #=ks = [n/ly for n in 1:lx]
     mp = [0.0,2/ly]
@@ -833,14 +843,15 @@ if false
 end
 
 # test 4pt momentum with ED
-if true
+if false
     #lx,ly,n = 8,4,4
-    #intstren = 300.0
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("flux_direction","y"),("if_check_fluxes",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
+    intstren = 300.0
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("flux_direction","y"),("if_check_fluxes",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
     states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
 
+    display(nrgs[1:2])
 
-    #fig = figure()
+    #=fig = figure()
     ks = [n/ly for n in 1:lx]
     ed_fourpt_vals = zeros(Float64,length(ks),length(ks))
     for (idx,ky) in enumerate(ks)
@@ -854,7 +865,7 @@ if true
     colorbar()
     xlabel("m'")
     ylabel("m")
-    title("ED 4pt Momentum $(lx)x$(ly) N=$n ULR=$intstren")
+    title("ED 4pt Momentum $(lx)x$(ly) N=$n ULR=$intstren")=#
     #xlabel("Momentum k = n / Ly, m' = $(Int(mp[2]*ly))")
     #ylabel("Four Point Momentum")
     #title("ED 4pt Momentum $(lx)x$(ly) N=$n ULR=$intstren")

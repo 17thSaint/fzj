@@ -15,7 +15,7 @@ Depends on:
 include("../other-funcs/include-other-files.jl")
 include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","synth-dims/hatsugai-mbcn.jl","other-funcs/basic-2d-observables.jl"])
 include_other_files(["review-practice-codes/plottings.jl","other-funcs/basic-2d-plottings.jl"])
-include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
+#include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
 
 function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
     hanis::Float64 = get(kwargs,:hopping_anisotropy,1.0)
@@ -59,6 +59,57 @@ function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
             end
         end
     end
+end
+
+# test rerunning TTN with new gauge Ham
+if true
+    lx,ly,n = 8,4,4
+    layers = Int(log(2,lx*ly))
+    intstren = 0.0
+
+    #=pdict_previous = Dict([("particles",n),("if_check_fluxes",false),("expander_fraction",100),("flux_direction","phys"),("layers",layers),("mdim",200),("if_save_data",true),("if_find_data",false),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+    mparas_previous = get_normal_model_params(pdict_previous)
+    all_results_previous = run_synth_dims_generic(pdict_previous)
+    psi_previous = all_results_previous[1]
+    previous_filename = joinpath(mparas_previous[:location],mparas_previous[:name])*".h5"=#
+
+    dataloc = get_folder_location("cluster-data/synth-dims/torus")
+    pdict = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc)
+    filter!(x -> !occursin("if_synth_rectangle",x),all_files)
+    display(all_files)
+    previous_filename = all_files[1]
+    d,m = read_data(dataloc * "/wavefunc" * previous_filename; output_level=0)
+    #=psi_previous = d["ttn"]
+
+
+    ks = [n/ly for n in 1:lx]
+    mp = [0.0,2/ly]
+    fourpt_previous = zeros(Float64,length(ks))
+    for (idx,ky) in enumerate(ks)
+        fourpt_previous[idx] = four_point(psi_previous,mp,[0.0,ky])
+    end
+    scatter(ks .* ly,fourpt_previous,c="b",label="Old")
+    xlabel("Momentum k = m / Ly, m' = $(Int(mp[2]*ly))")
+    ylabel("Four Point Momentum")
+    legend()=#
+
+    pdict_new = Dict([("particles",n),("expander_fraction",100),("flux_direction","synth"),("layers",layers),("mdim",200),("if_save_data",true),("if_find_data",false),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+    mparas_new = get_normal_model_params(pdict_new)
+    netnew = build_HH_net(mparas_new)
+	hamnew = long_range_HH_ham(netnew,mparas_new[:ts],mparas_new[:alpha]; mparas_new...)
+    new_params = Dict([("ham",hamnew)])
+    all_result_new = rerun_findGS(joinpath(dataloc,previous_filename); new_parameters=new_params)
+    #=psi_new = all_result_new[1]
+
+    fourpt_new = zeros(Float64,length(ks))
+    for (idx,ky) in enumerate(ks)
+        fourpt_new[idx] = four_point(psi_new,mp,[0.0,ky])
+    end
+    scatter(ks .* ly,fourpt_new,c="r",label="New")
+    legend()=#
+
+
 end
 
 # look at finite size scaling of commensurate filling interaction strength spectrum
@@ -599,7 +650,7 @@ if false
 end
 
 # time scaling for long range interaction strength
-if true
+if false
     dataloc = get_folder_location("cluster-data/synth-dims/torus")
     pdict = Dict([("layers",7),("particles",8),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc) 
