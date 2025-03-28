@@ -161,14 +161,11 @@ function ft_coeff_alberto(phys_site::Tuple{Int,Int},momentum::Vector{Float64},op
 
     dag_sign::Int = op_type == "Adag" ? 1 : -1
     val::ComplexF64 = exp(dag_sign*2*pi*im*momentum[2]*phys_site[2]) / sqrt(Ly)
-    if m == phys_site[1]
-        return val
-    else
-        return val * 0.0000000001
+    if m != phys_site[1]
+        val *= 0.0000000001
     end
-    #=lb = 1 / sqrt(2*pi*alpha)
-    val *= exp(-(phys_site[1]-m)^2 / (2*lb^2)) / sqrt(sqrt(pi)*lb^2)
-    return val=#
+
+    return val
 end
 
 function ft_coeff_alberto(phys_site::Vector{Int},momentum::Vector{Float64},op_type::String,Lx::Int,Ly::Int,m::Int,alpha::Float64)

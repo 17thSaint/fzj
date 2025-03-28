@@ -113,7 +113,7 @@ function get_normal_model_params_ed(params_dict::Dict)
     nev::Int64 = get(params_dict,"nev",1)
     if_save_data::Bool = get(params_dict, "if_save_data", true)
     if if_periodic_x && if_periodic_y
-		dataloc::String = get_folder_location("cluster-data/exact-diag/torus")
+		dataloc::String = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
 	elseif if_periodic_x || if_periodic_y
 		dataloc = get_folder_location("cluster-data/exact-diag")
 	elseif !if_periodic_x && !if_periodic_y
@@ -200,7 +200,7 @@ function get_normal_model_params_ed(params_dict::Dict)
     if typeof(alpha) == Vector{Float64}
         flux_dir::Union{String,Vector{String}} = ["x","y"]
     else
-        flux_dir = get(params_dict,"flux_direction","x")
+        flux_dir = get(params_dict,"flux_direction","y")
         if if_periodic_y && !if_periodic_x
             flux_dir = "y"
         elseif !if_periodic_y && if_periodic_x
@@ -241,7 +241,7 @@ function run_normal_ed(params_dict::Dict; kwargs...)
     filename_dict::Dict{String,Any} = make_filename_dict(lattice_params,hamilt_params)
     filename::String = join(["ed",make_parameters_filename(filename_dict)],"-")
     output_level > 0 && display(filename)
-    if_exists::Bool,found_data::Union{Vector{Dict},Nothing} = running_args.if_find_data ? check_data_exists(filename_dict,"ed"; location=running_args.dataloc,output_level=output_level-1,if_exact=true) : (false,nothing)
+    if_exists::Bool,found_data::Union{Vector{Dict},Nothing} = running_args.if_find_data ? check_data_exists(filename_dict,"ed"; location=running_args.dataloc,output_level=output_level-1,if_exact=true,file_type="jld2") : (false,nothing)
 
     # some old data has bad naming with int_stren = 1.0 even though rest of Us is zeros
     if params_dict["interaction_strength"] == 1.0 && if_exists
@@ -299,6 +299,7 @@ function run_normal_ed(params_dict::Dict; kwargs...)
     end
 
     filepath = running_args.dataloc * "/" * filename
+    filepath = make_sure_file_type(filepath,"jld2")
 
     if running_args.if_function
         return states,nrgs,rhos,hh,filepath,if_exists,lattice_params,hamilt_params

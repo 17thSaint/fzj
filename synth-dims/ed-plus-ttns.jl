@@ -574,7 +574,7 @@ if false
 end=#
 
 # do 4pt momentum MPO
-if true
+if false
     lx,ly,n = 8,4,4
     layers = Int(log(2,lx*ly))
     intstren = 0.0
@@ -843,32 +843,41 @@ if false
 end
 
 # test 4pt momentum with ED
-if false
-    #lx,ly,n = 8,4,4
-    intstren = 300.0
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("flux_direction","y"),("if_check_fluxes",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
+if true
+    lx,ly,n = 8,4,4
+    intstren = 0.0
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
     states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
 
-    display(nrgs[1:2])
+    fourpt_vals = four_point(states[1],lattice_params; plot_title="ED $(lx)x$(ly) N=$n ULR=$intstren")
+    datadict = Dict([("fourpt_momentum",fourpt_vals)])
+    modify_data(datadict,filepath,"metadata")
+end
 
-    #=fig = figure()
-    ks = [n/ly for n in 1:lx]
-    ed_fourpt_vals = zeros(Float64,length(ks),length(ks))
-    for (idx,ky) in enumerate(ks)
-        for (idx2,ky2) in enumerate(ks)
-            println("Working on ky = $ky, ky2 = $ky2")
-            ed_fourpt_vals[idx,idx2] = abs(ft_fourpt_alberto(states[1],[0.0,ky],[0.0,ky2],lattice_params))
-        end
-    end
-    fig = figure()
-    imshow(ed_fourpt_vals,origin="lower",vmin=0.0,extent=[1,lx,1,lx])
-    colorbar()
-    xlabel("m'")
-    ylabel("m")
-    title("ED 4pt Momentum $(lx)x$(ly) N=$n ULR=$intstren")=#
-    #xlabel("Momentum k = n / Ly, m' = $(Int(mp[2]*ly))")
-    #ylabel("Four Point Momentum")
-    #title("ED 4pt Momentum $(lx)x$(ly) N=$n ULR=$intstren")
+# read 4pt data ED
+if false
+    println("Starting ED")
+    lx,ly,n = 8,4,4
+    intstren = 0.0
+    
+    #=dataloc_ed = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren)])
+    all_files = find_data_file(pdict,"ed",dataloc_ed; file_type="jld2")
+    display(all_files)
+    f = all_files[1]
+    d_ed,m_ed = read_data(joinpath(dataloc_ed,f))
+    lattice_params = get_lattice_params_from_metadata(m_ed)
+    states = d_ed["state"]=#
+
+    m1 = [0.0,7/ly]
+    m2 = [0.0,7/ly]
+
+    #pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+    #states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict_ed; output_level=1)
+
+    fourpt_val_ed = ft_fourpt_alberto(states[1],m1,m2,lattice_params)
+    println("Final Value is $fourpt_val_ed")
+    #fourpt_vals_ed = four_point(states[1],lattice_params; if_plot=false)
 end
 
 # test 2pt momentum with ED
@@ -978,7 +987,122 @@ if false
 
 end
 
+# compare 4pt operator on 8x4 direct with Alberto
+if false
+    lx,ly,n = 8,4,4
+    intstren = 0.0
 
+    #=params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_check_fluxes",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",true)])
+    lattice_params,hamilt_params,running_args = get_normal_model_params_ed(params_dict)    
+    basis_dataloc = running_args.basis_dataloc
+    full_basis = n_particle_basis(lattice_params; output_level=running_args.output_level,dataloc=basis_dataloc)
+    lattice_params["full_basis"] = full_basis=#
+
+    fourpt_table = zeros(ComplexF64,lx*ly,lx*ly,lx*ly,lx*ly)
+    bf = open("fourPointTable.dat", "r")
+
+    for (idx,line) in enumerate(eachline(bf))
+
+        linevect = split(line,"\t")
+
+        coord1 = [parse(Int,linevect[1]) + 1,parse(Int,linevect[2]) + 1]
+        coord2 = [parse(Int,linevect[3]) + 1,parse(Int,linevect[4]) + 1]
+        coord3 = [parse(Int,linevect[5]) + 1,parse(Int,linevect[6]) + 1]
+        coord4 = [parse(Int,linevect[7]) + 1,parse(Int,linevect[8]) + 1]
+        lin1 = linear_index(coord1,lx,ly)
+        lin2 = linear_index(coord2,lx,ly)
+        lin3 = linear_index(coord3,lx,ly)
+        lin4 = linear_index(coord4,lx,ly)
+
+        fourpt_val = parse(Float64,linevect[9]) + im*parse(Float64,linevect[10])
+
+        fourpt_table[lin1,lin2,lin3,lin4] = fourpt_val
+    end
+    close(bf)
+
+    #pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
+    #states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
+
+
+    #=coord1 = [7,4]
+    coord2 = [1,1]
+    coord3 = [6,4]
+    coord4 = [1,3]
+    lin1 = linear_index(coord1,lx,ly)
+    lin2 = linear_index(coord2,lx,ly)
+    lin3 = linear_index(coord3,lx,ly)
+    lin4 = linear_index(coord4,lx,ly)=#
+
+    mismatch_sites = []
+    for lin1 in 1:lx*ly
+        for lin2 in 1:lx*ly
+            println("Working on lin1 = $lin1, lin2 = $lin2")
+            for lin3 in 1:lx*ly
+                for lin4 in 1:lx*ly
+                    bigop = four_point_operator(lin1,lin2,lin3,lin4,lattice_params)
+                    expval = adjoint(states[1]) * bigop * states[1]
+                    if !isapprox(expval,fourpt_table[lin1,lin2,lin3,lin4],atol=1e-3)
+                        println("Mismatch at ",coordinate(lin1,lx,ly) .- [1,1]," ",coordinate(lin2,lx,ly) .- [1,1]," ",coordinate(lin3,lx,ly) .- [1,1]," ",coordinate(lin4,lx,ly) .- [1,1])
+                        println("Expected ",fourpt_table[lin1,lin2,lin3,lin4])
+                        println("Got ",expval)
+                        push!(mismatch_sites,[[lin1,lin2,lin3,lin4]])
+                    end
+                end
+            end
+        end
+    end
+    println("All Matching! Woohoo")
+    
+    
+end
+
+
+# test 4pt ED with Alberto's real space data
+if false
+
+    lx,ly,n = 8,4,4
+    intstren = 0.0
+
+    #=fourpt_table = zeros(ComplexF64,lx*ly,lx*ly,lx*ly,lx*ly)
+    bf = open("fourPointTable.dat", "r")
+
+    for (idx,line) in enumerate(eachline(bf))
+
+        linevect = split(line,"\t")
+
+        coord1 = [parse(Int,linevect[1]) + 1,parse(Int,linevect[2]) + 1]
+        coord2 = [parse(Int,linevect[3]) + 1,parse(Int,linevect[4]) + 1]
+        coord3 = [parse(Int,linevect[5]) + 1,parse(Int,linevect[6]) + 1]
+        coord4 = [parse(Int,linevect[7]) + 1,parse(Int,linevect[8]) + 1]
+        lin1 = linear_index(coord1,lx,ly)
+        lin2 = linear_index(coord2,lx,ly)
+        lin3 = linear_index(coord3,lx,ly)
+        lin4 = linear_index(coord4,lx,ly)
+
+        fourpt_val = parse(Float64,linevect[9]) + im*parse(Float64,linevect[10])
+
+        fourpt_table[lin1,lin2,lin3,lin4] = fourpt_val
+    end
+    close(bf)
+
+    dataloc_ed = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren)])
+    all_files = find_data_file(pdict,"ed",dataloc_ed; file_type="jld2")
+    display(all_files)
+    f = all_files[1]
+    d_ed,m_ed = read_data(joinpath(dataloc_ed,f))
+    lattice_params = get_lattice_params_from_metadata(m_ed)
+    states = d_ed["state"]=#
+
+    m1 = [0.0,1/ly]
+    m2 = [0.0,0/ly]
+
+    fourpt_vals_alberto = ft_fourpt_alberto(states[1],m1,m2,lattice_params; if_readrealspace=true)
+    #fourpt_vals_patrick = ft_fourpt_alberto(states[1],m1,m2,lattice_params; if_readrealspace=false)
+
+    #println("Patrick's Value is $fourpt_vals_patrick")
+    println("Alberto's Value is $fourpt_vals_alberto")
+end
 
 
 

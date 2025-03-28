@@ -109,10 +109,14 @@ function build_HH_net(num_layers::Int64; kwargs...)
 end
 
 function build_HH_net(model_paras::Dict)
-	num_layers = model_paras[:layers]
-	syms = model_paras[:syms]
-	max_occ = model_paras[:max_occ]
-	return build_HH_net(num_layers; syms=syms, max_occ=max_occ)
+	if isnothing(model_paras[:seed_ttn])
+		num_layers = model_paras[:layers]
+		syms = model_paras[:syms]
+		max_occ = model_paras[:max_occ]
+		return build_HH_net(num_layers; syms=syms, max_occ=max_occ)
+	else
+		return model_paras[:seed_ttn].net
+	end
 end
 
 # isotropic not implemented for cylinder
@@ -1539,7 +1543,7 @@ function get_normal_model_params(params_dict::Dict)
 	# Hamiltonian parameters
 	if_pfaffian = get(params_dict, "if_pfaffian", false)
 	alpha = get(params_dict, "alpha", nothing)
-	flux_direction = get(params_dict,"flux_direction", "phys")
+	flux_direction = get(params_dict,"flux_direction", "synth")
 	if_synth_rectangle ? flux_direction = "synth" : nothing
 	if if_periodic_synth && !if_periodic_phys
 	    flux_direction = "synth"
@@ -1603,7 +1607,7 @@ function get_normal_model_params(params_dict::Dict)
 
 
 	if if_periodic_phys && if_periodic_synth
-		dataloc = get_folder_location("cluster-data/synth-dims/torus")
+		dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
 	elseif if_periodic_phys || if_periodic_synth
 		dataloc = get_folder_location("cluster-data/synth-dims")
 	elseif !if_periodic_phys && !if_periodic_synth
@@ -1612,9 +1616,9 @@ function get_normal_model_params(params_dict::Dict)
 	if sc_type == "rydberg"
 		dataloc = get_folder_location("cluster-data/synth-dims/rydberg")
 	end
-	if es_count > 0
+	#=if es_count > 0
 		dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
-	end
+	end=#
 	if if_pfaffian
 		dataloc = get_folder_location("cluster-data/pfaffian")
 	end

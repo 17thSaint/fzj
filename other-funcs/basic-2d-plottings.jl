@@ -278,6 +278,28 @@ function plot_pairdistribution(pairdist::Array{Float64,2}; kwargs...)
     return nothing
 end
 
+function plot_four_point(results::Matrix{Float64}; kwargs...)
+    plot_title = get(kwargs,:plot_title,"")
+    fig = figure()
+    imshow(results,vmin=0.0,origin="lower")
+    colorbar()
+    title("4pt Momentum "*plot_title)
+    ylabel("m")
+    xlabel("m'")
+    return nothing
+end
+
+function plot_four_point(results::Vector{Float64},mp::Int64; kwargs...)
+    plot_title = get(kwargs,:plot_title,"")
+    fig = figure()
+    plot(collect(1:length(results)),results,"-p")
+    title("4pt Momentum "*plot_title)
+    ylabel("4pt Momentum")
+    xlabel("Momentum k = m / Ly, m' = $mp")
+    return nothing
+end
+
+
 
 
 

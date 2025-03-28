@@ -1086,6 +1086,25 @@ function four_point(wavefuncs::Vector,momentum1::Vector{Float64},momentum2::Vect
     return eigvals(mat)
 end
 
+function four_point(wavefunc::TTN.TreeTensorNetwork; kwargs...)
+    if_plot::Bool = get(kwargs,:if_plot,false)
+    opl::Int = get(kwargs,:opl,1)
+
+    Lx,Ly = get_lattice_dims(wavefunc)
+
+    momenta = [n/Ly for n in 1:Lx]
+    fourpt_vals = zeros(Float64,Lx,Lx)
+    for (idx1,k1) in enumerate(momenta)
+        for (idx2,k2) in enumerate(momenta)
+            opl > 0 && println("Working on momenta $(k1) and $(k2)")
+            fourpt_vals[idx1,idx2] = four_point(wavefunc,[0.0,k1],[0.0,k2]; kwargs...)
+        end
+    end
+
+    if_plot && plot_four_point(fourpt_vals; kwargs...) 
+
+    return fourpt_vals
+end
 
 function four_point_mpo_real(wavefunc::TTN.TreeTensorNetwork,s1::Int,s2::Int,s3::Int,s4::Int; kwargs...)
 

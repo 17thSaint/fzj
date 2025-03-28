@@ -1034,7 +1034,7 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 			else
 				write_data(filename,ttn_data_dict,location,merge(metadata,new_metadata))
 			end=#
-			if_continuous_saving || if_redo ? save_ttn(sp.ttn,new_metadata,actual_filename,densmat; kwargs...) : save_ttn(sp.ttn,metadata,actual_filename,densmat; kwargs...,if_redo=if_redo)
+			if_continuous_saving ? save_ttn(sp.ttn,new_metadata,actual_filename,densmat; kwargs...) : save_ttn(sp.ttn,metadata,actual_filename,densmat; kwargs...,if_redo=if_redo)
 		end
 
 		
@@ -1300,7 +1300,6 @@ end
 function save_ttn(ttn::TTN.TreeTensorNetwork,metadata_dict::Dict,actual_filename::String,densmat::Matrix{ComplexF64}=zeros(ComplexF64,1,1); kwargs...)
 	if_gpu = kwargs[:if_gpu]
 	if_continuous_saving = kwargs[:if_continuous_saving]
-	if_redo = kwargs[:if_redo]
 	if_densmat = kwargs[:if_densmat]
 	location = kwargs[:location]
 
@@ -1310,7 +1309,7 @@ function save_ttn(ttn::TTN.TreeTensorNetwork,metadata_dict::Dict,actual_filename
 
 	actual_filename = make_sure_file_type(actual_filename,"h5")
 
-	if if_continuous_saving || if_redo
+	if if_continuous_saving
 		modify_data(metadata_dict,location * "/" * actual_filename,"metadata")
 		if if_densmat
 			if if_gpu
