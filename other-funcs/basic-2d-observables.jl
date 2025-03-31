@@ -168,8 +168,15 @@ function ft_coeff_alberto(phys_site::Tuple{Int,Int},momentum::Vector{Float64},op
     return val
 end
 
-function ft_coeff_alberto(phys_site::Vector{Int},momentum::Vector{Float64},op_type::String,Lx::Int,Ly::Int,m::Int,alpha::Float64)
-    return ft_coeff_alberto((phys_site[1],phys_site[2]),momentum,op_type,Lx,Ly,m,alpha)
+function diocane(phys_site::Tuple,momentum::Vector,op_type::String,Ly::Int)
+    mval = Int(momentum[2] * Ly)
+
+    if phys_site[1]-1 == mval
+        dag_sign::Int = op_type == "Adag" ? 1 : -1
+        return exp(dag_sign * 2*pi*im*momentum[2]*(phys_site[2]-1)) / sqrt(Ly)
+    else
+        return 0.0
+    end
 end
 
 

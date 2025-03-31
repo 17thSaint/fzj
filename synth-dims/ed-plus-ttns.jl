@@ -573,7 +573,7 @@ if false
     display(zc)
 end=#
 
-# do 4pt momentum MPO
+#= do 4pt momentum MPO
 if false
     lx,ly,n = 8,4,4
     layers = Int(log(2,lx*ly))
@@ -625,9 +625,9 @@ if false
 
 
     #end
-end
+end=#
 
-# do 2pt momentum MPO
+#= do 2pt momentum MPO
 if false
     lx,ly,n = 4,4,2
     layers = Int(log(2,lx*ly))
@@ -670,126 +670,9 @@ if false
     rho_ttn1 = all_results[end-1][1]
     rho_ttn2 = all_results[end-1][2]
 
-end
+end=#
 
-# plot 4pt momentum
-if false
-    lx,ly,n = 8,4,4
-    layers = Int(log(2,lx*ly))
-    #intstren = 100.0
-
-    dataloc = [get_folder_location("cluster-data/synth-dims/excited-states"),get_folder_location("cluster-data/synth-dims/torus")]
-    pdict = Dict([("layers",layers),("particles",n),("if_periodic_phys",true),("hopping_anisotropy",1.0)])
-    all_files = find_data_file(pdict,"ttn",dataloc)
-    filter!(x -> !occursin("if_synth_rectangle",x),all_files)
-    display(all_files)
-
-    #f = all_files[1]
-    ulrs = [0.0,0.5,1.0,10.0,300.0]
-    fig1 = figure()
-    for f in all_files
-        d,m = read_data(f; output_level=0)
-
-        #get_occupancy(d["densmat"]; plot_title="ULR=$(m["onsite_strength"])")
-
-        #!haskey(m,"twopt_momentum") && continue
-        !haskey(m,"fourpt_momentum") && continue
-        !haskey(d,"densmat") && continue
-
-        ulr = get_params_dict_from_filename(split(f,"/")[end])["onsite_strength"]
-        !(ulr in ulrs) && continue
-
-        #twopt_vals = m["twopt_momentum"]
-
-        #=fig = figure()
-        imshow(twopt_vals,origin="lower",extent=[0,lx,0,lx],vmin=0.0)
-        colorbar()
-        xlabel("kx")
-        ylabel("k2")
-        title("2-Point Momentum at ULR=$(m["onsite_strength"])")=#
-        #twopt_vals = two_point_densmat(d["densmat"],lx,ly)
-        #display(twopt_vals)
-        #scatter(m["onsite_strength"],mean(twopt_vals),c="b")
-        fourpt_vals = m["fourpt_momentum"]
-        #scatter(m["onsite_strength"],fourpt_vals[5,5],c="b")
-        #xlabel("Interaction Strength")
-        #ylabel("Fourpt at (4,4)")
-
-        #normalized_4pt = normalize_four_point(fourpt_vals,twopt_vals)
-
-        plot(0:size(fourpt_vals,1)-1,fourpt_vals[:,Int(lx/2)+1],"-p",label="$ulr")
-        title(L"$\langle \hat{a}_{k}^{\dagger} \hat{a}_{k'}^{\dagger} \hat{a}_{k'} \hat{a}_k \rangle / \langle \hat{n}_{k} \rangle \langle \hat{n}_{k'} \rangle$"*" for $(lx)x$(ly) N=$n Range ULR")
-        xlabel("Momentum k = n / Lx, n' = $(Int(lx/2))")
-        ylabel("Four Point Momentum")
-        legend()
-
-        #=plot(0:size(fourpt_vals,1)-1,diag(normalized_4pt),"-p",label="$ulr")
-        title(L"$\langle \hat{a}_{k}^{\dagger} \hat{a}_{k}^{\dagger} \hat{a}_{k} \hat{a}_k \rangle / \langle \hat{n}_{k} \rangle \langle \hat{n}_{k} \rangle$"*" for $(lx)x$(ly) N=$n Range ULR")
-        xlabel("Momentum k = n / Lx")
-        ylabel("Four Point Momentum")
-        legend()=#
-
-        #=scatter(m["onsite_strength"],sum(fourpt_vals),c="b")
-        xlabel("Interaction Strength")
-        ylabel("Sum of 4pt")
-        title("Sum of 4pt on $(lx)x$ly N=$n")=#
-
-        #plot(0:lx,fourpt_vals[:,5] ./ (lx*ly)^4,"-p",label="$(m["onsite_strength"])")
-        #xlabel("Momentum")
-        #ylabel("Four Point Momentum")
-
-        #=fig = figure()
-        imshow(fourpt_vals,origin="lower",extent=[0,lx,0,lx],vmin=0.0)
-        colorbar()
-        xlabel("kx")
-        ylabel("k2")
-        title("4-Point Momentum at ULR=$(m["onsite_strength"])")=#
-    end
-        
-
-end
-
-# testing 4pt momentum on known density wave
-if false
-    lx,ly,n = 4,4,2
-    layers = Int(log(2,lx*ly))
-
-    stren = 0.0
-    params_dict = Dict([("hopping_anisotropy",1.0),("es_count",1),("cutoff",1e-10),("particles",n),("layers",layers),("mdim",200),("expander_fraction",100),("if_save_data",false),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
-    psi, hamilthere, obs, rho, rt = run_synth_dims_generic(params_dict)
-
-    #lat = TTN.physical_lattice(psi[1].net)
-    #mapss = zigzag_curve(lx,ly)
-
-    fig = figure()
-    ks = [n/lx for n in 0:lx]
-    fourpt_vals1 = zeros(Float64,length(ks))
-    fourpt_vals2 = zeros(Float64,length(ks))
-    for (idx,kx) in enumerate(ks)
-        println("Working on kx = $kx")
-
-        fourpt_val = real.(four_point([psi[1],psi[2]], [kx,0], [kx,0]))
-        fourpt_vals1[idx] = fourpt_val[1]
-        fourpt_vals2[idx] = fourpt_val[2]
-
-        #twopt_val = real.(two_point([psi[1],psi[2]], [kx,0], [kx,0]))
-        #twopt_vals1[idx] = twopt_val[1]
-        #twopt_vals2[idx] = twopt_val[2]
-
-        if idx == 1
-            scatter(kx*lx,fourpt_val[1],c="b",label="TTN MPO 1")
-            scatter(kx*lx,fourpt_val[2],c="g",label="TTN MPO 2")
-        else
-            scatter(kx*lx,fourpt_val[1],c="b")
-            scatter(kx*lx,fourpt_val[2],c="g")
-        end
-        xlabel("Momentum k, k' = k")
-        ylabel("Four Point Momentum")
-    end
-
-end
-
-# do multi-state 4pt momentum MPO
+#= do multi-state 4pt momentum MPO
 if false
     lx,ly,n = 8,4,4
     layers = Int(log(2,lx*ly))
@@ -840,21 +723,21 @@ if false
         end
     end
 
-end
+end=#
 
-# test 4pt momentum with ED
-if true
+#= test 4pt momentum with ED
+if false
     lx,ly,n = 8,4,4
-    intstren = 0.0
+    intstren = 300.0
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
     states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
 
     fourpt_vals = four_point(states[1],lattice_params; plot_title="ED $(lx)x$(ly) N=$n ULR=$intstren")
     datadict = Dict([("fourpt_momentum",fourpt_vals)])
     modify_data(datadict,filepath,"metadata")
-end
+end=#
 
-# read 4pt data ED
+#= read 4pt data ED
 if false
     println("Starting ED")
     lx,ly,n = 8,4,4
@@ -878,9 +761,9 @@ if false
     fourpt_val_ed = ft_fourpt_alberto(states[1],m1,m2,lattice_params)
     println("Final Value is $fourpt_val_ed")
     #fourpt_vals_ed = four_point(states[1],lattice_params; if_plot=false)
-end
+end=#
 
-# test 2pt momentum with ED
+#= test 2pt momentum with ED
 if false
     println("Starting ED")
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_pinning",true),("flux_direction","y"),("if_check_fluxes",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
@@ -897,97 +780,9 @@ if false
 
     #rho_ed1 = density_matrix(states[1],lattice_params)
     #rho_ed2 = density_matrix(states[2],lattice_params)
-end
+end=#
 
-# compare 4pt momentum max_occs MPO
-if false
-    lx,ly,n = 8,4,4
-    layers = Int(log(2,lx*ly))
-
-    dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
-    pdict = Dict([("layers",layers),("particles",n),("onsite_strength",0.0),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
-    all_files = find_data_file(pdict,"ttn",dataloc)
-    display(all_files)
-
-    ho_dataloc = get_folder_location("cluster-data/synth-dims/torus")
-    higherocc_filename = "ttn-if_periodic_phys-true-onsite_strength-1000.0-lr-0-particles-4-if_gpu-true-max_occ-2-alpha-0.25-if_periodic_synth-true-layers-5-hopping_anisotropy-1.0.h5"
-    working_files = [joinpath(dataloc,all_files[1]),joinpath(ho_dataloc,higherocc_filename)]
-
-    ks = [n/ly for n in 1:lx]
-    mp = [0.0,4/ly]
-    col = "b"
-    for f in working_files
-        d,m = read_data(f)
-        psi = d["ttn"]
-        fourpt_vals = zeros(Float64,length(ks))
-        for (idx,ky) in enumerate(ks)
-            fourpt_vals[idx] = four_point(psi,mp,[0.0,ky])
-        end
-        scatter(ks .* ly,fourpt_vals,c="b",label="MaxOcc=$(m["max_occ"])")
-        xlabel("Momentum k = n / Lx, m' = $(Int(mp[2]*ly))")
-        ylabel("Four Point Momentum")
-        title("TTN 4pt Momentum $(lx)x$(ly) N=$n range Maximum Occupancy")
-        global col = "r"
-    end
-end
-
-# compare ED TTN ground states
-if false
-    lx,ly,n = 4,4,3
-    layers = Int(log(2,lx*ly))
-    intstren = 0.0
-
-    #=pdict_ttn = Dict([("particles",n),("cutoff",0.0),("es_count",1),("if_check_fluxes",false),("max_occ",1),("expander_fraction",100),("flux_direction","synth"),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
-    all_results = run_synth_dims_generic(pdict_ttn)
-    psi1 = all_results[1][1]
-    psi2 = all_results[1][2]
-
-    pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("flux_direction","y"),("if_check_fluxes",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
-    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict_ed; output_level=1)=#
-
-    rho_ttn1 = all_results[end-1][1]
-    rho_ttn2 = all_results[end-1][2]
-
-    rho_ed1 = density_matrix(states[1],lattice_params)
-    rho_ed2 = density_matrix(states[2],lattice_params)
-
-    #=println("ED Gap is ",nrgs[2] - nrgs[1])
-    println("TTN Gap is ",all_results[3][2].nrg[end] - all_results[3][1].nrg[end])
-    println("GS1 NRG Diff = ",nrgs[1] - all_results[3][1].nrg[end])
-    println("GS2 NRG Diff = ",nrgs[2] - all_results[3][2].nrg[end])
-
-    occs_ttn1 = get_occupancy(psi1; if_plot=true,plot_title="TTN GS1")
-    occs_ttn2 = get_occupancy(psi2; if_plot=true,plot_title="TTN GS2")
-    occs_ed1 = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="ED GS1")
-    occs_ed2 = get_occupancy(states[2],lattice_params; if_plot=true,plot_title="ED GS2")=#
-
-    # this makes the shape the same, I have no idea why
-    #rho_ttn1 = reverse(reverse(rho_ttn1,dims=1),dims=2)
-    #rho_ttn2 = reverse(reverse(rho_ttn2,dims=1),dims=2)
-
-    fig = figure()
-    imshow(abs.(rho_ttn1),origin="lower",vmin=0.0)
-    colorbar()
-    title("TTN GS1")
-
-    fig = figure()
-    imshow(abs.(rho_ttn2),origin="lower",vmin=0.0)
-    colorbar()
-    title("TTN GS2")
-
-    fig = figure()
-    imshow(abs.(rho_ed1),origin="lower",vmin=0.0)
-    colorbar()
-    title("ED GS1")
-
-    fig = figure()
-    imshow(abs.(rho_ed2),origin="lower",vmin=0.0)
-    colorbar()
-    title("ED GS2")
-
-end
-
-# compare 4pt operator on 8x4 direct with Alberto
+#= compare 4pt operator on 8x4 direct with Alberto
 if false
     lx,ly,n = 8,4,4
     intstren = 0.0
@@ -1054,10 +849,9 @@ if false
     println("All Matching! Woohoo")
     
     
-end
+end=#
 
-
-# test 4pt ED with Alberto's real space data
+#= test 4pt ED with Alberto's real space data
 if false
 
     lx,ly,n = 8,4,4
@@ -1102,6 +896,52 @@ if false
 
     #println("Patrick's Value is $fourpt_vals_patrick")
     println("Alberto's Value is $fourpt_vals_alberto")
+end=#
+
+# compare momoccs and 4pt ED and TTN 8x4 
+if true
+    lx,ly,n = 8,4,4
+    intstren = 300.0
+    layers = Int(log(2,lx*ly))
+
+    dataloc_ed = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren)])
+    all_files_ed = find_data_file(pdict_ed,"ed",dataloc_ed; file_type="jld2")
+    display(all_files_ed)
+    f_ed = all_files_ed[1]
+    d_ed,m_ed = read_data(joinpath(dataloc_ed,f_ed))
+    
+    #momoccs_ed = m_ed["mom_occs"]
+    fourpt_ed = m_ed["fourpt_momentum"]
+    plot_four_point(fourpt_ed; plot_title="ED $(lx)x$(ly) N=$n ULR=$intstren")
+    #plot_four_point(fourpt_ed[:,3],2; plot_title="ED $(lx)x$(ly) N=$n ULR=$intstren")
+
+
+    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict_ttn = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
+    display(all_files_ttn)
+    f_ttn = all_files_ttn[1]
+    d_ttn,m_ttn = read_data(dataloc_ttn * "/" * f_ttn; output_level=0)
+
+    fourpt_ttn = m_ttn["fourpt_momentum"]
+    plot_four_point(fourpt_ttn; plot_title="TTN GS1 $(lx)x$(ly) N=$n ULR=$intstren")
+    #plot_four_point(fourpt_ttn[:,4],3; plot_title="TTN GS1 $(lx)x$(ly) N=$n ULR=$intstren")
+    fourpt_ttn_1 = m_ttn["fourpt_momentum_1"]
+    plot_four_point(fourpt_ttn_1; plot_title="TTN GS2 $(lx)x$(ly) N=$n ULR=$intstren")
+    #plot_four_point(fourpt_ttn_1[:,3],2; plot_title="TTN GS2 $(lx)x$(ly) N=$n ULR=$intstren")
+
+    fourpt_gsmanifold_ttn = zeros(Float64,lx,lx)
+    fourpt_gsmanifold_ttn .+= fourpt_ttn
+    shifted_gs2 = zeros(Float64,lx,lx)
+    for i in 1:lx-1
+        for j in 1:lx-1
+            shifted_gs2[i+1,j+1] = fourpt_ttn_1[i,j]
+        end
+    end
+    fourpt_gsmanifold_ttn .+= shifted_gs2
+    plot_four_point(fourpt_gsmanifold_ttn; plot_title="TTN GS1+GS2 $(lx)x$(ly) N=$n ULR=$intstren")
+
 end
 
 

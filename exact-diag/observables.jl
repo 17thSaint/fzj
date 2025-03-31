@@ -1021,18 +1021,6 @@ function ft_fourpt_numop(wavefunc::Vector{ComplexF64},momentum::Vector{Float64},
     return term1 * (1 / (lx*ly)),term2 * (1 / sqrt(lx*ly))
 end
 
-
-function diocane(phys_site::Tuple,momentum::Vector,op_type::String,Ly::Int)
-    mval = Int(momentum[2] * Ly)
-
-    if phys_site[1]-1 == mval
-        dag_sign::Int = op_type == "Adag" ? 1 : -1
-        return exp(dag_sign * 2*pi*im*momentum[2]*(phys_site[2]-1)) / sqrt(Ly)
-    else
-        return 0.0
-    end
-end
-
 function ft_fourpt_alberto(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
     Lx::Int64 = lattice_params["Lx"]
     Ly::Int64 = lattice_params["Ly"]
@@ -1046,7 +1034,6 @@ function ft_fourpt_alberto(psi::Vector{ComplexF64},momentum1::Vector{Float64},mo
     #elseif mp == 0 || m == 0
         #error("Momentum cannot be zero: m=$m mp=$mp")
     end
-    alpha = 1/Ly
 
     fourpt::ComplexF64 = 0.0
     for y1 in 1:Ly
@@ -1085,39 +1072,6 @@ function ft_fourpt_alberto(psi::Vector{ComplexF64},momentum1::Vector{Float64},mo
             end
         end
     end
-
-    #=for s1 in 1:Lx*Ly
-        coord1 = coordinate(s1,Lx,Ly)
-        coeff1::ComplexF64 = diocane(coord1,momentum1,"Adag",Ly)
-        for s2 in 1:Lx*Ly
-            coord2 = coordinate(s2,Lx,Ly)
-            coeff2::ComplexF64 = diocane(coord2,momentum2,"Adag",Ly)
-            println("Working on s1=$(s1) s2=$(s2)")
-            for s3 in 1:Lx*Ly
-                coord3 = coordinate(s3,Lx,Ly)
-                coeff3::ComplexF64 = diocane(coord3,momentum2,"A",Ly)
-                for s4 in 1:Lx*Ly
-                    coord4 = coordinate(s4,Lx,Ly)
-                    coeff4::ComplexF64 = diocane(coord4,momentum1,"A",Ly)
-
-                    coeff::ComplexF64 = coeff1 * coeff2 * coeff3 * coeff4
-
-                    #println("Working on s1=$(s1) s2=$(s2) s3=$(s3) s4=$(s4)")
-
-                    if if_readrealspace
-                        expectval = fourpt_table[s1,s2,s3,s4]
-                    else
-                        big_operator = four_point_operator(s1,s2,s3,s4,lattice_params)
-                        expectval = (conj(transpose(psi)) * (big_operator * psi))
-                    end
-
-                    #println("expectation value = $(round(expectval,digits=10))")
-
-                    fourpt += coeff * expectval
-                end
-            end
-        end
-    end=#
 
     return fourpt
 end

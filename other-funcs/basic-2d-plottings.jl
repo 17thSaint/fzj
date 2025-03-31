@@ -292,7 +292,7 @@ end
 function plot_four_point(results::Vector{Float64},mp::Int64; kwargs...)
     plot_title = get(kwargs,:plot_title,"")
     fig = figure()
-    plot(collect(1:length(results)),results,"-p")
+    plot(collect(0:length(results)-1),results,"-p")
     title("4pt Momentum "*plot_title)
     ylabel("4pt Momentum")
     xlabel("Momentum k = m / Ly, m' = $mp")
