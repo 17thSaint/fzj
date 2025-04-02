@@ -730,56 +730,7 @@ function entanglement_entropy(rho_A::Matrix{ComplexF64}; tolerance=1e-8)
 end
 
 
-function four_point_operator_old(site1::Int64,site2::Int64,site3::Int64,site4::Int64,lattice_params::Dict)
-    
-    mat1 = buildHopping(lattice_params,site3,site1)
-    mat2 = buildHopping(lattice_params,site4,site2)
 
-    result = mat1 * mat2
-
-    site2 == site3 && (result -= buildHopping(lattice_params,site4,site1))
-
-    return result
-end
-
-function four_point_operator_singlebasis(site1::Int64,site2::Int64,site3::Int64,site4::Int64,this_basis_state)
-    coeff::Float64 = 1.0
-    N = length(this_basis_state)
-    #println("Working on basis state $this_basis_state")
-    #println("Hopping from sites $site3 and $site4 to sites $site1 and $site2 using basis state $this_basis_state")
-    
-    output_state = zeros(Int64,length(this_basis_state)) + this_basis_state
-    
-    n4 = length(filter(x->x==site4,output_state))
-    deleteat!(output_state,findfirst(x->x==site4,output_state))
-    coeff *= sqrt(n4)
-
-    n3 = length(filter(x->x==site3,output_state))
-    deleteat!(output_state,findfirst(x->x==site3,output_state))
-    coeff *= sqrt(n3)
-
-    n2 = length(filter(x->x==site2,output_state))
-    push!(output_state,site2)
-    coeff *= sqrt(n2+1)
-    
-    n1 = length(filter(x->x==site1,output_state))
-    push!(output_state,site1)
-    coeff *= sqrt(n1+1)
-
-    sort!(output_state,rev=true)
-    #println("Output state is $output_state with coeff $coeff")
-    
-    if length(unique(output_state)) < N
-        #println("Error: output state $output_state has double occupancy")
-        return nothing,0.0
-    end
-    if length(output_state) > N
-        error("Too long output state: $output_state")
-        #continue
-    end
-
-    return output_state,coeff
-end
 
 function four_point_operator(site1::Int64,site2::Int64,site3::Int64,site4::Int64,lattice_params::Dict)
     full_basis = lattice_params["full_basis"]
@@ -838,232 +789,43 @@ function four_point_operator(site1::Int64,site2::Int64,site3::Int64,site4::Int64
 end
 
 function ft_fourpt(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
-    
-    lx::Int64 = lattice_params["Lx"]
-    ly::Int64 = lattice_params["Ly"]
-
-    fourpt::ComplexF64 = 0.0
-    for s1 in 1:lx*ly
-        coord1 = coordinate(s1,lx,ly)
-        coeff1::ComplexF64 = ft_coeff(coord1,momentum1,"Adag")
-        for s2 in 1:lx*ly
-            coord2 = coordinate(s2,lx,ly)
-            coeff2::ComplexF64 = ft_coeff(coord2,momentum2,"Adag")
-            println("Working on s1=$(s1) s2=$(s2)")
-            for s3 in 1:lx*ly
-                coord3 = coordinate(s3,lx,ly)
-                coeff3::ComplexF64 = ft_coeff(coord3,momentum2,"A")
-                for s4 in 1:lx*ly
-                    coord4 = coordinate(s4,lx,ly)
-                    coeff4::ComplexF64 = ft_coeff(coord4,momentum1,"A")
-
-                    coeff::ComplexF64 = coeff1 * coeff2 * coeff3 * coeff4
-
-                    big_operator = four_point_operator(s1,s2,s3,s4,lattice_params)
-                    
-                    fourpt += coeff * (conj(transpose(psi)) * (big_operator * psi))
-                end
-            end
-        end
-    end
-
-    return fourpt / (lx*ly)^2
-end
-
-function ft_fourpt(wavefuncs::Vector{Vector{ComplexF64}},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
-    lx::Int64 = lattice_params["Lx"]
-    ly::Int64 = lattice_params["Ly"]
-
-    #=fourpt::Matrix{ComplexF64} = zeros(ComplexF64,length(wavefuncs),length(wavefuncs))
-    for s1 in 1:lx*ly
-        coord1 = coordinate(s1,lx,ly)
-        coeff1::ComplexF64 = ft_coeff(coord1,momentum1,"Adag")
-        for s2 in 1:lx*ly
-            coord2 = coordinate(s2,lx,ly)
-            coeff2::ComplexF64 = ft_coeff(coord2,momentum2,"Adag")
-            println("Working on s1=$(s1) s2=$(s2)")
-            for s3 in 1:lx*ly
-                coord3 = coordinate(s3,lx,ly)
-                coeff3::ComplexF64 = ft_coeff(coord3,momentum2,"A")
-                for s4 in 1:lx*ly
-                    coord4 = coordinate(s4,lx,ly)
-                    coeff4::ComplexF64 = ft_coeff(coord4,momentum1,"A")
-
-                    coeff::ComplexF64 = coeff1 * coeff2 * coeff3 * coeff4
-
-                    big_operator = four_point_operator(s1,s2,s3,s4,lattice_params)
-                    
-                    for i in 1:length(wavefuncs)
-                        for j in 1:length(wavefuncs)
-                            fourpt[i,j] += coeff * (conj(transpose(wavefuncs[j])) * (big_operator * wavefuncs[i]))
-                        end
-                    end
-
-                end
-            end
-        end
-    end=#
-
-    fourpt::Matrix{ComplexF64} = zeros(ComplexF64,length(wavefuncs),length(wavefuncs))
-    for s1 in 1:lx*ly
-        coord1 = coordinate(s1,lx,ly)
-        coeff1::ComplexF64 = ft_coeff(coord1,momentum1,"Adag")
-        for s3 in 1:lx*ly
-            coord3 = coordinate(s3,lx,ly)
-            coeff3::ComplexF64 = ft_coeff(coord3,momentum2,"Adag")
-            mat1 = buildHopping(lattice_params,s1,s3)
-            println("Working on s1=$(s1) s3=$(s3)")
-            for s4 in 1:lx*ly
-                coord4 = coordinate(s4,lx,ly)
-                coeff4::ComplexF64 = ft_coeff(coord4,momentum2,"A")
-                mat3 = buildHopping(lattice_params,s1,s4)
-                for s2 in 1:lx*ly
-                    coord2 = coordinate(s2,lx,ly)
-                    coeff2::ComplexF64 = ft_coeff(coord2,momentum1,"A")
-                    mat2 = buildHopping(lattice_params,s2,s3)
-
-                    big_operator = mat1 * mat2
-                    s2 == s3 && (big_operator -= mat3)
-
-                    for i in 1:length(wavefuncs)
-                        for j in 1:length(wavefuncs)
-                            fourpt[i,j] += coeff1 * coeff2 * coeff3 * coeff4 * (conj(transpose(wavefuncs[i])) * (big_operator * wavefuncs[j]))
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    display(fourpt)
-
-    return eigvals(fourpt ./ (lx*ly)^2)
-end
-
-function two_point_operator(site1::Int64,site2::Int64,lattice_params::Dict)
-    mat1 = buildHopping(lattice_params,site2,site1)
-    return mat1
-end
-
-function ft_twopt(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
-    
-    lx::Int64 = lattice_params["Lx"]
-    ly::Int64 = lattice_params["Ly"]
-
-    twopt::ComplexF64 = 0.0
-    for s1 in 1:lx*ly
-        coord1 = coordinate(s1,lx,ly)
-        coeff1::ComplexF64 = ft_coeff(coord1,momentum1,"Adag")
-        for s2 in 1:lx*ly
-            coord2 = coordinate(s2,lx,ly)
-            coeff2::ComplexF64 = ft_coeff(coord2,momentum2,"A")
-            println("Working on s1=$(s1) s2=$(s2)")
-            big_operator = two_point_operator(s1,s2,lattice_params)
-
-            twopt += coeff1 * coeff2 * (conj(transpose(psi)) * (big_operator * psi))
-        end
-    end
-
-    return twopt / (lx*ly)
-end
-
-function ft_twopt(wavefuncs::Vector{Vector{ComplexF64}},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
-    
-    lx::Int64 = lattice_params["Lx"]
-    ly::Int64 = lattice_params["Ly"]
-
-    twopt::Matrix{ComplexF64} = zeros(ComplexF64,length(wavefuncs),length(wavefuncs))
-    for s1 in 1:lx*ly
-        coord1 = coordinate(s1,lx,ly)
-        coeff1::ComplexF64 = ft_coeff(coord1,momentum1,"Adag")
-        for s2 in 1:lx*ly
-            coord2 = coordinate(s2,lx,ly)
-            coeff2::ComplexF64 = ft_coeff(coord2,momentum2,"A")
-            #println("Working on s1=$(s1) s2=$(s2)")
-            big_operator = two_point_operator(s1,s2,lattice_params)
-
-            for i in 1:length(wavefuncs)
-                for j in 1:length(wavefuncs)
-                    twopt[i,j] += coeff1 * coeff2 * (conj(transpose(wavefuncs[j])) * (big_operator * wavefuncs[i]))
-                end
-            end
-
-        end
-    end
-
-    #display(twopt)
-
-    return eigvals(twopt ./ (lx*ly))
-end
-
-
-function ft_fourpt_numop(wavefunc::Vector{ComplexF64},momentum::Vector{Float64},lattice_params::Dict; kwargs...)
-    
-    lx::Int64 = lattice_params["Lx"]
-    ly::Int64 = lattice_params["Ly"]
-    n::Int64 = lattice_params["N"]
-
-    term1::ComplexF64 = 0.0
-    term2::ComplexF64 = 0.0
-    for s1 in 1:lx*ly
-        coord1 = coordinate(s1,lx,ly)
-        coeff1::ComplexF64 = ft_coeff(coord1,momentum,"A")
-        mat1 = density_operator(lattice_params,coord1)
-        term2 += coeff1 * (conj(transpose(wavefunc)) * (mat1 * wavefunc))
-        for s2 in 1:lx*ly
-            coord2 = coordinate(s2,lx,ly)
-            coeff2::ComplexF64 = ft_coeff(coord2,momentum,"A")
-            mat2 = density_operator(lattice_params,coord2)
-            term1 += (coeff1 * coeff2) * (conj(transpose(wavefunc)) * ((mat1 * mat2) * wavefunc))
-        end
-    end
-
-    return term1 * (1 / (lx*ly)),term2 * (1 / sqrt(lx*ly))
-end
-
-function ft_fourpt_alberto(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
     Lx::Int64 = lattice_params["Lx"]
     Ly::Int64 = lattice_params["Ly"]
 
-    if_readrealspace::Bool = get(kwargs,:if_readrealspace,false)
+    which_coeff::Function = get(kwargs,:which_coeff,diocane)
+    coeff_kwargs::NamedTuple = get(kwargs,:coeff_kwargs,(Ly=Ly,))
 
     m = Int(momentum1[2] * Ly)
     mp = Int(momentum2[2] * Ly)
     if mp > Lx || m > Lx
         error("Momentum out of bounds: m=$m mp=$mp Lx=$Lx")
-    #elseif mp == 0 || m == 0
-        #error("Momentum cannot be zero: m=$m mp=$mp")
     end
 
     fourpt::ComplexF64 = 0.0
     for y1 in 1:Ly
         coord1 = (m+1,y1)
         s1 = linear_index(coord1,Lx,Ly)
-        coeff1::ComplexF64 = diocane(coord1,momentum1,"Adag",Ly)
+        coeff1::ComplexF64 = which_coeff(coord1,momentum1,"Adag"; coeff_kwargs...)
         for y2 in 1:Ly
             coord2 = (mp+1,y2)
             s2 = linear_index(coord2,Lx,Ly)
-            coeff2::ComplexF64 = diocane(coord2,momentum2,"Adag",Ly)
+            coeff2::ComplexF64 = which_coeff(coord2,momentum2,"Adag"; coeff_kwargs...)
             #println("Working on y1=$(y1) y2=$(y2)")
             for y3 in 1:Ly
                 coord3 = (mp+1,y3)
                 s3 = linear_index(coord3,Lx,Ly)
-                coeff3::ComplexF64 = diocane(coord3,momentum2,"A",Ly)
+                coeff3::ComplexF64 = which_coeff(coord3,momentum2,"A"; coeff_kwargs...)
                 for y4 in 1:Ly
                     coord4 = (m+1,y4)
                     s4 = linear_index(coord4,Lx,Ly)
-                    coeff4::ComplexF64 = diocane(coord4,momentum1,"A",Ly)
+                    coeff4::ComplexF64 = which_coeff(coord4,momentum1,"A"; coeff_kwargs...)
 
                     coeff::ComplexF64 = coeff1 * coeff2 * coeff3 * coeff4
 
                     #println("Working on s1=$(s1) s2=$(s2) s3=$(s3) s4=$(s4) coeff=$(coeff)")
 
-                    if if_readrealspace
-                        expectval = fourpt_table[s1,s2,s3,s4]
-                    else
-                        big_operator = four_point_operator(s1,s2,s3,s4,lattice_params)
-                        expectval = (conj(transpose(psi)) * (big_operator * psi))
-                    end
+                    big_operator = four_point_operator(s1,s2,s3,s4,lattice_params)
+                    expectval = (conj(transpose(psi)) * (big_operator * psi))
 
                     #println("expectation value = $(round(expectval,digits=10))")
 
@@ -1074,6 +836,62 @@ function ft_fourpt_alberto(psi::Vector{ComplexF64},momentum1::Vector{Float64},mo
     end
 
     return fourpt
+end
+
+function ft_fourpt(wavefuncs::Vector{Vector{ComplexF64}},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
+    Lx::Int64 = lattice_params["Lx"]
+    Ly::Int64 = lattice_params["Ly"]
+
+    which_coeff::Function = get(kwargs,:which_coeff,diocane)
+    coeff_kwargs::NamedTuple = get(kwargs,:coeff_kwargs,(Ly=Ly,))
+
+    m = Int(momentum1[2] * Ly)
+    mp = Int(momentum2[2] * Ly)
+    if mp > Lx || m > Lx
+        error("Momentum out of bounds: m=$m mp=$mp Lx=$Lx")
+    end
+
+    fourpt::Matrix{ComplexF64} = zeros(ComplexF64,length(wavefunc),length(wavefunc))
+    for y1 in 1:Ly
+        coord1 = (m+1,y1)
+        s1 = linear_index(coord1,Lx,Ly)
+        coeff1::ComplexF64 = which_coeff(coord1,momentum1,"Adag"; coeff_kwargs...)
+        for y2 in 1:Ly
+            coord2 = (mp+1,y2)
+            s2 = linear_index(coord2,Lx,Ly)
+            coeff2::ComplexF64 = which_coeff(coord2,momentum2,"Adag"; coeff_kwargs...)
+            println("Working on y1=$(y1) y2=$(y2)")
+            for y3 in 1:Ly
+                coord3 = (mp+1,y3)
+                s3 = linear_index(coord3,Lx,Ly)
+                coeff3::ComplexF64 = which_coeff(coord3,momentum2,"A"; coeff_kwargs...)
+                for y4 in 1:Ly
+                    coord4 = (m+1,y4)
+                    s4 = linear_index(coord4,Lx,Ly)
+                    coeff4::ComplexF64 = which_coeff(coord4,momentum1,"A"; coeff_kwargs...)
+
+                    coeff::ComplexF64 = coeff1 * coeff2 * coeff3 * coeff4
+
+                    #println("Working on s1=$(s1) s2=$(s2) s3=$(s3) s4=$(s4) coeff=$(coeff)")
+                    
+                    big_operator = four_point_operator(s1,s2,s3,s4,lattice_params)
+
+                    for i in 1:length(wavefuncs)
+                        for j in 1:length(wavefuncs)
+                            expectval = (adjoing(wavefuncs[j]) * (big_operator * wavefuncs[i]))
+                            fourpt[i,j] += coeff * expectval
+                        end
+                    end
+
+                    #println("expectation value = $(round(expectval,digits=10))")
+
+                    
+                end
+            end
+        end
+    end
+
+    return eigvals(fourpt)
 end
 
 function four_point(wavefunc::Vector{ComplexF64},lattice_params::Dict; kwargs...)
@@ -1096,23 +914,30 @@ function four_point(wavefunc::Vector{ComplexF64},lattice_params::Dict; kwargs...
     return fourpt_vals
 end
 
-function ft_twopt_alberto(wavefunc::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
+function ft_twopt(wavefunc::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
     Lx::Int64 = lattice_params["Lx"]
     Ly::Int64 = lattice_params["Ly"]
 
+    opl::Int = get(kwargs,:opl,1)
+
+    which_coeff::Function = get(kwargs,:which_coeff,diocane)
+    coeff_kwargs::NamedTuple = get(kwargs,:coeff_kwargs,(Ly=Ly,))
+
     mval = Int(momentum1[2] * Ly)
     mval2 = Int(momentum2[2] * Ly)
-    alpha = 1/Ly
+    if mval > Lx || mval2 > Lx
+        error("Momentum out of bounds: m=$mval mp=$mval2 Lx=$Lx")
+    end
 
     twopt::ComplexF64 = 0.0
             
     for y3 in 1:ly
-        coord3 = (mval,y3)
-        coeff3::ComplexF64 = ft_coeff_alberto(coord3,momentum1,"Adag",Lx,Ly,mval,alpha)
+        coord3 = (mval+1,y3)
+        coeff3::ComplexF64 = which_coeff(coord3,momentum1,"Adag"; coeff_kwargs...)
         for y4 in 1:ly
-            coord4 = (mval2,y4)
-            println("Working on y1=$(y3) y2=$(y4)")
-            coeff4::ComplexF64 = ft_coeff_alberto(coord4,momentum2,"A",Lx,Ly,mval2,alpha)
+            coord4 = (mval2+1,y4)
+            opl > 0 && println("Working on y1=$(y3) y2=$(y4)")
+            coeff4::ComplexF64 = which_coeff(coord4,momentum2,"A"; coeff_kwargs...)
 
             coeff::ComplexF64 = coeff3 * coeff4
             
@@ -1126,25 +951,30 @@ function ft_twopt_alberto(wavefunc::Vector{ComplexF64},momentum1::Vector{Float64
     return twopt
 end
 
-function ft_twopt_alberto(wavefuncs::Vector{Vector{ComplexF64}},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
+function ft_twopt(wavefuncs::Vector{Vector{ComplexF64}},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
     Lx::Int64 = lattice_params["Lx"]
     Ly::Int64 = lattice_params["Ly"]
 
+    which_coeff::Function = get(kwargs,:which_coeff,diocane)
+    coeff_kwargs::NamedTuple = get(kwargs,:coeff_kwargs,(Ly=Ly,))
+
     mval = Int(momentum1[2] * Ly)
     mval2 = Int(momentum2[2] * Ly)
-    alpha = 1/Ly
+    if mval > Lx || mval2 > Lx
+        error("Momentum out of bounds: m=$mval mp=$mval2 Lx=$Lx")
+    end
 
     twopt::Matrix{ComplexF64} = zeros(ComplexF64,length(wavefuncs),length(wavefuncs))
             
     for y3 in 1:ly
-        coord3 = (mval,y3)
-        coeff3::ComplexF64 = ft_coeff_alberto(coord3,momentum1,"Adag",Lx,Ly,mval,alpha)
+        coord3 = (mval+1,y3)
+        coeff3::ComplexF64 = which_coeff(coord3,momentum1,"Adag"; coeff_kwargs...)
         lin1 = linear_index(coord3,Lx,Ly)
         for y4 in 1:ly
-            coord4 = (mval2,y4)
+            coord4 = (mval2+1,y4)
             lin2 = linear_index(coord4,Lx,Ly)
             println("Working on y1=$(y3) y2=$(y4)")
-            coeff4::ComplexF64 = ft_coeff_alberto(coord4,momentum2,"A",Lx,Ly,mval2,alpha)
+            coeff4::ComplexF64 = which_coeff(coord4,momentum2,"A"; coeff_kwargs...)
 
             coeff::ComplexF64 = coeff3 * coeff4
             big_operator = two_point_operator(lin1,lin2,lattice_params)
@@ -1161,7 +991,6 @@ function ft_twopt_alberto(wavefuncs::Vector{Vector{ComplexF64}},momentum1::Vecto
 
     return eigvals(twopt)
 end
-
 
 
 

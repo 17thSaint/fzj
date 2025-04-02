@@ -1349,41 +1349,22 @@ end
 function save_initial_ttn(ttn::TTN.TreeTensorNetwork,metadata::Dict; kwargs...)
 	if_densmat = kwargs[:if_densmat]
 	if_gpu = kwargs[:if_gpu]
-	if_redo = get(kwargs, :if_redo, false)
 	location = kwargs[:location]
 	filename = kwargs[:name]
 
 	if if_densmat
 		if if_gpu
-			if if_redo
-				modify_data(Dict([("ttn",back2cpu(ttn))]),location * "/wavefunc" * filename)
-				actual_filename::String = modify_data(Dict([("densmat",density_matrix(ttn))]),location * "/" * filename)
-			else
-				write_data("wavefunc"*filename,Dict([("ttn",back2cpu(ttn))]),location,metadata)
-				actual_filename = write_data(filename,Dict([("densmat",density_matrix(ttn))]),location,metadata)
-			end
+			write_data("wavefunc"*filename,Dict([("ttn",back2cpu(ttn))]),location,metadata)
+			actual_filename = write_data(filename,Dict([("densmat",density_matrix(ttn))]),location,metadata)
 		else
-			if if_redo
-				modify_data(Dict([("ttn",ttn)]),location * "/wavefunc" * filename)
-				actual_filename = modify_data(Dict([("densmat",density_matrix(ttn))]),location * "/" * filename)
-			else
-				actual_filename = write_data(filename,Dict([("densmat",density_matrix(ttn))]),location,metadata)
-				write_data("wavefunc"*filename,Dict([("ttn",ttn)]),location,metadata)
-			end
+			actual_filename = write_data(filename,Dict([("densmat",density_matrix(ttn))]),location,metadata)
+			write_data("wavefunc"*filename,Dict([("ttn",ttn)]),location,metadata)
 		end
 	else
 		if if_gpu
-			if if_redo
-				actual_filename = modify_data(Dict([("ttn",back2cpu(ttn))]),location * "/wavefunc" * filename)
-			else
-				actual_filename = write_data("wavefunc"*filename,Dict([("ttn",back2cpu(ttn))]),location,metadata)
-			end
+			actual_filename = write_data("wavefunc"*filename,Dict([("ttn",back2cpu(ttn))]),location,metadata)
 		else
-			if if_redo
-				actual_filename = modify_data(Dict([("ttn",ttn)]),"wavefunc"*location * "/wavefunc" * filename)
-			else
-				actual_filename = write_data("wavefunc"*filename,Dict([("ttn",ttn)]),location,metadata)
-			end
+			actual_filename = write_data("wavefunc"*filename,Dict([("ttn",ttn)]),location,metadata)
 		end
 		actual_filename = remove_wavefunc_from_filename(actual_filename)
 	end

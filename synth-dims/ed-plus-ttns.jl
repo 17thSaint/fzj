@@ -136,6 +136,30 @@ function plot_nrg_vs_intstren_fromdata_ed(lx::Int64,ly::Int64,which_strens::Unio
     return intstrens,nrgs
 end
 
+function focking_vector(wavefunc::TTN.TreeTensorNetwork,full_basis::Matrix{Int64}; kwargs...)
+    opl::Int = get(kwargs, :output_level, 1)
+
+    allcoeffs = zeros(ComplexF64,size(full_basis,2))
+    for i in 1:size(full_basis,2)
+        opl > 0 && println("Working on $i / $(length(states[1]))")
+
+        # get the local configuration
+        local_config = lattice_params["full_basis"][:,i]
+
+        # make states with local configuration
+        all_states = ["0" for i in 1:lx*ly]
+        all_states[local_config] .= "1"
+
+        # build TTN with local configuration
+        local_ttn = TTN.ProductTreeTensorNetwork(wavefunc.net,all_states)
+
+        # find the overlap
+        local_overlap = TTN.inner(local_ttn,wavefunc)
+        allcoeffs[i] = local_overlap
+    end
+
+    return allcoeffs
+end
 
 #= look at finite size scaling of commensurate filling interaction strength spectrum
 if false
@@ -766,15 +790,22 @@ end=#
 #= test 2pt momentum with ED
 if false
     println("Starting ED")
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_pinning",true),("flux_direction","y"),("if_check_fluxes",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
     states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
 
-    #=ed_twopt_vals = zeros(Float64,length(ks))
+    ks = [n/ly for n in 0:lx-1]
+    ed_twopt_vals_1 = zeros(Float64,length(ks))
+    ed_twopt_vals_2 = zeros(Float64,length(ks))
     for (idx,ky) in enumerate(ks)
-        ed_twopt_vals[idx] = abs(ft_twopt_alberto(states[1],mp,[0.0,ky],lattice_params))
+        ed_twopt_vals_1[idx] = abs(ft_twopt(states[1],[0.0,ky],[0.0,ky],lattice_params; output_level=1))
+        ed_twopt_vals_2[idx] = abs(ft_twopt(states[2],[0.0,ky],[0.0,ky],lattice_params; output_level=1))
     end
-    scatter(ks .* ly,ed_twopt_vals,c="r",label="ED")
-    legend()=#
+    scatter(ks .* ly,ed_twopt_vals_1,c="r",label="GS1")
+    scatter(ks .* ly,ed_twopt_vals_2,c="b",label="GS2")
+    legend()
+
+    datadict = Dict([("mom_occs",ed_twopt_vals_1),("mom_occs_1",ed_twopt_vals_2)])
+    modify_data(datadict,filepath,"metadata")
 
     #ed_twopt_vals = ft_twopt_alberto(states[1:2],mp,mp,lattice_params)
 
@@ -898,8 +929,8 @@ if false
     println("Alberto's Value is $fourpt_vals_alberto")
 end=#
 
-# compare momoccs and 4pt ED and TTN 8x4 
-if true
+#= compare momoccs and 4pt ED and TTN 8x4 
+if false
     lx,ly,n = 8,4,4
     intstren = 300.0
     layers = Int(log(2,lx*ly))
@@ -911,9 +942,15 @@ if true
     f_ed = all_files_ed[1]
     d_ed,m_ed = read_data(joinpath(dataloc_ed,f_ed))
     
-    #momoccs_ed = m_ed["mom_occs"]
+    #=momoccs_ed = m_ed["mom_occs"]
+    plot(collect(0:lx-1),momoccs_ed,"-p",c="b",label="ED")
+    momoccs_ed_1 = m_ed["mom_occs_1"]
+    plot(collect(0:lx-1),momoccs_ed_1,"-p",c="r",label="ED GS2")
+    xlabel("Momentum")
+    ylabel("Occupancy")
+    title("Momentum Occupancies for $(lx)x$(ly) N=$n ULR=$intstren")=#
     fourpt_ed = m_ed["fourpt_momentum"]
-    plot_four_point(fourpt_ed; plot_title="ED $(lx)x$(ly) N=$n ULR=$intstren")
+    #plot_four_point(fourpt_ed; plot_title="ED $(lx)x$(ly) N=$n ULR=$intstren")
     #plot_four_point(fourpt_ed[:,3],2; plot_title="ED $(lx)x$(ly) N=$n ULR=$intstren")
 
 
@@ -924,15 +961,21 @@ if true
     f_ttn = all_files_ttn[1]
     d_ttn,m_ttn = read_data(dataloc_ttn * "/" * f_ttn; output_level=0)
 
+    #momoccs_ttn = m_ttn["mom_occs"]
+    #plot(collect(0:lx-1),momoccs_ttn,"-p",c="r",label="TTN GS1")
+    #momoccs_ttn_1 = m_ttn["mom_occs_1"]
+    #plot(collect(0:lx-1),momoccs_ttn_1,"-p",c="r"; label="TTN GS1")
+    #legend()
+
     fourpt_ttn = m_ttn["fourpt_momentum"]
-    plot_four_point(fourpt_ttn; plot_title="TTN GS1 $(lx)x$(ly) N=$n ULR=$intstren")
+    #plot_four_point(fourpt_ttn; plot_title="TTN GS1 $(lx)x$(ly) N=$n ULR=$intstren")
     #plot_four_point(fourpt_ttn[:,4],3; plot_title="TTN GS1 $(lx)x$(ly) N=$n ULR=$intstren")
     fourpt_ttn_1 = m_ttn["fourpt_momentum_1"]
-    plot_four_point(fourpt_ttn_1; plot_title="TTN GS2 $(lx)x$(ly) N=$n ULR=$intstren")
+    #plot_four_point(fourpt_ttn_1; plot_title="TTN GS1 $(lx)x$(ly) N=$n ULR=$intstren")
     #plot_four_point(fourpt_ttn_1[:,3],2; plot_title="TTN GS2 $(lx)x$(ly) N=$n ULR=$intstren")
 
-    fourpt_gsmanifold_ttn = zeros(Float64,lx,lx)
-    fourpt_gsmanifold_ttn .+= fourpt_ttn
+    #=fourpt_gsmanifold_ttn = zeros(Float64,lx,lx)
+    fourpt_gsmanifold_ttn .+= fourpt_ttn_1
     shifted_gs2 = zeros(Float64,lx,lx)
     for i in 1:lx-1
         for j in 1:lx-1
@@ -940,9 +983,41 @@ if true
         end
     end
     fourpt_gsmanifold_ttn .+= shifted_gs2
-    plot_four_point(fourpt_gsmanifold_ttn; plot_title="TTN GS1+GS2 $(lx)x$(ly) N=$n ULR=$intstren")
+    plot_four_point(fourpt_gsmanifold_ttn ./ 2; plot_title="TTN GS1+GS2 $(lx)x$(ly) N=$n ULR=$intstren")=#
+
+end=#
+
+# try to get overlap of TTN with ED
+if true
+    lx,ly,n = 4,4,2
+    layers = Int(log(2,lx*ly))
+    intstren = 0.0
+
+    #=pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict_ed; output_level=1)
+    
+    pdict_ttn = Dict([("particles",n),("cutoff",0.0),("es_count",1),("if_check_fluxes",false),("expander_fraction",100),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_results = run_synth_dims_generic(pdict_ttn)
+    psi = all_results[1][1]
+    psi_1 = all_results[1][2]
+    =#
+
+    #abnrgdiff = abs((nrgs[1] - all_results[3].nrg[end]) / nrgs[1])
+    #println("Percent Energy difference is ",abnrgdiff)
+
+    #=ttn_fockvector_1 = focking_vector(psi,lattice_params["full_basis"])
+    ttn_fockvector_2 = focking_vector(psi_1,lattice_params["full_basis"])
+
+    overlapvalue = zeros(Float64,2,2)
+    overlapvalue[1,1] = abs2(adjoint(ttn_fockvector_1) * states[1])
+    overlapvalue[1,2] = abs2(adjoint(ttn_fockvector_1) * states[2])
+    overlapvalue[2,1] = abs2(adjoint(ttn_fockvector_2) * states[1])
+    overlapvalue[2,2] = abs2(adjoint(ttn_fockvector_2) * states[2])=#
+    display(overlapvalue)
+    
 
 end
+
 
 
 

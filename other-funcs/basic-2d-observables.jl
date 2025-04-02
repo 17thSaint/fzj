@@ -152,23 +152,13 @@ function pairdist_ellipticalness(pairdist::Matrix{Float64}; kwargs...)
     return ellipticalness,x_avg,y_avg,x_var,y_var,xy_var
 end
 
-function ft_coeff(phys_site::Tuple{Int,Int},momentum::Vector{Float64},op_type::String)
+function ft_coeff(phys_site::Tuple{Int,Int},momentum::Vector{Float64},op_type::String; kwargs...)
     dag_sign::Int = op_type == "Adag" ? 1 : -1
     return exp(2*pi*im*dag_sign*dot(momentum,phys_site))
 end
 
-function ft_coeff_alberto(phys_site::Tuple{Int,Int},momentum::Vector{Float64},op_type::String,Lx::Int,Ly::Int,m::Int,alpha::Float64)
-
-    dag_sign::Int = op_type == "Adag" ? 1 : -1
-    val::ComplexF64 = exp(dag_sign*2*pi*im*momentum[2]*phys_site[2]) / sqrt(Ly)
-    if m != phys_site[1]
-        val *= 0.0000000001
-    end
-
-    return val
-end
-
-function diocane(phys_site::Tuple,momentum::Vector,op_type::String,Ly::Int)
+function diocane(phys_site::Tuple,momentum::Vector,op_type::String; kwargs...)
+    Ly::Int = kwargs[:Ly]
     mval = Int(momentum[2] * Ly)
 
     if phys_site[1]-1 == mval
