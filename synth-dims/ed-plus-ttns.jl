@@ -218,7 +218,11 @@ function focking_matrix_element(wavefunc::TTN.TreeTensorNetwork,tpo::TTN.MPOWrap
     TTN.move_ortho!(wavefunc,[TTN.number_of_layers(wavefunc),1])
 
     # find the overlap
-    local_expval = calculate_mpo_expectation(right_local_ttn,left_local_ttn,tpo; kwargs...)
+    if left_local_config == right_local_config
+        local_expval = calculate_mpo_expectation(right_local_ttn,tpo; kwargs...)
+    else
+        local_expval = calculate_mpo_expectation(right_local_ttn,left_local_ttn,tpo; kwargs...)
+    end
 
     return local_expval
 end
@@ -786,16 +790,20 @@ if true
     m1 = [0.0,1/ly]
     m2 = [0.0,1/ly]
 
-    #fourpt_mpo = round.(focking_matrix("4pt",m1,m2,psi,lattice_params["full_basis"]; output_level=1),digits=10)
-    #fourpt_fock = round.(ft_fourpt_matrix(zeros(ComplexF64,length(psi_fock)),m1,m2,lattice_params),digits=10)
+    # it makes the right operator but the expectation value is wrong
+    # the 4pt MPO only has bond dimension 9 when it should be 16, this could be why
+    # look into why it cuts off at 9
+
+    fourpt_mpo = round.(focking_matrix("4pt",m1,m2,psi,lattice_params["full_basis"]; output_level=1),digits=10)
+    fourpt_fock = round.(ft_fourpt_matrix(zeros(ComplexF64,length(psi_fock)),m1,m2,lattice_params),digits=10)
     println("Does MPO match with Fock: ",fourpt_mpo == fourpt_fock)
 
-    fourpt_mpo_value = abs(four_point(psi,m1,m2))
+    #=fourpt_mpo_value = abs(four_point(psi,m1,m2))
     fourpt_ed_value = abs(ft_fourpt(psi_fock,m1,m2,lattice_params))
     println("The measured values are MPO=$(fourpt_mpo_value) and ED=$(fourpt_ed_value)")
 
     expval = adjoint(psi_fock) * fourpt_mpo * psi_fock
-    println("The calculated value is $(expval)")
+    println("The calculated value is $(expval)")=#
 
 end
 

@@ -742,8 +742,7 @@ function construct_top_node_environments(ttn::TTN.TreeTensorNetwork, tpo::TTN.MP
 
 	net = ttn.net
 
-	n_sites = TTN.number_of_sites(net)
-	#n_tensors = TTN.number_of_tensors(net) + n_sites
+    TTN.move_ortho!(ttn,(TTN.number_of_layers(ttn),1))
 
 	mapping = tpo.mapping
 	ham = tpo.data
@@ -756,7 +755,7 @@ function construct_top_node_environments(ttn::TTN.TreeTensorNetwork, tpo::TTN.MP
     end
 	
 	for ll in Iterators.drop(TTN.eachlayer(net), 1)
-        opl > 0 && println("Constructing top node environments for layer $ll")
+        opl > 1 && println("Constructing top node environments for layer $ll")
 		bEnvironment_new = Vector{Vector{TTN.ITensor}}(undef, TTN.number_of_tensors(net, ll))
 		for pp in eachindex(net, ll)
 			n_chds = TTN.number_of_child_nodes(net, (ll,pp))
@@ -806,7 +805,7 @@ end
 function calculate_mpo_expectation(ttn::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper; kwargs...)
     opl::Int = get(kwargs,:output_level,1)
 	topenvs = construct_top_node_environments(ttn, tpo; kwargs...)
-    opl > 0 && println("Finished making environments")
+    opl > 1 && println("Finished making environments")
     #display(inds.(topenvs))
 	T = ttn[TTN.number_of_layers(ttn), 1]
 	tlist = [T, topenvs..., TTN.prime(TTN.dag(T))]
@@ -1113,11 +1112,11 @@ function four_point(wavefunc::TTN.TreeTensorNetwork,momentum1::Vector{Float64},m
     fourpt = four_point_mpo(wavefunc; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss, coeff_kwargs=coeff_kwargs, kwargs...)
     fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
 
-    matver = focking_matrix(wavefunc,fourpt_wrapped,lattice_params["full_basis"]; kwargs...)
+    #=matver = focking_matrix(wavefunc,fourpt_wrapped,lattice_params["full_basis"]; kwargs...)
     ed_wavefunc = focking_vector(wavefunc,lattice_params["full_basis"])
-    return abs(adjoint(ed_wavefunc) * matver * ed_wavefunc)
+    return abs(adjoint(ed_wavefunc) * matver * ed_wavefunc)=#
 
-    #return abs(calculate_mpo_expectation(wavefunc, wavefunc, fourpt_wrapped; kwargs...))
+    return abs(calculate_mpo_expectation(wavefunc, wavefunc, fourpt_wrapped; kwargs...))
 end
 
 function four_point(wavefuncs::Vector{TTN.TreeTensorNetwork},momentum1::Vector{Float64},momentum2::Vector{Float64}; kwargs...)
