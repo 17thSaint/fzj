@@ -156,7 +156,7 @@ function get_lattice_params_from_ttn(ttn_metadata::Dict)
     return lattice_params
 end
 
-function focking_element(wavefunc::TTN.TreeTensorNetwork,local_config::Vector{Int})
+function focking_vector_element(wavefunc::TTN.TreeTensorNetwork,local_config::Vector{Int})
     # make states with local configuration
     all_states = ["0" for i in 1:TTN.number_of_sites(wavefunc.net)]
     all_states[local_config] .= "1"
@@ -193,12 +193,71 @@ function focking_vector(wavefunc::TTN.TreeTensorNetwork,full_basis::Matrix{Int64
 
         # find the overlap
         local_overlap = TTN.inner(local_ttn,wavefunc)=#
-        local_overlap = focking_element(wavefunc,local_config)
+        local_overlap = focking_vector_element(wavefunc,local_config)
         allcoeffs[i] = local_overlap
     end
 
     return allcoeffs
 end
+
+function focking_matrix_element(wavefunc::TTN.TreeTensorNetwork,tpo::TTN.MPOWrapper,left_local_config::Vector{Int},right_local_config::Vector{Int}; kwargs...)
+    # make states with local configuration
+    left_all_states = ["0" for i in 1:TTN.number_of_sites(wavefunc.net)]
+    left_all_states[left_local_config] .= "1"
+
+    right_all_states = ["0" for i in 1:TTN.number_of_sites(wavefunc.net)]
+    right_all_states[right_local_config] .= "1"
+
+    # build TTN with local configuration
+    left_local_ttn = TTN.ProductTreeTensorNetwork(wavefunc.net,left_all_states)
+    right_local_ttn = TTN.ProductTreeTensorNetwork(wavefunc.net,right_all_states)
+
+    # make sure ortho_center is at top
+    TTN.move_ortho!(left_local_ttn,[TTN.number_of_layers(left_local_ttn),1])
+    TTN.move_ortho!(right_local_ttn,[TTN.number_of_layers(right_local_ttn),1])
+    TTN.move_ortho!(wavefunc,[TTN.number_of_layers(wavefunc),1])
+
+    # find the overlap
+    local_expval = calculate_mpo_expectation(right_local_ttn,left_local_ttn,tpo; kwargs...)
+
+    return local_expval
+end
+
+function focking_matrix(wavefunc::TTN.TreeTensorNetwork,tpo::TTN.MPOWrapper,full_basis::Matrix{Int64}; kwargs...)
+    opl::Int = get(kwargs, :output_level, 1)
+
+    fock_operator = spzeros(ComplexF64,size(full_basis,2),size(full_basis,2))
+    for i in 1:size(full_basis,2)
+        opl > 0 && println("Working on $i / $(size(full_basis,2))")
+
+        # get the local configuration
+        left_local_config = full_basis[:,i]
+
+        for j in 1:size(full_basis,2)
+            right_local_config = full_basis[:,j]
+
+            local_element = focking_matrix_element(wavefunc,tpo,left_local_config,right_local_config)
+            fock_operator[j,i] = local_element
+        end
+    end
+
+    return fock_operator
+end
+
+function focking_matrix(which_point::String,momentum1::Vector{Float64},momentum2::Vector{Float64},wavefunc::TTN.TreeTensorNetwork,full_basis::Matrix{Int64}; kwargs...)
+
+    if which_point == "2pt"
+        wrapped_op = two_point_mpowrapped(wavefunc,momentum1,momentum2; kwargs...)
+    elseif which_point == "4pt"
+        wrapped_op = four_point_mpowrapped(wavefunc,momentum1,momentum2; kwargs...)
+    else
+        error("Invalid point type")
+    end
+
+    return focking_matrix(wavefunc,wrapped_op,full_basis; kwargs...)
+end
+
+
 
 #= look at finite size scaling of commensurate filling interaction strength spectrum
 if false
@@ -724,16 +783,13 @@ if true
     println("Fock version")
     display(twopt_fock)=#
 
-    m1 = [0.0,1/ly]
+    m1 = [0.0,2/ly]
     m2 = [0.0,1/ly]
 
-    coeffs_mpo = zeros(ComplexF64,lx*ly,lx*ly,lx*ly,lx*ly)
-    coeffs_fock = zeros(ComplexF64,lx*ly,lx*ly,lx*ly,lx*ly)
+    fourpt_mpo = round.(focking_matrix("4pt",m1,m2,psi,lattice_params["full_basis"]; output_level=1),digits=10)
+    fourpt_fock = round.(ft_fourpt_matrix(zeros(ComplexF64,length(psi_fock)),m1,m2,lattice_params),digits=10)
 
-    fourpt_mpo = four_point(psi,m1,m2; output_level=0)
-    fourpt_fock = abs(ft_fourpt(psi_fock,m1,m2,lattice_params; output_level=0))
-
-    println("MPO version = ",fourpt_mpo," while Fock version = ",fourpt_fock)
+    println("Does MPO match with Fock: ",fourpt_mpo == fourpt_fock)
 
 end
 

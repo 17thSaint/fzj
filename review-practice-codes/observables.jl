@@ -682,7 +682,7 @@ function diocane(phys_site::TTN.Index,momentum::Vector{Float64},op_type::String;
     return diocane(coord_label,momentum,op_type; kwargs...)
 end
 
-function construct_top_node_environments(ttn1::TTN.TreeTensorNetwork, ttn2::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper)
+function construct_top_node_environments(ttn1::TTN.TreeTensorNetwork, ttn2::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper; kwargs...)
     opl::Int = get(kwargs,:output_level,1)
 
     # need to do some checks at the start
@@ -702,7 +702,7 @@ function construct_top_node_environments(ttn1::TTN.TreeTensorNetwork, ttn2::TTN.
     end
 
     for ll in Iterators.drop(TTN.eachlayer(net), 1)
-        opl > 0 && println("Constructing top node environments for layer $ll")
+        opl > 1 && println("Constructing top node environments for layer $ll")
 		bEnvironment_new = Vector{Vector{TTN.ITensor}}(undef, TTN.number_of_tensors(net, ll))
 		for pp in eachindex(net, ll)
 			n_chds = TTN.number_of_child_nodes(net, (ll,pp))
@@ -794,7 +794,7 @@ function calculate_mpo_expectation(ttn1::TTN.TreeTensorNetwork, ttn2::TTN.TreeTe
     opl::Int = get(kwargs,:output_level,1)
 
 	topenvs = construct_top_node_environments(ttn1, ttn2, tpo)
-    opl > 0 && println("Finished making environments")
+    opl > 1 && println("Finished making environments")
     #display(inds.(topenvs))
 	T1 = ttn1[TTN.number_of_layers(ttn1), 1]
     T2 = ttn2[TTN.number_of_layers(ttn2), 1]
@@ -970,16 +970,10 @@ function single_point_mpo(wavefunc::TTN.TreeTensorNetwork,op_type::String; kwarg
     links = build_links_singlepoint(op_type,length(phys_sites); mapping=mapping)
 
     tensor_train = Vector{TTN.ITensor}(undef,length(phys_sites))
-
-    all_coeffs = Dict()
     for (idx,s) in enumerate(phys_sites)
         opl > 1 && println("Working on Physical Site $(TTN.tags(s))")
 
         coeff::ComplexF64 = which_coeff(s,mom,op_type; coeff_kwargs...)
-    
-        blahblah = string(TTN.tags(s))
-        lin_ind = parse(Int,match(r"n=(\d+)",blahblah)[1])
-        all_coeffs[string(lin_ind)] = coeff
 
         mat = build_W_singlepoint(op_type,coeff,hilbdim)
 
@@ -996,7 +990,7 @@ function single_point_mpo(wavefunc::TTN.TreeTensorNetwork,op_type::String; kwarg
         tensor_train[idx] = mit
     end
 
-    return TTN.MPO(tensor_train), all_coeffs
+    return TTN.MPO(tensor_train)
 end
 
 function two_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
@@ -1012,6 +1006,17 @@ function two_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     opl > 0 && println("Made Annihilation")
 
     return apply(creat,annih)
+end
+
+function two_point_mpowrapped(wavefunc::TTN.TreeTensorNetwork,momentum1::Vector{Float64},momentum2::Vector{Float64}; kwargs...)
+    lat = TTN.physical_lattice(wavefunc.net)
+    Lx,Ly = size(lat)
+    mapss = zigzag_curve(Lx,Ly)
+    coeff_kwargs = get(kwargs,:coeff_kwargs,(Lx=Lx,Ly=Ly,))
+
+    twopt = two_point_mpo(wavefunc; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss, coeff_kwargs=coeff_kwargs, kwargs...)
+    twopt_wrapped = easy_mpowrapper(twopt, lat; mapping=mapss)
+    return twopt_wrapped
 end
 
 function two_point(wavefunc::TTN.TreeTensorNetwork,momentum1::Vector{Float64},momentum2::Vector{Float64}; kwargs...)
@@ -1075,27 +1080,28 @@ function four_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
 
     #println("Momenta are $(k1[2]) and $(k2[2])")
 
-    creat1, coeffs_c1 = single_point_mpo(wavefunc,"Adag"; momentum=k1,mapping=mapping, kwargs...)
+    creat1 = single_point_mpo(wavefunc,"Adag"; momentum=k1,mapping=mapping, kwargs...)
     #println("Made Creation 1")
-    creat2, coeffs_c2 = single_point_mpo(wavefunc,"Adag"; momentum=k2,mapping=mapping, kwargs...)
+    creat2 = single_point_mpo(wavefunc,"Adag"; momentum=k2,mapping=mapping, kwargs...)
     #println("Made Creation 2")
-    annih1, coeffs_a1 = single_point_mpo(wavefunc,"A"; momentum=k2,mapping=mapping, kwargs...)
+    annih1 = single_point_mpo(wavefunc,"A"; momentum=k2,mapping=mapping, kwargs...)
     #println("Made Annihilation 1")
-    annih2, coeffs_a2 = single_point_mpo(wavefunc,"A"; momentum=k1,mapping=mapping, kwargs...)
+    annih2 = single_point_mpo(wavefunc,"A"; momentum=k1,mapping=mapping, kwargs...)
     #println("Made Annihilation 2")
     opl > 0 && println("Made Suboperators")
 
-    for (k1,v1) in coeffs_c1
-        for (k2,v2) in coeffs_c2
-            for (k3,v3) in coeffs_a1
-                for (k4,v4) in coeffs_a2
-                    global coeffs_mpo[parse(Int,k1),parse(Int,k2),parse(Int,k3),parse(Int,k4)] = v1*v2*v3*v4
-                end
-            end
-        end
-    end
-
     return apply(apply(creat1, creat2), apply(annih1, annih2))
+end
+
+function four_point_mpowrapped(wavefunc::TTN.TreeTensorNetwork,momentum1::Vector{Float64},momentum2::Vector{Float64}; kwargs...)
+    lat = TTN.physical_lattice(wavefunc.net)
+    Lx,Ly = size(lat)
+    mapss = zigzag_curve(Lx,Ly)
+    coeff_kwargs = get(kwargs,:coeff_kwargs,(Lx=Lx,Ly=Ly,))
+
+    fourpt = four_point_mpo(wavefunc; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss, coeff_kwargs=coeff_kwargs, kwargs...)
+    fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
+    return fourpt_wrapped
 end
 
 function four_point(wavefunc::TTN.TreeTensorNetwork,momentum1::Vector{Float64},momentum2::Vector{Float64}; kwargs...)

@@ -822,16 +822,64 @@ function ft_fourpt(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2:
 
                     coeff::ComplexF64 = coeff1 * coeff2 * coeff3 * coeff4
 
-                    global coeffs_fock[s1,s2,s3,s4] = coeff
-
                     #println("Working on s1=$(s1) s2=$(s2) s3=$(s3) s4=$(s4) coeff=$(coeff)")
 
                     big_operator = four_point_operator(s1,s2,s3,s4,lattice_params)
-                    expectval = (conj(transpose(psi)) * (big_operator * psi))
+                    expectval = (adjoint(psi) * (big_operator * psi))
 
                     #println("expectation value = $(round(expectval,digits=10))")
 
                     fourpt += coeff * expectval
+                end
+            end
+        end
+    end
+
+    return fourpt
+end
+
+function ft_fourpt_matrix(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
+    Lx::Int64 = lattice_params["Lx"]
+    Ly::Int64 = lattice_params["Ly"]
+
+    which_coeff::Function = get(kwargs,:which_coeff,diocane)
+    coeff_kwargs::NamedTuple = get(kwargs,:coeff_kwargs,(Ly=Ly,))
+
+    m = Int(momentum1[2] * Ly)
+    mp = Int(momentum2[2] * Ly)
+    if mp > Lx || m > Lx
+        error("Momentum out of bounds: m=$m mp=$mp Lx=$Lx")
+    end
+
+    fourpt = spzeros(ComplexF64,length(psi),length(psi))
+    for y1 in 1:Ly
+        coord1 = (m+1,y1)
+        s1 = linear_index(coord1,Lx,Ly)
+        coeff1::ComplexF64 = which_coeff(coord1,momentum1,"Adag"; coeff_kwargs...)
+        for y2 in 1:Ly
+            coord2 = (mp+1,y2)
+            s2 = linear_index(coord2,Lx,Ly)
+            coeff2::ComplexF64 = which_coeff(coord2,momentum2,"Adag"; coeff_kwargs...)
+            #println("Working on y1=$(y1) y2=$(y2)")
+            for y3 in 1:Ly
+                coord3 = (mp+1,y3)
+                s3 = linear_index(coord3,Lx,Ly)
+                coeff3::ComplexF64 = which_coeff(coord3,momentum2,"A"; coeff_kwargs...)
+                for y4 in 1:Ly
+                    coord4 = (m+1,y4)
+                    s4 = linear_index(coord4,Lx,Ly)
+                    coeff4::ComplexF64 = which_coeff(coord4,momentum1,"A"; coeff_kwargs...)
+
+                    coeff::ComplexF64 = coeff1 * coeff2 * coeff3 * coeff4
+
+                    #println("Working on s1=$(s1) s2=$(s2) s3=$(s3) s4=$(s4) coeff=$(coeff)")
+
+                    big_operator = four_point_operator(s1,s2,s3,s4,lattice_params)
+                    #expectval = (adjoint(psi) * (big_operator * psi))
+
+                    #println("expectation value = $(round(expectval,digits=10))")
+
+                    fourpt .+= coeff .* big_operator
                 end
             end
         end
