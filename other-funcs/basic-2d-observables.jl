@@ -165,7 +165,7 @@ function diocane(phys_site::Tuple,momentum::Vector,op_type::String; kwargs...)
         dag_sign::Int = op_type == "Adag" ? 1 : -1
         return exp(dag_sign * 2*pi*im*momentum[2]*(phys_site[2]-1)) / sqrt(Ly)
     else
-        return 0.0
+        return 0.00000000000000001
     end
 end
 

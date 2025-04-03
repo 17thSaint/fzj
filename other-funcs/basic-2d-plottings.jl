@@ -280,10 +280,12 @@ end
 
 function plot_four_point(results::Matrix{Float64}; kwargs...)
     plot_title = get(kwargs,:plot_title,"")
+    if_2pt::Bool = get(kwargs,:if_2pt,false)
+    if_2pt ? pt_title = "2pt " : pt_title = "4pt "
     fig = figure()
     imshow(results,vmin=0.0,origin="lower")
     colorbar()
-    title("4pt Momentum "*plot_title)
+    title("$pt_title Momentum "*plot_title)
     ylabel("m")
     xlabel("m'")
     return nothing

@@ -136,17 +136,55 @@ function plot_nrg_vs_intstren_fromdata_ed(lx::Int64,ly::Int64,which_strens::Unio
     return intstrens,nrgs
 end
 
+function get_lattice_params_from_ttn(ttn_metadata::Dict)
+
+    N = ttn_metadata["particles"]
+    Lx,Ly = get_lattice_dims_from_layers(ttn_metadata["layers"])
+    if_periodic_x = ttn_metadata["if_periodic_phys"]
+    if_periodic_y = ttn_metadata["if_periodic_synth"]
+    twist_angle = ttn_metadata["twist_angle"]
+    full_basis = n_particle_basis(N,Lx,Ly)
+
+    lattice_params::Dict{String,Any} = Dict("Lx"=>Lx,
+                        "Ly"=>Ly,
+                        "N"=>N,
+                        "full_basis"=>full_basis,
+                        "if_periodic_x"=>if_periodic_x,
+                        "if_periodic_y"=>if_periodic_y,
+                        "twist_angle"=>twist_angle)
+
+    return lattice_params
+end
+
+function focking_element(wavefunc::TTN.TreeTensorNetwork,local_config::Vector{Int})
+    # make states with local configuration
+    all_states = ["0" for i in 1:TTN.number_of_sites(wavefunc.net)]
+    all_states[local_config] .= "1"
+
+    # build TTN with local configuration
+    local_ttn = TTN.ProductTreeTensorNetwork(wavefunc.net,all_states)
+
+    # make sure ortho_center is at top
+    TTN.move_ortho!(local_ttn,[TTN.number_of_layers(local_ttn),1])
+    TTN.move_ortho!(wavefunc,[TTN.number_of_layers(wavefunc),1])
+
+    # find the overlap
+    local_overlap = TTN.inner(local_ttn,wavefunc)
+
+    return local_overlap
+end
+
 function focking_vector(wavefunc::TTN.TreeTensorNetwork,full_basis::Matrix{Int64}; kwargs...)
     opl::Int = get(kwargs, :output_level, 1)
 
     allcoeffs = zeros(ComplexF64,size(full_basis,2))
     for i in 1:size(full_basis,2)
-        opl > 0 && println("Working on $i / $(length(states[1]))")
+        opl > 0 && println("Working on $i / $(size(full_basis,2))")
 
         # get the local configuration
-        local_config = lattice_params["full_basis"][:,i]
+        local_config = full_basis[:,i]
 
-        # make states with local configuration
+        #= make states with local configuration
         all_states = ["0" for i in 1:lx*ly]
         all_states[local_config] .= "1"
 
@@ -154,7 +192,8 @@ function focking_vector(wavefunc::TTN.TreeTensorNetwork,full_basis::Matrix{Int64
         local_ttn = TTN.ProductTreeTensorNetwork(wavefunc.net,all_states)
 
         # find the overlap
-        local_overlap = TTN.inner(local_ttn,wavefunc)
+        local_overlap = TTN.inner(local_ttn,wavefunc)=#
+        local_overlap = focking_element(wavefunc,local_config)
         allcoeffs[i] = local_overlap
     end
 
@@ -651,8 +690,8 @@ if false
     #end
 end=#
 
-#= do 2pt momentum MPO
-if false
+# do 2pt momentum MPO
+if true
     lx,ly,n = 4,4,2
     layers = Int(log(2,lx*ly))
     intstren = 0.0
@@ -667,34 +706,36 @@ if false
     d,m = read_data(dataloc * "/" * f; output_level=0)
     psi = d["ttn"]=#
     
-    pdict = Dict([("particles",n),("es_count",1),("if_pinning",true),("if_check_fluxes",false),("max_occ",1),("expander_fraction",100),("flux_direction","synth"),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",1000000.0),("lr",0),("if_periodic_phys",true),("if_periodic_synth",true)])
-    #all_results = run_synth_dims_generic(pdict)
-    psi1 = all_results[1][1]
-    psi2 = all_results[1][2]
+    #=pdict = Dict([("particles",n),("expander_fraction",100),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_results = run_synth_dims_generic(pdict)
+    psi = all_results[1]
 
-    ks = [2/ly]#[n/ly for n in 1:lx]
-    mp = [0.0,2/ly]
+    lattice_params = Dict([("Lx",lx),("Ly",ly),("N",n),("twist_angle",[0.0,0.0]),("full_basis",n_particle_basis(n,lx,ly)),("if_periodic_x",true),("if_periodic_y",true)])
 
-    twopt_vals = two_point([psi1,psi2],mp,mp)
+    psi_fock = focking_vector(psi,lattice_params["full_basis"]; output_level=0)=#
 
-    #=twopt_vals = zeros(Float64,length(ks))
-    real_twopt_vals = zeros(Float64,length(ks))
-    for (idx,ky) in enumerate(ks)
-        #fourpt_vals[idx] = four_point(psi,mp,[0.0,ky])
-        real_twopt_vals[idx] = abs(two_point_real(psi, mp, [0.0,ky]))
-    end
+    
 
-    #scatter(ks .* ly,fourpt_vals,c="b",label="MPO")
-    scatter(ks .* ly,real_twopt_vals,c="g",label="Real")
-    legend()
-    xlabel("Momentum k = m / Ly, m' = $(Int(mp[2]*ly))")
-    ylabel("Two Point Momentum")
-    title("Two Point Momentum for $(lx)x$(ly) N=$n")=#
+    #=twopt_mpo = two_point(psi; output_level=0,if_plot=true,plot_title="MPO")
+    twopt_fock = two_point(psi_fock,lattice_params; output_level=0,if_plot=true,plot_title="Fock")
 
-    rho_ttn1 = all_results[end-1][1]
-    rho_ttn2 = all_results[end-1][2]
+    println("MPO version")
+    display(twopt_mpo)
+    println("Fock version")
+    display(twopt_fock)=#
 
-end=#
+    m1 = [0.0,1/ly]
+    m2 = [0.0,1/ly]
+
+    coeffs_mpo = zeros(ComplexF64,lx*ly,lx*ly,lx*ly,lx*ly)
+    coeffs_fock = zeros(ComplexF64,lx*ly,lx*ly,lx*ly,lx*ly)
+
+    fourpt_mpo = four_point(psi,m1,m2; output_level=0)
+    fourpt_fock = abs(ft_fourpt(psi_fock,m1,m2,lattice_params; output_level=0))
+
+    println("MPO version = ",fourpt_mpo," while Fock version = ",fourpt_fock)
+
+end
 
 #= do multi-state 4pt momentum MPO
 if false
@@ -987,37 +1028,104 @@ if false
 
 end=#
 
-# try to get overlap of TTN with ED
-if true
-    lx,ly,n = 4,4,2
+#= save fock vector for TTN
+if false
+    lx,ly,n = 8,4,4
+    layers = Int(log(2,lx*ly))
+    intstren = 0.0
+    
+    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict_ttn = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
+    display(all_files_ttn)
+    #=f_ttn = all_files_ttn[1]
+    d_ttn,m_ttn = read_data(dataloc_ttn * "/wavefunc" * f_ttn; output_level=0)
+
+    psi = d_ttn["ttn"]
+    ttn_fockvector_1 = focking_vector(psi,lattice_params["full_basis"])
+    datadict1 = Dict([("fock_vector",ttn_fockvector_1)])
+    modify_data(datadict1,dataloc_ttn * "/" * f_ttn,"metadata")
+
+    psi_1 = d_ttn["ttn_1"]
+    ttn_fockvector_2 = focking_vector(psi_1,lattice_params["full_basis"])
+    datadict2 = Dict([("fock_vector_1",ttn_fockvector_2)])
+    modify_data(datadict2,dataloc_ttn * "/" * f_ttn,"metadata")=#
+
+
+
+end=#
+
+#= check overlap of TTN and ED states
+if false
+    lx,ly,n = 8,4,4
+    layers = Int(log(2,lx*ly))
+    intstren = 300.0
+
+    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict_ttn = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
+    display(all_files_ttn)
+    f_ttn = all_files_ttn[1]
+    d_ttn,m_ttn = read_data(dataloc_ttn * "/" * f_ttn; output_level=0)
+
+    f1_ttn = m_ttn["fock_vector"]
+    f2_ttn = m_ttn["fock_vector_1"]
+
+    dataloc_ed = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren)])
+    all_files_ed = find_data_file(pdict_ed,"ed",dataloc_ed; file_type="jld2")
+    display(all_files_ed)
+    f_ed = all_files_ed[1]
+    d_ed,m_ed = read_data(joinpath(dataloc_ed,f_ed))
+
+    f1_ed = d_ed["state"][1]
+    f2_ed = d_ed["state"][2]
+    f3_ed = d_ed["state"][3]
+
+    overlapmat = zeros(Float64,2,3)
+    overlapmat[1,1] = abs2(adjoint(f1_ttn) * f1_ed)
+    overlapmat[1,2] = abs2(adjoint(f1_ttn) * f2_ed)
+    overlapmat[2,1] = abs2(adjoint(f2_ttn) * f1_ed)
+    overlapmat[2,2] = abs2(adjoint(f2_ttn) * f2_ed)
+    overlapmat[1,3] = abs2(adjoint(f1_ttn) * f3_ed)
+    overlapmat[2,3] = abs2(adjoint(f2_ttn) * f3_ed)
+
+    display(overlapmat)
+
+end=#
+
+#= 4pt momentum for TTN 8x4 from Fock vector
+if false
+    lx,ly,n = 8,4,4
     layers = Int(log(2,lx*ly))
     intstren = 0.0
 
-    #=pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
-    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict_ed; output_level=1)
-    
-    pdict_ttn = Dict([("particles",n),("cutoff",0.0),("es_count",1),("if_check_fluxes",false),("expander_fraction",100),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
-    all_results = run_synth_dims_generic(pdict_ttn)
-    psi = all_results[1][1]
-    psi_1 = all_results[1][2]
-    =#
+    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict_ttn = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
+    display(all_files_ttn)
+    f_ttn = all_files_ttn[1]
+    d_ttn,m_ttn = read_data(dataloc_ttn * "/" * f_ttn; output_level=0)
 
-    #abnrgdiff = abs((nrgs[1] - all_results[3].nrg[end]) / nrgs[1])
-    #println("Percent Energy difference is ",abnrgdiff)
+    fourpt_fock_1 = m_ttn["fourpt_momentum_fock"]
+    #fourpt_fock_2 = m_ttn["fourpt_momentum_fock_1"]
 
-    #=ttn_fockvector_1 = focking_vector(psi,lattice_params["full_basis"])
-    ttn_fockvector_2 = focking_vector(psi_1,lattice_params["full_basis"])
+    plot_four_point(fourpt_fock_1; plot_title="TTN Fock GS1 $(lx)x$(ly) N=$n ULR=$intstren")
+    #plot_four_point(fourpt_fock_2; plot_title="TTN Fock GS2 $(lx)x$(ly) N=$n ULR=$intstren")
 
-    overlapvalue = zeros(Float64,2,2)
-    overlapvalue[1,1] = abs2(adjoint(ttn_fockvector_1) * states[1])
-    overlapvalue[1,2] = abs2(adjoint(ttn_fockvector_1) * states[2])
-    overlapvalue[2,1] = abs2(adjoint(ttn_fockvector_2) * states[1])
-    overlapvalue[2,2] = abs2(adjoint(ttn_fockvector_2) * states[2])=#
-    display(overlapvalue)
-    
+    fourpt_ttn = m_ttn["fourpt_momentum"]
+    plot_four_point(fourpt_ttn; plot_title="TTN GS1 $(lx)x$(ly) N=$n ULR=$intstren")
 
-end
+    dataloc_ed = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren)])
+    all_files_ed = find_data_file(pdict_ed,"ed",dataloc_ed; file_type="jld2")
+    display(all_files_ed)
+    f_ed = all_files_ed[1]
+    d_ed,m_ed = read_data(joinpath(dataloc_ed,f_ed))
 
+    fourpt_ed = m_ed["fourpt_momentum"]
+    plot_four_point(fourpt_ed; plot_title="ED $(lx)x$(ly) N=$n ULR=$intstren")
+end=#
 
 
 

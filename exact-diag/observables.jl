@@ -822,6 +822,8 @@ function ft_fourpt(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2:
 
                     coeff::ComplexF64 = coeff1 * coeff2 * coeff3 * coeff4
 
+                    global coeffs_fock[s1,s2,s3,s4] = coeff
+
                     #println("Working on s1=$(s1) s2=$(s2) s3=$(s3) s4=$(s4) coeff=$(coeff)")
 
                     big_operator = four_point_operator(s1,s2,s3,s4,lattice_params)
@@ -905,7 +907,7 @@ function four_point(wavefunc::Vector{ComplexF64},lattice_params::Dict; kwargs...
     for (idx1,k1) in enumerate(momenta)
         for (idx2,k2) in enumerate(momenta)
             opl > 0 && println("Working on momenta $(k1) and $(k2)")
-            fourpt_vals[idx1,idx2] = abs(ft_fourpt_alberto(wavefunc,[0.0,k1],[0.0,k2],lattice_params; kwargs...))
+            fourpt_vals[idx1,idx2] = abs(ft_fourpt(wavefunc,[0.0,k1],[0.0,k2],lattice_params; kwargs...))
         end
     end
 
@@ -931,10 +933,10 @@ function ft_twopt(wavefunc::Vector{ComplexF64},momentum1::Vector{Float64},moment
 
     twopt::ComplexF64 = 0.0
             
-    for y3 in 1:ly
+    for y3 in 1:Ly
         coord3 = (mval+1,y3)
         coeff3::ComplexF64 = which_coeff(coord3,momentum1,"Adag"; coeff_kwargs...)
-        for y4 in 1:ly
+        for y4 in 1:Ly
             coord4 = (mval2+1,y4)
             opl > 0 && println("Working on y1=$(y3) y2=$(y4)")
             coeff4::ComplexF64 = which_coeff(coord4,momentum2,"A"; coeff_kwargs...)
@@ -949,6 +951,26 @@ function ft_twopt(wavefunc::Vector{ComplexF64},momentum1::Vector{Float64},moment
     end
 
     return twopt
+end
+
+function two_point(wavefunc::Vector{ComplexF64},lattice_params::Dict; kwargs...)
+    if_plot::Bool = get(kwargs,:if_plot,false)
+    opl::Int = get(kwargs,:opl,1)
+
+    Lx,Ly = lattice_params["Lx"],lattice_params["Ly"]
+
+    momenta = [n/Ly for n in 0:Lx-1]
+    twopt_vals = zeros(Float64,Lx,Lx)
+    for (idx1,k1) in enumerate(momenta)
+        for (idx2,k2) in enumerate(momenta)
+            opl > 0 && println("Working on momenta $(k1) and $(k2)")
+            twopt_vals[idx1,idx2] = abs(ft_twopt(wavefunc,[0.0,k1],[0.0,k2],lattice_params; kwargs...))
+        end
+    end
+
+    if_plot && plot_four_point(twopt_vals; kwargs...,if_2pt=true)
+
+    return twopt_vals
 end
 
 function ft_twopt(wavefuncs::Vector{Vector{ComplexF64}},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
