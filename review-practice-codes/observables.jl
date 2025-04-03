@@ -1112,7 +1112,12 @@ function four_point(wavefunc::TTN.TreeTensorNetwork,momentum1::Vector{Float64},m
 
     fourpt = four_point_mpo(wavefunc; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss, coeff_kwargs=coeff_kwargs, kwargs...)
     fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
-    return abs(calculate_mpo_expectation(wavefunc, fourpt_wrapped; kwargs...))
+
+    matver = focking_matrix(wavefunc,fourpt_wrapped,lattice_params["full_basis"]; kwargs...)
+    ed_wavefunc = focking_vector(wavefunc,lattice_params["full_basis"])
+    return abs(adjoint(ed_wavefunc) * matver * ed_wavefunc)
+
+    #return abs(calculate_mpo_expectation(wavefunc, wavefunc, fourpt_wrapped; kwargs...))
 end
 
 function four_point(wavefuncs::Vector{TTN.TreeTensorNetwork},momentum1::Vector{Float64},momentum2::Vector{Float64}; kwargs...)

@@ -783,13 +783,19 @@ if true
     println("Fock version")
     display(twopt_fock)=#
 
-    m1 = [0.0,2/ly]
+    m1 = [0.0,1/ly]
     m2 = [0.0,1/ly]
 
-    fourpt_mpo = round.(focking_matrix("4pt",m1,m2,psi,lattice_params["full_basis"]; output_level=1),digits=10)
-    fourpt_fock = round.(ft_fourpt_matrix(zeros(ComplexF64,length(psi_fock)),m1,m2,lattice_params),digits=10)
-
+    #fourpt_mpo = round.(focking_matrix("4pt",m1,m2,psi,lattice_params["full_basis"]; output_level=1),digits=10)
+    #fourpt_fock = round.(ft_fourpt_matrix(zeros(ComplexF64,length(psi_fock)),m1,m2,lattice_params),digits=10)
     println("Does MPO match with Fock: ",fourpt_mpo == fourpt_fock)
+
+    fourpt_mpo_value = abs(four_point(psi,m1,m2))
+    fourpt_ed_value = abs(ft_fourpt(psi_fock,m1,m2,lattice_params))
+    println("The measured values are MPO=$(fourpt_mpo_value) and ED=$(fourpt_ed_value)")
+
+    expval = adjoint(psi_fock) * fourpt_mpo * psi_fock
+    println("The calculated value is $(expval)")
 
 end
 
