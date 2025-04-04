@@ -769,13 +769,13 @@ if true
     d,m = read_data(dataloc * "/" * f; output_level=0)
     psi = d["ttn"]=#
     
-    #=pdict = Dict([("particles",n),("expander_fraction",100),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
-    all_results = run_synth_dims_generic(pdict)
+    pdict = Dict([("particles",n),("expander_fraction",100),("if_check_fluxes",false),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+    #all_results = run_synth_dims_generic(pdict)
     psi = all_results[1]
 
     lattice_params = Dict([("Lx",lx),("Ly",ly),("N",n),("twist_angle",[0.0,0.0]),("full_basis",n_particle_basis(n,lx,ly)),("if_periodic_x",true),("if_periodic_y",true)])
 
-    psi_fock = focking_vector(psi,lattice_params["full_basis"]; output_level=0)=#
+    #psi_fock = focking_vector(psi,lattice_params["full_basis"]; output_level=0)
 
     
 
@@ -794,16 +794,17 @@ if true
     # the 4pt MPO only has bond dimension 9 when it should be 16, this could be why
     # look into why it cuts off at 9
 
-    fourpt_mpo = round.(focking_matrix("4pt",m1,m2,psi,lattice_params["full_basis"]; output_level=1),digits=10)
-    fourpt_fock = round.(ft_fourpt_matrix(zeros(ComplexF64,length(psi_fock)),m1,m2,lattice_params),digits=10)
-    println("Does MPO match with Fock: ",fourpt_mpo == fourpt_fock)
 
-    #=fourpt_mpo_value = abs(four_point(psi,m1,m2))
+    #fourpt_mpo = round.(focking_matrix("4pt",m1,m2,psi,lattice_params["full_basis"]; output_level=1),digits=10)
+    #fourpt_fock = round.(ft_fourpt_matrix(zeros(ComplexF64,length(psi_fock)),m1,m2,lattice_params),digits=10)
+    #println("Does MPO match with Fock: ",fourpt_mpo == fourpt_fock)
+
+    fourpt_mpo_value = abs(four_point(psi,m1,m2))
     fourpt_ed_value = abs(ft_fourpt(psi_fock,m1,m2,lattice_params))
     println("The measured values are MPO=$(fourpt_mpo_value) and ED=$(fourpt_ed_value)")
 
-    expval = adjoint(psi_fock) * fourpt_mpo * psi_fock
-    println("The calculated value is $(expval)")=#
+    expval = abs(adjoint(psi_fock) * fourpt_mpo * psi_fock)
+    println("The calculated value is $(expval)")
 
 end
 

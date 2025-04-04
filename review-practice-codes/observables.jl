@@ -1090,6 +1090,9 @@ function four_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     opl > 0 && println("Made Suboperators")
 
     return apply(apply(creat1, creat2), apply(annih1, annih2))
+    #bothcreats = TTN.replaceprime(TTN.contract(creat1',creat2; alg="naive", truncate=false), 2 => 1)
+    #bothannihs = TTN.replaceprime(TTN.contract(annih1',annih2; alg="naive", truncate=false), 2 => 1)
+    #return bothcreats = TTN.replaceprime(TTN.contract(bothcreats',bothannihs; alg="naive", truncate=false), 2 => 1)
 end
 
 function four_point_mpowrapped(wavefunc::TTN.TreeTensorNetwork,momentum1::Vector{Float64},momentum2::Vector{Float64}; kwargs...)
@@ -1116,7 +1119,7 @@ function four_point(wavefunc::TTN.TreeTensorNetwork,momentum1::Vector{Float64},m
     ed_wavefunc = focking_vector(wavefunc,lattice_params["full_basis"])
     return abs(adjoint(ed_wavefunc) * matver * ed_wavefunc)=#
 
-    return abs(calculate_mpo_expectation(wavefunc, wavefunc, fourpt_wrapped; kwargs...))
+    return abs(calculate_mpo_expectation(wavefunc, fourpt_wrapped; kwargs...))
 end
 
 function four_point(wavefuncs::Vector{TTN.TreeTensorNetwork},momentum1::Vector{Float64},momentum2::Vector{Float64}; kwargs...)
