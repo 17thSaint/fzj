@@ -200,7 +200,57 @@ function focking_vector(wavefunc::TTN.TreeTensorNetwork,full_basis::Matrix{Int64
     return allcoeffs
 end
 
-function focking_matrix_element(wavefunc::TTN.TreeTensorNetwork,tpo::TTN.MPOWrapper,left_local_config::Vector{Int},right_local_config::Vector{Int}; kwargs...)
+function focking_matrix_element(wavefunc::TTN.TreeTensorNetwork,tpo::TTN.MPOWrapper,local_config_left::Vector{Int},local_config_right::Vector{Int}; kwargs...)
+    # make states with local configuration
+    all_states_left = ["0" for i in 1:TTN.number_of_sites(wavefunc.net)]
+    all_states_left[local_config_left] .= "1"
+
+    all_states_right = ["0" for i in 1:TTN.number_of_sites(wavefunc.net)]
+    all_states_right[local_config_right] .= "1"
+
+    # build TTN with local configuration
+    local_ttn_left = TTN.ProductTreeTensorNetwork(wavefunc.net,all_states_left)
+    local_ttn_right = TTN.ProductTreeTensorNetwork(wavefunc.net,all_states_right)
+
+    # make sure ortho_center is at top
+    TTN.move_ortho!(local_ttn_left,[TTN.number_of_layers(local_ttn_left),1])
+    TTN.move_ortho!(local_ttn_right,[TTN.number_of_layers(local_ttn_right),1])
+    TTN.move_ortho!(wavefunc,[TTN.number_of_layers(wavefunc),1])
+
+    # find the overlap
+    local_expval = calculate_mpo_expectation(local_ttn_right,local_ttn_left,tpo; kwargs...)
+
+    return local_expval
+end
+
+function focking_matrix(wavefunc::TTN.TreeTensorNetwork,tpo::TTN.MPOWrapper,full_basis::Matrix{Int64}; kwargs...)
+    opl::Int = get(kwargs, :output_level, 1)
+
+    fock_operator = spzeros(ComplexF64,size(full_basis,2),size(full_basis,2))
+    for f in 1:size(full_basis,2)
+        opl > 0 && println("Working on $f / $(size(full_basis,2))")
+        local_config_left = full_basis[:,f]
+        for fp in 1:size(full_basis,2)
+            local_config_right = full_basis[:,fp]
+
+            local_element = focking_matrix_element(wavefunc,tpo,local_config_left,local_config_right)
+            fock_operator[f,fp] = local_element
+        end
+    end
+
+    return fock_operator
+end
+
+function focking_matrix(which_function::Function,wavefunc::TTN.TreeTensorNetwork,full_basis::Matrix{Int64}; kwargs...)
+
+    tree_operator = which_function(wavefunc, kwargs[:momentum1], kwargs[:momentum2]; kwargs...)
+
+    fockmatrix_operator = focking_matrix(wavefunc,tree_operator,full_basis; kwargs...)
+
+    return fockmatrix_operator
+end
+
+#=function focking_matrix_element(wavefunc::TTN.TreeTensorNetwork,tpo::TTN.MPOWrapper,left_local_config::Vector{Int},right_local_config::Vector{Int}; kwargs...)
     # make states with local configuration
     left_all_states = ["0" for i in 1:TTN.number_of_sites(wavefunc.net)]
     left_all_states[left_local_config] .= "1"
@@ -218,11 +268,7 @@ function focking_matrix_element(wavefunc::TTN.TreeTensorNetwork,tpo::TTN.MPOWrap
     TTN.move_ortho!(wavefunc,[TTN.number_of_layers(wavefunc),1])
 
     # find the overlap
-    if left_local_config == right_local_config
-        local_expval = calculate_mpo_expectation(right_local_ttn,tpo; kwargs...)
-    else
-        local_expval = calculate_mpo_expectation(right_local_ttn,left_local_ttn,tpo; kwargs...)
-    end
+    local_expval = calculate_mpo_expectation(right_local_ttn,left_local_ttn,tpo; kwargs...)
 
     return local_expval
 end
@@ -259,7 +305,9 @@ function focking_matrix(which_point::String,momentum1::Vector{Float64},momentum2
     end
 
     return focking_matrix(wavefunc,wrapped_op,full_basis; kwargs...)
-end
+end=#
+
+
 
 
 
@@ -753,7 +801,7 @@ if false
     #end
 end=#
 
-# do 2pt momentum MPO
+# do compare both pts momentum MPO ED
 if true
     lx,ly,n = 4,4,2
     layers = Int(log(2,lx*ly))
@@ -768,15 +816,24 @@ if true
     f = all_files[1]
     d,m = read_data(dataloc * "/" * f; output_level=0)
     psi = d["ttn"]=#
+
+    #
+
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_check_fluxes",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",5),("if_find_data",false),("if_save_data",false)])
+    #states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
+
+    println("Energy gap is $(nrgs[2] - nrgs[1])")
     
-    pdict = Dict([("particles",n),("expander_fraction",100),("if_check_fluxes",false),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+    pdict = Dict([("particles",n),("es_count",1),("expander_fraction",100),("if_check_fluxes",false),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
     #all_results = run_synth_dims_generic(pdict)
-    psi = all_results[1]
+    psis = all_results[1]
 
-    lattice_params = Dict([("Lx",lx),("Ly",ly),("N",n),("twist_angle",[0.0,0.0]),("full_basis",n_particle_basis(n,lx,ly)),("if_periodic_x",true),("if_periodic_y",true)])
 
-    #psi_fock = focking_vector(psi,lattice_params["full_basis"]; output_level=0)
 
+    #psi_fock = focking_vector(psis[1],lattice_params["full_basis"]; output_level=0)
+    #psi_fock1 = focking_vector(psis[2],lattice_params["full_basis"]; output_level=0)
+
+    #
     
 
     #=twopt_mpo = two_point(psi; output_level=0,if_plot=true,plot_title="MPO")
@@ -788,25 +845,51 @@ if true
     display(twopt_fock)=#
 
     m1 = [0.0,1/ly]
-    m2 = [0.0,1/ly]
+    m2 = [0.0,3/ly]
 
-    # it makes the right operator but the expectation value is wrong
-    # the 4pt MPO only has bond dimension 9 when it should be 16, this could be why
-    # look into why it cuts off at 9
+    #=overlapmat = zeros(Float64,3,2)
+    overlapmat[1,1] = abs2(adjoint(psi_fock) * states[1])
+    overlapmat[2,1] = abs2(adjoint(psi_fock) * states[2])
+    overlapmat[3,1] = abs2(adjoint(psi_fock) * states[3])
+    overlapmat[1,2] = abs2(adjoint(psi_fock1) * states[1])
+    overlapmat[2,2] = abs2(adjoint(psi_fock1) * states[2])
+    overlapmat[3,2] = abs2(adjoint(psi_fock1) * states[3])
+    println("Overlap between TTN Fock and ED")
+    display(overlapmat)=#
 
 
-    #fourpt_mpo = round.(focking_matrix("4pt",m1,m2,psi,lattice_params["full_basis"]; output_level=1),digits=10)
-    #fourpt_fock = round.(ft_fourpt_matrix(zeros(ComplexF64,length(psi_fock)),m1,m2,lattice_params),digits=10)
-    #println("Does MPO match with Fock: ",fourpt_mpo == fourpt_fock)
+    fourpt_mpo = focking_matrix(four_point_mpowrapped,psis[1],lattice_params["full_basis"]; output_level=1,momentum1 = m1, momentum2 = m2)
+    fourpt_ed = ft_fourpt_matrix(states[1],m1,m2,lattice_params; output_level=0)
+    println("Does MPO match with ED: ",round.(fourpt_mpo,digits=10) == round.(fourpt_ed,digits=10))
 
-    fourpt_mpo_value = abs(four_point(psi,m1,m2))
-    fourpt_ed_value = abs(ft_fourpt(psi_fock,m1,m2,lattice_params))
+
+    fourpt_mpo_value = abs.(four_point(psis,m1,m2; output_level=0))
+    fourpt_ed_value = abs.(ft_fourpt(states[1:2],m1,m2,lattice_params; output_level=0))
     println("The measured values are MPO=$(fourpt_mpo_value) and ED=$(fourpt_ed_value)")
 
-    expval = abs(adjoint(psi_fock) * fourpt_mpo * psi_fock)
-    println("The calculated value is $(expval)")
+    expval = zeros(ComplexF64,2,2)
+    expval[1,1] = adjoint(psi_fock) * fourpt_ed * psi_fock
+    expval[2,1] = adjoint(psi_fock) * fourpt_ed * psi_fock1
+    expval[1,2] = adjoint(psi_fock1) * fourpt_ed * psi_fock
+    expval[2,2] = adjoint(psi_fock1) * fourpt_ed * psi_fock1
+    println("The calculated value with ED is $(abs.(eigvals(expval)))")
 
-end
+    expval_mpo = zeros(ComplexF64,2,2)
+    expval_mpo[1,1] = adjoint(psi_fock) * fourpt_mpo * psi_fock
+    expval_mpo[2,1] = adjoint(psi_fock) * fourpt_mpo * psi_fock1
+    expval_mpo[1,2] = adjoint(psi_fock1) * fourpt_mpo * psi_fock
+    expval_mpo[2,2] = adjoint(psi_fock1) * fourpt_mpo * psi_fock1
+    println("The calculated value with Fock MPO is $(abs.(eigvals(expval_mpo)))")
+    
+    expval_mpot = zeros(ComplexF64,2,2)
+    expval_mpot[1,1] = adjoint(psi_fock) * transpose(fourpt_mpo) * psi_fock
+    expval_mpot[2,1] = adjoint(psi_fock) * transpose(fourpt_mpo) * psi_fock1
+    expval_mpot[1,2] = adjoint(psi_fock1) * transpose(fourpt_mpo) * psi_fock
+    expval_mpot[2,2] = adjoint(psi_fock1) * transpose(fourpt_mpo) * psi_fock1
+    println("The calculated value with Transpose Fock MPO is $(abs.(eigvals(expval_mpot)))")
+
+
+end#
 
 #= do multi-state 4pt momentum MPO
 if false
@@ -814,50 +897,16 @@ if false
     layers = Int(log(2,lx*ly))
     intstren = 0.0
 
-    dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
-    pdict = Dict([("layers",layers),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc)
     filter!(x -> !occursin("if_synth_rectangle",x),all_files)
     display(all_files)
-
     f = all_files[1]
+    d,m = read_data(dataloc * "/" * f; output_level=0)
+    psi = d["ttn"]
 
-    d,m = read_data(joinpath(dataloc,f); output_level=0)
-
-    @assert haskey(d,"ttn")
-    @assert haskey(d,"ttn_1")
-
-    psi1 = d["ttn"]
-    psi2 = d["ttn_1"]
-
-    lat = TTN.physical_lattice(psi1.net)
-    mapss = zigzag_curve(lx,ly)
-    ks = [n/lx for n in 0:lx]
-    for (idx,kx) in enumerate(ks)
-        fourpt = four_point_mpo(psi1; momentum1 = [kx,0], momentum2 = [0.5,0], mapping = mapss)
-        fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
-        mat::Matrix{Float64} = zeros(Float64,2,2)
-        mat[1,1] = real(calculate_mpo_expectation(psi1, psi1, fourpt_wrapped)) / (lx*ly)^2
-        mat[1,2] = real(calculate_mpo_expectation(psi1, psi2, fourpt_wrapped)) / (lx*ly)^2
-        mat[2,1] = real(calculate_mpo_expectation(psi2, psi1, fourpt_wrapped)) / (lx*ly)^2
-        mat[2,2] = real(calculate_mpo_expectation(psi2, psi2, fourpt_wrapped)) / (lx*ly)^2
-
-        if idx == 1
-            scatter(idx-1,mat[1,1],c="r",label="11")
-            scatter(idx-1,mat[1,2],c="g",label="12")
-            scatter(idx-1,mat[2,1],c="b",label="21")
-            scatter(idx-1,mat[2,2],c="k",label="22")
-            title(L"$\langle \hat{a}_{k}^{\dagger} \hat{a}_{k'}^{\dagger} \hat{a}_{k'} \hat{a}_k \rangle$"*" for $(lx)x$(ly) N=$n ULR=$(m["onsite_strength"])")
-            xlabel("Momentum k = n / Lx, n' = $(Int(lx/2))")
-            ylabel("Four Point Momentum")
-            legend()
-        else
-            scatter(idx-1,mat[1,1],c="r")
-            scatter(idx-1,mat[1,2],c="g")
-            scatter(idx-1,mat[2,1],c="b")
-            scatter(idx-1,mat[2,2],c="k")
-        end
-    end
+    
 
 end=#
 
@@ -1179,12 +1228,25 @@ if false
     d_ttn,m_ttn = read_data(dataloc_ttn * "/" * f_ttn; output_level=0)
 
     fourpt_fock_1 = m_ttn["fourpt_momentum_fock"]
-    #fourpt_fock_2 = m_ttn["fourpt_momentum_fock_1"]
+    fourpt_fock_2 = m_ttn["fourpt_momentum_fock_1"]
 
-    plot_four_point(fourpt_fock_1; plot_title="TTN Fock GS1 $(lx)x$(ly) N=$n ULR=$intstren")
+    psi1 = m_ttn["fock_vector"]
+    psi2 = m_ttn["fock_vector_1"]
+
+    m1 = [0.0,0/ly]
+    m2 = [0.0,1/ly]
+
+    lattice_params = get_lattice_params_from_ttn(m_ttn)
+
+    fourpt_ttn_mixed1,fourpt_ttn_mixed2 = abs.(ft_fourpt([psi1,psi2],m1,m2,lattice_params; output_level=0))
+
+    println("The unmixed Fock values are $fourpt_fock_1 and $fourpt_fock_2")
+    println("From mixing we get $fourpt_ttn_mixed1 and $fourpt_ttn_mixed2")
+
+    #plot_four_point(fourpt_fock_1; plot_title="TTN Fock GS1 $(lx)x$(ly) N=$n ULR=$intstren")
     #plot_four_point(fourpt_fock_2; plot_title="TTN Fock GS2 $(lx)x$(ly) N=$n ULR=$intstren")
 
-    fourpt_ttn = m_ttn["fourpt_momentum"]
+    #=fourpt_ttn = m_ttn["fourpt_momentum"]
     plot_four_point(fourpt_ttn; plot_title="TTN GS1 $(lx)x$(ly) N=$n ULR=$intstren")
 
     dataloc_ed = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
@@ -1195,7 +1257,7 @@ if false
     d_ed,m_ed = read_data(joinpath(dataloc_ed,f_ed))
 
     fourpt_ed = m_ed["fourpt_momentum"]
-    plot_four_point(fourpt_ed; plot_title="ED $(lx)x$(ly) N=$n ULR=$intstren")
+    plot_four_point(fourpt_ed; plot_title="ED $(lx)x$(ly) N=$n ULR=$intstren")=#
 end=#
 
 

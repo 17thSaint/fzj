@@ -813,6 +813,47 @@ function calculate_mpo_expectation(ttn::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapp
 	return TTN.scalar(contract(tlist; sequence = opt_seq))
 end
 
+function stupid_mpottn_contraction(ttn1::TTN.TreeTensorNetwork,ttn2::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper; kwargs...)
+    opl::Int = get(kwargs,:output_level,1)
+
+    # need to do some checks at the start
+    TTN.move_ortho!(ttn2,(TTN.number_of_layers(ttn2),1))
+    TTN.move_ortho!(ttn1,(TTN.number_of_layers(ttn1),1))
+
+    net = ttn1.net
+    num_layers = TTN.number_of_layers(net)
+
+    mapping = tpo.mapping
+    ham = tpo.data
+
+    # build the MPO elements in vector form
+    effective_observable_previous::Vector{TTN.ITensor} = map(1:2^4) do pp
+        ham[TTN.inverse_mapping(mapping)][pp]
+    end
+
+    # compute the effective observable iteractively for all layers
+    for ll in 1:num_layers
+        opl > 1 && println("Constructing top node environments for layer $ll")
+
+        effective_observable_next = Vector{TTN.ITensor}(undef, 2^(num_layers - ll))
+        
+        # loop over all tensors within the layer
+        for pp in 1:2^(num_layers - ll)
+            opl > 2 && println("Working on site $pp")
+
+            local_obs_left = effective_observable_previous[2*pp-1]
+            local_obs_right = effective_observable_previous[2*pp]
+
+            tlist = vcat(ttn1[(ll,pp)], local_obs_left, local_obs_right, TTN.prime(TTN.dag(ttn2[(ll,pp)])))
+            opt_seq = TTN.optimal_contraction_sequence(tlist)
+            effective_observable_next[pp] = contract(tlist; sequence = opt_seq)           
+        end
+        effective_observable_previous = effective_observable_next
+    end
+
+    return TTN.scalar(effective_observable_previous[1])
+end
+
 function zigzag_curve(lat::TTN.AbstractLattice)
     return zigzag_curve(lat.dims[1],lat.dims[2])
 end
@@ -1034,8 +1075,9 @@ function two_point(wavefuncs::Vector{TTN.TreeTensorNetwork},momentum1::Vector{Fl
     lat = TTN.physical_lattice(wavefuncs[1].net)
     Lx,Ly = size(lat)
     mapss = zigzag_curve(Lx,Ly)
+    coeff_kwargs = get(kwargs,:coeff_kwargs,(Lx=Lx,Ly=Ly,))
 
-    twop = two_point_mpo(wavefuncs[1]; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss, kwargs...)
+    twop = two_point_mpo(wavefuncs[1]; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss, coeff_kwargs=coeff_kwargs, kwargs...)
     twop_wrapped = easy_mpowrapper(twop, lat; mapping=mapss)
 
     mat::Matrix{ComplexF64} = zeros(Float64,length(wavefuncs),length(wavefuncs))
@@ -1092,7 +1134,7 @@ function four_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     return apply(apply(creat1, creat2), apply(annih1, annih2))
     #bothcreats = TTN.replaceprime(TTN.contract(creat1',creat2; alg="naive", truncate=false), 2 => 1)
     #bothannihs = TTN.replaceprime(TTN.contract(annih1',annih2; alg="naive", truncate=false), 2 => 1)
-    #return bothcreats = TTN.replaceprime(TTN.contract(bothcreats',bothannihs; alg="naive", truncate=false), 2 => 1)
+    #return TTN.replaceprime(TTN.contract(bothcreats',bothannihs; alg="naive", truncate=false), 2 => 1)
 end
 
 function four_point_mpowrapped(wavefunc::TTN.TreeTensorNetwork,momentum1::Vector{Float64},momentum2::Vector{Float64}; kwargs...)
@@ -1127,18 +1169,18 @@ function four_point(wavefuncs::Vector{TTN.TreeTensorNetwork},momentum1::Vector{F
     lat = TTN.physical_lattice(wavefuncs[1].net)
     Lx,Ly = size(lat)
     mapss = zigzag_curve(Lx,Ly)
+    coeff_kwargs = get(kwargs,:coeff_kwargs,(Lx=Lx,Ly=Ly,))
 
-    fourpt = four_point_mpo(wavefuncs[1]; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss, kwargs...)
+    fourpt = four_point_mpo(wavefuncs[1]; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss, coeff_kwargs=coeff_kwargs, kwargs...)
     fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
 
     mat::Matrix{ComplexF64} = zeros(Float64,length(wavefuncs),length(wavefuncs))
     for i in 1:length(wavefuncs)
         for j in 1:length(wavefuncs)
-            mat[i,j] = calculate_mpo_expectation(wavefuncs[i], wavefuncs[j], fourpt_wrapped; kwargs...)
+            #mat[i,j] = calculate_mpo_expectation(wavefuncs[i], wavefuncs[j], fourpt_wrapped; kwargs...)
+            mat[i,j] = stupid_mpottn_contraction(wavefuncs[i], wavefuncs[j], fourpt_wrapped; kwargs...)
         end 
     end
-
-    display(mat)
 
     return eigvals(mat)
 end
