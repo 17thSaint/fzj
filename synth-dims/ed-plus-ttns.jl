@@ -250,63 +250,6 @@ function focking_matrix(which_function::Function,wavefunc::TTN.TreeTensorNetwork
     return fockmatrix_operator
 end
 
-#=function focking_matrix_element(wavefunc::TTN.TreeTensorNetwork,tpo::TTN.MPOWrapper,left_local_config::Vector{Int},right_local_config::Vector{Int}; kwargs...)
-    # make states with local configuration
-    left_all_states = ["0" for i in 1:TTN.number_of_sites(wavefunc.net)]
-    left_all_states[left_local_config] .= "1"
-
-    right_all_states = ["0" for i in 1:TTN.number_of_sites(wavefunc.net)]
-    right_all_states[right_local_config] .= "1"
-
-    # build TTN with local configuration
-    left_local_ttn = TTN.ProductTreeTensorNetwork(wavefunc.net,left_all_states)
-    right_local_ttn = TTN.ProductTreeTensorNetwork(wavefunc.net,right_all_states)
-
-    # make sure ortho_center is at top
-    TTN.move_ortho!(left_local_ttn,[TTN.number_of_layers(left_local_ttn),1])
-    TTN.move_ortho!(right_local_ttn,[TTN.number_of_layers(right_local_ttn),1])
-    TTN.move_ortho!(wavefunc,[TTN.number_of_layers(wavefunc),1])
-
-    # find the overlap
-    local_expval = calculate_mpo_expectation(right_local_ttn,left_local_ttn,tpo; kwargs...)
-
-    return local_expval
-end
-
-function focking_matrix(wavefunc::TTN.TreeTensorNetwork,tpo::TTN.MPOWrapper,full_basis::Matrix{Int64}; kwargs...)
-    opl::Int = get(kwargs, :output_level, 1)
-
-    fock_operator = spzeros(ComplexF64,size(full_basis,2),size(full_basis,2))
-    for i in 1:size(full_basis,2)
-        opl > 0 && println("Working on $i / $(size(full_basis,2))")
-
-        # get the local configuration
-        left_local_config = full_basis[:,i]
-
-        for j in 1:size(full_basis,2)
-            right_local_config = full_basis[:,j]
-
-            local_element = focking_matrix_element(wavefunc,tpo,left_local_config,right_local_config)
-            fock_operator[j,i] = local_element
-        end
-    end
-
-    return fock_operator
-end
-
-function focking_matrix(which_point::String,momentum1::Vector{Float64},momentum2::Vector{Float64},wavefunc::TTN.TreeTensorNetwork,full_basis::Matrix{Int64}; kwargs...)
-
-    if which_point == "2pt"
-        wrapped_op = two_point_mpowrapped(wavefunc,momentum1,momentum2; kwargs...)
-    elseif which_point == "4pt"
-        wrapped_op = four_point_mpowrapped(wavefunc,momentum1,momentum2; kwargs...)
-    else
-        error("Invalid point type")
-    end
-
-    return focking_matrix(wavefunc,wrapped_op,full_basis; kwargs...)
-end=#
-
 
 
 
@@ -747,7 +690,7 @@ if false
     display(zc)
 end=#
 
-#= do 4pt momentum MPO
+#= read 4pt momentum MPO
 if false
     lx,ly,n = 8,4,4
     layers = Int(log(2,lx*ly))
@@ -801,8 +744,8 @@ if false
     #end
 end=#
 
-# do compare both pts momentum MPO ED
-if true
+#= do compare both pts momentum MPO ED
+if false
     lx,ly,n = 4,4,2
     layers = Int(log(2,lx*ly))
     intstren = 0.0
@@ -844,10 +787,10 @@ if true
     println("Fock version")
     display(twopt_fock)=#
 
-    m1 = [0.0,1/ly]
-    m2 = [0.0,3/ly]
+    #m1 = [0.0,1/ly]
+    #m2 = [0.0,3/ly]
 
-    #=overlapmat = zeros(Float64,3,2)
+    overlapmat = zeros(Float64,3,2)
     overlapmat[1,1] = abs2(adjoint(psi_fock) * states[1])
     overlapmat[2,1] = abs2(adjoint(psi_fock) * states[2])
     overlapmat[3,1] = abs2(adjoint(psi_fock) * states[3])
@@ -855,19 +798,26 @@ if true
     overlapmat[2,2] = abs2(adjoint(psi_fock1) * states[2])
     overlapmat[3,2] = abs2(adjoint(psi_fock1) * states[3])
     println("Overlap between TTN Fock and ED")
-    display(overlapmat)=#
+    display(overlapmat)
 
 
-    fourpt_mpo = focking_matrix(four_point_mpowrapped,psis[1],lattice_params["full_basis"]; output_level=1,momentum1 = m1, momentum2 = m2)
-    fourpt_ed = ft_fourpt_matrix(states[1],m1,m2,lattice_params; output_level=0)
-    println("Does MPO match with ED: ",round.(fourpt_mpo,digits=10) == round.(fourpt_ed,digits=10))
+    #fourpt_mpo = focking_matrix(four_point_mpowrapped,psis[1],lattice_params["full_basis"]; output_level=1,momentum1 = m1, momentum2 = m2)
+    #fourpt_ed = ft_fourpt_matrix(states[1],m1,m2,lattice_params; output_level=0)
+    #println("Does MPO match with ED: ",round.(fourpt_mpo,digits=10) == round.(fourpt_ed,digits=10))
 
 
-    fourpt_mpo_value = abs.(four_point(psis,m1,m2; output_level=0))
-    fourpt_ed_value = abs.(ft_fourpt(states[1:2],m1,m2,lattice_params; output_level=0))
-    println("The measured values are MPO=$(fourpt_mpo_value) and ED=$(fourpt_ed_value)")
+    #fourpt_mpo_value = abs.(four_point(psis,m1,m2; output_level=0))
+    #fourpt_ed_value = abs.(ft_fourpt(states[1:2],m1,m2,lattice_params; output_level=0))
+    #println("The measured values are MPO=$(fourpt_mpo_value) and ED=$(fourpt_ed_value)")
 
-    expval = zeros(ComplexF64,2,2)
+    fourpt_mpo_value = four_point(psis; output_level=0, if_plot=true, plot_title="MPO $(lx)x$(ly) N=$n ULR=$intstren")
+    fourpt_ed_value = four_point(states[1:2],lattice_params; output_level=0, if_plot=true, plot_title="ED $(lx)x$(ly) N=$n ULR=$intstren")
+    println("MPO values are ")
+    display(fourpt_mpo_value)
+    println("ED values are ")
+    display(fourpt_ed_value)
+
+    #=expval = zeros(ComplexF64,2,2)
     expval[1,1] = adjoint(psi_fock) * fourpt_ed * psi_fock
     expval[2,1] = adjoint(psi_fock) * fourpt_ed * psi_fock1
     expval[1,2] = adjoint(psi_fock1) * fourpt_ed * psi_fock
@@ -886,10 +836,32 @@ if true
     expval_mpot[2,1] = adjoint(psi_fock) * transpose(fourpt_mpo) * psi_fock1
     expval_mpot[1,2] = adjoint(psi_fock1) * transpose(fourpt_mpo) * psi_fock
     expval_mpot[2,2] = adjoint(psi_fock1) * transpose(fourpt_mpo) * psi_fock1
-    println("The calculated value with Transpose Fock MPO is $(abs.(eigvals(expval_mpot)))")
+    println("The calculated value with Transpose Fock MPO is $(abs.(eigvals(expval_mpot)))")=#
 
 
-end#
+end=#
+
+#= fix transpose MPO
+if false
+    lx,ly,n = 4,4,2
+    layers = Int(log(2,lx*ly))
+    intstren = 0.0
+
+    pdict = Dict([("particles",n),("expander_fraction",100),("if_check_fluxes",false),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+    #all_results = run_synth_dims_generic(pdict)
+    psi = all_results[1]
+
+    mapss = zigzag_curve(lx,ly)
+    coeff_kwargs = (Lx=lx,Ly=ly,)
+
+    m1 = [0.0,1/ly]
+    m2 = [0.0,3/ly]
+
+    fourpt_val = four_point(psi)
+    #println("4pt MPO value is $(fourpt_val)")
+    display(fourpt_val)
+
+end=#
 
 #= do multi-state 4pt momentum MPO
 if false

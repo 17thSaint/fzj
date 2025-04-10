@@ -966,6 +966,33 @@ function four_point(wavefunc::Vector{ComplexF64},lattice_params::Dict; kwargs...
     return fourpt_vals
 end
 
+function four_point(wavefuncs::Vector{Vector{ComplexF64}},lattice_params::Dict; kwargs...)
+    if_plot::Bool = get(kwargs,:if_plot,false)
+    opl::Int = get(kwargs,:opl,1)
+
+    Lx,Ly = lattice_params["Lx"],lattice_params["Ly"]
+
+    momenta = [n/Ly for n in 0:Lx-1]
+    fourpt_vals = [zeros(Float64,Lx,Lx) for i in 1:length(wavefuncs)]
+    for (idx1,k1) in enumerate(momenta)
+        for (idx2,k2) in enumerate(momenta)
+            opl > 0 && println("Working on momenta $(k1) and $(k2)")
+            result = abs.(ft_fourpt(wavefuncs,[0.0,k1],[0.0,k2],lattice_params; kwargs...))
+            for i in 1:length(wavefuncs)
+                fourpt_vals[i][idx1,idx2] = result[i]
+            end
+        end
+    end
+
+    if if_plot
+        for i in 1:length(wavefuncs)
+            plot_four_point(fourpt_vals[i]; kwargs...)
+        end
+    end
+
+    return fourpt_vals
+end
+
 function ft_twopt(wavefunc::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
     Lx::Int64 = lattice_params["Lx"]
     Ly::Int64 = lattice_params["Ly"]

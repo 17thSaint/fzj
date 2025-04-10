@@ -644,20 +644,6 @@ function local_hilbert_space_dimension(ttn::TTN.TreeTensorNetwork)
     return minimum(TTN.dims(ttn[1,1]))
 end
 
-function make_qnset(op_string::String)
-    if op_string == "A"
-        return [TTN.QN("Number",0)=>1,TTN.QN("Number",-1)=>1]
-    elseif op_string == "Adag"
-        return [TTN.QN("Number",0)=>1,TTN.QN("Number",1)=>1]
-    elseif op_string == "N"
-        return [TTN.QN("Number",0)=>2]
-    elseif op_string == "2pt"
-        return [TTN.QN("Number",0)=>2,TTN.QN("Number",-1)=>1,TTN.QN("Number",1)=>1]
-    else
-        error("Invalid operator string")
-    end
-end
-
 function ft_coeff(phys_site::TTN.Index,momentum::Vector{Float64},op_type::String; kwargs...)
     Lx::Int = kwargs[:Lx]
     Ly::Int = kwargs[:Ly]
@@ -679,7 +665,10 @@ function diocane(phys_site::TTN.Index,momentum::Vector{Float64},op_type::String;
 
     lin_ind = parse(Int,match(r"n=(\d+)",index_tag)[1])
     coord_label = coordinate(lin_ind,Lx,Ly)
-    return diocane(coord_label,momentum,op_type; kwargs...)
+
+    other_op_type = op_type == "A" ? "Adag" : "A"
+
+    return diocane(coord_label,momentum,other_op_type; kwargs...)
 end
 
 function construct_top_node_environments(ttn1::TTN.TreeTensorNetwork, ttn2::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper; kwargs...)
@@ -813,47 +802,6 @@ function calculate_mpo_expectation(ttn::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapp
 	return TTN.scalar(contract(tlist; sequence = opt_seq))
 end
 
-function stupid_mpottn_contraction(ttn1::TTN.TreeTensorNetwork,ttn2::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper; kwargs...)
-    opl::Int = get(kwargs,:output_level,1)
-
-    # need to do some checks at the start
-    TTN.move_ortho!(ttn2,(TTN.number_of_layers(ttn2),1))
-    TTN.move_ortho!(ttn1,(TTN.number_of_layers(ttn1),1))
-
-    net = ttn1.net
-    num_layers = TTN.number_of_layers(net)
-
-    mapping = tpo.mapping
-    ham = tpo.data
-
-    # build the MPO elements in vector form
-    effective_observable_previous::Vector{TTN.ITensor} = map(1:2^4) do pp
-        ham[TTN.inverse_mapping(mapping)][pp]
-    end
-
-    # compute the effective observable iteractively for all layers
-    for ll in 1:num_layers
-        opl > 1 && println("Constructing top node environments for layer $ll")
-
-        effective_observable_next = Vector{TTN.ITensor}(undef, 2^(num_layers - ll))
-        
-        # loop over all tensors within the layer
-        for pp in 1:2^(num_layers - ll)
-            opl > 2 && println("Working on site $pp")
-
-            local_obs_left = effective_observable_previous[2*pp-1]
-            local_obs_right = effective_observable_previous[2*pp]
-
-            tlist = vcat(ttn1[(ll,pp)], local_obs_left, local_obs_right, TTN.prime(TTN.dag(ttn2[(ll,pp)])))
-            opt_seq = TTN.optimal_contraction_sequence(tlist)
-            effective_observable_next[pp] = contract(tlist; sequence = opt_seq)           
-        end
-        effective_observable_previous = effective_observable_next
-    end
-
-    return TTN.scalar(effective_observable_previous[1])
-end
-
 function zigzag_curve(lat::TTN.AbstractLattice)
     return zigzag_curve(lat.dims[1],lat.dims[2])
 end
@@ -926,7 +874,7 @@ function easy_mpowrapper(mpo::TTN.MPO, lat::L; mapping::Vector{Int} = collect(ea
     return TTN.MPOWrapper{L, TTN.MPO}(lat, mpo, mapping)
 end
 
-function a_matrix(hilbdim::Int)
+function adag_matrix(hilbdim::Int)
     mat = zeros(Float64,hilbdim,hilbdim)
     for i in 1:(hilbdim-1)
         mat[i,i+1] = sqrt(i)
@@ -934,7 +882,7 @@ function a_matrix(hilbdim::Int)
     return mat
 end
 
-function adag_matrix(hilbdim::Int)
+function a_matrix(hilbdim::Int)
     mat = zeros(Float64,hilbdim,hilbdim)
     for i in 2:hilbdim
         mat[i,i-1] = sqrt(i-1)
@@ -950,10 +898,24 @@ function n_matrix(hilbdim::Int)
     return mat
 end
 
+function make_qnset(op_string::String)
+    if op_string == "A"
+        return [TTN.QN("Number",0)=>1,TTN.QN("Number",-1)=>1]
+    elseif op_string == "Adag"
+        return [TTN.QN("Number",0)=>1,TTN.QN("Number",1)=>1]
+    elseif op_string == "N"
+        return [TTN.QN("Number",0)=>2]
+    elseif op_string == "2pt"
+        return [TTN.QN("Number",0)=>2,TTN.QN("Number",-1)=>1,TTN.QN("Number",1)=>1]
+    else
+        error("Invalid operator string")
+    end
+end
+
 function build_W_singlepoint(op_type::String,coeff::ComplexF64,hilbdim::Int)
-    if op_type == "A"
+    if op_type == "Adag"
         mat = adag_matrix(hilbdim)
-    elseif op_type == "Adag"
+    elseif op_type == "A"
         mat = a_matrix(hilbdim)
     elseif op_type == "N"
         mat = n_matrix(hilbdim)
@@ -962,13 +924,13 @@ function build_W_singlepoint(op_type::String,coeff::ComplexF64,hilbdim::Int)
     end
 
     A11 = I(hilbdim)
-    A12 = zeros(hilbdim,hilbdim)
-    A21 = coeff * mat
+    A21 = zeros(hilbdim,hilbdim)
+    A12 = coeff * mat
     A22 = I(hilbdim)
     M = Array{ComplexF64, 4}(undef, 2,hilbdim,2,hilbdim)
     M[1,:,1,:] = A11
-    M[1,:,2,:] = A21
-    M[2,:,1,:] = A12
+    M[2,:,1,:] = A21
+    M[1,:,2,:] = A12
     M[2,:,2,:] = A22
 
     return M
@@ -977,21 +939,25 @@ end
 function build_links_singlepoint(op_type::String,L::Int; kwargs...)
     mapping = kwargs[:mapping]
     links = Vector{TTN.Index}(undef,L+1)
-    for i in 0:L
+
+    qnset_start = make_qnset(op_type)
+
+    # do zeroth link
+    links[1] = TTN.Index(qnset_start; tags="Link,Left=Start,Right=$(mapping[1])")
+
+    # do interior links
+    for i in 1:L-1
         qnset = make_qnset(op_type)
-        if i == 0
-            left_tag = "Start"
-            right_tag = string(mapping[i+1])
-        elseif i == L
-            left_tag = string(mapping[i])
-            right_tag = "End"
-        else
-            #println("At link $i which is physical site $(mapping[i]) which has left tag $(string(mapping[i])) and right tag $(string(mapping[i+1]))")
-            left_tag = string(mapping[i])
-            right_tag = string(mapping[i+1])
-        end
+        #println("At link $i which is physical site $(mapping[i]) which has left tag $(string(mapping[i])) and right tag $(string(mapping[i+1]))")
+        left_tag = string(mapping[i])
+        right_tag = string(mapping[i+1])
         links[i+1] = TTN.Index(qnset; tags="Link,Left=$left_tag,Right=$right_tag")
     end
+
+    # do last link
+    qnset_end = make_qnset(op_type)
+    links[L+1] = TTN.Index(qnset_end; tags="Link,Left=$(mapping[L]),Right=End")
+
     return links
 end
 
@@ -1177,12 +1143,11 @@ function four_point(wavefuncs::Vector{TTN.TreeTensorNetwork},momentum1::Vector{F
     mat::Matrix{ComplexF64} = zeros(Float64,length(wavefuncs),length(wavefuncs))
     for i in 1:length(wavefuncs)
         for j in 1:length(wavefuncs)
-            #mat[i,j] = calculate_mpo_expectation(wavefuncs[i], wavefuncs[j], fourpt_wrapped; kwargs...)
-            mat[i,j] = stupid_mpottn_contraction(wavefuncs[i], wavefuncs[j], fourpt_wrapped; kwargs...)
+            mat[i,j] = calculate_mpo_expectation(wavefuncs[i], wavefuncs[j], fourpt_wrapped; kwargs...)
         end 
     end
 
-    return eigvals(mat)
+    return abs.(eigvals(mat))
 end
 
 function four_point(wavefunc::TTN.TreeTensorNetwork; kwargs...)
@@ -1201,6 +1166,33 @@ function four_point(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     end
 
     if_plot && plot_four_point(fourpt_vals; kwargs...) 
+
+    return fourpt_vals
+end
+
+function four_point(wavefuncs::Vector{TTN.TreeTensorNetwork}; kwargs...)
+    if_plot::Bool = get(kwargs,:if_plot,false)
+    opl::Int = get(kwargs,:opl,1)
+
+    Lx,Ly = get_lattice_dims(wavefuncs[1])
+
+    momenta = [n/Ly for n in 0:Lx-1]
+    fourpt_vals = [zeros(Float64,Lx,Lx) for i in 1:length(wavefuncs)]
+    for (idx1,k1) in enumerate(momenta)
+        for (idx2,k2) in enumerate(momenta)
+            opl > 0 && println("Working on momenta $(k1) and $(k2)")
+            result = four_point(wavefuncs,[0.0,k1],[0.0,k2]; kwargs...)
+            for i in 1:length(wavefuncs)
+                fourpt_vals[i][idx1,idx2] = result[i]
+            end
+        end
+    end
+
+    if if_plot
+        for i in 1:length(wavefuncs)
+            plot_four_point(fourpt_vals[i]; kwargs...)
+        end
+    end
 
     return fourpt_vals
 end
