@@ -692,7 +692,7 @@ end=#
 
 #= read 4pt momentum MPO
 if false
-    lx,ly,n = 8,4,4
+    lx,ly,n = 16,8,8
     layers = Int(log(2,lx*ly))
     intstren = 0.0
 
@@ -700,52 +700,38 @@ if false
     all_results = run_synth_dims_generic(pdict_ttn)
     psi = all_results[1]=#
 
-    dataloc = get_folder_location("cluster-data/synth-dims/torus")
-    pdict = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
-    all_files = find_data_file(pdict,"ttn",dataloc)
-    filter!(x -> !occursin("if_synth_rectangle",x),all_files)
-    display(all_files)
-    f = all_files[1]
-    d,m = read_data(dataloc * "/" * f; output_level=0)
-    #psi = d["ttn"]
+    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict_ttn = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
+    display(all_files_ttn)
+    f_ttn = all_files_ttn[1]
+    d_ttn,m_ttn = read_data(dataloc_ttn * "/" * f_ttn; output_level=0)
     
-    fourpt_vals_1 = m["fourpt_momentum"]
-    fourpt_vals_2 = m["fourpt_momentum_1"]
-    
-    fig = figure()
-    imshow(fourpt_vals_1,origin="lower",vmin=0.0,extent=[1,lx,1,lx])
-    colorbar()
-    xlabel("m'")
-    ylabel("m")
-    title("TTN 4pt Momentum GS1 for $(lx)x$(ly) N=$n ULR=$intstren")
+    fourpt_mpo_1 = m_ttn["fourpt_momentum"]
+    #fourpt_mpo_2 = m_ttn["fourpt_momentum_1"]
+    #fourpt_mpo_mix = 0.5 .* (fourpt_mpo_1 + fourpt_mpo_2)
 
-    fig = figure()
-    imshow(fourpt_vals_2,origin="lower",vmin=0.0,extent=[1,lx,1,lx])
-    colorbar()
-    xlabel("m'")
-    ylabel("m")
-    title("TTN 4pt Momentum GS2 for $(lx)x$(ly) N=$n ULR=$intstren")
+    #plot_four_point(fourpt_mpo_mix; plot_title="TTN GS1+GS2 $(lx)x$ly N=$n ULR=$intstren")
+    plot_four_point(fourpt_mpo_1; plot_title="TTN GS1 $(lx)x$ly N=$n ULR=$intstren")
+    #plot_four_point(fourpt_mpo_2; plot_title="TTN GS2 $(lx)x$ly N=$n ULR=$intstren")
 
-    #=ks = [n/ly for n in 1:lx]
-    mp = [0.0,2/ly]
-    fourpt_vals = zeros(Float64,length(ks))
-    for (idx,ky) in enumerate(ks)
-        fourpt_vals[idx] = four_point(psi,mp,[0.0,ky])
-    end=#
+    #=dataloc_ed = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren)])
+    all_files_ed = find_data_file(pdict_ed,"ed",dataloc_ed; file_type="jld2")
+    display(all_files_ed)
+    f_ed = all_files_ed[1]
+    d_ed,m_ed = read_data(joinpath(dataloc_ed,f_ed))
 
-    #display(vals)
-    #=fig = figure()
-    scatter(ks .* ly,fourpt_vals[4,:],c="b",label="MPO")
-    xlabel("Momentum k = m / Ly, m' = $(Int(mp[2]*ly))")
-    ylabel("Four Point Momentum")
-    title("Four Point Momentum for $(lx)x$(ly) N=$n")=#
+    fourpt_ed_1 = m_ed["fourpt_momentum"]
 
+    plot_four_point(fourpt_ed_1; plot_title="ED GS1 $(lx)x$ly N=$n ULR=$intstren")=#
 
-    #end
+    #plot_four_point(abs.(fourpt_mpo_1 - fourpt_ed_1); plot_title="Diff TTN/ED $(lx)x$ly N=$n ULR=$intstren")
+
 end=#
 
-#= do compare both pts momentum MPO ED
-if false
+# do compare both pts momentum MPO ED
+if true
     lx,ly,n = 4,4,2
     layers = Int(log(2,lx*ly))
     intstren = 0.0
@@ -765,11 +751,11 @@ if false
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_check_fluxes",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",5),("if_find_data",false),("if_save_data",false)])
     #states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
 
-    println("Energy gap is $(nrgs[2] - nrgs[1])")
+    #println("Energy gap is $(nrgs[2] - nrgs[1])")
     
-    pdict = Dict([("particles",n),("es_count",1),("expander_fraction",100),("if_check_fluxes",false),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+    pdict = Dict([("particles",n),("es_count",0),("expander_fraction",100),("if_check_fluxes",false),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
     #all_results = run_synth_dims_generic(pdict)
-    psis = all_results[1]
+    psi = all_results[1]
 
 
 
@@ -787,10 +773,10 @@ if false
     println("Fock version")
     display(twopt_fock)=#
 
-    #m1 = [0.0,1/ly]
-    #m2 = [0.0,3/ly]
+    m1 = [0.0,1/ly]
+    m2 = [0.0,3/ly]
 
-    overlapmat = zeros(Float64,3,2)
+    #=overlapmat = zeros(Float64,3,2)
     overlapmat[1,1] = abs2(adjoint(psi_fock) * states[1])
     overlapmat[2,1] = abs2(adjoint(psi_fock) * states[2])
     overlapmat[3,1] = abs2(adjoint(psi_fock) * states[3])
@@ -798,24 +784,30 @@ if false
     overlapmat[2,2] = abs2(adjoint(psi_fock1) * states[2])
     overlapmat[3,2] = abs2(adjoint(psi_fock1) * states[3])
     println("Overlap between TTN Fock and ED")
-    display(overlapmat)
+    display(overlapmat)=#
 
 
     #fourpt_mpo = focking_matrix(four_point_mpowrapped,psis[1],lattice_params["full_basis"]; output_level=1,momentum1 = m1, momentum2 = m2)
     #fourpt_ed = ft_fourpt_matrix(states[1],m1,m2,lattice_params; output_level=0)
     #println("Does MPO match with ED: ",round.(fourpt_mpo,digits=10) == round.(fourpt_ed,digits=10))
 
+    # ttn1 with ortho_center at top has arrows pointing all away from oc
+    # this could be the dagger already actually
+    # this is where the transpose is
+    # need to get single mpo to match primes and flows with MPO expectation part
 
-    #fourpt_mpo_value = abs.(four_point(psis,m1,m2; output_level=0))
-    #fourpt_ed_value = abs.(ft_fourpt(states[1:2],m1,m2,lattice_params; output_level=0))
+    thismpo = single_point_mpo(psi,"Adag"; coeff_kwargs=(Lx=lx,Ly=ly,), mapping=collect(1:lx*ly))
+
+    #fourpt_mpo_value = abs(four_point(psi,m1,m2; output_level=0))
+    #fourpt_ed_value = abs(ft_fourpt(states[1],m1,m2,lattice_params; output_level=0))
     #println("The measured values are MPO=$(fourpt_mpo_value) and ED=$(fourpt_ed_value)")
 
-    fourpt_mpo_value = four_point(psis; output_level=0, if_plot=true, plot_title="MPO $(lx)x$(ly) N=$n ULR=$intstren")
+    #=fourpt_mpo_value = four_point(psis; output_level=0, if_plot=true, plot_title="MPO $(lx)x$(ly) N=$n ULR=$intstren")
     fourpt_ed_value = four_point(states[1:2],lattice_params; output_level=0, if_plot=true, plot_title="ED $(lx)x$(ly) N=$n ULR=$intstren")
     println("MPO values are ")
     display(fourpt_mpo_value)
     println("ED values are ")
-    display(fourpt_ed_value)
+    display(fourpt_ed_value)=#
 
     #=expval = zeros(ComplexF64,2,2)
     expval[1,1] = adjoint(psi_fock) * fourpt_ed * psi_fock
@@ -839,7 +831,7 @@ if false
     println("The calculated value with Transpose Fock MPO is $(abs.(eigvals(expval_mpot)))")=#
 
 
-end=#
+end#
 
 #= fix transpose MPO
 if false

@@ -666,9 +666,9 @@ function diocane(phys_site::TTN.Index,momentum::Vector{Float64},op_type::String;
     lin_ind = parse(Int,match(r"n=(\d+)",index_tag)[1])
     coord_label = coordinate(lin_ind,Lx,Ly)
 
-    other_op_type = op_type == "A" ? "Adag" : "A"
+    #other_op_type = op_type == "A" ? "Adag" : "A"
 
-    return diocane(coord_label,momentum,other_op_type; kwargs...)
+    return diocane(coord_label,momentum,op_type; kwargs...)
 end
 
 function construct_top_node_environments(ttn1::TTN.TreeTensorNetwork, ttn2::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper; kwargs...)
@@ -983,6 +983,7 @@ function single_point_mpo(wavefunc::TTN.TreeTensorNetwork,op_type::String; kwarg
 
         mat = build_W_singlepoint(op_type,coeff,hilbdim)
 
+        #local_inds = [links[idx],TTN.dag(s),TTN.dag(links[idx+1]),TTN.prime(s)]
         local_inds = [links[idx],TTN.dag(s),TTN.dag(links[idx+1]),TTN.prime(s)]
 
         mit = TTN.ITensor(mat,local_inds)
@@ -1060,7 +1061,7 @@ end
 
 function two_point(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     if_plot::Bool = get(kwargs,:if_plot,false)
-    opl::Int = get(kwargs,:opl,1)
+    opl::Int = get(kwargs,:outpu_level,1)
 
     Lx,Ly = get_lattice_dims(wavefunc)
 
@@ -1095,7 +1096,7 @@ function four_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     #println("Made Annihilation 1")
     annih2 = single_point_mpo(wavefunc,"A"; momentum=k1,mapping=mapping, kwargs...)
     #println("Made Annihilation 2")
-    opl > 0 && println("Made Suboperators")
+    opl > 1 && println("Made Suboperators")
 
     return apply(apply(creat1, creat2), apply(annih1, annih2))
     #bothcreats = TTN.replaceprime(TTN.contract(creat1',creat2; alg="naive", truncate=false), 2 => 1)
@@ -1152,7 +1153,7 @@ end
 
 function four_point(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     if_plot::Bool = get(kwargs,:if_plot,false)
-    opl::Int = get(kwargs,:opl,1)
+    opl::Int = get(kwargs,:output_level,1)
 
     Lx,Ly = get_lattice_dims(wavefunc)
 
@@ -1172,7 +1173,7 @@ end
 
 function four_point(wavefuncs::Vector{TTN.TreeTensorNetwork}; kwargs...)
     if_plot::Bool = get(kwargs,:if_plot,false)
-    opl::Int = get(kwargs,:opl,1)
+    opl::Int = get(kwargs,:output_level,1)
 
     Lx,Ly = get_lattice_dims(wavefuncs[1])
 

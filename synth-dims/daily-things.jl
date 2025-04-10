@@ -61,11 +61,11 @@ function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
     end
 end
 
-#= testing factory run on TTN with new gauge with seed ttn
+# testing factory run on TTN with new gauge with seed ttn
 if false
     lx,ly,n = 8,4,4
     layers = Int(log(2,lx*ly))
-    intstren = 300.0
+    intstren = 0.0
 
     which_one = 1
     dataloc = get_folder_location("cluster-data/synth-dims/torus")
@@ -76,13 +76,13 @@ if false
     d_previous,m_previous = read_data(joinpath(dataloc,f_previous); output_level=0)
     previous_ttn = d_previous["ttn"]
 
-    params_dict = Dict([("hopping_anisotropy",1.0),("expander_fraction",100),("seed_ttn",previous_ttn),("if_redo",true),("particles",n),("layers",layers),("mdim",400),("if_save_data",true),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+    params_dict = Dict([("hopping_anisotropy",1.0),("if_gpu",true),("seed_ttn",previous_ttn),("if_redo",true),("particles",n),("layers",layers),("mdim",400),("if_save_data",true),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
     all_results = run_synth_dims_generic(params_dict)
 
-end=#
+end#
 
-# data collection of 4pt MPO
-if true
+#= data collection of 4pt MPO
+if false
     lx,ly,n = 8,4,4
     layers = Int(log(2,lx*ly))
     intstren = 300.0
@@ -101,7 +101,7 @@ if true
 
     datadict = Dict([("fourpt_momentum",fourpt_mpo[1]),("fourpt_momentum_1",fourpt_mpo[2])])
     modify_data(datadict,dataloc * "/" * f,"metadata"; output_level=0)
-end
+end=#
 
 #= bond dim scaling for 8x4
 if false
