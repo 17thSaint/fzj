@@ -796,11 +796,11 @@ if true
     # this is where the transpose is
     # need to get single mpo to match primes and flows with MPO expectation part
 
-    thismpo = single_point_mpo(psi,"Adag"; coeff_kwargs=(Lx=lx,Ly=ly,), mapping=collect(1:lx*ly))
+    #thismpo = single_point_mpo(psi,"Adag"; coeff_kwargs=(Lx=lx,Ly=ly,), mapping=collect(1:lx*ly))
 
-    #fourpt_mpo_value = abs(four_point(psi,m1,m2; output_level=0))
-    #fourpt_ed_value = abs(ft_fourpt(states[1],m1,m2,lattice_params; output_level=0))
-    #println("The measured values are MPO=$(fourpt_mpo_value) and ED=$(fourpt_ed_value)")
+    fourpt_mpo_value = abs(four_point(psi,m1,m2; output_level=0))
+    fourpt_ed_value = abs(ft_fourpt(states[1],m1,m2,lattice_params; output_level=0))
+    println("The measured values are MPO=$(fourpt_mpo_value) and ED=$(fourpt_ed_value)")
 
     #=fourpt_mpo_value = four_point(psis; output_level=0, if_plot=true, plot_title="MPO $(lx)x$(ly) N=$n ULR=$intstren")
     fourpt_ed_value = four_point(states[1:2],lattice_params; output_level=0, if_plot=true, plot_title="ED $(lx)x$(ly) N=$n ULR=$intstren")

@@ -666,9 +666,10 @@ function diocane(phys_site::TTN.Index,momentum::Vector{Float64},op_type::String;
     lin_ind = parse(Int,match(r"n=(\d+)",index_tag)[1])
     coord_label = coordinate(lin_ind,Lx,Ly)
 
-    #other_op_type = op_type == "A" ? "Adag" : "A"
+    # turns out this doesn't actually work
+    other_op_type = op_type == "A" ? "Adag" : "A"
 
-    return diocane(coord_label,momentum,op_type; kwargs...)
+    return diocane(coord_label,momentum,other_op_type; kwargs...)
 end
 
 function construct_top_node_environments(ttn1::TTN.TreeTensorNetwork, ttn2::TTN.TreeTensorNetwork, tpo::TTN.MPOWrapper; kwargs...)
@@ -763,6 +764,7 @@ function construct_top_node_environments(ttn::TTN.TreeTensorNetwork, tpo::TTN.MP
                 #display(TTN.tags.(TTN.inds(Tn)))
                 #display([TTN.tags.(in) for in in TTN.inds.(tensorListBottom)])
 				tlist = vcat(Tn, tensorListBottom, TTN.prime(TTN.dag(Tn)))
+                #tlist = vcat(TTN.prime(Tn), tensorListBottom, TTN.dag(Tn))
                 #display(prod(prod.(TTN.ITensorMPS.dims.(tlist))))
                 #display(TTN.dims.(tlist))
 				opt_seq = TTN.optimal_contraction_sequence(tlist)
@@ -983,8 +985,8 @@ function single_point_mpo(wavefunc::TTN.TreeTensorNetwork,op_type::String; kwarg
 
         mat = build_W_singlepoint(op_type,coeff,hilbdim)
 
-        #local_inds = [links[idx],TTN.dag(s),TTN.dag(links[idx+1]),TTN.prime(s)]
         local_inds = [links[idx],TTN.dag(s),TTN.dag(links[idx+1]),TTN.prime(s)]
+        #local_inds = [links[idx],s,TTN.dag(links[idx+1]),TTN.prime(TTN.dag(s))]
 
         mit = TTN.ITensor(mat,local_inds)
 

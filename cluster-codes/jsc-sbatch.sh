@@ -1,11 +1,11 @@
 #!/bin/bash -x
 
 #SBATCH --account=netenesyquma
-#SBATCH --nodes=1
+#SBATCH --nodes=2
 #SBATCH --cpus-per-task=5
 #SBATCH --ntasks-per-node=1
 #SBATCH --time=00:10:00
-#SBATCH --partition=batch
+#SBATCH --partition=mem192
 
 echo "Date:"
 date
@@ -41,10 +41,10 @@ additional_params=("${@:5}")
 
 # Get the current date and time
 #alpha=$(date +"%Y-%m-%d_%H-%M")
-datafolder="/p/project/netenesyquma/geraghty1/data/data-memory-testing"
+datafolder="/p/project/netenesyquma/geraghty1/data/gpu-trial-run"
 
 # Create the folder
-#mkdir -p "$datafolder"
+mkdir -p "$datafolder"
 
 
 #value=$(( ( $SLURM_ARRAY_TASK_ID - 1 ) * $STEP_SIZE + $START_VALUE ))
