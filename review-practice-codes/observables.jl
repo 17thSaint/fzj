@@ -666,7 +666,6 @@ function diocane(phys_site::TTN.Index,momentum::Vector{Float64},op_type::String;
     lin_ind = parse(Int,match(r"n=(\d+)",index_tag)[1])
     coord_label = coordinate(lin_ind,Lx,Ly)
 
-    # turns out this doesn't actually work
     other_op_type = op_type == "A" ? "Adag" : "A"
 
     return diocane(coord_label,momentum,other_op_type; kwargs...)

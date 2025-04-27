@@ -1,5 +1,5 @@
-using Pkg
-Pkg.activate(".")
+#using Pkg
+#Pkg.activate(".")
 include("../review-practice-codes/ttn.jl")
 include("../other-funcs/basic-2d-stuff.jl")
 include("../review-practice-codes/observables.jl")
@@ -1999,7 +1999,7 @@ if true
 		
 		#d,m = read_data("../cluster-data/synth-dims/torus/ttn-if_periodic_phys-true-onsite_strength-0.0-lr-0-particles-4-alpha-0.0-layers-4-hopping_anisotropy-1.0.h5")
 		#st = d["ttn"]
-		params_dict = Dict([("hopping_anisotropy",1.0),("if_gpu",true),("particles",4),("layers",5),("mdim",600),("if_save_data",true),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("hopping_anisotropy",1.0),("es_count",1),("expander_fraction",1e-5),("particles",8),("layers",7),("mdim",400),("if_save_data",true),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		#=open_cores = get(params_dict, "open_cores", 5)

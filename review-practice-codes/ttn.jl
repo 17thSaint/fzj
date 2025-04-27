@@ -1111,7 +1111,7 @@ function find_excited_states(num_layers::Int,num_excited_states::Int,particle_co
 			ttn = TTN.increase_dim_tree_tensor_network_zeros(old_ttn, maxdim = max_dim)
 			ttn = TTN.adjust_tree_tensor_dimensions(old_ttn,max_dim)
 		end
-		metadata["seed_ttn"] = ttn
+		#metadata["seed_ttn"] = ttn
 	end
 
 	#=if if_continuous_saving
@@ -1136,10 +1136,6 @@ function find_excited_states(num_layers::Int,num_excited_states::Int,particle_co
 		ham_operator = metadata["ham"]
 	end
 	ham::TTN.AbstractTensorProductOperator = TTN.TPO(ham_operator,lat)
-	if if_gpu
-		println("Doing GPU Ham TPO")
-		ham = TTN.gpu(ham,ttn)
-	end
 	println("Built Hamiltonian")
 
 	es_start = length(ortho_states)
@@ -1515,11 +1511,13 @@ function TTN.ITensorMPS.measure!(o::SavingExcitedNRGVarObserver; kwargs...)
     dmrg = kwargs[:sweep_handler]
     append!(o.nrg,[dmrg.current_energy])
 
-	alldata_update::Dict{String,Any} = Dict([("ttn"*string_part,dmrg.ttn),("densmat"*string_part,density_matrix(dmrg.ttn))])
-	modify_data(alldata_update,o.file_path,"all_data")
+	wavefunc_update::Dict{String,Any} = Dict([("ttn"*string_part,dmrg.ttn)])
+	modify_data(wavefunc_update,add_wavefunc_to_filepath(o.file_path),"all_data")
 	
 	metadata_update = Dict([("observer"*string_part,o),("maxlinkdim"*string_part,TTN.maxlinkdim(dmrg.ttn))])
+	densmat_update = Dict([("densmat"*string_part,density_matrix(dmrg.ttn))])
 	modify_data(metadata_update,o.file_path,"metadata")
+	modify_data(densmat_update,o.file_path,"all_data")
 end
 
 function TTN.ITensorMPS.checkdone!(o::SavingExcitedNRGVarObserver;kwargs...)

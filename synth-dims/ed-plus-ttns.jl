@@ -19,7 +19,7 @@ using JLD2
 include("../other-funcs/include-other-files.jl")
 include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","other-funcs/basic-2d-observables.jl","exact-diag/execute-ed.jl","exact-diag/observables.jl"])
 #include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
-include_other_files(["other-funcs/basic-2d-plottings.jl","review-practice-codes/plottings.jl","exact-diag/plottings.jl"])
+#include_other_files(["other-funcs/basic-2d-plottings.jl","review-practice-codes/plottings.jl","exact-diag/plottings.jl"])
 
 function plot_nrg_vs_intstren_fromdata_ttn(layers::Int64,which_strens::Union{String,Vector{Float64}}="all"; kwargs...)
     hanis = get(kwargs, :hopping_anisotropy, 1.0)
@@ -730,30 +730,32 @@ if false
 
 end=#
 
-# do compare both pts momentum MPO ED
-if true
+#= do compare both pts momentum MPO ED
+if false
     lx,ly,n = 4,4,2
     layers = Int(log(2,lx*ly))
-    intstren = 0.0
+    intstren = 300.0
 
     
-    #=dataloc = get_folder_location("cluster-data/synth-dims/excited-states")
+    #=dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
     pdict = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc)
     filter!(x -> !occursin("if_synth_rectangle",x),all_files)
     display(all_files)
     f = all_files[1]
     d,m = read_data(dataloc * "/" * f; output_level=0)
-    psi = d["ttn"]=#
+    psi = [d["ttn"],d["ttn_1"]]=#
+
+
 
     #
 
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_check_fluxes",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",5),("if_find_data",false),("if_save_data",false)])
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_check_fluxes",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",5),("if_find_data",true),("if_save_data",false)])
     #states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
 
-    #println("Energy gap is $(nrgs[2] - nrgs[1])")
+    println("Energy gap is $(nrgs[2] - nrgs[1])")
     
-    pdict = Dict([("particles",n),("es_count",0),("expander_fraction",100),("if_check_fluxes",false),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+    pdict = Dict([("particles",n),("es_count",1),("expander_fraction",100),("if_check_fluxes",false),("layers",layers),("mdim",200),("if_save_data",false),("if_find_data",false),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
     #all_results = run_synth_dims_generic(pdict)
     psi = all_results[1]
 
@@ -787,9 +789,10 @@ if true
     display(overlapmat)=#
 
 
-    #fourpt_mpo = focking_matrix(four_point_mpowrapped,psis[1],lattice_params["full_basis"]; output_level=1,momentum1 = m1, momentum2 = m2)
-    #fourpt_ed = ft_fourpt_matrix(states[1],m1,m2,lattice_params; output_level=0)
-    #println("Does MPO match with ED: ",round.(fourpt_mpo,digits=10) == round.(fourpt_ed,digits=10))
+    #=fourpt_mpo = focking_matrix(four_point_mpowrapped,psi[1],lattice_params["full_basis"]; output_level=1,momentum1 = m1, momentum2 = m2)
+    fourpt_ed = ft_fourpt_matrix(states[1],m1,m2,lattice_params; output_level=0)
+    println("Does MPO match with ED: ",round.(fourpt_mpo,digits=10) == round.(fourpt_ed,digits=10))
+    println("Does Transpose Match: ",round.(transpose(fourpt_mpo),digits=10) == round.(fourpt_ed,digits=10))=#
 
     # ttn1 with ortho_center at top has arrows pointing all away from oc
     # this could be the dagger already actually
@@ -798,8 +801,8 @@ if true
 
     #thismpo = single_point_mpo(psi,"Adag"; coeff_kwargs=(Lx=lx,Ly=ly,), mapping=collect(1:lx*ly))
 
-    fourpt_mpo_value = abs(four_point(psi,m1,m2; output_level=0))
-    fourpt_ed_value = abs(ft_fourpt(states[1],m1,m2,lattice_params; output_level=0))
+    fourpt_mpo_value = four_point(psi,m1,m2; output_level=0)
+    fourpt_ed_value = ft_fourpt(states[1:2],m1,m2,lattice_params; output_level=0)
     println("The measured values are MPO=$(fourpt_mpo_value) and ED=$(fourpt_ed_value)")
 
     #=fourpt_mpo_value = four_point(psis; output_level=0, if_plot=true, plot_title="MPO $(lx)x$(ly) N=$n ULR=$intstren")
@@ -831,7 +834,7 @@ if true
     println("The calculated value with Transpose Fock MPO is $(abs.(eigvals(expval_mpot)))")=#
 
 
-end#
+end=#
 
 #= fix transpose MPO
 if false

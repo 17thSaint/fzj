@@ -835,7 +835,7 @@ function ft_fourpt(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2:
         end
     end
 
-    return fourpt
+    return abs(fourpt)
 end
 
 function ft_fourpt_matrix(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
@@ -943,7 +943,7 @@ function ft_fourpt(wavefuncs::Vector{Vector{ComplexF64}},momentum1::Vector{Float
         end
     end
 
-    return eigvals(fourpt)
+    return abs.(eigvals(fourpt))
 end
 
 function four_point(wavefunc::Vector{ComplexF64},lattice_params::Dict; kwargs...)

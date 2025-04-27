@@ -14,7 +14,7 @@ Depends on:
 
 include("../other-funcs/include-other-files.jl")
 include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","synth-dims/hatsugai-mbcn.jl","other-funcs/basic-2d-observables.jl"])
-#include_other_files(["review-practice-codes/plottings.jl","other-funcs/basic-2d-plottings.jl"])
+include_other_files(["review-practice-codes/plottings.jl","other-funcs/basic-2d-plottings.jl"])
 #include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
 
 function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
@@ -61,7 +61,7 @@ function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
     end
 end
 
-# testing factory run on TTN with new gauge with seed ttn
+#= testing factory run on TTN with new gauge with seed ttn
 if false
     lx,ly,n = 8,4,4
     layers = Int(log(2,lx*ly))
@@ -79,13 +79,13 @@ if false
     params_dict = Dict([("hopping_anisotropy",1.0),("if_gpu",true),("seed_ttn",previous_ttn),("if_redo",true),("particles",n),("layers",layers),("mdim",400),("if_save_data",true),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
     all_results = run_synth_dims_generic(params_dict)
 
-end#
+end=#
 
 #= data collection of 4pt MPO
 if false
-    lx,ly,n = 8,4,4
+    lx,ly,n = 16,8,8
     layers = Int(log(2,lx*ly))
-    intstren = 300.0
+    intstren = 0.0
 
     dataloc = get_folder_location("cluster-data/synth-dims/torus/new_gauge")
     pdict = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
@@ -95,11 +95,13 @@ if false
     d,m = read_data(dataloc * "/wavefunc" * f; output_level=0)
 
     psi1 = d["ttn"]
-    psi2 = d["ttn_1"]
+    #psi2 = d["ttn_1"]
 
-    fourpt_mpo = four_point([psi1,psi2]; output_level=0)
+    #fourpt_mpo = four_point([psi1,psi2]; output_level=0)
+    fourpt_mpo = four_point(psi1; output_level=0)
 
-    datadict = Dict([("fourpt_momentum",fourpt_mpo[1]),("fourpt_momentum_1",fourpt_mpo[2])])
+    #datadict = Dict([("fourpt_momentum",fourpt_mpo[1]),("fourpt_momentum_1",fourpt_mpo[2])])
+    datadict = Dict([("fourpt_momentum",fourpt_mpo)])
     modify_data(datadict,dataloc * "/" * f,"metadata"; output_level=0)
 end=#
 
@@ -124,27 +126,19 @@ end=#
 #= plot 4pt 16x8
 if false
      
-    lx,ly,n = 8,4,4
+    lx,ly,n = 16,8,8
     layers = Int(log(2,lx*ly))
+    intstren = 300.0
 
     dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
-    pdict = Dict([("layers",layers),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    pdict = Dict([("layers",layers),("onsite_strength",intstren),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc)
 
-    for f in all_files
-        #f = all_files[1]    
-        d,m = read_data(joinpath(dataloc,f))
+    f = all_files[1]    
+    d,m = read_data(joinpath(dataloc,f))
 
-        fourpt_vals = m["fourpt_momentum"]
-        momoccs = m["mom_occs"]
-        plottingdata = fourpt_vals ./ (momoccs * transpose(momoccs))
-        plot(collect(1:lx),momoccs,"-p",label="$(m["onsite_strength"])")
-        xlabel("Momentum value")
-        ylabel("Occupancy")
-        title("Momentum Occupancy for $(lx)x$(ly) N=$(n)")
-        legend()
-        #plot_four_point(plottingdata)
-    end
+    fourpt_vals = m["fourpt_momentum"]
+    plot_four_point(fourpt_vals; plot_title=" 16x8 N=8 ULR=$(m["onsite_strength"])")
     
 
 end=#
