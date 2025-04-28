@@ -34,18 +34,28 @@ if true
     #CUDA.@allowscalar rez = calculate_mpo_expectation(psi, fourpt_wrapped)
     #tlist = [psi[1,1], TTN.adapt(CuArray,fourpt[1]), TTN.dag(TTN.prime(psi[1,1]))]
 
-
     net = BinaryRectangularNetwork((lx,ly), "Boson"; conserve_qns=true, dim = 2)
     psi = RandomTreeTensorNetwork(net; maxdim=25)
     psi = gpu(psi)
 
-    phys_ind = TTN.inds(psi[1,1])[1]
+    tn1 = psi[1,1]
+
+    # the issue seems to be independent of the MPO in the middle, it's the inner product that can't be done
+
+
+    #=psi_phys_index1 = TTN.Index([TTN.QN("Number",0)=>1,TTN.QN("Number",1)=>1]; tags="Site 1")
+    psi_phys_index2 = TTN.Index([TTN.QN("Number",0)=>1,TTN.QN("Number",1)=>1]; tags="Site 2")
+    psi_up_index = TTN.Index([TTN.QN("Number",0)=>1,TTN.QN("Number",1)=>2,TTN.QN("Number",2)=>1]; tags="Upsite")
+    ttn_tensor = TTN.ITensors.randomITensor(ComplexF64,[psi_phys_index1,psi_phys_index2,TTN.dag(psi_up_index)])
+    ttn_tensor = TTN.adapt(CuArray,ttn_tensor)=#
+
+    #=phys_ind = psi_phys_index1
     virt_index = TTN.Index([TTN.QN("Number",0)=>1,TTN.QN("Number",1)=>1]; tags="virtual")
     blahmpo = TTN.ITensors.randomITensor(ComplexF64,[TTN.dag(phys_ind),TTN.prime(phys_ind),virt_index])
-    blahmpo = TTN.adapt(CuArray,blahmpo)
+    blahmpo = TTN.adapt(CuArray,blahmpo)=#
 
-    tlist = [psi[1,1], blahmpo, TTN.dag(TTN.prime(psi[1,1]))]
-    CUDA.@allowscalar rez = contract(tlist)
+    #tlist = [ttn_tensor, blahmpo, TTN.dag(TTN.prime(ttn_tensor))]
+    #CUDA.@allowscalar rez = contract(tlist)
 
     #=pos = (2,1)
     net = psi.net
@@ -67,6 +77,7 @@ if true
     res = R*tn_parent=#
     # R is not on GPU memory, tn_child is GPU but the resulting Q,R are not on the GPU, because Factorize uses scalar indexing and happens on the GPU
     # however when R is put on GPU afterwards it still gets an illegal memory error
+
 
 
 end
