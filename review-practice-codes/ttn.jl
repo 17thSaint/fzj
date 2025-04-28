@@ -1511,7 +1511,7 @@ function TTN.ITensorMPS.measure!(o::SavingExcitedNRGVarObserver; kwargs...)
     dmrg = kwargs[:sweep_handler]
     append!(o.nrg,[dmrg.current_energy])
 
-	wavefunc_update::Dict{String,Any} = Dict([("ttn"*string_part,dmrg.ttn)])
+	wavefunc_update::Dict{String,Any} = Dict([("ttn"*string_part,cpu(dmrg.ttn))])
 	modify_data(wavefunc_update,add_wavefunc_to_filepath(o.file_path),"all_data")
 	
 	metadata_update = Dict([("observer"*string_part,o),("maxlinkdim"*string_part,TTN.maxlinkdim(dmrg.ttn))])

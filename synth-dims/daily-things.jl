@@ -14,7 +14,7 @@ Depends on:
 
 include("../other-funcs/include-other-files.jl")
 include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","synth-dims/hatsugai-mbcn.jl","other-funcs/basic-2d-observables.jl"])
-include_other_files(["review-practice-codes/plottings.jl","other-funcs/basic-2d-plottings.jl"])
+#include_other_files(["review-practice-codes/plottings.jl","other-funcs/basic-2d-plottings.jl"])
 #include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
 
 function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
@@ -87,7 +87,7 @@ if false
     layers = Int(log(2,lx*ly))
     intstren = 0.0
 
-    dataloc = get_folder_location("cluster-data/synth-dims/torus/new_gauge")
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
     pdict = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc)
     display(all_files)
@@ -105,30 +105,47 @@ if false
     modify_data(datadict,dataloc * "/" * f,"metadata"; output_level=0)
 end=#
 
-#= bond dim scaling for 8x4
-if false
-    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/bonddim-scaling")
-    all_files = readdir(dataloc)
+# check if expander is so required 8x4 and 16x8
+if true
+    lx,ly,n = 8,4,4
+    layers = Int(log(2,lx*ly))
+    intstren = 0.0
 
-    nrgs = []
-    bonddims = []
-    for f in all_files
-        d,m = read_data(dataloc * "/" * f; output_level=0)
-        append!(nrgs,[-m["energies"][end]])
-        append!(bonddims,[m["maxlinkdim"]])
-    end
-    plot(bonddims,nrgs,"-p")
-    xlabel("Bond Dimension")
-    ylabel("Energy")
-    yscale("log")
-end=#
+
+    params_dict = Dict([("hopping_anisotropy",1.0),("es_count",1),("particles",n),("layers",layers),("mdim",200),("if_save_data",true),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_results = run_synth_dims_generic(params_dict)
+
+    #=dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc)
+    filter!(x -> !occursin("gpu",x),all_files)
+    display(all_files)
+    f = all_files[1]
+    d,m = read_data(dataloc * "/wavefunc" * f; output_level=0)
+    psi_withexp = d["ttn"]
+    #psi2_withexp = d["ttn_1"]=#
+
+    #=pdict_noexp = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files_noexp = find_data_file(pdict_noexp,"ttn",dataloc)
+    filter!(x -> occursin("gpu",x),all_files_noexp)
+    display(all_files_noexp)
+    f_noexp = all_files_noexp[1]
+    d_noexp,m_noexp = read_data(dataloc * "/" * f_noexp; output_level=0)
+    psi_noexp = d_noexp["ttn"]
+    #psi2_noexp = d_noexp["ttn_1"]=#
+
+    # check overlap of states
+
+
+
+end#
 
 #= plot 4pt 16x8
 if false
      
     lx,ly,n = 16,8,8
     layers = Int(log(2,lx*ly))
-    intstren = 300.0
+    intstren = 0.0
 
     dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
     pdict = Dict([("layers",layers),("onsite_strength",intstren),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
@@ -138,8 +155,42 @@ if false
     d,m = read_data(joinpath(dataloc,f))
 
     fourpt_vals = m["fourpt_momentum"]
-    plot_four_point(fourpt_vals; plot_title=" 16x8 N=8 ULR=$(m["onsite_strength"])")
+    plot_four_point(fourpt_vals; plot_title="GS1 16x8 N=8 ULR=$(m["onsite_strength"])")
+
+    fourpt_vals2 = m["fourpt_momentum_1"]
+    plot_four_point(fourpt_vals2; plot_title="GS2 16x8 N=8 ULR=$(m["onsite_strength"])")
+
+    #=mixed_fourpt = 0.5 .* (fourpt_vals .+ fourpt_vals2)
+    plot_four_point(mixed_fourpt; plot_title="GS1+GS2 16x8 N=8 ULR=$(m["onsite_strength"])")=#
     
+
+end=#
+
+#= compare 4pt for 8x4 and 16x8 for finite size scaling
+if false
+    
+    big_lx,big_ly,big_n = 16,8,8
+    big_layers = Int(log(2,lx*ly))
+    intstren = 0.0
+
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    big_pdict = Dict([("layers",big_layers),("onsite_strength",intstren),("particles",big_n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    big_all_files = find_data_file(big_pdict,"ttn",dataloc)
+
+    big_f = big_all_files[1]    
+    big_d,big_m = read_data(joinpath(dataloc,big_f))
+
+    big_fourpt_vals = 0.5 .* (big_m["fourpt_momentum"] .+ big_m["fourpt_momentum_1"])
+    plot_four_point(big_fourpt_vals; plot_title="GS1 16x8 N=8 ULR=$(big_m["onsite_strength"])")
+
+    small_lx,small_ly,small_n = 8,4,4
+    small_layers = Int(log(2,small_lx*small_ly))
+    small_pdict = Dict([("layers",small_layers),("onsite_strength",intstren),("particles",small_n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    small_all_files = find_data_file(small_pdict,"ttn",dataloc)
+    small_f = small_all_files[1]
+    small_d,small_m = read_data(joinpath(dataloc,small_f))
+    small_fourpt_vals = 0.5 .* (small_m["fourpt_momentum"] .+ small_m["fourpt_momentum_1"])
+    plot_four_point(small_fourpt_vals; plot_title="GS1 8x4 N=4 ULR=$(small_m["onsite_strength"])")
 
 end=#
 

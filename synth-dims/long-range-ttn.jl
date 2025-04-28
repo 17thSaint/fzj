@@ -1,10 +1,10 @@
-#using Pkg
-#Pkg.activate(".")
+using Pkg
+Pkg.activate(".")
 include("../review-practice-codes/ttn.jl")
 include("../other-funcs/basic-2d-stuff.jl")
 include("../review-practice-codes/observables.jl")
 #include("../review-practice-codes/plottings.jl")
-using Profile,MKL
+using Profile,MKL,TensorOperations
 
 function spin_matrix_element(m1,m2,spin,direction::String)
 	if direction == "X"
@@ -1496,6 +1496,10 @@ function make_synthdims_filename(model_parameters::Dict)
 		filename_dict["max_occ"] = model_parameters["max_occ"]
 	end
 
+	if model_parameters["expander"] == TTN.NoExpander()
+		filename_dict["expander"] = false
+	end
+
 	return make_parameters_filename(filename_dict)*".h5"
 end
 
@@ -1966,7 +1970,7 @@ if false
 end
 
 # synth-dims for loop runnings
-if true
+if false
 
 	cols = ["b","g","r"]
 	#nnst = 0.0

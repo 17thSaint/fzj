@@ -30,6 +30,11 @@ if true
     fourpt = four_point_mpo(psi; momentum1 = [0.0,0], momentum2 = [0.0,0.0], mapping = mapss)
     =#
 
+    function TTN.NDTensors.similar(arraytype::Type{<:DenseVector{ComplexF64}}, dims::Dims)
+      @assert length(dims) == 1
+      return Vector{ComplexF64}(undef, dims[1])
+    end
+
     tn = TTN.ITensors.tensor(psi[1,1])
     mp = TTN.ITensors.tensor(fourpt[1])
     la,lb = TTN.ITensors.compute_contraction_labels(TTN.inds(tn),TTN.inds(mp))
