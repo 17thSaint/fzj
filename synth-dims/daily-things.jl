@@ -105,8 +105,32 @@ if false
     modify_data(datadict,dataloc * "/" * f,"metadata"; output_level=0)
 end=#
 
-# check if expander is so required 8x4 and 16x8
-if true
+#= calculate entanglement spectrum for new data
+if false
+    BLAS.set_num_threads(5)
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict = Dict([("layers",7),("particles",8),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc) 
+    display(all_files)
+    
+    for f in all_files
+        d,m = read_data(dataloc * "/wavefunc" * f; output_level=0)
+        
+        fulldata = zeros(ComplexF64,pdict["layers"]-1,maxlinkdim(d["ttn"]))
+        for k in 0:pdict["layers"] - 2
+            entspec = spatial_entanglement_spectrum(d["ttn"]; layers_down=k)
+            fulldata[k+1,:] = vcat(entspec,zeros(ComplexF64,maxlinkdim(d["ttn"]) - length(entspec)))
+        end
+        datadict = Dict([("entanglement_spectrum",fulldata)])
+        modify_data(datadict,dataloc * "/" * f,"metadata"; output_level=0)
+    end
+
+
+end=#
+
+
+#= check if expander is so required 8x4 and 16x8
+if false
     lx,ly,n = 8,4,4
     layers = Int(log(2,lx*ly))
     intstren = 0.0
@@ -138,7 +162,7 @@ if true
 
 
 
-end#
+end=#
 
 #= plot 4pt 16x8
 if false

@@ -13,7 +13,7 @@ include("../other-funcs/include-other-files.jl")
 include_other_files(["synth-dims/long-range-ttn.jl","other-funcs/basic-2d-observables.jl"])
 
 # testing tensor times mpo which has DenseVector type issues
-if true
+if false
     #
     lx,ly,n = 8,4,4
     layers = Int(log(2,lx*ly))

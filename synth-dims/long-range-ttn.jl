@@ -1,5 +1,5 @@
-using Pkg
-Pkg.activate(".")
+#using Pkg
+#Pkg.activate(".")
 include("../review-practice-codes/ttn.jl")
 include("../other-funcs/basic-2d-stuff.jl")
 include("../review-practice-codes/observables.jl")
