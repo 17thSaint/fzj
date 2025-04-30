@@ -1,5 +1,5 @@
-using Pkg
-Pkg.activate(".")
+#using Pkg
+#Pkg.activate("../synth-dims/")
 include("../review-practice-codes/ttn.jl")
 include("../other-funcs/basic-2d-stuff.jl")
 include("../review-practice-codes/observables.jl")
@@ -1970,7 +1970,7 @@ if false
 end
 
 # synth-dims for loop runnings
-if true
+if false
 
 	cols = ["b","g","r"]
 	#nnst = 0.0
