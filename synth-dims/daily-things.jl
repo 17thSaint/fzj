@@ -61,14 +61,14 @@ function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
     end
 end
 
-#= testing factory run on TTN with new gauge with seed ttn
-if false
-    lx,ly,n = 8,4,4
+# testing factory run on TTN with new gauge with seed ttn
+if true
+    lx,ly,n = 16,8,8
     layers = Int(log(2,lx*ly))
-    intstren = 0.0
+    intstren = 300.0
 
     which_one = 1
-    dataloc = get_folder_location("cluster-data/synth-dims/torus")
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
     previous_pdict = Dict([("layers",layers),("onsite_strength",intstren),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files_previous = find_data_file(previous_pdict,"wavefuncttn",dataloc)
     display(all_files_previous)
@@ -76,37 +76,39 @@ if false
     d_previous,m_previous = read_data(joinpath(dataloc,f_previous); output_level=0)
     previous_ttn = d_previous["ttn"]
 
-    params_dict = Dict([("hopping_anisotropy",1.0),("if_gpu",true),("seed_ttn",previous_ttn),("if_redo",true),("particles",n),("layers",layers),("mdim",400),("if_save_data",true),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+    params_dict = Dict([("hopping_anisotropy",1.0),("expander_fraction",1e-5),("seed_ttn",previous_ttn),("if_redo",true),("particles",n),("layers",layers),("mdim",400),("if_save_data",true),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
     all_results = run_synth_dims_generic(params_dict)
 
-end=#
+end#
 
 #= data collection of 4pt MPO
 if false
     lx,ly,n = 16,8,8
     layers = Int(log(2,lx*ly))
-    intstren = 0.0
+    #intstren = 0.0
 
     dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
-    pdict = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    pdict = Dict([("layers",layers),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc)
     display(all_files)
-    f = all_files[1]
-    d,m = read_data(dataloc * "/wavefunc" * f; output_level=0)
+    #f = all_files[1]
+    for f in all_files
+        d,m = read_data(dataloc * "/wavefunc" * f; output_level=0)
 
-    psi1 = d["ttn"]
-    #psi2 = d["ttn_1"]
+        psi1 = d["ttn"]
+        #psi2 = d["ttn_1"]
 
-    #fourpt_mpo = four_point([psi1,psi2]; output_level=0)
-    fourpt_mpo = four_point(psi1; output_level=0)
+        #fourpt_mpo = four_point([psi1,psi2]; output_level=0)
+        fourpt_mpo = four_point(psi1; output_level=0)
 
-    #datadict = Dict([("fourpt_momentum",fourpt_mpo[1]),("fourpt_momentum_1",fourpt_mpo[2])])
-    datadict = Dict([("fourpt_momentum",fourpt_mpo)])
-    modify_data(datadict,dataloc * "/" * f,"metadata"; output_level=0)
+        #datadict = Dict([("fourpt_momentum",fourpt_mpo[1]),("fourpt_momentum_1",fourpt_mpo[2])])
+        datadict = Dict([("fourpt_momentum",fourpt_mpo)])
+        modify_data(datadict,dataloc * "/" * f,"metadata"; output_level=0)
+    end
 end=#
 
 #= calculate entanglement spectrum for new data
-if false
+if true
     BLAS.set_num_threads(5)
     dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
     pdict = Dict([("layers",7),("particles",8),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])

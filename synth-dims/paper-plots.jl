@@ -15,15 +15,13 @@ include("../other-funcs/include-other-files.jl")
 include_other_files(["synth-dims/long-range-ttn.jl","synth-dims/hatsugai-mbcn.jl","other-funcs/basic-2d-observables.jl"])
 include_other_files(["review-practice-codes/plottings.jl","other-funcs/basic-2d-plottings.jl"])
 include_other_files(["exact-diag/execute-ed.jl","exact-diag/observables.jl","exact-diag/plottings.jl"])
-using JLD2
-
+using JLD2,LaTeXStrings,LsqFit
 
 ########### TO-DO ############
 #=
 
        Plots to be made
 1. Hatsugai Chern number counting (or use old figure)
-2. Topological Entanglement Entropy for ULR = 0.0 and 300.0
 3. Fourier transform of density thermodynamic scaling to show flatness
 
 
@@ -171,7 +169,7 @@ end
 #kept_files = plot_finitesize_gapscaling(0.0)
 
 # finite size scaling of the topological gap
-# stil need 16x8 to get E3
+# still need 16x8 to get E3
 function plot_topo_gapscaling(ulr::Float64=0.0)
 
     # ED section
@@ -246,7 +244,8 @@ function plot_ee_scaling()
     all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
     display(all_files_ttn)
 
-    perims = [8*4,8*3,4*4,4*3,2*4]
+    perims = [8*3,4*4,4*3,2*4,2*3]
+    all_ees = []
     for f in all_files_ttn
 
         params = get_params_dict_from_filename(f)
@@ -255,19 +254,34 @@ function plot_ee_scaling()
         ees = zeros(Float64,layers-2)
         entspecs = real.(m["entanglement_spectrum"])
 
-        for k in 1:layers-2
+        for k in 2:layers-1
             entspec = filter(x -> x != 0.0, entspecs[k,:])
             #display(entspec)
 
             ee = entanglement_entropy(entspec)
-            append!(ees,[ee])
+            ees[k-1] = ee
         end
-        println(size(ees),", ",size(perims))
         scatter(perims,ees,label="$(params["onsite_strength"])")
+        append!(all_ees,[ees])
     end
 
+    xlabel("Perimeter")
+    ylabel("Entanglement Entropy")
+    #title("Entanglement Entropy vs Perimeter $(lx)x$(ly) N=$(n)")
+    #legend()
+    ylim(-1.0,1.1*maximum(Iterators.flatten(all_ees)))
+    xlim(0.0,1.1*maximum(perims))
+
+    linmodel(x,p) = p[1] .* x .+ p[2]
+    linfit = curve_fit(linmodel,perims,all_ees[1],[1.0,1.0])
+    yintercept = linfit.param[2]
+    title("Entanglement Entropy vs Perimeter $(lx)x$(ly) N=$(n)")
+    xs = [0.0,1.2*maximum(perims)]
+    plot(xs,linmodel(xs,linfit.param),label="Fit: "*L"$\gamma = $"*"$(round(-yintercept, digits=3))",c="b")
+    legend()
+
 end
-plot_ee_scaling()
+#plot_ee_scaling()
 
 
 
