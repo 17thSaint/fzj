@@ -1,5 +1,5 @@
-#using Pkg
-#Pkg.activate(".")
+using Pkg
+Pkg.activate(".")
 include("../review-practice-codes/ttn.jl")
 include("../other-funcs/basic-2d-stuff.jl")
 include("../review-practice-codes/observables.jl")
@@ -1970,7 +1970,7 @@ if false
 end
 
 # synth-dims for loop runnings
-if false
+if true
 
 	cols = ["b","g","r"]
 	#nnst = 0.0
@@ -1993,6 +1993,9 @@ if false
 	args_dict = make_args_dict(ARGS)
 	dataloc = args_dict["dataloc"]
 	stren = args_dict["onsite_strength"]
+	layers = args_dict["layers"]
+	n = args_dict["particles"]
+	mdim = args_dict["mdim"]
 	#alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
 	#strens = [0.0,0.5,1.0,1.5,2.0]#range(0.1,0.5,length=3)
 	#for (idx,anis) in enumerate(anises)
@@ -2004,7 +2007,7 @@ if false
 		
 		#d,m = read_data("../cluster-data/synth-dims/torus/ttn-if_periodic_phys-true-onsite_strength-0.0-lr-0-particles-4-alpha-0.0-layers-4-hopping_anisotropy-1.0.h5")
 		#st = d["ttn"]
-		params_dict = Dict([("hopping_anisotropy",1.0),("dataloc",dataloc),("es_count",1),("expander_fraction",1e-5),("particles",8),("layers",7),("mdim",mdim),("if_save_data",true),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("hopping_anisotropy",1.0),("dataloc",dataloc),("es_count",1),("expander_fraction",1e-5),("particles",n),("layers",layers),("mdim",mdim),("if_save_data",true),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		#=open_cores = get(params_dict, "open_cores", 5)

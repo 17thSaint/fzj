@@ -36,5 +36,5 @@ done
 
 echo "$@"
 
-juliau "$@" > "${OUTPUTFILENAME}"
+julia "$@" > "${OUTPUTFILENAME}"
 

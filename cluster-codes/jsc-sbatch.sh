@@ -41,7 +41,7 @@ additional_params=("${@:5}")
 
 # Get the current date and time
 #alpha=$(date +"%Y-%m-%d_%H-%M")
-datafolder="/p/project/netenesyquma/geraghty1/data/gpu-trial-run"
+datafolder="/p/project/netenesyquma/geraghty1/data/jsc-test"
 
 # Create the folder
 mkdir -p "$datafolder"
