@@ -1496,10 +1496,6 @@ function make_synthdims_filename(model_parameters::Dict)
 		filename_dict["max_occ"] = model_parameters["max_occ"]
 	end
 
-	if model_parameters["expander"] == TTN.NoExpander()
-		filename_dict["expander"] = false
-	end
-
 	return make_parameters_filename(filename_dict)*".h5"
 end
 
@@ -1991,7 +1987,7 @@ if false
 	#anises = range(1.0,5.0,length=10)
 	#strens = [0.0,0.25,0.5,0.75,1.0,1.5,2.0,5.0,10.0,20.0,50.0,100.0,300.0,1000.0]
 	args_dict = make_args_dict(ARGS)
-	dataloc = args_dict["dataloc"]
+	#dataloc = args_dict["dataloc"]
 	stren = args_dict["onsite_strength"]
 	layers = args_dict["layers"]
 	n = args_dict["particles"]

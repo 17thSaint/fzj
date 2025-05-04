@@ -13,7 +13,7 @@ using HDF5
 function HDF5.read(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, observer::Type{<:TTN.ITensorMPS.AbstractObserver})
     group = open_group(parent, name)
     
-    observer_type = read(attributes(group)["type"])
+    observer_type = read(HDF5.attributes(group)["type"])
 
     if observer_type == "SavingNRGVarObserver"
         return read_SNVO(group, SavingNRGVarObserver)
@@ -39,7 +39,7 @@ function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, o
 	write(group, "var_tol", var_tol)
 	write(group, "nrg", nrg)
 
-    attributes(group)["type"] = "SavingNRGVarObserver"
+    HDF5.attributes(group)["type"] = "SavingNRGVarObserver"
 end
 
 function read_SNVO(group::HDF5.Group, observer::Type{<:SavingNRGVarObserver})
@@ -61,7 +61,7 @@ function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, o
 	write(group, "var_tol", var_tol)
 	write(group, "nrg", nrg)
 
-    attributes(group)["type"] = "NRGVarObserver"
+    HDF5.attributes(group)["type"] = "NRGVarObserver"
 end
 
 function read_NVO(group::HDF5.Group, observer::Type{<:NRGVarObserver})
@@ -88,7 +88,7 @@ function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, o
 	write(group, "measurement_functions", measurement_functions)
 	write(group, "measurements", measurements)
 
-    attributes(g)["type"] = "SavingMeasurementsObserver"
+    HDF5.attributes(g)["type"] = "SavingMeasurementsObserver"
 end
 
 function read_SMO(group::HDF5.Group, observer::Type{<:SavingMeasurementsObserver})
@@ -116,7 +116,7 @@ function HDF5.write(parent::Union{HDF5.File,HDF5.Group}, name::AbstractString, o
     write(group, "nrg_level", nrg_level)
     write(group, "nrg", nrg)
 
-    attributes(group)["type"] = "SavingExcitedNRGVarObserver"
+    HDF5.attributes(group)["type"] = "SavingExcitedNRGVarObserver"
 end
 
 function read_SENVO(group::HDF5.Group, observer::Type{<:SavingExcitedNRGVarObserver})

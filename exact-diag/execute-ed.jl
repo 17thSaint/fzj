@@ -43,7 +43,7 @@ end
 
 
 include_other_files(["other-funcs/basic-2d-stuff.jl","other-funcs/basic-2d-observables.jl","exact-diag/two-dimensions.jl","exact-diag/observables.jl","exact-diag/hatsugai-mbcn.jl"])
-#include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
+include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
 
 function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     if hamilt_params["U"][2] == 0.0
@@ -310,17 +310,17 @@ function run_normal_ed(params_dict::Dict; kwargs...)
 end
 
 # run data collection with for loops
-if false
+if true
     
     #args_dict = make_args_dict(ARGS)
     #which_one = args_dict["which_one"]
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
     
-    lx,ly,n = 10,5,5
+    lx,ly,n = 8,4,4
     #for (idx,n) in enumerate([2,3,4,5])
-    intstrens = vcat(range(0.0,1.0,length=6),exp10.(range(0.0,log10(1000),length=19)))#[3,4,5,6,7,8,9,20,30,40,70,150,200,300,400]
-    #intstren = 1000.0
+    #intstrens = vcat(range(0.0,1.0,length=6),exp10.(range(0.0,log10(1000),length=19)))#[3,4,5,6,7,8,9,20,30,40,70,150,200,300,400]
+    #intstrens = [0.0,1.0,100.0,500.0,1000.0]
     #other_intstrens = range(2.0,10.0,length=37)
     #intstrens = sort([intstrens; other_intstrens])
     #all_nrgs = zeros(Float64,length(thetas))
@@ -332,10 +332,10 @@ if false
     #for (idx,nu) in enumerate(nus)
     #for (idx,anis) in enumerate(anises)
     #    anis = 1/anis
-    for (idx,intstren) in enumerate(intstrens)
+    #for (idx,intstren) in enumerate(intstrens)
     #for (idx2,sigma) in enumerate(sigmas)
     #for lrd in [0,1]
-    #intstren = 0.0
+    intstren = 50.0
 
     #= set number of open cores
     open_cores = 5#get(params_dict, "open_cores", 5)
@@ -347,6 +347,7 @@ if false
     #intstren = 0.0
     tw2 = 0.0
     tw1 = 0.0
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")#/new-gauge/pinned-scaling")
     #tws = range(0.0,1.0,length=11)
     #tws2 = range(0.0,1.0,length=3)
     #fts = zeros(Float64,length(tws),length(tws))
@@ -363,7 +364,7 @@ if false
         #    continue
         #end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_pinning",false),("if_reading",true),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",true)])
+        params_dict = Dict([("output_level",1),("dataloc",dataloc),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_pinning",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
         #println("Starting from here")
@@ -432,7 +433,7 @@ if false
     ylabel(L"\theta_y / 2\pi")
     title("FT Density at k=(pi,0) for $(lx)x$(ly) N=$n ULR=$intstren")=#
 
-    end
+    #end
 
     #xlabel(L"\theta_x / 2\pi")
     #ylabel(L"\theta_y / 2\pi")

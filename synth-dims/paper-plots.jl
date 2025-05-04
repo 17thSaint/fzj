@@ -112,7 +112,7 @@ function plot_finitesize_gapscaling(ulr::Float64=0.0)
     pdict = Dict([("hopping_anisotropy",1.0),("interaction_strength",ulr),("if_periodic_x",true),("if_periodic_y",true)])
     all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2")
     filter!(x -> !occursin("twist_angle",x), all_files)
-    #display(all_files)
+    display(all_files)
 
     used_files = []
     lxs = []
