@@ -106,11 +106,12 @@ end
 # finite size scaling of the finite size gap
 # waiting for 16x8 to finish running GS2
 function plot_finitesize_gapscaling(ulr::Float64=0.0)
+    fig = figure()
 
     # ED section
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     pdict = Dict([("hopping_anisotropy",1.0),("interaction_strength",ulr),("if_periodic_x",true),("if_periodic_y",true)])
-    all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2")
+    all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2", output_level=0)
     filter!(x -> !occursin("twist_angle",x), all_files)
     display(all_files)
 
@@ -128,16 +129,16 @@ function plot_finitesize_gapscaling(ulr::Float64=0.0)
         d,m = read_data_jld2(joinpath(dataloc,f); output_level=0)
         all_nrgs = d["nrg"]
 
-        scatter(1/params["Lx"],all_nrgs[2] - all_nrgs[1],c="b")
+        scatter(params["Lx"],all_nrgs[2] - all_nrgs[1],c="b")
         append!(lxs,[params["Lx"]])
     end
     xlabel("Lx")
     ylabel("E1 - E0")
-    title("Finite Gap Scaling")
+    title("Finite Gap Scaling for ULR=$ulr")
     yscale("log")
 
 
-    # TTN section
+    #= TTN section
     dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
     pdict_ttn = Dict([("hopping_anisotropy",1.0),("onsite_strength",ulr),("if_periodic_phys",true),("if_periodic_synth",true)])
     all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
@@ -158,15 +159,80 @@ function plot_finitesize_gapscaling(ulr::Float64=0.0)
 
         e1 = m["observer"].nrg[end]
         e2 = m["observer_1"].nrg[end]
-        scatter(1/Lx,e2 - e1,c="r")
+        scatter(Lx,e2 - e1,c="r")
         append!(lxs,[Lx])
     end
+    =#
 
-    xlim(0.0,1.1*(1/minimum(lxs)))
+    xlim(0.0,1.1*(maximum(lxs)))
 
     return used_files
 end
 #kept_files = plot_finitesize_gapscaling(0.0)
+
+# finite size scaling of the finite size gap with density perturbation at (1,1) strength 1e-4
+function plot_finitesize_gapscaling_pinned(ulr::Float64=300.0)
+    fig = figure()
+
+    # ED section
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
+    pdict = Dict([("hopping_anisotropy",1.0),("if_pinning",true),("interaction_strength",ulr),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2")
+    filter!(x -> !occursin("twist_angle",x), all_files)
+    display(all_files)
+
+    used_files = []
+    lxs = []
+    for f in all_files
+        params = get_params_dict_from_filename(f)
+
+        if (params["N"] / params["Lx"] != 0.5) || (params["Lx"] != 2*params["Ly"])
+            continue
+        end
+
+        append!(used_files,[f])
+
+        d,m = read_data_jld2(joinpath(dataloc,f); output_level=0)
+        all_nrgs = d["nrg"]
+
+        scatter(params["Lx"],all_nrgs[2] - all_nrgs[1],c="b")
+        append!(lxs,[params["Lx"]])
+    end
+    xlabel("Lx")
+    ylabel("E1 - E0")
+    title("Finite Gap Scaling of Pinned State for ULR=$ulr")
+    yscale("log")
+
+
+    #= TTN section
+    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
+    pdict_ttn = Dict([("hopping_anisotropy",1.0),("if_pinning",true),("onsite_strength",ulr),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
+    display(all_files_ttn)
+
+    for f in all_files_ttn
+        params = get_params_dict_from_filename(f)
+        Lx,Ly = get_lattice_dims_from_layers(params["layers"])
+
+
+        if (params["particles"] / Lx != 0.5) || (Lx != 2*Ly) || Lx <= 10
+            continue
+        end
+
+        append!(used_files,[f])
+
+        d,m = read_data(joinpath(dataloc_ttn,f); output_level=0)
+
+        e1 = m["observer"].nrg[end]
+        e2 = m["observer_1"].nrg[end]
+        scatter(Lx,e2 - e1,c="r")
+        append!(lxs,[Lx])
+    end=#
+
+    xlim(0.0,1.1*(maximum(lxs)))
+
+    return used_files
+end
 
 # finite size scaling of the topological gap
 # still need 16x8 to get E3
@@ -194,16 +260,16 @@ function plot_topo_gapscaling(ulr::Float64=0.0)
         d,m = read_data_jld2(joinpath(dataloc,f); output_level=0)
         all_nrgs = d["nrg"]
 
-        scatter(1/params["Lx"],all_nrgs[3] - all_nrgs[1],c="b")
+        scatter(params["Lx"],all_nrgs[3] - all_nrgs[1],c="b")
         
         append!(allvals,[all_nrgs[3] - all_nrgs[1]])
         append!(lxs,[params["Lx"]])
     end
-    xlabel("1 / Lx")
+    xlabel("Lx")
     ylabel("E2 - E0")
     title("Topological Gap Scaling")
     ylim(0.0,1.1*maximum(allvals))
-    xlim(0.0,1.1*maximum(1.0 ./ lxs))
+    xlim(0.0,1.1*maximum(lxs))
 
     #= TTN section
     dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")

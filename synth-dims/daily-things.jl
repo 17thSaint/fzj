@@ -14,7 +14,7 @@ Depends on:
 
 include("../other-funcs/include-other-files.jl")
 include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","synth-dims/hatsugai-mbcn.jl","other-funcs/basic-2d-observables.jl"])
-#include_other_files(["review-practice-codes/plottings.jl","other-funcs/basic-2d-plottings.jl"])
+include_other_files(["review-practice-codes/plottings.jl","other-funcs/basic-2d-plottings.jl"])
 #include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
 
 function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
@@ -62,7 +62,7 @@ function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
 end
 
 # testing factory run on TTN with new gauge with seed ttn
-if true
+if false
     lx,ly,n = 16,8,8
     layers = Int(log(2,lx*ly))
     intstren = 300.0

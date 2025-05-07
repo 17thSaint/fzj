@@ -15,6 +15,7 @@ Depends on:
 
 #using Pkg
 #Pkg.activate(".")
+using JLD2
 
 function find_center()
 	all_folders = split(pwd(),"/")
@@ -43,7 +44,7 @@ end
 
 
 include_other_files(["other-funcs/basic-2d-stuff.jl","other-funcs/basic-2d-observables.jl","exact-diag/two-dimensions.jl","exact-diag/observables.jl","exact-diag/hatsugai-mbcn.jl"])
-include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
+#include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
 
 function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     if hamilt_params["U"][2] == 0.0
@@ -310,14 +311,14 @@ function run_normal_ed(params_dict::Dict; kwargs...)
 end
 
 # run data collection with for loops
-if true
+if false
     
     #args_dict = make_args_dict(ARGS)
     #which_one = args_dict["which_one"]
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
     
-    lx,ly,n = 8,4,4
+    lx,ly,n = 10,5,5
     #for (idx,n) in enumerate([2,3,4,5])
     #intstrens = vcat(range(0.0,1.0,length=6),exp10.(range(0.0,log10(1000),length=19)))#[3,4,5,6,7,8,9,20,30,40,70,150,200,300,400]
     #intstrens = [0.0,1.0,100.0,500.0,1000.0]
@@ -335,7 +336,7 @@ if true
     #for (idx,intstren) in enumerate(intstrens)
     #for (idx2,sigma) in enumerate(sigmas)
     #for lrd in [0,1]
-    intstren = 50.0
+    intstren = 300.0
 
     #= set number of open cores
     open_cores = 5#get(params_dict, "open_cores", 5)
@@ -347,7 +348,7 @@ if true
     #intstren = 0.0
     tw2 = 0.0
     tw1 = 0.0
-    dataloc = get_folder_location("cluster-data/exact-diag/torus")#/new-gauge/pinned-scaling")
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
     #tws = range(0.0,1.0,length=11)
     #tws2 = range(0.0,1.0,length=3)
     #fts = zeros(Float64,length(tws),length(tws))
@@ -364,7 +365,7 @@ if true
         #    continue
         #end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("dataloc",dataloc),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_pinning",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("dataloc",dataloc),("if_pinning",true),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",true)])
         #params_dict = make_args_dict(ARGS)
 
         #println("Starting from here")
@@ -372,6 +373,14 @@ if true
         if true
             states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
         end
+        
+        #=if params_dict["if_pinning"]
+            nrg1_pin = nrgs[1]
+            nrg2_pin = nrgs[2]
+        else
+            nrg1_none = nrgs[1]
+            nrg2_none = nrgs[2]
+        end=#
         
         #scatter3D(tw1,tw2,nrgs[1] - nrgs[1],c="b")
         #scatter3D(tw1,tw2,nrgs[2] - nrgs[1],c="g")

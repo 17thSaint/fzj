@@ -10,8 +10,8 @@ Depends on:
 ######################################################
 
 include("execute-ed.jl")
-#include("plottings.jl")
-#include("../other-funcs/basic-2d-plottings.jl")
+include("plottings.jl")
+include("../other-funcs/basic-2d-plottings.jl")
 
 function datacollection_flatness(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
     hanis::Float64 = get(kwargs,:hopping_anisotropy,1.0)
@@ -59,7 +59,7 @@ function datacollection_flatness(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
 end
 
 
-# redo gamma/omega calcs for all files
+#= redo gamma/omega calcs for all files
 if false
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     all_files = filter(x -> occursin("ed",x),readdir(dataloc))
@@ -1111,7 +1111,7 @@ if false
         end
     end
 
-end
+end=#
 
 
 

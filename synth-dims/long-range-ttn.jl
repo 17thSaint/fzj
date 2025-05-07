@@ -1,10 +1,10 @@
-#using Pkg
-#Pkg.activate("../synth-dims/")
+using Pkg
+Pkg.activate("../synth-dims/")
 include("../review-practice-codes/ttn.jl")
 include("../other-funcs/basic-2d-stuff.jl")
 include("../review-practice-codes/observables.jl")
 #include("../review-practice-codes/plottings.jl")
-using Profile,MKL,TensorOperations
+using Profile,MKL,TensorOperations,CUDA
 
 function spin_matrix_element(m1,m2,spin,direction::String)
 	if direction == "X"
@@ -1780,6 +1780,17 @@ function run_synth_dims_generic(params_dict::Dict)
 	end
 end
 
+function initialize_dmrg(if_gpu::Bool)
+	pdict = Dict([("hopping_anisotropy",1.0),("if_gpu",if_gpu),("if_find_data",false),("es_count",1),("expander_fraction",1e-5),("particles",2),("layers",4),("mdim",100),("if_save_data",false),("filling",0.5),("onsite_strength",1.0),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+
+	if if_gpu
+		CUDA.@allowscalar all_results = run_synth_dims_generic(pdict)
+	else
+		all_results = run_synth_dims_generic(pdict)
+	end
+
+end
+
 if false
 	here = pwd()
 	cd("../cluster-data/synth-dims/excited-states/")
@@ -2003,17 +2014,19 @@ if false
 		
 		#d,m = read_data("../cluster-data/synth-dims/torus/ttn-if_periodic_phys-true-onsite_strength-0.0-lr-0-particles-4-alpha-0.0-layers-4-hopping_anisotropy-1.0.h5")
 		#st = d["ttn"]
-		params_dict = Dict([("hopping_anisotropy",1.0),("dataloc",dataloc),("es_count",1),("expander_fraction",1e-5),("particles",n),("layers",layers),("mdim",mdim),("if_save_data",true),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("hopping_anisotropy",1.0),("if_gpu",true),("es_count",1),("expander_fraction",1e-5),("particles",n),("layers",layers),("mdim",mdim),("if_save_data",true),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
-		#=open_cores = get(params_dict, "open_cores", 5)
-		if typeof(open_cores) != String
-			BLAS.set_num_threads(open_cores)	
-			display(BLAS.get_config())
-		end=#
+		#open_cores = get(params_dict, "open_cores", 5)
+		#if typeof(open_cores) != String
+			BLAS.set_num_threads(2)	
+		#	display(BLAS.get_config())
+		#end#
+
+		initialize_dmrg(params_dict["if_gpu"])
 
 
-		all_results = run_synth_dims_generic(params_dict)
+		CUDA.@allowscalar all_results = run_synth_dims_generic(params_dict)
 		#nrgs = [all_results[3][i].nrg[end] for i in 1:params_dict["es_count"]+1]
 		#plot_spectrum(strens,nrgs,idx,params_dict["es_count"]+1,"Interaction Strength",true; plot_title=" Synth Rectangle TTN")
 
