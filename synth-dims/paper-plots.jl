@@ -22,7 +22,6 @@ using JLD2,LaTeXStrings,LsqFit
 
        Plots to be made
 1. Hatsugai Chern number counting (or use old figure)
-3. Fourier transform of density thermodynamic scaling to show flatness
 
 
        Data to be run
@@ -164,7 +163,7 @@ function plot_finitesize_gapscaling(ulr::Float64=0.0)
     end
     =#
 
-    xlim(0.0,1.1*(maximum(lxs)))
+    #xlim(0.0,1.1*(maximum(lxs)))
 
     return used_files
 end
@@ -172,7 +171,6 @@ end
 
 # finite size scaling of the finite size gap with density perturbation at (1,1) strength 1e-4
 function plot_finitesize_gapscaling_pinned(ulr::Float64=300.0)
-    fig = figure()
 
     # ED section
     dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
@@ -182,7 +180,8 @@ function plot_finitesize_gapscaling_pinned(ulr::Float64=300.0)
     display(all_files)
 
     used_files = []
-    lxs = []
+    lxs = Dict("0.01"=>[], "0.0001"=>[], "0.001"=>[])
+    gaps = Dict("0.01"=>[], "0.0001"=>[], "0.001"=>[])
     for f in all_files
         params = get_params_dict_from_filename(f)
 
@@ -195,14 +194,33 @@ function plot_finitesize_gapscaling_pinned(ulr::Float64=300.0)
         d,m = read_data_jld2(joinpath(dataloc,f); output_level=0)
         all_nrgs = d["nrg"]
 
-        scatter(params["Lx"],all_nrgs[2] - all_nrgs[1],c="b")
-        append!(lxs,[params["Lx"]])
+        if haskey(m,"pinning_strength")
+            if haskey(gaps,string(m["pinning_strength"]))
+                append!(gaps[string(m["pinning_strength"])],[all_nrgs[2] - all_nrgs[1]])
+                append!(lxs[string(m["pinning_strength"])],[params["Lx"]])
+            else
+                gaps[string(m["pinning_strength"])] = [all_nrgs[2] - all_nrgs[1]]
+                lxs[string(m["pinning_strength"])] = [params["Lx"]]
+            end
+        else
+            append!(gaps["0.0001"],[all_nrgs[2] - all_nrgs[1]])
+            append!(lxs["0.0001"],[params["Lx"]])
+        end
+        #append!(lxs[1],[params["Lx"]])
+        #append!(gaps[1],[all_nrgs[2] - all_nrgs[1]])
+
+        #scatter(params["Lx"],all_nrgs[2] - all_nrgs[1],c=col)
+
+    end
+    fig = figure()
+    for (k,v) in gaps
+        length(v) > 0 && scatter(lxs[k],v,label="$(parse(Float64,k)/10)")
     end
     xlabel("Lx")
     ylabel("E1 - E0")
     title("Finite Gap Scaling of Pinned State for ULR=$ulr")
     yscale("log")
-
+    legend()
 
     #= TTN section
     dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
@@ -229,7 +247,7 @@ function plot_finitesize_gapscaling_pinned(ulr::Float64=300.0)
         append!(lxs,[Lx])
     end=#
 
-    xlim(0.0,1.1*(maximum(lxs)))
+    #xlim(0.0,1.1*(maximum(lxs)))
 
     return used_files
 end
@@ -348,6 +366,209 @@ function plot_ee_scaling()
 
 end
 #plot_ee_scaling()
+
+# correlations for 16x8 N=8
+function plot_correlations(ulr::Float64=0.0)
+    lx,ly,n = 16,8,8
+    layers = Int(log(2,lx*ly))
+
+    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict_ttn = Dict([("hopping_anisotropy",1.0),("onsite_strength",ulr),("layers",layers),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
+
+    if length(all_files_ttn) > 1
+        error("Multiple files found: $(all_files_ttn)")
+    end
+    
+    f = all_files_ttn[1]
+
+    params = get_params_dict_from_filename(f)
+    d,m = read_data(joinpath(dataloc_ttn,f); output_level=0)
+
+    rho = d["densmat"]
+    corrs = physical_correlation(rho,lx,ly; if_plot=true,plot_title="$(lx)x$(ly) N=$n ULR=$ulr")
+    #corrs = synthetic_correlation(rho,lx,ly; if_plot=true,plot_title="$(lx)x$(ly) N=$n ULR=$ulr")
+
+    return corrs
+end
+
+# fourpt flatness scaling
+# get fourpt data for ED 10x5
+function plot_fourpt_flatness_scaling()
+
+    # ED section
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict = Dict([("hopping_anisotropy",1.0),("interaction_strength",0.0),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2", output_level=0)
+    filter!(x -> !occursin("twist_angle",x), all_files)
+    display(all_files)
+
+    for f in all_files
+        params = get_params_dict_from_filename(f)
+
+        d,m = read_data_jld2(joinpath(dataloc,f); output_level=0)
+        
+        fourpt_vals = m["fourpt_momentum"]
+        #plot_four_point(fourpt_vals; plot_title="$(params["Lx"])x$(params["Ly"]) N=$(params["N"]) ULR=$ulr")
+
+        restricted_fourpts = fourpt_vals[1,4:end-2]
+
+        maxval = maximum(restricted_fourpts)
+        minval = minimum(restricted_fourpts)
+        maxminratio = maxval / minval
+        scatter(params["Lx"],maxminratio,c="b")
+    end
+    xlabel("System Size")
+    ylabel("Max/Min Density")
+    #title("Density Flatness Scaling for ULR=$ulr")
+
+    # TTN section
+    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict_ttn = Dict([("hopping_anisotropy",1.0),("layers",7),("onsite_strength",0.0),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
+    display(all_files_ttn)
+
+    for f in all_files_ttn
+        params = get_params_dict_from_filename(f)
+        Lx,Ly = get_lattice_dims_from_layers(params["layers"])
+
+        d,m = read_data(joinpath(dataloc_ttn,f); output_level=0)
+
+        fourpt_vals = m["fourpt_momentum"]
+        #plot_four_point(fourpt_vals; plot_title="$(params["Lx"])x$(params["Ly"]) N=$(params["N"]) ULR=$ulr")
+
+        restricted_fourpts = fourpt_vals[1,4:end-2]
+
+        maxval = maximum(restricted_fourpts)
+        minval = minimum(restricted_fourpts)
+        maxminratio = maxval / minval
+        scatter(Lx,maxminratio,c="r")
+    end
+    
+    return
+end
+
+# fourpt momentum diagonal max as order parameter for k-DW transition
+function plot_fourpt_kdw_transition()
+    layers = 7
+
+    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict_ttn = Dict([("hopping_anisotropy",1.0),("layers",layers),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
+    display(all_files_ttn)
+
+    orderparams_ttn = Float64[]
+    intstrens_ttn = Float64[]
+    for f in all_files_ttn
+        d,m = read_data(joinpath(dataloc_ttn,f); output_level=0)
+
+        if !("fourpt_momentum" in keys(m))
+            continue
+        end
+
+        fourpt_vals = m["fourpt_momentum"]
+
+        orderparam = maximum(diag(fourpt_vals))
+        append!(orderparams_ttn,[orderparam])
+        append!(intstrens_ttn,[m["onsite_strength"]])
+    end
+    scatter(intstrens_ttn,orderparams_ttn ./ orderparams_ttn[1],label="TTN N=8")
+    xlabel("ULR")
+    ylabel("Max Fourpt")
+    title("Order Parameter for k-DW transition")
+
+
+    for n in [3,4,5]
+        lx,ly,n = Int(2*n),n,n
+
+        orderparams_ed = Float64[]
+        intstrens_ed = Float64[]
+
+        dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("hopping_anisotropy",1.0),("if_periodic_x",true),("if_periodic_y",true)])
+        all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2")
+        for f in all_files
+            d,m = read_data_jld2(joinpath(dataloc,f); output_level=1)
+
+            fourpt_vals = m["fourpt_momentum"]
+
+            append!(orderparams_ed,[maximum(diag(fourpt_vals))])
+            append!(intstrens_ed,[m["U"][end]])
+        end
+
+        scatter(intstrens_ed,orderparams_ed ./ orderparams_ed[1],label="N=$n")
+        xlabel("Interaction Strength")
+        ylabel("Max 4pt Diagonal")
+        title("k-DW Order Parameter")
+    end
+    legend()
+
+end
+
+function plot_overlapslices_fourpt(Lx::Int64,ulr::Float64; kwargs...)
+    plot_title::String = get(kwargs,:plot_title," ")
+
+    if_ed::Bool = Lx <= 12
+    if Lx > 10
+        layers = Int(log(2,Lx*Lx/2))
+        dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+        pdict_ttn = Dict([("hopping_anisotropy",1.0),("onsite_strength",ulr),("layers",layers),("if_periodic_phys",true),("if_periodic_synth",true)])
+        all_files = find_data_file(pdict_ttn,"ttn",dataloc)
+        display(all_files)
+    else
+        Ly,N = Int(Lx/2),Int(Lx/2)
+        dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+        pdict = Dict([("Lx",Lx),("Ly",Ly),("N",N),("hopping_anisotropy",1.0),("interaction_strength",ulr),("if_periodic_x",true),("if_periodic_y",true)])
+        all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2", output_level=0)
+        filter!(x -> !occursin("twist_angle",x), all_files)
+        display(all_files)
+    end
+
+
+    for f in all_files
+        fig = figure()
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+
+        hasboth::Bool = false
+        if haskey(m,"fourpt_momentum")
+            if haskey(m,"fourpt_momentum_1")
+                fourpt_vals = 0.5 .* (m["fourpt_momentum_1"] + m["fourpt_momentum"])
+                hasboth = true
+            else
+                fourpt_vals = m["fourpt_momentum"]
+            end
+        else
+            error("No fourpt data found in file $(f)")
+        end
+
+        for i in 1:Lx
+            if hasboth || if_ed
+                println("Working on slice $i")
+                xs = collect(Int(-Lx/2+1):1:Int(Lx/2))
+                reshaped_fourpts = circshift(fourpt_vals[i,:],Int(Lx/2 - i))
+                plot(xs,reshaped_fourpts,"-p",label="$(i)")
+            else
+                if isodd(i)
+                    println("Working on slice $i")
+                    xs = collect(Int(-Lx/2+1):1:Int(Lx/2))
+                    reshaped_fourpts = circshift(fourpt_vals[i,:],Int(Lx/2 - i))
+                    plot(xs,reshaped_fourpts,"-p",label="$(i)")
+                end
+            end
+        end
+        xlabel("x")
+        ylabel("Fourpt m,m+x")
+        title("Fourpt Slices for ULR=$ulr")
+        legend()
+        title("Fourpt Slices $(Lx)x$(Int(Lx/2)) N=$(Int(Lx/2)) ULR=$ulr"*plot_title)
+    end
+end
+plot_overlapslices_fourpt(16,300.0)
+plot_overlapslices_fourpt(16,0.0)
+plot_overlapslices_fourpt(8,300.0)
+plot_overlapslices_fourpt(8,0.0)
+
+
 
 
 

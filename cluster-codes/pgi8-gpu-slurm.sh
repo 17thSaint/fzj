@@ -6,6 +6,6 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=5
 #SBATCH --mem=128G
-#SBATCH --gres=gpu:a100:1
+#SBATCH --gres=gpu:h100:1
 
 srun julia long-range-ttn.jl "layers" 7 "particles" 8 "onsite_strength" 2.0 "mdim" 500 

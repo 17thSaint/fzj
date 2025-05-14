@@ -254,6 +254,7 @@ end
 
 
 
+
 #= look at finite size scaling of commensurate filling interaction strength spectrum
 if false
     eight_xs, eight_ys = plot_nrg_vs_intstren_fromdata_ttn(6; particles=8, if_gap=true,if_plot=false)
@@ -879,12 +880,13 @@ end=#
 
 #= test 4pt momentum with ED
 if false
-    lx,ly,n = 8,4,4
-    intstren = 300.0
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
+    lx,ly,n = 10,5,5
+    intstren = 0.0
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("dataloc",dataloc),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
     states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
 
-    fourpt_vals = four_point(states[1],lattice_params; plot_title="ED $(lx)x$(ly) N=$n ULR=$intstren")
+    fourpt_vals = four_point(states[1],lattice_params; plot_title="ED $(lx)x$(ly) N=$n ULR=$intstren",if_plot=true)
     datadict = Dict([("fourpt_momentum",fourpt_vals)])
     modify_data(datadict,filepath,"metadata")
 end=#

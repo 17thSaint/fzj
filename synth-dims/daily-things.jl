@@ -14,7 +14,7 @@ Depends on:
 
 include("../other-funcs/include-other-files.jl")
 include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","synth-dims/hatsugai-mbcn.jl","other-funcs/basic-2d-observables.jl"])
-include_other_files(["review-practice-codes/plottings.jl","other-funcs/basic-2d-plottings.jl"])
+#include_other_files(["review-practice-codes/plottings.jl","other-funcs/basic-2d-plottings.jl"])
 #include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
 
 function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
@@ -61,7 +61,7 @@ function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
     end
 end
 
-# testing factory run on TTN with new gauge with seed ttn
+#= testing factory run on TTN with new gauge with seed ttn
 if false
     lx,ly,n = 16,8,8
     layers = Int(log(2,lx*ly))
@@ -79,21 +79,25 @@ if false
     params_dict = Dict([("hopping_anisotropy",1.0),("expander_fraction",1e-5),("seed_ttn",previous_ttn),("if_redo",true),("particles",n),("layers",layers),("mdim",400),("if_save_data",true),("filling",0.5),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
     all_results = run_synth_dims_generic(params_dict)
 
-end#
+end=#
 
-#= data collection of 4pt MPO
-if false
+# data collection of 4pt MPO
+if true
     lx,ly,n = 16,8,8
     layers = Int(log(2,lx*ly))
-    #intstren = 0.0
+    intstren = 2.0
 
     dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
-    pdict = Dict([("layers",layers),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    pdict = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc)
     display(all_files)
     #f = all_files[1]
     for f in all_files
         d,m = read_data(dataloc * "/wavefunc" * f; output_level=0)
+
+        if "fourpt_momentum" in keys(m)
+            continue
+        end
 
         psi1 = d["ttn"]
         #psi2 = d["ttn_1"]
@@ -105,7 +109,7 @@ if false
         datadict = Dict([("fourpt_momentum",fourpt_mpo)])
         modify_data(datadict,dataloc * "/" * f,"metadata"; output_level=0)
     end
-end=#
+end#
 
 #= calculate entanglement spectrum for new data
 if true

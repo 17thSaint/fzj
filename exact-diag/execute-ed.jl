@@ -214,6 +214,8 @@ function get_normal_model_params_ed(params_dict::Dict)
         alpha = [alpha * (flux_dir == "x"), alpha * (flux_dir == "y")]
     end
 
+    pinning_strength::Float64 = get(params_dict,"pinning_strength",1e-3)
+
     disorder_strength::Float64 = get(params_dict,"disorder_strength",0.0)
     if_pinning::Bool = get(params_dict,"if_pinning",false)
     hamilt_params::Dict{String,Any} = Dict("alpha"=>alpha,
@@ -223,6 +225,7 @@ function get_normal_model_params_ed(params_dict::Dict)
                         "ty"=>ty,
                         "hopping_anisotropy"=>hopping_anisotropy,
                         "disorder_strength"=>disorder_strength,
+                        "pinning_strength"=>pinning_strength,
                         "U"=>us,
                         "which_dir"=>which_dir,
                         "interaction_cutoff"=>int_cutoff)
@@ -318,10 +321,10 @@ if false
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
     
-    lx,ly,n = 10,5,5
+    lx,ly,n = 6,3,3
     #for (idx,n) in enumerate([2,3,4,5])
     #intstrens = vcat(range(0.0,1.0,length=6),exp10.(range(0.0,log10(1000),length=19)))#[3,4,5,6,7,8,9,20,30,40,70,150,200,300,400]
-    #intstrens = [0.0,1.0,100.0,500.0,1000.0]
+    #intstrens = range(1.3,1.7,length=21)
     #other_intstrens = range(2.0,10.0,length=37)
     #intstrens = sort([intstrens; other_intstrens])
     #all_nrgs = zeros(Float64,length(thetas))
@@ -333,10 +336,12 @@ if false
     #for (idx,nu) in enumerate(nus)
     #for (idx,anis) in enumerate(anises)
     #    anis = 1/anis
+    #prev_states = []
+    #cols = ["b","g","r","c","y","orange","purple","pink","brown","gray"]
     #for (idx,intstren) in enumerate(intstrens)
     #for (idx2,sigma) in enumerate(sigmas)
     #for lrd in [0,1]
-    intstren = 300.0
+    #intstren = 300.0
 
     #= set number of open cores
     open_cores = 5#get(params_dict, "open_cores", 5)
@@ -345,7 +350,7 @@ if false
         display(BLAS.get_config())
     end=#
 
-    #intstren = 0.0
+    intstren = 0.0
     tw2 = 0.0
     tw1 = 0.0
     dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
@@ -365,7 +370,7 @@ if false
         #    continue
         #end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("dataloc",dataloc),("if_pinning",true),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",true)])
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("dataloc",dataloc),("pinning_strength",1e-1),("if_pinning",true),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",true)])
         #params_dict = make_args_dict(ARGS)
 
         #println("Starting from here")
@@ -373,6 +378,40 @@ if false
         if true
             states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
         end
+
+        #=if idx == 1
+            for i in 1:params_dict["nev"]
+                scatter(intstren,nrgs[i] - nrgs[1],c=cols[i])
+            end
+        else
+            overlaps = zeros(Float64,params_dict["nev"],params_dict["nev"])
+            for i in 1:params_dict["nev"]
+                for j in 1:params_dict["nev"]
+                    overlaps[i,j] = abs2(dot(states[i],prev_states[j]))
+                end
+            end
+            display(overlaps)
+
+            for i in 1:params_dict["nev"]
+                all_overlaps = overlaps[i,:]
+                if all(all_overlaps .< 0.01) 
+                    scatter(intstren,nrgs[i] - nrgs[1],c="k")
+                elseif sort(all_overlaps)[end] / sort(all_overlaps)[end-1] > 10 && maximum(all_overlaps) > 0.1
+                    tracked_index = findfirst(x -> all_overlaps[x] == maximum(all_overlaps),1:length(all_overlaps))
+                    scatter(intstren,nrgs[i] - nrgs[1],c=cols[tracked_index])
+                    cols[i] = cols[tracked_index]
+                elseif sum(all_overlaps .> 0.1) > 1
+                    scatter(intstren,nrgs[i] - nrgs[1],c="m")
+                else
+                    # idk whatever
+                    scatter(intstren,nrgs[i] - nrgs[1],c="k")
+                end
+            end
+        end
+
+        global prev_states = states=#
+
+
         
         #=if params_dict["if_pinning"]
             nrg1_pin = nrgs[1]

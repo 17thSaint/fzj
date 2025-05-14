@@ -984,7 +984,7 @@ end
 function addPinning(ham::SparseMatrixCSC{ComplexF64},lattice_params::Dict,hamilt_params::Dict)
     full_basis = lattice_params["full_basis"]
 
-    pinning_strength::ComplexF64 = 1E-4
+    pinning_strength = hamilt_params["pinning_strength"]
     #=ham[1,1] += pinning_strength
     previous_basis_index = [1]
     for i in 1:(lattice_params["Lx"]*lattice_params["Ly"]) - 1

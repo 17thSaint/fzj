@@ -11,7 +11,7 @@ Depends on:
 
 include("execute-ed.jl")
 include("plottings.jl")
-include("../other-funcs/basic-2d-plottings.jl")
+#include("../other-funcs/basic-2d-plottings.jl")
 
 function datacollection_flatness(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
     hanis::Float64 = get(kwargs,:hopping_anisotropy,1.0)
@@ -57,6 +57,53 @@ function datacollection_flatness(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
         end
     end
 end
+
+# data collection for 4pt
+if true
+    lx,ly,n = 10,5,5
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true)])
+    
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    display(all_files)
+
+    for f in all_files
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+        lattice_params = get_lattice_params_from_metadata(m)
+
+        if haskey(m,"fourpt_momentum")
+            println("Already has 4pt data")
+            continue
+        else
+            fourpt_vals = four_point(d["state"][1],lattice_params)
+            datadict = Dict([("fourpt_momentum",fourpt_vals)])
+            modify_data(datadict,filepath,"metadata")
+        end
+    end
+end
+
+#= test 4pt diag max as order parameter for 6x3
+if false
+    for n in [3,4]
+        lx,ly,n = Int(2*n),n,n
+        intstrens = range(0.0,10.0,length=21)
+
+        orderparams = zeros(Float64,length(intstrens))
+        for (idx,intstren) in enumerate(intstrens)
+            params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("nev",10),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("if_find_data",true),("if_save_data",true)])
+            states,nrgs,rhos,filepath,if_found,latpara,hamiltpara = run_normal_ed(params_dict; output_level=1)
+
+            fourpt_vals = four_point_diag(states[1],latpara; if_plot=false)
+
+            orderparams[idx] = maximum(fourpt_vals)
+        end
+        plot(intstrens,orderparams,"-p",label="N=$n")
+        xlabel("Interaction Strength")
+        ylabel("Max 4pt Diagonal")
+        title("k-DW Order Parameter")
+    end
+
+end=#
 
 
 #= redo gamma/omega calcs for all files

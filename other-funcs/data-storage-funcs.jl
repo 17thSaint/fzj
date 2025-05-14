@@ -387,7 +387,8 @@ function check_duplicates(full_file_name::String)
 		string_elems = split(file_name,"-")
 		if "mk" in string_elems
 			mk_number_loc = findfirst(x -> x == "mk",string_elems) + 1
-			string_elems[mk_number_loc] = string(parse(Int,string_elems[mk_number_loc]) + 1)
+			local_string = split(string_elems[mk_number_loc],".")[1]
+			string_elems[mk_number_loc] = string(parse(Int,local_string) + 1)
 		else
 			append!(string_elems,["mk","2"])
 		end

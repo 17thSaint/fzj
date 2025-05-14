@@ -211,9 +211,10 @@ function synthetic_current(densmat::Matrix{ComplexF64},Lx::Int64,Ly::Int64; kwar
 
     currents = Array{Float64,2}(undef,Lx,Ly)
     for j in 1:Lx
-        for s in 1:Lx
+        for s in 1:Ly
             site1 = linear_index((j,s),Lx,Ly)
             site2 = linear_index((j,mod1(s+1,Ly)),Lx,Ly)
+            #println("Working on site $(j),$(s) with linear index $(site1) and $(site2)")
             current_val = imag(densmat[site1,site2] - densmat[site2,site1])
             current_normalization = densmat[site1,site1] + densmat[site2,site2]
             current_val /= current_normalization

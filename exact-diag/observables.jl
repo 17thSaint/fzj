@@ -993,6 +993,21 @@ function four_point(wavefuncs::Vector{Vector{ComplexF64}},lattice_params::Dict; 
     return fourpt_vals
 end
 
+function four_point_diag(wavefunc::Vector{ComplexF64},lattice_params::Dict; kwargs...)
+    opl::Int = get(kwargs,:opl,1)
+
+    Lx,Ly = lattice_params["Lx"],lattice_params["Ly"]
+
+    momenta = [n/Ly for n in 0:Lx-1]
+    fourpt_vals = zeros(Float64,Lx)
+    for (idx1,k1) in enumerate(momenta)
+        opl > 0 && println("Working on momenta $(k1)")
+        fourpt_vals[idx1] = abs(ft_fourpt(wavefunc,[0.0,k1],[0.0,k1],lattice_params; kwargs...))
+    end
+
+    return fourpt_vals
+end
+
 function ft_twopt(wavefunc::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
     Lx::Int64 = lattice_params["Lx"]
     Ly::Int64 = lattice_params["Ly"]
