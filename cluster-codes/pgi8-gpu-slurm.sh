@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=gpu_10x5_pinning_ulr
-#SBATCH --output=log_file_10x5_pinning_ulr
-#SBATCH --error=log_file_10x5_pinning_ulr
+#SBATCH --job-name=gpu_10x5_pinning
+#SBATCH --output=log_file_10x5_pinning
+#SBATCH --error=log_file_10x5_pinning
 #SBATCH -p pgi-8-gpu-h100
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=5

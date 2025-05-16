@@ -2032,7 +2032,7 @@ if true
 		
 		#d,m = read_data("../cluster-data/synth-dims/torus/ttn-if_periodic_phys-true-onsite_strength-0.0-lr-0-particles-4-alpha-0.0-layers-4-hopping_anisotropy-1.0.h5")
 		#st = d["ttn"]
-		params_dict = Dict([("hopping_anisotropy",1.0),("if_pinning",true),("dataloc",dataloc),("pinning_strength",pinstren),("make_smaller_lattice",[lx,ly]),("es_count",1),("expander_fraction",1e-5),("particles",n),("mdim",mdim),("if_save_data",true),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("hopping_anisotropy",1.0),("if_gpu",true),("if_pinning",true),("dataloc",dataloc),("pinning_strength",pinstren),("make_smaller_lattice",[lx,ly]),("es_count",1),("expander_fraction",1e-5),("particles",n),("mdim",mdim),("if_save_data",true),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		#open_cores = get(params_dict, "open_cores", 5)
@@ -2044,7 +2044,7 @@ if true
 		#initialize_dmrg(params_dict["if_gpu"])
 
 
-		all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
+		CUDA.@allowscalar all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
 		#nrgs = [all_results[3][i].nrg[end] for i in 1:params_dict["es_count"]+1]
 		#plot_spectrum(strens,nrgs,idx,params_dict["es_count"]+1,"Interaction Strength",true; plot_title=" Synth Rectangle TTN")
 
