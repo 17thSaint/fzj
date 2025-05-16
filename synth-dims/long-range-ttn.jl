@@ -2012,7 +2012,7 @@ if true
 	#anises = [0.01,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.6,0.8,0.9,1.1,1.3,1.5,1.7,1.9,2.0,2.5,3.0,3.5,4.0,6.0,8.0,9.0,10.0,15.0,20.0,25.0,30.0,40.0,50.0,70.0,90.0,100.0,1000.0,10000.0]
 	#anises = range(1.0,5.0,length=10)
 	#strens = [0.0,0.25,0.5,0.75,1.0,1.5,2.0,5.0,10.0,20.0,50.0,100.0,300.0,1000.0]
-	#args_dict = make_args_dict(ARGS)
+	args_dict = make_args_dict(ARGS)
 	dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
 	stren = args_dict["onsite_strength"]
 	#layers = args_dict["layers"]
