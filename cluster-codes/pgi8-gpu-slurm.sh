@@ -2,7 +2,7 @@
 #SBATCH --job-name=gpu_withexpander_16x8
 #SBATCH --output=log_file
 #SBATCH --error=log_file
-#SBATCH -p pgi-8-gpu
+#SBATCH -p pgi-8-gpu-h100
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=5
 #SBATCH --mem=128G
