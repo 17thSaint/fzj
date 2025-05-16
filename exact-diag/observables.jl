@@ -794,6 +794,7 @@ function ft_fourpt(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2:
 
     which_coeff::Function = get(kwargs,:which_coeff,diocane)
     coeff_kwargs::NamedTuple = get(kwargs,:coeff_kwargs,(Ly=Ly,))
+    opl::Int = get(kwargs,:output_level,1)
 
     m = Int(momentum1[2] * Ly)
     mp = Int(momentum2[2] * Ly)
@@ -810,7 +811,7 @@ function ft_fourpt(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2:
             coord2 = (mp+1,y2)
             s2 = linear_index(coord2,Lx,Ly)
             coeff2::ComplexF64 = which_coeff(coord2,momentum2,"Adag"; coeff_kwargs...)
-            #println("Working on y1=$(y1) y2=$(y2)")
+            opl > 1 && println("Working on y1=$(y1) y2=$(y2)")
             for y3 in 1:Ly
                 coord3 = (mp+1,y3)
                 s3 = linear_index(coord3,Lx,Ly)
@@ -948,7 +949,7 @@ end
 
 function four_point(wavefunc::Vector{ComplexF64},lattice_params::Dict; kwargs...)
     if_plot::Bool = get(kwargs,:if_plot,false)
-    opl::Int = get(kwargs,:opl,1)
+    opl::Int = get(kwargs,:output_level,1)
 
     Lx,Ly = lattice_params["Lx"],lattice_params["Ly"]
 
@@ -968,7 +969,7 @@ end
 
 function four_point(wavefuncs::Vector{Vector{ComplexF64}},lattice_params::Dict; kwargs...)
     if_plot::Bool = get(kwargs,:if_plot,false)
-    opl::Int = get(kwargs,:opl,1)
+    opl::Int = get(kwargs,:output_level,1)
 
     Lx,Ly = lattice_params["Lx"],lattice_params["Ly"]
 
@@ -994,7 +995,7 @@ function four_point(wavefuncs::Vector{Vector{ComplexF64}},lattice_params::Dict; 
 end
 
 function four_point_diag(wavefunc::Vector{ComplexF64},lattice_params::Dict; kwargs...)
-    opl::Int = get(kwargs,:opl,1)
+    opl::Int = get(kwargs,:output_level,1)
 
     Lx,Ly = lattice_params["Lx"],lattice_params["Ly"]
 
@@ -1047,7 +1048,7 @@ end
 
 function two_point(wavefunc::Vector{ComplexF64},lattice_params::Dict; kwargs...)
     if_plot::Bool = get(kwargs,:if_plot,false)
-    opl::Int = get(kwargs,:opl,1)
+    opl::Int = get(kwargs,:output_level,1)
 
     Lx,Ly = lattice_params["Lx"],lattice_params["Ly"]
 

@@ -1,10 +1,10 @@
-#using Pkg
-#Pkg.activate("../synth-dims/")
+using Pkg
+Pkg.activate("../synth-dims/")
 include("../review-practice-codes/ttn.jl")
 include("../other-funcs/basic-2d-stuff.jl")
 include("../review-practice-codes/observables.jl")
 #include("../review-practice-codes/plottings.jl")
-using Profile,MKL,CUDA
+using Profile,MKL,CUDA,TensorOperations
 
 function spin_matrix_element(m1,m2,spin,direction::String)
 	if direction == "X"
@@ -256,6 +256,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	onsite_strength = get(kwargs, :onsite_strength, 0.0)
 	if_pinning_pot = get(kwargs, :if_pinning_pot, false)
 	if_pinning::Bool = get(kwargs, :if_pinning, false)
+	pinning_strength::Float64 = kwargs[:pinning_strength]
 	vpinning = get(kwargs, :vpinning, 2.5)
 	no_magF = get(kwargs, :no_magF, false)
 	chem_strength = get(kwargs, :chem_strength, 0.0)
@@ -413,12 +414,12 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 		restrict_size = TTN.OpSum()
 		for i in restricted_size[1]+1:phys_edge_length
 			for j in 1:virt_edge_length
-				restrict_size += (1e10,"N",(i,j))
+				restrict_size += (1e6,"N",(i,j))
 			end
 		end
 		for i in restricted_size[2]+1:virt_edge_length
 			for j in 1:restricted_size[1]
-				restrict_size += (1e10,"N",(j,i))
+				restrict_size += (1e6,"N",(j,i))
 			end
 		end
 		append!(resulting_ham,[restrict_size])
@@ -433,9 +434,8 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	end
 
 	if if_pinning
-		vpinning::Float64 = 1E-6
 		pinning = TTN.OpSum()
-		pinning += (vpinning,"N",(1,1))
+		pinning += (pinning_strength,"N",(1,1))
 
 		append!(resulting_ham,[pinning])
 	end
@@ -1496,6 +1496,15 @@ function make_synthdims_filename(model_parameters::Dict)
 		filename_dict["max_occ"] = model_parameters["max_occ"]
 	end
 
+	if !all(model_parameters["restricted_size"] .== get_lattice_dims_from_layers(layer_count))
+		filename_dict["Lx"] = model_parameters["restricted_size"][1]
+		filename_dict["Ly"] = model_parameters["restricted_size"][2]
+	end
+
+	if model_parameters["if_pinning"]
+		filename_dict["if_pinning"] = true
+	end
+
 	return make_parameters_filename(filename_dict)*".h5"
 end
 
@@ -1537,6 +1546,10 @@ function get_normal_model_params(params_dict::Dict)
 	make_smaller_lattice = get(params_dict, "make_smaller_lattice", [phys_edge_length,synth_edge_length])
 	if make_smaller_lattice != [phys_edge_length,synth_edge_length]
 		phys_edge_length,synth_edge_length = make_smaller_lattice
+		layer_count = Int(ceil(log(2,phys_edge_length*synth_edge_length)))
+		if !all(get_lattice_dims_from_layers(layer_count) .>= make_smaller_lattice)
+			layer_count += 1
+		end
 	end
 
 
@@ -1573,6 +1586,7 @@ function get_normal_model_params(params_dict::Dict)
 	mu = get(params_dict, "chem_strength", 0.0)
 	mag_off = get(params_dict, "mag_off", true)
 	if_pinning = get(params_dict, "if_pinning", false)
+	pinning_strength::Float64 = get(params_dict, "pinning_strength", 1e-4)
 	centralflux_strength = get(params_dict, "centralflux_strength", 0.0)
 	twist_angle = [get(params_dict, "tw1", 0.0),get(params_dict, "tw2", 0.0)]
 
@@ -1654,6 +1668,7 @@ function get_normal_model_params(params_dict::Dict)
 						"centralflux_strength"=>centralflux_strength,
 						"if_pinning_pot"=>false,
 						"if_pinning"=>if_pinning,
+						"pinning_strength"=>pinning_strength,
 						"if_periodic_phys"=>if_periodic_phys,
 						"if_periodic_synth"=>if_periodic_synth,
 						"if_nn_int"=>if_NN,
@@ -1977,7 +1992,7 @@ if false
 end
 
 # synth-dims for loop runnings
-if false
+if true
 
 	cols = ["b","g","r"]
 	#nnst = 0.0
@@ -1997,10 +2012,13 @@ if false
 	#anises = [0.01,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.6,0.8,0.9,1.1,1.3,1.5,1.7,1.9,2.0,2.5,3.0,3.5,4.0,6.0,8.0,9.0,10.0,15.0,20.0,25.0,30.0,40.0,50.0,70.0,90.0,100.0,1000.0,10000.0]
 	#anises = range(1.0,5.0,length=10)
 	#strens = [0.0,0.25,0.5,0.75,1.0,1.5,2.0,5.0,10.0,20.0,50.0,100.0,300.0,1000.0]
-	args_dict = make_args_dict(ARGS)
-	#dataloc = args_dict["dataloc"]
+	#args_dict = make_args_dict(ARGS)
+	dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
 	stren = args_dict["onsite_strength"]
-	layers = args_dict["layers"]
+	#layers = args_dict["layers"]
+	pinstren = args_dict["pinning_strength"]
+	lx = args_dict["Lx"]
+	ly = args_dict["Ly"]
 	n = args_dict["particles"]
 	mdim = args_dict["mdim"]
 	#alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
@@ -2014,19 +2032,19 @@ if false
 		
 		#d,m = read_data("../cluster-data/synth-dims/torus/ttn-if_periodic_phys-true-onsite_strength-0.0-lr-0-particles-4-alpha-0.0-layers-4-hopping_anisotropy-1.0.h5")
 		#st = d["ttn"]
-		params_dict = Dict([("hopping_anisotropy",1.0),("if_gpu",true),("es_count",1),("expander_fraction",1e-5),("particles",n),("layers",layers),("mdim",mdim),("if_save_data",true),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("hopping_anisotropy",1.0),("if_pinning",true),("dataloc",dataloc),("pinning_strength",pinstren),("make_smaller_lattice",[lx,ly]),("es_count",1),("expander_fraction",1e-5),("particles",n),("mdim",mdim),("if_save_data",true),("filling",0.5),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		#open_cores = get(params_dict, "open_cores", 5)
 		#if typeof(open_cores) != String
-			BLAS.set_num_threads(2)	
+			#BLAS.set_num_threads(5)
 		#	display(BLAS.get_config())
 		#end#
 
-		initialize_dmrg(params_dict["if_gpu"])
+		#initialize_dmrg(params_dict["if_gpu"])
 
 
-		CUDA.@allowscalar all_results = run_synth_dims_generic(params_dict)
+		all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
 		#nrgs = [all_results[3][i].nrg[end] for i in 1:params_dict["es_count"]+1]
 		#plot_spectrum(strens,nrgs,idx,params_dict["es_count"]+1,"Interaction Strength",true; plot_title=" Synth Rectangle TTN")
 

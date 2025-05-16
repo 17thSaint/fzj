@@ -10,7 +10,7 @@ Depends on:
 ######################################################
 
 include("execute-ed.jl")
-include("plottings.jl")
+#include("plottings.jl")
 #include("../other-funcs/basic-2d-plottings.jl")
 
 function datacollection_flatness(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
@@ -61,8 +61,8 @@ end
 # data collection for 4pt
 if true
     lx,ly,n = 10,5,5
-    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true)])
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",0.0),("if_periodic_x",true),("if_periodic_y",true)])
     
     all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
     display(all_files)
@@ -71,14 +71,17 @@ if true
         d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
         lattice_params = get_lattice_params_from_metadata(m)
 
-        if haskey(m,"fourpt_momentum")
+        #=if haskey(m,"fourpt_momentum")
             println("Already has 4pt data")
             continue
         else
             fourpt_vals = four_point(d["state"][1],lattice_params)
             datadict = Dict([("fourpt_momentum",fourpt_vals)])
             modify_data(datadict,filepath,"metadata")
-        end
+        end=#
+        two_fourpts = [ft_fourpt(d["state"][1],[0.0,n/ly],[0.0,n/ly],lattice_params) for n in 0:1]
+        datadict = Dict([("fourpt_momentum_diag",two_fourpts)])
+        modify_data(datadict,filepath,"metadata"; output_level=0)
     end
 end
 

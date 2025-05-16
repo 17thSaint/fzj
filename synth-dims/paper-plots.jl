@@ -398,16 +398,23 @@ function plot_fourpt_flatness_scaling()
 
     # ED section
     dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
-    pdict = Dict([("hopping_anisotropy",1.0),("interaction_strength",0.0),("if_periodic_x",true),("if_periodic_y",true)])
+    pdict = Dict([("hopping_anisotropy",1.0),("if_periodic_x",true),("if_periodic_y",true)])
     all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2", output_level=0)
     filter!(x -> !occursin("twist_angle",x), all_files)
     display(all_files)
 
+    ratios = Dict([("8",[]),("10",[]),("16",[])])
+    intstrens = Dict([("8",[]),("10",[]),("16",[])])
     for f in all_files
         params = get_params_dict_from_filename(f)
+        if params["Lx"] <= 6
+            continue
+        end
 
         d,m = read_data_jld2(joinpath(dataloc,f); output_level=0)
         
+        !haskey(m,"fourpt_momentum") && continue
+
         fourpt_vals = m["fourpt_momentum"]
         #plot_four_point(fourpt_vals; plot_title="$(params["Lx"])x$(params["Ly"]) N=$(params["N"]) ULR=$ulr")
 
@@ -415,16 +422,14 @@ function plot_fourpt_flatness_scaling()
 
         maxval = maximum(restricted_fourpts)
         minval = minimum(restricted_fourpts)
-        maxminratio = maxval / minval
-        scatter(params["Lx"],maxminratio,c="b")
+        maxminratio = minval / maxval
+        append!(ratios[string(params["Lx"])],[maxminratio])
+        append!(intstrens[string(params["Lx"])],[params["interaction_strength"]])
     end
-    xlabel("System Size")
-    ylabel("Max/Min Density")
-    #title("Density Flatness Scaling for ULR=$ulr")
 
     # TTN section
     dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
-    pdict_ttn = Dict([("hopping_anisotropy",1.0),("layers",7),("onsite_strength",0.0),("if_periodic_phys",true),("if_periodic_synth",true)])
+    pdict_ttn = Dict([("hopping_anisotropy",1.0),("layers",7),("if_periodic_phys",true),("if_periodic_synth",true)])
     all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
     display(all_files_ttn)
 
@@ -441,16 +446,27 @@ function plot_fourpt_flatness_scaling()
 
         maxval = maximum(restricted_fourpts)
         minval = minimum(restricted_fourpts)
-        maxminratio = maxval / minval
-        scatter(Lx,maxminratio,c="r")
+        maxminratio = minval / maxval
+        append!(ratios[string(Lx)], [maxminratio])
+        append!(intstrens[string(Lx)], [params["onsite_strength"]])
     end
+
+    for (k,v) in ratios
+        if length(v) > 0
+            scatter(intstrens[k],v,label="$(k)")
+        end
+    end
+    xlabel("Interaction Strength")
+    ylabel("Min/Max Fourpt")
+    legend()
+    yscale("log")
     
     return
 end
 
 # fourpt momentum diagonal max as order parameter for k-DW transition
 function plot_fourpt_kdw_transition()
-    layers = 7
+    #=layers = 7
 
     dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
     pdict_ttn = Dict([("hopping_anisotropy",1.0),("layers",layers),("if_periodic_phys",true),("if_periodic_synth",true)])
@@ -475,9 +491,9 @@ function plot_fourpt_kdw_transition()
     scatter(intstrens_ttn,orderparams_ttn ./ orderparams_ttn[1],label="TTN N=8")
     xlabel("ULR")
     ylabel("Max Fourpt")
-    title("Order Parameter for k-DW transition")
+    title("Order Parameter for k-DW transition")=#
 
-
+    laughlin_values = []
     for n in [3,4,5]
         lx,ly,n = Int(2*n),n,n
 
@@ -490,13 +506,33 @@ function plot_fourpt_kdw_transition()
         for f in all_files
             d,m = read_data_jld2(joinpath(dataloc,f); output_level=1)
 
-            fourpt_vals = m["fourpt_momentum"]
+            if n == 5
+                !haskey(m,"fourpt_momentum_diag") && continue
+                fourpt_vals = m["fourpt_momentum_diag"]
+                append!(orderparams_ed,[maximum(fourpt_vals)])
+            else
+                fourpt_vals = m["fourpt_momentum"]
+                append!(orderparams_ed,[maximum(diag(fourpt_vals))])
+            end
 
-            append!(orderparams_ed,[maximum(diag(fourpt_vals))])
             append!(intstrens_ed,[m["U"][end]])
+
+            if m["U"][end] == 0.0
+                append!(laughlin_values,[orderparams_ed[end]])
+            end
+
         end
 
-        scatter(intstrens_ed,orderparams_ed ./ orderparams_ed[1],label="N=$n")
+        if n in [3,4]
+            orderparams_ed = orderparams_ed ./ laughlin_values[n-2]
+        else
+            mm = laughlin_values[2] - laughlin_values[1]
+            bb = laughlin_values[2] - mm*4
+            laughlin_5 = mm*5 + bb
+            orderparams_ed = orderparams_ed ./ laughlin_5
+        end
+
+        scatter(intstrens_ed,orderparams_ed,label="N=$n")
         xlabel("Interaction Strength")
         ylabel("Max 4pt Diagonal")
         title("k-DW Order Parameter")
@@ -563,25 +599,51 @@ function plot_overlapslices_fourpt(Lx::Int64,ulr::Float64; kwargs...)
         title("Fourpt Slices $(Lx)x$(Int(Lx/2)) N=$(Int(Lx/2)) ULR=$ulr"*plot_title)
     end
 end
-plot_overlapslices_fourpt(16,300.0)
-plot_overlapslices_fourpt(16,0.0)
-plot_overlapslices_fourpt(8,300.0)
-plot_overlapslices_fourpt(8,0.0)
 
+# 4pt slices for ranging intstren to see change to k-DW
+function plot_transition_slices(ulrs::Vector{Float64},Lx::Int64=16; kwargs...)
 
+    if_ed::Bool = Lx <= 12
+    intstren_string = if_ed ? "interacion_strength" : "onsite_strength"
+    if Lx > 10
+        layers = Int(log(2,Lx*Lx/2))
+        dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+        pdict_ttn = Dict([("hopping_anisotropy",1.0),("layers",layers),("if_periodic_phys",true),("if_periodic_synth",true)])
+        all_files = find_data_file(pdict_ttn,"ttn",dataloc)
+        display(all_files)
+    else
+        Ly,N = Int(Lx/2),Int(Lx/2)
+        dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+        pdict = Dict([("Lx",Lx),("Ly",Ly),("N",N),("hopping_anisotropy",1.0),("if_periodic_x",true),("if_periodic_y",true)])
+        all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2", output_level=0)
+        filter!(x -> !occursin("twist_angle",x), all_files)
+        display(all_files)
+    end
+    which_slice = Int(Lx/2)-1
 
+    for f in all_files
+        fp = get_params_dict_from_filename(f)
+        if fp[intstren_string] in ulrs
+            d,m = read_data(joinpath(dataloc,f); output_level=0)
 
+            !haskey(m,"fourpt_momentum") && error("No fourpt data found in file $(f)")
+            if haskey(m,"fourpt_momentum_1")
+                fourpt_vals = 0.5 .* (m["fourpt_momentum_1"] + m["fourpt_momentum"])
+            else
+                fourpt_vals = m["fourpt_momentum"]
+            end
 
+            xs = collect(Int(-Lx/2+1):1:Int(Lx/2))
+            ys = circshift(fourpt_vals[which_slice,:],Int(Lx/2 - which_slice)) ./ sum(fourpt_vals)
+            plot(xs,ys,"-p",label="$(fp[intstren_string])")
 
-
-
-
-
-
-
-
-
-
+        end
+    end
+    xlabel("x")
+    ylabel("Fourpt m,m+x")
+    title("Fourpt Slices for $(Lx)x$(Int(Lx/2)) N=$(Int(Lx/2))")
+    legend()
+end
 
 
 

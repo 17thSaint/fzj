@@ -253,7 +253,19 @@ end
 
 
 
+# see if excited TTNs restrict_size matches ED
+if true
+    lx,ly,n = 3,3,2
+    layers = Int(ceil(log(2,lx*ly)))
 
+    pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",0.0),("nev",10),("hopping_anisotropy",1.0),("if_check_fluxes",false),("if_save_data",false),("if_find_data",false)])
+    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict_ed; output_level=1)
+    display(nrgs)
+
+    pdict_ttn = Dict([("hopping_anisotropy",1.0),("make_smaller_lattice",[lx,ly]),("es_count",2),("if_check_fluxes",false),("expander_fraction",1.0),("particles",n),("layers",layers),("mdim",200),("if_save_data",false),("filling",0.5),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(pdict_ttn)
+
+end#
 
 #= look at finite size scaling of commensurate filling interaction strength spectrum
 if false
