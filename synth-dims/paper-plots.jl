@@ -252,6 +252,130 @@ function plot_finitesize_gapscaling_pinned(ulr::Float64=300.0)
     return used_files
 end
 
+# plot finite splitting scaling pinned and unpinned
+function plot_finitesplitting_scaling(ulr::Float64=0.0)
+    fig = figure()
+
+    pinning_strength = ulr == 0.0 ? 0.1 : 0.0001
+
+    # ED section: pinned
+    dataloc_pin = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
+    pdict_pin = Dict([("hopping_anisotropy",1.0),("if_pinning",true),("interaction_strength",ulr),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files_pin = find_data_file(pdict_pin,"ed",dataloc_pin; file_type="jld2")
+    display(all_files_pin)
+
+    used_files = []
+    lxs = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
+    gaps = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
+    for f in all_files_pin
+        params = get_params_dict_from_filename(f)
+
+        if (params["N"] / params["Lx"] != 0.5) || (params["Lx"] != 2*params["Ly"])
+            continue
+        end
+
+        append!(used_files,[f])
+
+        d,m = read_data_jld2(joinpath(dataloc_pin,f); output_level=0)
+        all_nrgs = d["nrg"]
+
+        if haskey(m,"pinning_strength") && m["pinning_strength"] == pinning_strength
+            append!(gaps[string(pinning_strength)],[all_nrgs[2] - all_nrgs[1]])
+            append!(lxs[string(pinning_strength)],[params["Lx"]])
+        end
+    end
+
+    # ED section: unpinned
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    pdict = Dict([("hopping_anisotropy",1.0),("interaction_strength",ulr),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2")
+    display(all_files)
+
+    for f in all_files
+        params = get_params_dict_from_filename(f)
+
+        if (params["N"] / params["Lx"] != 0.5) || (params["Lx"] != 2*params["Ly"])
+            continue
+        end
+
+        append!(used_files,[f])
+
+        d,m = read_data_jld2(joinpath(dataloc,f); output_level=0)
+        all_nrgs = d["nrg"]
+
+        append!(gaps["0.0"],[all_nrgs[2] - all_nrgs[1]])
+        append!(lxs["0.0"],[params["Lx"]])
+    end
+
+    # TTN section: pinned
+    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
+    pdict_ttn = Dict([("hopping_anisotropy",1.0),("onsite_strength",ulr),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
+    display(all_files_ttn)
+
+    for f in all_files_ttn
+        params = get_params_dict_from_filename(f)
+        Lx,Ly = "Lx" in keys(params) ? (params["Lx"],params["Ly"]) : get_lattice_dims_from_layers(params["layers"])
+
+
+        if (params["particles"] / Lx != 0.5) || (Lx != 2*Ly) || Lx <= 10
+            continue
+        end
+
+        d,m = read_data(joinpath(dataloc_ttn,f); output_level=0)
+
+        if haskey(m,"observer") && haskey(m,"observer_1")
+            append!(used_files,[f])
+            append!(gaps[string(pinning_strength)], [abs(m["observer_1"].nrg[end] - m["observer"].nrg[end])])
+            append!(lxs[string(pinning_strength)], [Lx])
+        end
+
+    end
+
+    # TTN section: unpinned
+    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict_ttn = Dict([("hopping_anisotropy",1.0),("onsite_strength",ulr),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
+    display(all_files_ttn)
+
+    for f in all_files_ttn
+        params = get_params_dict_from_filename(f)
+        Lx,Ly = "Lx" in keys(params) ? (params["Lx"],params["Ly"]) : get_lattice_dims_from_layers(params["layers"])
+
+        # 16x8 is not converged yet
+        Lx == 16 && continue
+
+        if (params["particles"] / Lx != 0.5) || (Lx != 2*Ly) || Lx <= 10
+            continue
+        end
+
+        d,m = read_data(joinpath(dataloc_ttn,f); output_level=0)
+
+        if haskey(m,"observer") && haskey(m,"observer_1")
+            append!(used_files,[f])
+            append!(gaps["0.0"], [abs(m["observer_1"].nrg[end] - m["observer"].nrg[end])])
+            append!(lxs["0.0"], [Lx])
+        end
+
+    end
+    #
+
+
+
+    for (k,v) in gaps
+        local_label = k == "0.0" ? "Unpinned" : "$(parse(Float64,k)/10)"
+        length(v) > 0 && scatter(lxs[k],v,label=local_label)
+    end
+    xlabel("Lx")
+    ylabel("E1 - E0")
+    title("Finite Splitting Scaling for ULR=$ulr")
+    yscale("log")
+    legend()
+
+    return gaps,lxs
+end
+#rez_gaps,rez_lxs = plot_finitesplitting_scaling(0.0)
+
 # finite size scaling of the topological gap
 # still need 16x8 to get E3
 function plot_topo_gapscaling(ulr::Float64=0.0)
@@ -523,14 +647,7 @@ function plot_fourpt_kdw_transition()
 
         end
 
-        if n in [3,4]
-            orderparams_ed = orderparams_ed ./ laughlin_values[n-2]
-        else
-            mm = laughlin_values[2] - laughlin_values[1]
-            bb = laughlin_values[2] - mm*4
-            laughlin_5 = mm*5 + bb
-            orderparams_ed = orderparams_ed ./ laughlin_5
-        end
+        orderparams_ed = orderparams_ed ./ laughlin_values[n-2]
 
         scatter(intstrens_ed,orderparams_ed,label="N=$n")
         xlabel("Interaction Strength")

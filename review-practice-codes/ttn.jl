@@ -749,7 +749,7 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 		observer = NoObserver()
 	elseif if_continuous_saving
 		file_path = make_sure_file_type(file_path,"h5")
-		if isnothing(psi_ortho)
+		if isnothing(psi_ortho) || length(psi_ortho) == 0
 			if length(measurements) > 0
 				observer = SavingMeasurementsObserver(measurement_functions,measurements,file_path,etol)
 			else
@@ -775,7 +775,7 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	if sweep_type == "dmrg"
 		#println("Before starting DMRG the bond dim is ",TTN.maxlinkdim(ttn))
 		#get_occupancy(ttn; plot_title="Before DMRG")
-		if isnothing(psi_ortho)
+		if isnothing(psi_ortho) || length(psi_ortho) == 0
 			sp::TTN.AbstractSweepHandler = TTN.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff, eigsolve_krylovdim=eigsolve_krylovdim, eigsolve_verbosity=eigsolve_verbosity)
 		else
 			# prep the orthogonal states before starting DMRG
@@ -1287,10 +1287,15 @@ function save_excited_ttn(ttn::TTN.TreeTensorNetwork,metadata::Dict,actual_filen
 	densmat_dict::Dict{String,Any} = Dict([("densmat_$es_number",densmat)])
 
 	actual_filename = make_sure_file_type(actual_filename,"h5")
+	if length(split(actual_filename,"/")) > 1
+		filepath = actual_filename
+	else
+		filepath = metadata["location"] * "/" * actual_filename
+	end
 
-	modify_data(wavefunc_dict,metadata["location"] * "/wavefunc" * actual_filename,"all_data")
-	modify_data(densmat_dict,metadata["location"] * "/" * actual_filename,"all_data")
-	modify_data(metadata,metadata["location"] * "/" * actual_filename,"metadata")
+	modify_data(wavefunc_dict,add_wavefunc_to_filepath(filepath),"all_data")
+	modify_data(densmat_dict,filepath,"all_data")
+	modify_data(metadata,filepath,"metadata")
 end
 
 function save_ttn(ttn::TTN.TreeTensorNetwork,metadata_dict::Dict,actual_filename::String,densmat::Matrix{ComplexF64}=zeros(ComplexF64,1,1); kwargs...)
@@ -1600,6 +1605,7 @@ function rerun_findGS(fileloc::String; kwargs...)
 
 	return dm_sp.ttn, hamilt, rezobs, dens, runtime
 end
+
 
 function plot_grid(virt_edge_length,phys_edge_length)
 	for i in 1:virt_edge_length

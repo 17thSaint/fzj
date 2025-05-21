@@ -1,6 +1,5 @@
 using ITensorMPS
 using LinearAlgebra
-using LaTeXStrings
 using KrylovKit
 using Printf, Random
 

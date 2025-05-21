@@ -1,0 +1,421 @@
+pgi8cluster22: Using Ethernet for MPI communication.
+pgi8cluster22: Using Ethernet for MPI communication.
+The latest version of Julia in the `release` channel is 1.11.5+0.x64.linux.gnu. You currently have `1.11.3+0.x64.linux.gnu` installed. Run:
+
+  juliaup update
+
+in your terminal shell to install Julia 1.11.5+0.x64.linux.gnu and update the `release` channel to that version.
+  Activating project at `/local/geraghty/synth-dims`
+ttn-if_periodic_phys-true-onsite_strength-1.0-lr-3-particles-2-if_gpu-true-alpha-0.25-if_periodic_synth-true-layers-4-hopping_anisotropy-1.0.h5
+Location for data is /local/geraghty/cluster-data/synth-dims/torus/new-gauge
+Starting Script using 2 particles on 16 sites with Flux = 0.25, Bond Dim = 100, and Long Range Dist = 3
+Phys = 4, Virt = 4
+4-element Vector{Float64}:
+ 1.0
+ 1.0
+ 1.0
+ 1.0
+Dict{String, Any} with 49 entries:
+  "cutoff" => 1.0e-8
+  "if_change" => false
+  "which_dir" => "virt"
+  "no_magF" => false
+  "if_periodic_phys" => true
+  "if_old_excited" => false
+  "syms" => true
+  "if_densmat" => true
+  "lr" => 3
+  "if_continuous_saving" => false
+  "name" => "ttn-if_periodic_phys-true-onsite_strength-1.0-lr-3-particles-2-if_gpu-true-alpha-0.25-if_periodic_synth-true-layers-4-hopping_anisotropy-1.0.h5"
+  "noise" => [0.0]
+  "scaling" => "flat"
+  "if_pinning" => false
+  "alpha" => 0.25
+  "output_level" => 0
+  "sweep_type" => "dmrg"
+  "layers" => 4
+  "change" => 0.0001
+  "num_sweeps" => 5
+  "cliff" => false
+  "if_pfaffian" => false
+  "trunc" => 0.001
+  "chem_strength" => 0.0
+  "if_gpu" => true
+  "max_occ" => 1
+  "if_synth_rectangle" => false
+  "if_sweep" => true
+  "if_save_data" => false
+  "location" => "/local/geraghty/cluster-data/synth-dims/torus/new-gauge"
+  "phi" => 0.25
+  "restricted_size" => [4, 4]
+  "mdim" => 100
+  "particle_type" => "Boson"
+  "if_pinning_pot" => false
+  "expander" => DefaultExpander{Float64}(1.0e-5, 1, 10, 1.0e-5)
+  "onsite_strength" => 1.0
+  "particles" => 2
+  "twist_angle" => [0.0, 0.0]
+  "if_redo" => false
+  "if_periodic_synth" => true
+  "hopping_anisotropy" => 1.0
+  "ts" => 1.0
+  "if_nn_int" => false
+  "nrgtol" => 5.0e-5
+  "if_memobs" => false
+  "flux_direction" => "synth"
+  "centralflux_strength" => 0.0
+  "conserve_qns" => true
+Finished Building Network
+Doing GPU TTN
+Added States
+Built Hamiltonian
+Link dimension right now is 6 while the maxdim is 25
+Finished sweep 1. Needed Time 150.877s
+	Current energy: -5.528883383640012.
+
+Energy Change = 1005.5288834
+Link dimension right now is 6 while the maxdim is 50
+Finished sweep 2. Needed Time 124.996s
+	Current energy: -5.540112542550892.
+
+Energy Change = 0.0112292
+Link dimension right now is 7 while the maxdim is 100
+Finished sweep 3. Needed Time 113.390s
+	Current energy: -5.541409769878935.
+
+Energy Change = 0.0012972
+Link dimension right now is 8 while the maxdim is 100
+Finished sweep 4. Needed Time 103.120s
+	Current energy: -5.542120917269846.
+
+Energy Change = 0.0007111
+Link dimension right now is 9 while the maxdim is 100
+Finished sweep 5. Needed Time 104.039s
+	Current energy: -5.542434874875395.
+
+Energy Change = 0.000314
+Dict{String, Any} with 50 entries:
+  "cutoff" => 1.0e-8
+  "if_change" => false
+  "which_dir" => "virt"
+  "no_magF" => false
+  "if_periodic_phys" => true
+  "if_old_excited" => false
+  "syms" => true
+  "if_densmat" => true
+  "lr" => 3
+  "if_continuous_saving" => false
+  "name" => "ttn-if_periodic_phys-true-onsite_strength-1.0-lr-3-particles-2-if_gpu-true-alpha-0.25-if_periodic_synth-true-layers-4-hopping_anisotropy-1.0.h5"
+  "noise" => [0.0]
+  "scaling" => "flat"
+  "if_pinning" => false
+  "alpha" => 0.25
+  "output_level" => 0
+  "sweep_type" => "dmrg"
+  "layers" => 4
+  "change" => 0.0001
+  "num_sweeps" => 5
+  "cliff" => false
+  "if_pfaffian" => false
+  "trunc" => 0.001
+  "chem_strength" => 0.0
+  "if_gpu" => true
+  "max_occ" => 1
+  "if_synth_rectangle" => false
+  "if_sweep" => true
+  "if_save_data" => false
+  "location" => "/local/geraghty/cluster-data/synth-dims/torus/new-gauge"
+  "net" => BinaryNetwork{SimpleLattice{2, Index, Vector{Pair{QN, Int64}}}}(SimpleLattice{2, Index, Vector{Pair{QN, Int64}}}[Simple Lattice of dimension 2, with dimensions: (4, 4):
+
+	|(dim=2|id=691|"Boson,Site,n=1") <Out>
+ 1: QN("Number",0) => 1
+ 2: QN("Number",1) => 1|-|(dim=2|id=379|"Boson,Site,n=2") <Out>
+ 1: QN("Number",0) => 1
+ 2: QN("Number",1) => 1|-|(dim=2|id=611|"Boson,Site,n=3") <Out>
+ 1: QN("Number",0) => 1
+ 2: QN("Number",1) => 1|-|(dim=2|id=440|"Boson,Site,n=4") <Out>
+ 1: QN("Number",0) => 1
+ 2: QN("Number",1) => 1|
+	                                           |                                                                                       |                                                                                       |                                                                                       |                                           
+	|(dim=2|id=38|"Boson,Site,n=5") <Out>
+ 1: QN("Number",0) => 1
+ 2: QN("Number",1) => 1|-|(dim=2|id=386|"Boson,Site,n=6") <Out>
+ 1: QN("Number",0) => 1
+ 2: QN("Number",1) => 1|-|(dim=2|id=869|"Boson,Site,n=7") <Out>
+ 1: QN("Number",0) => 1
+ 2: QN("Number",1) => 1|-|(dim=2|id=844|"Boson,Site,n=8") <Out>
+ 1: QN("Number",0) => 1
+ 2: QN("Number",1) => 1|
+	                                           |                                                                                      |                                                                                       |                                                                                       |                                           
+	|(dim=2|id=553|"Boson,Site,n=9") <Out>
+ 1: QN("Number",0) => 1
+ 2: QN("Number",1) => 1|-|(dim=2|id=603|"Boson,Site,n=10") <Out>
+ 1: QN("Number",0) => 1
+ 2: QN("Number",1) => 1|-|(dim=2|id=659|"Boson,Site,n=11") <Out>
+ 1: QN("Number",0) => 1
+ 2: QN("Number",1) => 1|-|(dim=2|id=557|"Boson,Site,n=12") <Out>
+ 1: QN("Number",0) => 1
+ 2: QN("Number",1) => 1|
+	                                           |                                                                                       |                                                                                        |                                                                                        |                                            
+	|(dim=2|id=206|"Boson,Site,n=13") <Out>
+ 1: QN("Number",0) => 1
+ 2: QN("Number",1) => 1|-|(dim=2|id=152|"Boson,Site,n=14") <Out>
+ 1: QN("Number",0) => 1
+ 2: QN("Number",1) => 1|-|(dim=2|id=269|"Boson,Site,n=15") <Out>
+ 1: QN("Number",0) => 1
+ 2: QN("Number",1) => 1|-|(dim=2|id=598|"Boson,Site,n=16") <Out>
+ 1: QN("Number",0) => 1
+ 2: QN("Number",1) => 1|
+, Simple Lattice of dimension 2, with dimensions: (2, 4):
+
+	|Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}|-|Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}|
+	                        |                                                 |                        
+	|Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}|-|Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}|
+	                        |                                                 |                        
+	|Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}|-|Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}|
+	                        |                                                 |                        
+	|Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}|-|Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}|
+, Simple Lattice of dimension 2, with dimensions: (2, 2):
+
+	|Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}|-|Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}|
+	                        |                                                 |                        
+	|Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}|-|Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}|
+, Simple Lattice of dimension 2, with dimensions: (1, 2):
+
+	|Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}|
+	                        |                        
+	|Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}|
+, Simple Lattice of dimension 2, with dimensions: (1, 1):
+
+	|Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}|
+])
+  "phi" => 0.25
+  "restricted_size" => [4, 4]
+  "mdim" => 100
+  "particle_type" => "Boson"
+  "if_pinning_pot" => false
+  "expander" => DefaultExpander{Float64}(1.0e-5, 1, 10, 1.0e-5)
+  "onsite_strength" => 1.0
+  "particles" => 2
+  "twist_angle" => [0.0, 0.0]
+  "if_redo" => false
+  "if_periodic_synth" => true
+  "hopping_anisotropy" => 1.0
+  "ts" => 1.0
+  "if_nn_int" => false
+  "nrgtol" => 5.0e-5
+  "if_memobs" => false
+  "flux_direction" => "synth"
+  "centralflux_strength" => 0.0
+  "conserve_qns" => true
+Finished Building Network
+Doing GPU TTN
+Added States
+Built Hamiltonian
+Link dimension right now is 6 while the maxdim is 25
+Finished sweep 1. Needed Time 71.576s
+	Current energy: -5.526594657155886.
+
+Energy Change = 1005.5265947
+Link dimension right now is 6 while the maxdim is 50
+Finished sweep 2. Needed Time 61.916s
+	Current energy: -5.538805305620749.
+
+Energy Change = 0.0122106
+Link dimension right now is 7 while the maxdim is 100
+Finished sweep 3. Needed Time 56.775s
+	Current energy: -5.541605110349659.
+
+Energy Change = 0.0027998
+Link dimension right now is 8 while the maxdim is 100
+Finished sweep 4. Needed Time 50.980s
+	Current energy: -5.542142661522155.
+
+Energy Change = 0.0005376
+Link dimension right now is 9 while the maxdim is 100
+Finished sweep 5. Needed Time 43.983s
+	Current energy: -5.542449477126308.
+
+Energy Change = 0.0003068
+Finished Excited State 1 
+
+Running time = 1048.6390359401703
+Finished DMRG Initialization
+Number of Fluxes = 16.0 for Lx = 16 and Ly = 8
+Checking fluxes only along Gauge Direction
+ttn-if_periodic_phys-true-onsite_strength-2.0-lr-7-particles-8-if_gpu-true-alpha-0.125-if_periodic_synth-true-layers-7-hopping_anisotropy-1.0.h5
+Location for data is /local/geraghty/cluster-data/synth-dims/torus/new-gauge
+Starting Script using 8 particles on 128 sites with Flux = 0.125, Bond Dim = 500, and Long Range Dist = 7
+Phys = 16, Virt = 8
+8-element Vector{Float64}:
+ 2.0
+ 2.0
+ 2.0
+ 2.0
+ 2.0
+ 2.0
+ 2.0
+ 2.0
+Dict{String, Any} with 49 entries:
+  "cutoff" => 1.0e-8
+  "if_change" => false
+  "which_dir" => "virt"
+  "no_magF" => false
+  "if_periodic_phys" => true
+  "if_old_excited" => false
+  "syms" => true
+  "if_densmat" => true
+  "lr" => 7
+  "if_continuous_saving" => true
+  "name" => "ttn-if_periodic_phys-true-onsite_strength-2.0-lr-7-particles-8-if_gpu-true-alpha-0.125-if_periodic_synth-true-layers-7-hopping_anisotropy-1.0.h5"
+  "noise" => [0.0]
+  "scaling" => "flat"
+  "if_pinning" => false
+  "alpha" => 0.125
+  "output_level" => 0
+  "sweep_type" => "dmrg"
+  "layers" => 7
+  "change" => 0.0001
+  "num_sweeps" => 100
+  "cliff" => false
+  "if_pfaffian" => false
+  "trunc" => 0.001
+  "chem_strength" => 0.0
+  "if_gpu" => true
+  "max_occ" => 1
+  "if_synth_rectangle" => false
+  "if_sweep" => true
+  "if_save_data" => true
+  "location" => "/local/geraghty/cluster-data/synth-dims/torus/new-gauge"
+  "phi" => 0.125
+  "restricted_size" => [16, 8]
+  "mdim" => 500
+  "particle_type" => "Boson"
+  "if_pinning_pot" => false
+  "expander" => DefaultExpander{Float64}(1.0e-5, 1, 10, 1.0e-5)
+  "onsite_strength" => 2.0
+  "particles" => 8
+  "twist_angle" => [0.0, 0.0]
+  "if_redo" => false
+  "if_periodic_synth" => true
+  "hopping_anisotropy" => 1.0
+  "ts" => 1.0
+  "if_nn_int" => false
+  "nrgtol" => 5.0e-5
+  "if_memobs" => false
+  "flux_direction" => "synth"
+  "centralflux_strength" => 0.0
+  "conserve_qns" => true
+Finished Building Network
+Data Added, File Closed: /local/geraghty/cluster-data/synth-dims/torus/new-gauge/wavefuncttn-if_periodic_phys-true-onsite_strength-2.0-lr-7-particles-8-if_gpu-true-alpha-0.125-if_periodic_synth-true-layers-7-hopping_anisotropy-1.0.h5
+Data Added, File Closed: /local/geraghty/cluster-data/synth-dims/torus/new-gauge/ttn-if_periodic_phys-true-onsite_strength-2.0-lr-7-particles-8-if_gpu-true-alpha-0.125-if_periodic_synth-true-layers-7-hopping_anisotropy-1.0.h5
+Doing GPU TTN
+Added States
+Built Hamiltonian
+ERROR: LoadError: Out of GPU memory
+Effective GPU memory usage: 99.99% (79.134 GiB/79.138 GiB)
+Memory pool usage: 57.273 GiB (78.625 GiB reserved)
+
+Stacktrace:
+  [1] throw_api_error(res::CUDA.cudaError_enum)
+    @ CUDA /local/geraghty/.julia/packages/CUDA/2kjXI/lib/cudadrv/libcuda.jl:28
+  [2] check
+    @ /local/geraghty/.julia/packages/CUDA/2kjXI/lib/cudadrv/libcuda.jl:37 [inlined]
+  [3] cuMemAllocAsync
+    @ /local/geraghty/.julia/packages/CUDA/2kjXI/lib/utils/call.jl:34 [inlined]
+  [4] alloc(::Type{CUDA.DeviceMemory}, bytesize::Int64; async::Bool, stream::Nothing, pool::Nothing)
+    @ CUDA /local/geraghty/.julia/packages/CUDA/2kjXI/lib/cudadrv/memory.jl:73
+  [5] alloc(::Type{CUDA.DeviceMemory}, bytesize::Int64)
+    @ CUDA /local/geraghty/.julia/packages/CUDA/2kjXI/lib/cudadrv/memory.jl:61
+  [6] (::CUDA.var"#1138#1139"{ComplexF64, CuArray{ComplexF64, 1, CUDA.DeviceMemory}, Int64, Int64})()
+    @ CUDA /local/geraghty/.julia/packages/CUDA/2kjXI/src/array.jl:844
+  [7] #context!#990
+    @ /local/geraghty/.julia/packages/CUDA/2kjXI/lib/cudadrv/state.jl:168 [inlined]
+  [8] context!
+    @ /local/geraghty/.julia/packages/CUDA/2kjXI/lib/cudadrv/state.jl:163 [inlined]
+  [9] resize!(A::CuArray{ComplexF64, 1, CUDA.DeviceMemory}, n::Int64)
+    @ CUDA /local/geraghty/.julia/packages/CUDA/2kjXI/src/array.jl:843
+ [10] append!
+    @ /local/geraghty/.julia/packages/GPUArrays/qt4ax/src/host/abstractarray.jl:326 [inlined]
+ [11] macro expansion
+    @ /local/geraghty/.julia/packages/GPUArraysCore/GMsgk/src/GPUArraysCore.jl:210 [inlined]
+ [12] append!(Ecollection::NDTensors.Expose.Exposed{CuArray{ComplexF64, 1, CUDA.DeviceMemory}, CuArray{ComplexF64, 1, CUDA.DeviceMemory}}, collections::CuArray{ComplexF64, 1, CUDA.DeviceMemory})
+    @ NDTensorsCUDAExt /local/geraghty/.julia/packages/NDTensors/zHdA1/ext/NDTensorsCUDAExt/append.jl:7
+ [13] insertblock_offset!(T::NDTensors.BlockSparseTensor{ComplexF64, 3, Tuple{ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, NDTensors.BlockSparse{ComplexF64, CuArray{ComplexF64, 1, CUDA.DeviceMemory}, 3}}, newblock::NDTensors.Block{3})
+    @ NDTensors /local/geraghty/.julia/packages/NDTensors/zHdA1/src/blocksparse/blocksparsetensor.jl:271
+ [14] insertblock!
+    @ /local/geraghty/.julia/packages/NDTensors/zHdA1/src/blocksparse/blocksparsetensor.jl:276 [inlined]
+ [15] setindex!
+    @ /local/geraghty/.julia/packages/NDTensors/zHdA1/src/blocksparse/blocksparsetensor.jl:312 [inlined]
+ [16] permutedims!(R::NDTensors.BlockSparseTensor{ComplexF64, 3, Tuple{ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, NDTensors.BlockSparse{ComplexF64, CuArray{ComplexF64, 1, CUDA.DeviceMemory}, 3}}, T::NDTensors.BlockSparseTensor{ComplexF64, 3, Tuple{ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, NDTensors.BlockSparse{ComplexF64, CuArray{ComplexF64, 1, CUDA.DeviceMemory}, 3}}, perm::Tuple{Int64, Int64, Int64}, f::typeof(+))
+    @ NDTensors /local/geraghty/.julia/packages/NDTensors/zHdA1/src/blocksparse/blocksparsetensor.jl:835
+ [17] permutedims!!(R::NDTensors.BlockSparseTensor{ComplexF64, 3, Tuple{ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, NDTensors.BlockSparse{ComplexF64, CuArray{ComplexF64, 1, CUDA.DeviceMemory}, 3}}, T::NDTensors.BlockSparseTensor{ComplexF64, 3, Tuple{ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, NDTensors.BlockSparse{ComplexF64, CuArray{ComplexF64, 1, CUDA.DeviceMemory}, 3}}, perm::Tuple{Int64, Int64, Int64}, f::Function)
+    @ NDTensors /local/geraghty/.julia/packages/NDTensors/zHdA1/src/blocksparse/blocksparsetensor.jl:770
+ [18] _map!!(f::Function, R::NDTensors.BlockSparseTensor{ComplexF64, 3, Tuple{ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, NDTensors.BlockSparse{ComplexF64, CuArray{ComplexF64, 1, CUDA.DeviceMemory}, 3}}, T1::NDTensors.BlockSparseTensor{ComplexF64, 3, Tuple{ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, NDTensors.BlockSparse{ComplexF64, CuArray{ComplexF64, 1, CUDA.DeviceMemory}, 3}}, T2::NDTensors.BlockSparseTensor{ComplexF64, 3, Tuple{ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, NDTensors.BlockSparse{ComplexF64, CuArray{ComplexF64, 1, CUDA.DeviceMemory}, 3}})
+    @ ITensors /local/geraghty/.julia/packages/ITensors/Zs2nC/src/itensor.jl:1910
+ [19] map!(f::Function, R::ITensors.ITensor, T1::ITensors.ITensor, T2::ITensors.ITensor)
+    @ ITensors /local/geraghty/.julia/packages/ITensors/Zs2nC/src/itensor.jl:1915
+ [20] copyto!
+    @ /local/geraghty/.julia/packages/ITensors/Zs2nC/src/broadcast.jl:310 [inlined]
+ [21] materialize!
+    @ ./broadcast.jl:883 [inlined]
+ [22] materialize!
+    @ ./broadcast.jl:880 [inlined]
+ [23] _add(A::NDTensors.BlockSparseTensor{ComplexF64, 3, Tuple{ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, NDTensors.BlockSparse{ComplexF64, CuArray{ComplexF64, 1, CUDA.DeviceMemory}, 3}}, B::NDTensors.BlockSparseTensor{ComplexF64, 3, Tuple{ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, NDTensors.BlockSparse{ComplexF64, CuArray{ComplexF64, 1, CUDA.DeviceMemory}, 3}})
+    @ ITensors /local/geraghty/.julia/packages/ITensors/Zs2nC/src/itensor.jl:1811
+ [24] +(A::ITensors.ITensor, B::ITensors.ITensor)
+    @ ITensors /local/geraghty/.julia/packages/ITensors/Zs2nC/src/itensor.jl:1819
+ [25] mapreduce_impl(f::TTN.var"#482#484"{ITensors.ITensor}, op::typeof(+), A::Vector{Prod{Op}}, ifirst::Int64, ilast::Int64, blksize::Int64)
+    @ Base ./reduce.jl:262
+ [26] mapreduce_impl
+    @ ./reduce.jl:277 [inlined]
+ [27] _mapreduce(f::TTN.var"#482#484"{ITensors.ITensor}, op::typeof(+), ::IndexLinear, A::Vector{Prod{Op}})
+    @ Base ./reduce.jl:444
+ [28] _mapreduce_dim
+    @ ./reducedim.jl:337 [inlined]
+ [29] mapreduce
+    @ ./reducedim.jl:329 [inlined]
+ [30] action
+    @ /local/geraghty/.julia/packages/TTN/src/TPO/ProjTPO/ProjectedTensorProductOperator.jl:196 [inlined]
+ [31] apply(f::TTN.var"#action#483"{Vector{Prod{Op}}}, x::ITensors.ITensor)
+    @ KrylovKit /local/geraghty/.julia/packages/KrylovKit/jC5gU/src/apply.jl:2
+ [32] lanczosrecurrence(operator::Function, V::KrylovKit.OrthonormalBasis{ITensors.ITensor}, β::Float64, orth::ModifiedGramSchmidt2)
+    @ KrylovKit /local/geraghty/.julia/packages/KrylovKit/jC5gU/src/factorizations/lanczos.jl:318
+ [33] expand!(iter::LanczosIterator{TTN.var"#action#483"{Vector{Prod{Op}}}, ITensors.ITensor, ModifiedGramSchmidt2}, state::KrylovKit.LanczosFactorization{ITensors.ITensor, Float64}; verbosity::Int64)
+    @ KrylovKit /local/geraghty/.julia/packages/KrylovKit/jC5gU/src/factorizations/lanczos.jl:249
+ [34] eigsolve(A::Function, x₀::ITensors.ITensor, howmany::Int64, which::Symbol, alg::Lanczos{ModifiedGramSchmidt2, Float64}; alg_rrule::Arnoldi{ModifiedGramSchmidt2, Float64})
+    @ KrylovKit /local/geraghty/.julia/packages/KrylovKit/jC5gU/src/eigsolve/lanczos.jl:74
+ [35] eigsolve
+    @ /local/geraghty/.julia/packages/KrylovKit/jC5gU/src/eigsolve/lanczos.jl:1 [inlined]
+ [36] eigsolve(f::Function, x₀::ITensors.ITensor, howmany::Int64, which::Symbol; kwargs::@Kwargs{ishermitian::Bool, tol::Float64, krylovdim::Int64, maxiter::Int64, verbosity::Int64})
+    @ KrylovKit /local/geraghty/.julia/packages/KrylovKit/jC5gU/src/eigsolve/eigsolve.jl:223
+ [37] eigsolve
+    @ /local/geraghty/.julia/packages/KrylovKit/jC5gU/src/eigsolve/eigsolve.jl:197 [inlined]
+ [38] (::TTN.var"#534#535"{Symbol, Bool, Int64, Int64, Int64, Float64})(action::Function, T::ITensors.ITensor)
+    @ TTN /local/geraghty/.julia/packages/TTN/src/algorithms/sweeps.jl:102
+ [39] update!(sp::TTN.SimpleSweepHandler, pos::Tuple{Int64, Int64}; svd_alg::Nothing)
+    @ TTN /local/geraghty/.julia/packages/TTN/src/algorithms/SweepHandler/SimpleSweepHandler.jl:224
+ [40] update!
+    @ /local/geraghty/.julia/packages/TTN/src/algorithms/SweepHandler/SimpleSweepHandler.jl:69 [inlined]
+ [41] sweep(psi0::TreeTensorNetwork{BinaryNetwork{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, ITensors.ITensor}, sp::TTN.SimpleSweepHandler; kwargs::@Kwargs{number_of_sweeps::Int64, maxdims::Vector{Int64}, noise::Vector{Float64}, output_level::Int64, observer::SavingNRGVarObserver, cutoff::Float64, eigsolve_krylovdim::Int64, eigsolve_verbosity::Int64})
+    @ TTN /local/geraghty/.julia/packages/TTN/src/algorithms/sweeps.jl:41
+ [42] sweep
+    @ /local/geraghty/.julia/packages/TTN/src/algorithms/sweeps.jl:17 [inlined]
+ [43] dmrg(psi0::TreeTensorNetwork{BinaryNetwork{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, ITensors.ITensor}, tpo::TPO{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}; expander::DefaultExpander{Float64}, kwargs::@Kwargs{number_of_sweeps::Int64, maxdims::Vector{Int64}, noise::Vector{Float64}, output_level::Int64, observer::SavingNRGVarObserver, cutoff::Float64, eigsolve_krylovdim::Int64, eigsolve_verbosity::Int64})
+    @ TTN /local/geraghty/.julia/packages/TTN/src/algorithms/sweeps.jl:111
+ [44] do_sweep(ttn::TreeTensorNetwork{BinaryNetwork{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, ITensors.ITensor}, ham::TPO{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, sweep_type::String; kwargs::@Kwargs{ttn_net::BinaryNetwork{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, ham::Sum{Scaled{ComplexF64, Prod{Op}}}, alpha::Float64, cliff::Bool, if_old_excited::Bool, onsite_strength::Float64, if_redo::Bool, no_magF::Bool, name::String, noise::Vector{Float64}, if_save_data::Bool, nrgtol::Float64, if_pinning::Bool, seed_ttn::Nothing, lr::Int64, change::Float64, num_sweeps::Int64, flux_direction::String, if_change::Bool, if_pfaffian::Bool, scaling::String, if_nn_int::Bool, if_memobs::Bool, hopping_anisotropy::Float64, if_continuous_saving::Bool, particles::Int64, cutoff::Float64, ts::Float64, phi::Float64, centralflux_strength::Float64, restricted_size::Vector{Int64}, if_densmat::Bool, if_pinning_pot::Bool, mdim::Int64, sweep_type::String, layers::Int64, syms::Bool, output_level::Int64, location::String, if_gpu::Bool, max_occ::Int64, if_synth_rectangle::Bool, if_sweep::Bool, twist_angle::Vector{Float64}, which_dir::String, expander::DefaultExpander{Float64}, chem_strength::Float64, trunc::Float64, if_periodic_phys::Bool, if_periodic_synth::Bool, metadata::Dict{String, Any}, file_path::String})
+    @ Main /local/geraghty/review-practice-codes/ttn.jl:779
+ [45] find_ground_state(num_layers::Int64, particle_count::Int64; kwargs::@Kwargs{ttn_net::BinaryNetwork{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, ham::Sum{Scaled{ComplexF64, Prod{Op}}}, alpha::Float64, cliff::Bool, if_old_excited::Bool, onsite_strength::Float64, if_redo::Bool, no_magF::Bool, name::String, noise::Vector{Float64}, if_save_data::Bool, nrgtol::Float64, if_pinning::Bool, seed_ttn::Nothing, lr::Int64, change::Float64, num_sweeps::Int64, flux_direction::String, if_change::Bool, if_pfaffian::Bool, scaling::String, if_nn_int::Bool, if_memobs::Bool, hopping_anisotropy::Float64, if_continuous_saving::Bool, particles::Int64, cutoff::Float64, ts::Float64, phi::Float64, centralflux_strength::Float64, restricted_size::Vector{Int64}, if_densmat::Bool, if_pinning_pot::Bool, mdim::Int64, sweep_type::String, layers::Int64, syms::Bool, output_level::Int64, location::String, if_gpu::Bool, max_occ::Int64, if_synth_rectangle::Bool, if_sweep::Bool, twist_angle::Vector{Float64}, which_dir::String, expander::DefaultExpander{Float64}, chem_strength::Float64, trunc::Float64, if_periodic_phys::Bool, if_periodic_synth::Bool, metadata::Dict{String, Any}})
+    @ Main /local/geraghty/review-practice-codes/ttn.jl:982
+ [46] find_spectrum(model_paras::Dict{Any, Any}, num_excited_states::Int64, metadata::Dict{String, Any}; kwargs::@Kwargs{})
+    @ Main /local/geraghty/review-practice-codes/ttn.jl:1258
+ [47] find_spectrum
+    @ /local/geraghty/review-practice-codes/ttn.jl:1254 [inlined]
+ [48] run_synth_dims_generic(params_dict::Dict{String, Any})
+    @ Main /local/geraghty/synth-dims/long-range-ttn.jl:1767
+ [49] macro expansion
+    @ /local/geraghty/.julia/packages/GPUArraysCore/GMsgk/src/GPUArraysCore.jl:210 [inlined]
+ [50] top-level scope
+    @ /local/geraghty/synth-dims/long-range-ttn.jl:2025
+in expression starting at /local/geraghty/synth-dims/long-range-ttn.jl:1975
+srun: error: pgi8cluster22: task 0: Exited with exit code 1

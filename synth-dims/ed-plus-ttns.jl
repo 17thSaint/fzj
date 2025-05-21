@@ -250,11 +250,18 @@ function focking_matrix(which_function::Function,wavefunc::TTN.TreeTensorNetwork
     return fockmatrix_operator
 end
 
+# rerun GS and excited states
+if false
+    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict_ttn = Dict([("onsite_strength",0.0),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
 
 
+end
 
-# see if excited TTNs restrict_size matches ED
-if true
+
+#= see if excited TTNs restrict_size matches ED
+if false
     lx,ly,n = 3,3,2
     layers = Int(ceil(log(2,lx*ly)))
 
@@ -265,7 +272,7 @@ if true
     pdict_ttn = Dict([("hopping_anisotropy",1.0),("make_smaller_lattice",[lx,ly]),("es_count",2),("if_check_fluxes",false),("expander_fraction",1.0),("particles",n),("layers",layers),("mdim",200),("if_save_data",false),("filling",0.5),("if_periodic_phys",true),("if_periodic_synth",true)])
     all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(pdict_ttn)
 
-end#
+end=#
 
 #= look at finite size scaling of commensurate filling interaction strength spectrum
 if false

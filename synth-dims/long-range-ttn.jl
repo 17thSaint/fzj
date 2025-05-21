@@ -1,5 +1,5 @@
-using Pkg
-Pkg.activate("../synth-dims/")
+#using Pkg
+#Pkg.activate("../synth-dims/")
 include("../review-practice-codes/ttn.jl")
 include("../other-funcs/basic-2d-stuff.jl")
 include("../review-practice-codes/observables.jl")
@@ -1806,6 +1806,94 @@ function initialize_dmrg(if_gpu::Bool)
 
 end
 
+function get_num_states_from_datadict(data)
+	num_states = 0
+	for (k,v) in data
+		if occursin("densmat",k)
+			num_states += 1
+		end
+	end
+	return num_states
+end
+
+function reconverge_ttn(filepath::String; kwargs...)
+	new_parameters = get(kwargs, :new_parameters, nothing)
+
+	# pull out the old data
+	data,metadata_old = read_data(filepath)
+
+	
+	num_states = get_num_states_from_datadict(data)
+	all_wavefuncs::Vector = Vector{TTN.TreeTensorNetwork}(undef,num_states)
+
+	# pull out wavefunctions whether in this file of wavefunc version
+	if haskey(data,"ttn") && !isnothing(data["ttn"])
+		for (k,v) in data
+			if occursin("ttn_",k)
+				all_wavefuncs[parse(Int,split(k,"_")[2])+1] = v
+			elseif k == "ttn"
+				all_wavefuncs[1] = v
+			end
+		end
+	else
+		data_wavefunc,mm = read_data(add_wavefunc_to_filepath(filepath))
+		for (k,v) in data_wavefunc
+			if occursin("ttn_",k)
+				all_wavefuncs[parse(Int,split(k,"_")[2])+1] = v
+			elseif k == "ttn"
+				all_wavefuncs[1] = v
+			end
+		end
+	end
+	metadata_old["if_redo"] = true
+
+	# replace the old parameters with the new ones
+	for (key,value) in new_parameters
+		metadata_old[key] = value
+	end
+
+	# pull out the old data necessary for DMRG sweep
+	ham_op = metadata_old["ham"]
+	ttn_net = metadata_old["seed_ttn"].net
+	model_paras = dict_to_symbols(metadata_old)
+	layers = metadata_old["layers"]
+	num_particles = metadata_old["particles"]
+	if_gpu::Bool = get(new_parameters, "if_gpu", false)
+	ham::TTN.AbstractTensorProductOperator = TTN.TPO(ham_op,physical_lattice(ttn_net))
+
+	all_obs = Vector{TTN.AbstractObserver}(undef,num_states)
+	all_densmats = Vector{Matrix{ComplexF64}}(undef,num_states)
+	all_runtimes = zeros(num_states)
+	ttn_orthos::Vector{TTN.TreeTensorNetwork} = []
+	for i in 1:length(all_wavefuncs)
+		println("Working on state $i")
+		
+		# run DMRG
+		new_ttn, new_ham, new_sp, new_obs, runtime, densmat = find_excited_state(all_wavefuncs[i],ttn_orthos,ham,"dmrg",metadata_old["if_densmat"],metadata_old["location"],filepath; model_paras...)
+		
+		# add new ttn to the list of orthogonal states for next step
+		append!(ttn_orthos,[new_sp.ttn])
+
+		# save the newly converged data
+		all_wavefuncs[i] = new_sp.ttn
+		all_obs[i] = new_obs
+		all_densmats[i] = densmat
+		all_runtimes[i] = runtime
+
+		# save data to file
+		new_metadata::Dict{String,Any} = Dict([("location",metadata_old["location"]),("observer_$(i-1)",new_obs),("runtime_$(i-1)",runtime),("energies_$(i-1)",new_obs.nrg),("maxlinkdim_$(i-1)",TTN.maxlinkdim(new_sp.ttn))])
+		save_excited_ttn(new_sp.ttn,new_metadata,filepath,i-1,densmat; model_paras...)
+
+	end
+
+
+	return all_wavefuncs, ham, all_obs, all_densmats, all_runtimes
+end
+
+
+
+	
+
 if false
 	here = pwd()
 	cd("../cluster-data/synth-dims/excited-states/")
@@ -1992,7 +2080,7 @@ if false
 end
 
 # synth-dims for loop runnings
-if true
+if false
 
 	cols = ["b","g","r"]
 	#nnst = 0.0
@@ -2012,15 +2100,22 @@ if true
 	#anises = [0.01,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.6,0.8,0.9,1.1,1.3,1.5,1.7,1.9,2.0,2.5,3.0,3.5,4.0,6.0,8.0,9.0,10.0,15.0,20.0,25.0,30.0,40.0,50.0,70.0,90.0,100.0,1000.0,10000.0]
 	#anises = range(1.0,5.0,length=10)
 	#strens = [0.0,0.25,0.5,0.75,1.0,1.5,2.0,5.0,10.0,20.0,50.0,100.0,300.0,1000.0]
+	
+	#=
 	args_dict = make_args_dict(ARGS)
-	dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
 	stren = args_dict["onsite_strength"]
-	#layers = args_dict["layers"]
-	pinstren = args_dict["pinning_strength"]
 	lx = args_dict["Lx"]
 	ly = args_dict["Ly"]
 	n = args_dict["particles"]
 	mdim = args_dict["mdim"]
+	if_pinning = "pinning_strength" in keys(args_dict)
+	pinstren = if_pinning ? args_dict["pinning_strength"] : 1e-3
+	dataloc = if_pinning ? get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling") : get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+	=#
+
+	lx,ly,n = 4,4,2
+	stren = 0.0
+	
 	#alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
 	#strens = [0.0,0.5,1.0,1.5,2.0]#range(0.1,0.5,length=3)
 	#for (idx,anis) in enumerate(anises)
@@ -2032,7 +2127,10 @@ if true
 		
 		#d,m = read_data("../cluster-data/synth-dims/torus/ttn-if_periodic_phys-true-onsite_strength-0.0-lr-0-particles-4-alpha-0.0-layers-4-hopping_anisotropy-1.0.h5")
 		#st = d["ttn"]
-		params_dict = Dict([("hopping_anisotropy",1.0),("if_gpu",true),("if_pinning",true),("dataloc",dataloc),("pinning_strength",pinstren),("make_smaller_lattice",[lx,ly]),("es_count",1),("expander_fraction",1e-5),("particles",n),("mdim",mdim),("if_save_data",true),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+		
+		#("if_pinning",if_pinning),("dataloc",dataloc),("pinning_strength",pinstren)
+		
+		params_dict = Dict([("hopping_anisotropy",1.0),("nrgtol",1e-3),("make_smaller_lattice",[lx,ly]),("es_count",1),("expander_fraction",1e-5),("particles",n),("mdim",100),("if_save_data",true),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		#open_cores = get(params_dict, "open_cores", 5)
@@ -2044,7 +2142,7 @@ if true
 		#initialize_dmrg(params_dict["if_gpu"])
 
 
-		CUDA.@allowscalar all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
+		all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
 		#nrgs = [all_results[3][i].nrg[end] for i in 1:params_dict["es_count"]+1]
 		#plot_spectrum(strens,nrgs,idx,params_dict["es_count"]+1,"Interaction Strength",true; plot_title=" Synth Rectangle TTN")
 

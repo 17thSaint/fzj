@@ -81,8 +81,8 @@ if false
 
 end=#
 
-# data collection of 4pt MPO
-if true
+#= data collection of 4pt MPO
+if false
     lx,ly,n = 16,8,8
     layers = Int(log(2,lx*ly))
     intstren = 2.0
@@ -109,7 +109,7 @@ if true
         datadict = Dict([("fourpt_momentum",fourpt_mpo)])
         modify_data(datadict,dataloc * "/" * f,"metadata"; output_level=0)
     end
-end#
+end=#
 
 #= calculate entanglement spectrum for new data
 if true
