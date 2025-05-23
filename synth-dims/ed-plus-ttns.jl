@@ -15,7 +15,7 @@ Depends on:
 =#
 ######################################################
 
-using JLD2
+using JLD2,LaTeXStrings
 include("../other-funcs/include-other-files.jl")
 include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","other-funcs/basic-2d-observables.jl","exact-diag/execute-ed.jl","exact-diag/observables.jl"])
 #include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
@@ -250,15 +250,62 @@ function focking_matrix(which_function::Function,wavefunc::TTN.TreeTensorNetwork
     return fockmatrix_operator
 end
 
-# rerun GS and excited states
+
+# test 4pt MPO on non-regular TTN
+if true
+    lx,ly,n = 3,6,3
+    intstren = 0.0
+    pdict = Dict([("hopping_anisotropy",1.0),("if_check_fluxes",false),("make_smaller_lattice",[lx,ly]),("es_count",0),("expander_fraction",1e-5),("particles",n),("mdim",100),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(pdict)
+
+    m1 = [0.0,1/ly]
+    m2 = [0.0,0/ly]
+    fourpt_rez = four_point(all_states,m1,m2,[lx,ly])
+
+    pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren),("nev",10),("hopping_anisotropy",1.0),("if_check_fluxes",false),("if_save_data",false),("if_find_data",false)])
+    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict_ed; output_level=1)
+
+    fourpt_ed = ft_fourpt(states[1],m1,m2,lattice_params)
+
+    println("TTN fourpt: ",fourpt_rez)
+    println("ED fourpt: ",fourpt_ed)
+    println("Ratio Square is ",(fourpt_ed / fourpt_rez)^2)
+end#
+
+#= plot rho1D NRG spectrum transition scaling in size
 if false
-    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
-    pdict_ttn = Dict([("onsite_strength",0.0),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
-    all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
+    cols = ["b","r","k"]
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    all_files = find_data_file(Dict([("hopping_anisotropy",1.0),("if_periodic_x",true),("if_periodic_y",true)]),"ed",dataloc; file_type="jld2")
+    
+    g2s = []
+    g3s = []
+    ulrs = []
+    lxs = []
+    for f in all_files
+        fparas = get_params_dict_from_filename(f)
+        if fparas["Ly"] == 2*fparas["Lx"] && fparas["N"] == fparas["Lx"]
+            d,m = read_data_jld2(joinpath(dataloc,f); output_level=0)
+            lx = m["Lx"]
+            scatter(m["U"][end],0.0,c=cols[lx-2])
+            scatter(m["U"][end],d["nrg"][2] - d["nrg"][1],c=cols[lx-2])
+            scatter(m["U"][end],d["nrg"][3] - d["nrg"][1],c=cols[lx-2])
 
+            append!(g2s,[d["nrg"][2] - d["nrg"][1]])
+            append!(g3s,[d["nrg"][3] - d["nrg"][1]])
+            append!(ulrs,[m["U"][end]])
+            append!(lxs,[lx])
+        end
+    end
+    scatter(0.0,0.0,c=cols[1],label="N=3")
+    scatter(0.0,0.0,c=cols[2],label="N=4") 
+    scatter(0.0,0.0,c=cols[3],label="N=5")
+    xlabel("Interaction Strength")
+    ylabel("E - E0")
+    title("Energy Spectrum Finite Size Scaling rho_1D = 1.0")
+    legend()
 
-end
-
+end=#
 
 #= see if excited TTNs restrict_size matches ED
 if false

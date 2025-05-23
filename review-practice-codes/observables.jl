@@ -436,7 +436,7 @@ function spatial_entanglement_spectrum(psi::TTN.TreeTensorNetwork; kwargs...)
     numlayers = TTN.number_of_layers(psi)
     TTN.move_ortho!(psi,(numlayers - layers_down,1))
     top_tensor = psi[numlayers - layers_down,1]
-    idx_left = inds(top_tensor; tags = "Link,nl=$(numlayers-1-layers_down),np=1")
+    idx_left = TTN.inds(top_tensor; tags = "Link,nl=$(numlayers-1-layers_down),np=1")
     u,s,v,spec = svd(top_tensor,idx_left)
 
     result = isnothing(cap) ? spec.eigs : spec.eigs[1:cap]
@@ -666,6 +666,22 @@ function diocane(phys_site::TTN.Index,momentum::Vector{Float64},op_type::String;
 
     lin_ind = parse(Int,match(r"n=(\d+)",index_tag)[1])
     coord_label = coordinate(lin_ind,Lx,Ly)
+
+    other_op_type = op_type == "A" ? "Adag" : "A"
+
+    return diocane(coord_label,momentum,other_op_type; kwargs...)
+end
+
+function diocane(phys_site::TTN.Index,momentum::Vector{Float64},op_type::String,ttn_size::Tuple{Int,Int}; kwargs...)
+    # this is the functional lattice size
+    #Lx::Int = kwargs[:Lx]
+    #Ly::Int = kwargs[:Ly]
+
+    index_tag = string(TTN.tags(phys_site))
+    @assert occursin("Site",index_tag)
+
+    lin_ind = parse(Int,match(r"n=(\d+)",index_tag)[1])
+    coord_label = coordinate(lin_ind,ttn_size[1],ttn_size[2])
 
     other_op_type = op_type == "A" ? "Adag" : "A"
 
@@ -1002,6 +1018,54 @@ function single_point_mpo(wavefunc::TTN.TreeTensorNetwork,op_type::String; kwarg
     return TTN.MPO(tensor_train)
 end
 
+# same function for restricted size TTNs means set coeffs on dead sites to zero
+function single_point_mpo(wavefunc::TTN.TreeTensorNetwork,op_type::String,restricted_size::Vector{Int}; kwargs...)
+    opl::Int = get(kwargs,:output_level,1)
+    mom::Vector{Float64} = get(kwargs,:momentum,[0.0,0.0])
+    which_coeff::Function = get(kwargs,:which_coeff,diocane)
+    coeff_kwargs::NamedTuple = kwargs[:coeff_kwargs]
+
+    ttn_size = get_lattice_dims(wavefunc)
+
+    dead_sites_linear = find_dead_linear_sites(restricted_size,ttn_size)
+
+    hilbdim = local_hilbert_space_dimension(wavefunc)
+
+    mapping = kwargs[:mapping]
+
+    phys_sites = TTN.sites(wavefunc)[mapping]
+
+    links = build_links_singlepoint(op_type,length(phys_sites); mapping=mapping)
+
+    tensor_train = Vector{TTN.ITensor}(undef,length(phys_sites))
+    for (idx,s) in enumerate(phys_sites)
+        opl > 1 && println("Working on Physical Site $(TTN.tags(s))")
+
+        if idx in dead_sites_linear
+            coeff::ComplexF64 = 0.0*im
+        else
+            coeff = which_coeff(s,mom,op_type,ttn_size; coeff_kwargs...)
+        end
+
+        mat = build_W_singlepoint(op_type,coeff,hilbdim)
+
+        local_inds = [links[idx],TTN.dag(s),TTN.dag(links[idx+1]),TTN.prime(s)]
+        #local_inds = [links[idx],s,TTN.dag(links[idx+1]),TTN.prime(TTN.dag(s))]
+
+        mit = TTN.ITensor(mat,local_inds)
+
+        if idx == 1
+			mit = mit * TTN.dag(TTN.onehot(links[1] => 1))
+		elseif idx == length(phys_sites)
+			mit = mit * (TTN.onehot(links[end] => 2))
+		end
+        
+        tensor_train[idx] = mit
+    end
+
+    return TTN.MPO(tensor_train)
+end
+
 function two_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     opl::Int = get(kwargs,:output_level,1)
 
@@ -1106,6 +1170,31 @@ function four_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     #return TTN.replaceprime(TTN.contract(bothcreats',bothannihs; alg="naive", truncate=false), 2 => 1)
 end
 
+function four_point_mpo(wavefunc::TTN.TreeTensorNetwork,restricted_size::Vector{Int}; kwargs...)
+    opl::Int = get(kwargs,:output_level,1)
+
+    k1::Vector{Float64} = get(kwargs,:momentum1,[0.0,0.0])
+    k2::Vector{Float64} = get(kwargs,:momentum2,[0.0,0.0])
+    mapping::Vector{Int} = get(kwargs,:mapping,collect(1:TTN.number_of_sites(wavefunc.net)))
+
+    #println("Momenta are $(k1[2]) and $(k2[2])")
+
+    creat1 = single_point_mpo(wavefunc,"Adag",restricted_size; momentum=k1,mapping=mapping, kwargs...)
+    #println("Made Creation 1")
+    creat2 = single_point_mpo(wavefunc,"Adag",restricted_size; momentum=k2,mapping=mapping, kwargs...)
+    #println("Made Creation 2")
+    annih1 = single_point_mpo(wavefunc,"A",restricted_size; momentum=k2,mapping=mapping, kwargs...)
+    #println("Made Annihilation 1")
+    annih2 = single_point_mpo(wavefunc,"A",restricted_size; momentum=k1,mapping=mapping, kwargs...)
+    #println("Made Annihilation 2")
+    opl > 1 && println("Made Suboperators")
+
+    return apply(apply(creat1, creat2), apply(annih1, annih2))
+    #bothcreats = TTN.replaceprime(TTN.contract(creat1',creat2; alg="naive", truncate=false), 2 => 1)
+    #bothannihs = TTN.replaceprime(TTN.contract(annih1',annih2; alg="naive", truncate=false), 2 => 1)
+    #return TTN.replaceprime(TTN.contract(bothcreats',bothannihs; alg="naive", truncate=false), 2 => 1)
+end
+
 function four_point_mpowrapped(wavefunc::TTN.TreeTensorNetwork,momentum1::Vector{Float64},momentum2::Vector{Float64}; kwargs...)
     lat = TTN.physical_lattice(wavefunc.net)
     Lx,Ly = size(lat)
@@ -1133,6 +1222,22 @@ function four_point(wavefunc::TTN.TreeTensorNetwork,momentum1::Vector{Float64},m
     return abs(calculate_mpo_expectation(wavefunc, fourpt_wrapped; kwargs...))
 end
 
+function four_point(wavefunc::TTN.TreeTensorNetwork,momentum1::Vector{Float64},momentum2::Vector{Float64},restricted_size::Vector{Int}; kwargs...)
+    lat = TTN.physical_lattice(wavefunc.net)
+    Lx,Ly = size(lat)
+    mapss = zigzag_curve(Lx,Ly)
+    coeff_kwargs = get(kwargs,:coeff_kwargs,(Lx=restricted_size[1],Ly=restricted_size[2],))
+
+    fourpt = four_point_mpo(wavefunc, restricted_size; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss, coeff_kwargs=coeff_kwargs, kwargs...)
+    fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
+
+    #=matver = focking_matrix(wavefunc,fourpt_wrapped,lattice_params["full_basis"]; kwargs...)
+    ed_wavefunc = focking_vector(wavefunc,lattice_params["full_basis"])
+    return abs(adjoint(ed_wavefunc) * matver * ed_wavefunc)=#
+
+    return abs(calculate_mpo_expectation(wavefunc, fourpt_wrapped; kwargs...))
+end
+
 function four_point(wavefuncs::Vector{TTN.TreeTensorNetwork},momentum1::Vector{Float64},momentum2::Vector{Float64}; kwargs...)
 
     lat = TTN.physical_lattice(wavefuncs[1].net)
@@ -1141,6 +1246,26 @@ function four_point(wavefuncs::Vector{TTN.TreeTensorNetwork},momentum1::Vector{F
     coeff_kwargs = get(kwargs,:coeff_kwargs,(Lx=Lx,Ly=Ly,))
 
     fourpt = four_point_mpo(wavefuncs[1]; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss, coeff_kwargs=coeff_kwargs, kwargs...)
+    fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
+
+    mat::Matrix{ComplexF64} = zeros(Float64,length(wavefuncs),length(wavefuncs))
+    for i in 1:length(wavefuncs)
+        for j in 1:length(wavefuncs)
+            mat[i,j] = calculate_mpo_expectation(wavefuncs[i], wavefuncs[j], fourpt_wrapped; kwargs...)
+        end 
+    end
+
+    return abs.(eigvals(mat))
+end
+
+function four_point(wavefuncs::Vector{TTN.TreeTensorNetwork},momentum1::Vector{Float64},momentum2::Vector{Float64},restricted_size::Vector{Int}; kwargs...)
+
+    lat = TTN.physical_lattice(wavefuncs[1].net)
+    Lx,Ly = size(lat)
+    mapss = zigzag_curve(Lx,Ly)
+    coeff_kwargs = get(kwargs,:coeff_kwargs,(Lx=Lx,Ly=Ly,))
+
+    fourpt = four_point_mpo(wavefuncs[1],restricted_size; momentum1 = momentum1, momentum2 = momentum2, mapping = mapss, coeff_kwargs=coeff_kwargs, kwargs...)
     fourpt_wrapped = easy_mpowrapper(fourpt, lat; mapping=mapss)
 
     mat::Matrix{ComplexF64} = zeros(Float64,length(wavefuncs),length(wavefuncs))
@@ -1173,6 +1298,26 @@ function four_point(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     return fourpt_vals
 end
 
+function four_point(wavefunc::TTN.TreeTensorNetwork,restricted_size::Vector{Int}; kwargs...)
+    if_plot::Bool = get(kwargs,:if_plot,false)
+    opl::Int = get(kwargs,:output_level,1)
+
+    Lx,Ly = restricted_size
+
+    momenta = [n/Ly for n in 0:Lx-1]
+    fourpt_vals = zeros(Float64,Lx,Lx)
+    for (idx1,k1) in enumerate(momenta)
+        for (idx2,k2) in enumerate(momenta)
+            opl > 0 && println("Working on momenta $(k1) and $(k2)")
+            fourpt_vals[idx1,idx2] = four_point(wavefunc,[0.0,k1],[0.0,k2],restricted_size; kwargs...)
+        end
+    end
+
+    if_plot && plot_four_point(fourpt_vals; kwargs...) 
+
+    return fourpt_vals
+end
+
 function four_point(wavefuncs::Vector{TTN.TreeTensorNetwork}; kwargs...)
     if_plot::Bool = get(kwargs,:if_plot,false)
     opl::Int = get(kwargs,:output_level,1)
@@ -1185,6 +1330,33 @@ function four_point(wavefuncs::Vector{TTN.TreeTensorNetwork}; kwargs...)
         for (idx2,k2) in enumerate(momenta)
             opl > 0 && println("Working on momenta $(k1) and $(k2)")
             result = four_point(wavefuncs,[0.0,k1],[0.0,k2]; kwargs...)
+            for i in 1:length(wavefuncs)
+                fourpt_vals[i][idx1,idx2] = result[i]
+            end
+        end
+    end
+
+    if if_plot
+        for i in 1:length(wavefuncs)
+            plot_four_point(fourpt_vals[i]; kwargs...)
+        end
+    end
+
+    return fourpt_vals
+end
+
+function four_point(wavefuncs::Vector{TTN.TreeTensorNetwork},restricted_size::Vector{Int}; kwargs...)
+    if_plot::Bool = get(kwargs,:if_plot,false)
+    opl::Int = get(kwargs,:output_level,1)
+
+    Lx,Ly = restricted_size
+
+    momenta = [n/Ly for n in 0:Lx-1]
+    fourpt_vals = [zeros(Float64,Lx,Lx) for i in 1:length(wavefuncs)]
+    for (idx1,k1) in enumerate(momenta)
+        for (idx2,k2) in enumerate(momenta)
+            opl > 0 && println("Working on momenta $(k1) and $(k2)")
+            result = four_point(wavefuncs,[0.0,k1],[0.0,k2],restricted_size; kwargs...)
             for i in 1:length(wavefuncs)
                 fourpt_vals[i][idx1,idx2] = result[i]
             end

@@ -14,7 +14,7 @@ Depends on:
 
 include("../other-funcs/include-other-files.jl")
 include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","synth-dims/hatsugai-mbcn.jl","other-funcs/basic-2d-observables.jl"])
-#include_other_files(["review-practice-codes/plottings.jl","other-funcs/basic-2d-plottings.jl"])
+include_other_files(["review-practice-codes/plottings.jl","other-funcs/basic-2d-plottings.jl"])
 #include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
 
 function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
@@ -81,6 +81,22 @@ if false
 
 end=#
 
+#= rerun 16x8 laughlin to converge further
+if false
+    BLAS.set_num_threads(5)
+
+    lx,ly,n = 16,8,8
+    layers = Int(log(2,lx*ly))
+    intstren = 0.0
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict = Dict([("layers",layers),("onsite_strength",intstren),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc)
+    display(all_files)
+
+    newparas = Dict([("nrgtol",1e-7),("mdim",500)])
+    rez = reconverge_ttn(joinpath(dataloc,all_files[1]); new_parameters=newparas)
+end=#
+
 #= data collection of 4pt MPO
 if false
     lx,ly,n = 16,8,8
@@ -114,8 +130,8 @@ end=#
 #= calculate entanglement spectrum for new data
 if true
     BLAS.set_num_threads(5)
-    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
-    pdict = Dict([("layers",7),("particles",8),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/")
+    pdict = Dict([("layers",5),("particles",4),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc) 
     display(all_files)
     
@@ -133,6 +149,33 @@ if true
 
 
 end=#
+
+# plot entanglement entropy to look for kDW phase transition
+if true
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/")
+    pdict = Dict([("layers",5),("particles",4),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc) 
+    display(all_files)
+    
+    entropies = Dict([("1",[]),("2",[]),("3",[]),("4",[])])
+    intstrens = []
+    for f in all_files
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+        entanglement_spectrum = real.(m["entanglement_spectrum"])
+        append!(intstrens,[m["onsite_strength"]])
+        for i in 1:4
+            local_ent_spec = filter(x -> x != 0.0,entanglement_spectrum[i,:])
+            #display(local_ent_spec)
+            append!(entropies[string(i)],[entanglement_entropy(local_ent_spec)])
+        end
+    end
+    for i in 1:4
+        scatter(intstrens,entropies[string(i)],label="$(i)")
+    end
+    xlabel("Interaction Strength")
+    ylabel("Entanglement Entropy")
+    legend()
+end#
 
 
 #= check if expander is so required 8x4 and 16x8

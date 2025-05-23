@@ -44,7 +44,7 @@ end
 
 
 include_other_files(["other-funcs/basic-2d-stuff.jl","other-funcs/basic-2d-observables.jl","exact-diag/two-dimensions.jl","exact-diag/observables.jl","exact-diag/hatsugai-mbcn.jl"])
-include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
+#include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
 
 function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     if hamilt_params["U"][2] == 0.0
@@ -316,11 +316,11 @@ end
 # run data collection with for loops
 if false
     
-    #args_dict = make_args_dict(ARGS)
+    args_dict = make_args_dict(ARGS)
     #which_one = args_dict["which_one"]
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
-    lx,ly,n = 8,4,4
+    #lx,ly,n = 5,10,5
     #for (idx,n) in enumerate([2,3,4,5])
     #intstrens = vcat(range(0.0,1.0,length=6),exp10.(range(0.0,log10(1000),length=19)))#[3,4,5,6,7,8,9,20,30,40,70,150,200,300,400]
     #intstrens = range(0.0,2.0,length=11)
@@ -339,8 +339,8 @@ if false
     #cols = ["b","g","r","c","y","orange","purple","pink","brown","gray"]
     #for (idx,intstren) in enumerate(intstrens)
     #for (idx2,sigma) in enumerate(sigmas)
-    lls = range(0.01,ly,length=2)
-    for (idx,ll) in enumerate(lls)
+    #lls = range(0.01,ly,length=2)
+    #for (idx,ll) in enumerate(lls)
     #for lrd in [0,1]
     #intstren = 300.0
 
@@ -351,9 +351,12 @@ if false
         display(BLAS.get_config())
     end=#
     
-    #BLAS.set_num_threads(5)
+    BLAS.set_num_threads(5)
 
-    intstren = 5.0#args_dict["interaction_strength"]
+    intstren = args_dict["interaction_strength"]
+    lx = args_dict["Lx"]
+    ly = args_dict["Ly"]
+    n = args_dict["N"]
     tw2 = 0.0
     tw1 = 0.0
     #dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
@@ -373,7 +376,7 @@ if false
         #    continue
         #end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("pinning_strength",1e-1),("if_pinning",false),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
         #params_dict = make_args_dict(ARGS)
 
         #println("Starting from here")
@@ -475,7 +478,7 @@ if false
         #gammas1[idx,idx2] = gamma1
         #gammas2[idx,idx2] = gamma2
 
-    end
+    #end
     #end
 
     #=fig = figure()

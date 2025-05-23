@@ -314,6 +314,7 @@ function plot_finitesplitting_scaling(ulr::Float64=0.0)
     display(all_files_ttn)
 
     for f in all_files_ttn
+        println("Working on file $f")
         params = get_params_dict_from_filename(f)
         Lx,Ly = "Lx" in keys(params) ? (params["Lx"],params["Ly"]) : get_lattice_dims_from_layers(params["layers"])
 
@@ -374,7 +375,7 @@ function plot_finitesplitting_scaling(ulr::Float64=0.0)
 
     return gaps,lxs
 end
-#rez_gaps,rez_lxs = plot_finitesplitting_scaling(0.0)
+rez_gaps,rez_lxs = plot_finitesplitting_scaling(0.0)
 
 # finite size scaling of the topological gap
 # still need 16x8 to get E3

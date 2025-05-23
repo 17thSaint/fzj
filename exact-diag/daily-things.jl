@@ -58,8 +58,9 @@ function datacollection_flatness(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
     end
 end
 
-# data collection for 4pt
-if true
+
+#= data collection for 4pt
+if false
     lx,ly,n = 10,5,5
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",0.0),("if_periodic_x",true),("if_periodic_y",true)])
@@ -83,7 +84,7 @@ if true
         datadict = Dict([("fourpt_momentum_diag",two_fourpts)])
         modify_data(datadict,filepath,"metadata"; output_level=0)
     end
-end
+end=#
 
 #= test 4pt diag max as order parameter for 6x3
 if false
