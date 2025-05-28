@@ -113,17 +113,17 @@ function build_HH_net(lat_size::Vector; kwargs...)
 	max_occ = get(kwargs,:max_occ,1)
 
 	if all(log2.(lat_size) .% 1 .== 0)
-		return TTN.BinaryRectangularNetwork(Tuple(lat_size), TTN.ITensorNode, Boson; conserve_qns=conserve_qns,dim=max_occ+1)
+		return TTN.BinaryNetwork(Tuple(lat_size), TTN.ITensorNode, "Boson"; conserve_qns=conserve_qns,dim=max_occ+1)
 	else
 		# if given dimensions do not fit binary TTN, find minimally larger TTN to fit
-		ttn_lat_size = Int(ceil(log2(lat_size[1]))),Int(ceil(log2(lat_size[2])))
-		return TTN.BinaryRectangularNetwork(ttn_lat_size, TTN.ITensorNode, Boson; conserve_qns=conserve_qns,dim=max_occ+1)
+		ttn_lat_size = Tuple(Int.(ceil.(log2.(lat_size))))
+		return TTN.BinaryNetwork(ttn_lat_size, TTN.ITensorNode, "Boson"; conserve_qns=conserve_qns,dim=max_occ+1)
 	end
 end
 
 function build_HH_net(model_paras::Dict)
 	if isnothing(model_paras[:seed_ttn])
-		return build_HH_net(model_paras[:make_smaller_lattice]; syms=model_paras[:syms], max_occ=model_paras[:max_occ])
+		return build_HH_net(model_paras[:ttn_size]; syms=model_paras[:syms], max_occ=model_paras[:max_occ])
 	else
 		return model_paras[:seed_ttn].net
 	end
@@ -275,14 +275,14 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	end
 
 	resulting_ham = []
-	phys_edge_length,virt_edge_length = get_lattice_dims(net; kwargs...)
+	phys_edge_length,virt_edge_length = kwargs[:ttn_size]
 	println("Phys = ",phys_edge_length,", Virt = ",virt_edge_length)
 	
 	scaling_distance = get(kwargs, :lr, 0)
 	
 	which_dir = get(kwargs, :which_dir, "virt")
 	flux_direction = get(kwargs, :flux_direction, "phys")
-	restricted_size = get(kwargs, :restricted_size, [phys_edge_length,virt_edge_length])
+	restricted_size = get(kwargs, :lattice_size, [phys_edge_length,virt_edge_length])
 	if_periodic_virt = get(kwargs, :if_periodic_synth, false)
 	if_periodic_phys = get(kwargs, :if_periodic_phys, false)
 	#println("Checking periodicity $if_periodic_phys and $if_periodic_virt")
@@ -1532,9 +1532,9 @@ function make_synthdims_filename(model_parameters::Dict)
 		filename_dict["max_occ"] = model_parameters["max_occ"]
 	end
 
-	if !all(model_parameters["restricted_size"] .== get_lattice_dims_from_layers(layer_count))
-		filename_dict["Lx"] = model_parameters["restricted_size"][1]
-		filename_dict["Ly"] = model_parameters["restricted_size"][2]
+	if !all(model_parameters["lattice_size"] .== get_tatami_lattice_dims(layer_count))
+		filename_dict["Lx"] = model_parameters["lattice_size"][1]
+		filename_dict["Ly"] = model_parameters["lattice_size"][2]
 	end
 
 	if model_parameters["if_pinning"]
@@ -1563,30 +1563,23 @@ function get_normal_model_params(params_dict::Dict)
 
 
 	# Lattice/TTN Parameters
-	layer_count = Int(get(params_dict, "layers", 4))
 	mdim = get(params_dict, "mdim", 300)
 	if_periodic_phys = get(params_dict, "if_periodic_phys", false)
 	if_periodic_synth = get(params_dict, "if_periodic_synth", false)
 	max_occ = get(params_dict, "max_occ", 1)
 	if_synth_rectangle = get(params_dict, "if_synth_rectangle", false)
+	Lx::Int = get(params_dict, "Lx", 4)
+	Ly::Int = get(params_dict, "Ly", 4)
+	num_particles::Int = get(params_dict, "particles", Int(Lx/2))
+	ttn_size = get_ttn_dims([Lx,Ly])
+	layer_count = get_layers_from_dims([Lx,Ly])
+	
 
-	# Get Lattice parameters whose values depend on other parameters
-	if layer_count % 2 == 0
-		phys_edge_length,synth_edge_length = Int(sqrt(2^layer_count)),Int(sqrt(2^layer_count))
-		num_particles = get(params_dict, "particles", Int(phys_edge_length/2))
-	else
-		phys_edge_length,synth_edge_length = Int(sqrt(2^(layer_count+1))),Int(sqrt(2^(layer_count+1))/2)
-		num_particles = get(params_dict, "particles", Int(sqrt(2^(layer_count+1))/2))
-	end
-
-	make_smaller_lattice = get(params_dict, "make_smaller_lattice", [phys_edge_length,synth_edge_length])
+	#=make_smaller_lattice = get(params_dict, "make_smaller_lattice", [phys_edge_length,synth_edge_length])
 	if make_smaller_lattice != [phys_edge_length,synth_edge_length]
 		phys_edge_length,synth_edge_length = make_smaller_lattice
-		layer_count = Int(ceil(log(2,phys_edge_length*synth_edge_length)))
-		if !all(get_lattice_dims_from_layers(layer_count) .>= make_smaller_lattice)
-			layer_count += 1
-		end
-	end
+		layer_count = log2(prod(Int.(ceil.(log2.(make_smaller_lattice)))))
+	end=#
 
 
 	# Hamiltonian parameters
@@ -1611,12 +1604,12 @@ function get_normal_model_params(params_dict::Dict)
 	longrange_dist = get(params_dict, "lr", 0)
 	if longrange_dist == "all" && !if_synth_rectangle
 		if which_dir == "phys"
-			longrange_dist = phys_edge_length-1
+			longrange_dist = Lx-1
 		else
-			longrange_dist = synth_edge_length-1
+			longrange_dist = Ly-1
 		end
 	elseif if_synth_rectangle
-		longrange_dist = phys_edge_length - 1
+		longrange_dist = Lx - 1
 	end
 
 	mu = get(params_dict, "chem_strength", 0.0)
@@ -1629,14 +1622,14 @@ function get_normal_model_params(params_dict::Dict)
 	if isnothing(alpha)
 		filling = get(params_dict, "filling", 0.5)
 		phys_shift,synth_shift = !if_periodic_phys,!if_periodic_synth
-		alpha = num_particles/(filling*(phys_edge_length - phys_shift)*(synth_edge_length - synth_shift))
+		alpha = num_particles/(filling*(Lx - phys_shift)*(Ly - synth_shift))
 		filling == 0.0 ? alpha = 0.0 : nothing
 		mag_off = false
 	else
 		mag_off = alpha == 0.0
 	end
 	if_check_fluxes = get(params_dict, "if_check_fluxes", true)
-	if_check_fluxes ? check_fluxes(alpha,phys_edge_length,synth_edge_length,if_periodic_phys,if_periodic_synth,flux_direction; output_level=output_level) : nothing
+	if_check_fluxes ? check_fluxes(alpha,Lx,Ly,if_periodic_phys,if_periodic_synth,flux_direction; output_level=output_level) : nothing
 
 
 	# What to calculate
@@ -1646,7 +1639,7 @@ function get_normal_model_params(params_dict::Dict)
 	if_cluster = any([occursin("local",pwd()),occursin("Local",pwd()),occursin("geraghty",pwd())])
 	if_continuous_saving = get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 7)
 	save_data ? nothing : if_continuous_saving = false
-	es_count = get(params_dict, "es_count", 0)
+	#es_count = get(params_dict, "es_count", 0)
 	
 	all_measurements = get(params_dict, "all_measurements", String[])
 	measurement_functions::Vector{NamedTuple} = construct_measurement_info(all_measurements)
@@ -1700,7 +1693,9 @@ function get_normal_model_params(params_dict::Dict)
 						"nrgtol"=>nrgtol,
 						"if_densmat"=>if_densmat,
 						"if_redo"=>if_redo,
-						"restricted_size"=>make_smaller_lattice,
+						#"restricted_size"=>make_smaller_lattice,
+						"lattice_size"=>[Lx,Ly],
+						"ttn_size"=>ttn_size,
 						"centralflux_strength"=>centralflux_strength,
 						"if_pinning_pot"=>false,
 						"if_pinning"=>if_pinning,
@@ -1807,7 +1802,7 @@ function run_synth_dims_generic(params_dict::Dict)
 			gs_sp = nothing
 		end
 	else # if no data found then run from scratch starting from the ground state
-		println("Starting Script using $(model_paras[:particles]) particles on $(2^model_paras[:layers]) sites with Flux = $(round(model_paras[:alpha],digits=4)), Bond Dim = $(model_paras[:mdim]), and Long Range Dist = $(model_paras[:lr])")
+		println("Starting Script using $(model_paras[:particles]) particles on $(model_paras[:lattice_size][1])x$(model_paras[:lattice_size][2]) lattice with Flux = $(round(model_paras[:alpha],digits=4)), Bond Dim = $(model_paras[:mdim]), and Long Range Dist = $(model_paras[:lr])")
 
 		starting = time()
 		net = build_HH_net(model_paras)
@@ -1933,7 +1928,7 @@ end
 
 	
 
-if false
+#=if false
 	here = pwd()
 	cd("../cluster-data/synth-dims/excited-states/")
 	files = readdir()
@@ -2116,10 +2111,10 @@ if false
 	end
 
 	all_results = run_synth_dims_generic(params_dict)
-end
+end=#
 
 # synth-dims for loop runnings
-if false
+if true
 	#BLAS.set_num_threads(open_cores)
 	cols = ["b","g","r"]
 	#nnst = 0.0
@@ -2140,7 +2135,7 @@ if false
 	#anises = range(1.0,5.0,length=10)
 	#strens = [0.0,0.25,0.5,0.75,1.0,1.5,2.0,5.0,10.0,20.0,50.0,100.0,300.0,1000.0]
 	
-	#
+	#=
 	args_dict = make_args_dict(ARGS)
 	stren = args_dict["onsite_strength"]
 	lx = args_dict["Lx"]
@@ -2150,10 +2145,10 @@ if false
 	#if_pinning = "pinning_strength" in keys(args_dict)
 	#pinstren = if_pinning ? args_dict["pinning_strength"] : 1e-3
 	#dataloc = if_pinning ? get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling") : get_folder_location("cluster-data/synth-dims/torus/new-gauge")
-	#
+	=#
 
-	#lx,ly,n = 12,6,6
-	#stren = 0.0
+	lx,ly,n = 8,2,2
+	stren = 0.0
 	
 	#alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
 	#strens = [0.25,0.5,0.75,1.25,1.5,3.0,4.0]#range(0.1,0.5,length=3)
@@ -2169,7 +2164,7 @@ if false
 		
 		#("if_pinning",if_pinning),("dataloc",dataloc),("pinning_strength",pinstren)
 		
-		params_dict = Dict([("hopping_anisotropy",1.0),("make_smaller_lattice",[lx,ly]),("es_count",2),("expander_fraction",1e-5),("particles",n),("mdim",400),("if_save_data",true),("filling",0.5),("if_find_data",true),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("if_check_fluxes",false),("expander_fraction",1e-5),("particles",n),("mdim",100),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		#open_cores = get(params_dict, "open_cores", 5)

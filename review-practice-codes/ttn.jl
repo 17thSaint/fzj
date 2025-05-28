@@ -36,7 +36,7 @@ function get_site_number(x, y, side_length)
 end
 =#
 
-function get_lattice_dims_from_layers(layers::Int; kwargs...)
+function get_tatami_lattice_dims(layers::Int; kwargs...)
 	if_synth_rectangle = get(kwargs, :if_synth_rectangle, false)
 
 	println("This is only for perfectly rectangular lattices")
@@ -60,12 +60,6 @@ function get_site_count(ttn)
 	return 2^layers
 end
 
-# this function is only for perfectly rectangular lattices
-#=function get_lattice_dims(input_data; kwargs...)
-	num_layers = TTN.number_of_layers(input_data)
-	return get_lattice_dims_from_layers(num_layers; kwargs...)
-end=#
-
 function get_lattice_dims(net::TTN.BinaryNetwork)
 	return size(TTN.physical_lattice(net))
 end
@@ -73,6 +67,15 @@ end
 function get_lattice_dims(ttn::TTN.TreeTensorNetwork)
 	return get_lattice_dims(TTN.network(ttn))
 end
+
+function get_ttn_dims(dims::Union{Vector,Tuple})
+	return Int.(2 .^ ceil.(log2.(dims)))
+end
+
+function get_layers_from_dims(dims::Union{Vector,Tuple})
+	return Int(log2(prod(get_ttn_dims(dims))))
+end
+
 
 #=function get_ydir_greenfunc(ttn; kwargs...)
 	if_fermion = get(kwargs, :if_fermion, false)
