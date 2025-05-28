@@ -10,8 +10,8 @@ Depends on:
 ######################################################
 
 include("execute-ed.jl")
-#include("plottings.jl")
-#include("../other-funcs/basic-2d-plottings.jl")
+include("plottings.jl")
+include("../other-funcs/basic-2d-plottings.jl")
 
 function datacollection_flatness(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
     hanis::Float64 = get(kwargs,:hopping_anisotropy,1.0)
@@ -109,6 +109,24 @@ if false
 
 end=#
 
+# find if xi_crit depends on system size
+if false
+    intstren = 2.0
+
+    for n in [3,4]
+        lx = n
+        ly = 2n
+        xis = range(0.01,ly,length=11)
+
+        fig = figure()
+        for (idx,xi) in enumerate(xis)
+            pdict = Dict([("output_level",1),("scaling_type","exp"),("corr_length",xi),("if_check_fluxes",false),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+            states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
+            plot_spectrum(xis,nrgs,idx,pdict["nev"],"Interaction Scale",true; plot_title="")
+        end
+        title("Energy Spectrum $(lx)x$(ly) N=$(n) ULR=$(intstren)")
+    end
+end
 
 #= redo gamma/omega calcs for all files
 if false

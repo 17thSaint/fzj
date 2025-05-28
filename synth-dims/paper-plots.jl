@@ -36,6 +36,7 @@ using JLD2,LaTeXStrings,LsqFit
 function plot_opengap_8x4_ed()
     lx,ly,n = 8,4,4
     layers = Int(log(2,lx*ly))
+    cols = ["#82AC9F","#C73E1D","#36213E"]
 
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("hopping_anisotropy",1.0),("if_periodic_x",true),("if_periodic_y",true)])
@@ -43,6 +44,10 @@ function plot_opengap_8x4_ed()
     filter!(x -> !occursin("twist_angle",x), all_files)
     #display(all_files)
 
+    g2s = []
+    g3s = []
+    ulrs_g2 = []
+    ulrs_g3 = []
     for f in all_files
         d,m = read_data_jld2(joinpath(dataloc,f); output_level=0)
         all_nrgs = d["nrg"]
@@ -50,17 +55,77 @@ function plot_opengap_8x4_ed()
         params = get_params_dict_from_filename(f)
         ulr = params["interaction_strength"]
 
-        scatter(ulr,0.0,c="r")
-        scatter(ulr,all_nrgs[2] - all_nrgs[1],c="r")
+        if ulr > 2.0 && round(ulr,digits=0) != ulr
+            continue
+        end
+
+        append!(g2s,[all_nrgs[2] - all_nrgs[1]])
+        append!(ulrs_g2,[ulr])
 
         for i in 3:length(all_nrgs)
-            scatter(ulr,all_nrgs[i] - all_nrgs[1],c="k")
+            append!(g3s,[all_nrgs[i] - all_nrgs[1]])
+            append!(ulrs_g3,[ulr])
         end
     end
-    xlabel("Interaction Strength")
+    #=fig = figure()
+    scatter(ulrs_g3[1],g3s[1],c=cols[3],label="E2") # do this first to make E2 in legend on top
+    scatter(ulrs_g2,g2s,c=cols[2],label="E1")
+    scatter(ulrs_g3,g3s,c=cols[3]) # put them after so points are on top of E1
+    scatter(ulrs_g2,zeros(length(ulrs_g2)),c=cols[1],label="E0")
+    xlabel(L"U_{ir} / t")
     ylabel("E - E0")
-    title("Energy Spectrum $(lx)x$(ly) N=$(n)")
-    ylim(-0.02,0.6)
+    #title("Energy Spectrum $(lx)x$(ly) N=$(n)")
+    xscale("log")
+    legend()
+    ylim([-0.02,0.65])=#
+
+    # Split data for the two axis types
+    log_transition_ulr = 2.1
+    mask_linear_g2 = ulrs_g2 .<= log_transition_ulr
+    mask_log_g2 = ulrs_g2 .> log_transition_ulr
+
+    mask_linear_g3 = ulrs_g3 .<= log_transition_ulr
+    mask_log_g3 = ulrs_g3 .> log_transition_ulr
+
+    # Create subplots
+    fig, (ax1, ax2) = subplots(1, 2, sharey=true, gridspec_kw=Dict("width_ratios" => [1, 2]))
+
+    # Left: Linear scale
+    ax1.scatter(ulrs_g3[mask_linear_g3][1], g3s[mask_linear_g3][1], c=cols[3],label="E2")
+    ax1.scatter(ulrs_g2[mask_linear_g2], g2s[mask_linear_g2], c=cols[2], label="E1")
+    ax1.scatter(ulrs_g3[mask_linear_g3], g3s[mask_linear_g3], c=cols[3])
+    ax1.scatter(ulrs_g2[mask_linear_g2], zeros(sum(mask_linear_g2)), c=cols[1], label="E0")
+    ax1.set_xlim(-0.2, log_transition_ulr)
+    ax1.set_xscale("linear")
+    ax1.set_ylabel("E - E₀")
+    #ax1.set_xlabel(L"U_{ir} / t")
+
+    # Right: Log scale
+    ax2.scatter(ulrs_g2[mask_log_g2], g2s[mask_log_g2], c=cols[2])
+    ax2.scatter(ulrs_g3[mask_log_g3], g3s[mask_log_g3], c=cols[3])
+    ax2.scatter(ulrs_g2[mask_log_g2], zeros(sum(mask_log_g2)), c=cols[1])
+    ax2.set_xlim(minimum(ulrs_g2[mask_log_g2]), 1.1*maximum(ulrs_g2[mask_log_g2]))
+    ax2.set_xscale("log")
+    ax2.set_xlabel(L"U_{ir} / t")
+
+    # Synchronize y-limits
+    ax1.set_ylim([-0.02, 0.65])
+
+    # Formatting tweaks
+    ax1.spines["right"].set_visible(false)
+    ax2.spines["left"].set_visible(false)
+    ax2.yaxis.tick_right()
+    ax2.yaxis.set_label_position("right")
+
+    # Optional: break marks
+    d = .015
+    ax1.plot([1-d, 1+d], [-d, +d], transform=ax1.transAxes, color="k", clip_on=false)
+    ax1.plot([1-d, 1+d], [1-d, 1+d], transform=ax1.transAxes, color="k", clip_on=false)
+    ax2.plot([-d, +d], [-d, +d], transform=ax2.transAxes, color="k", clip_on=false)
+    ax2.plot([-d, +d], [1-d, 1+d], transform=ax2.transAxes, color="k", clip_on=false)
+
+    #ax1.legend()
+    #ax2.legend()
 
 end
 #plot_opengap_8x4_ed()
@@ -69,6 +134,7 @@ end
 function plot_closedgap_8x4_ed()
     lx,ly,n = 4,8,4
     layers = Int(log(2,lx*ly))
+    cols = ["#82AC9F","#C73E1D","#36213E"]
 
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("hopping_anisotropy",1.0),("if_periodic_x",true),("if_periodic_y",true)])
@@ -76,6 +142,10 @@ function plot_closedgap_8x4_ed()
     filter!(x -> !occursin("twist_angle",x), all_files)
     #display(all_files)
 
+    g2s = []
+    g3s = []
+    ulrs_g2 = []
+    ulrs_g3 = []
     for f in all_files
         params = get_params_dict_from_filename(f)
         ulr = params["interaction_strength"]
@@ -87,17 +157,32 @@ function plot_closedgap_8x4_ed()
         d,m = read_data_jld2(joinpath(dataloc,f); output_level=0)
         all_nrgs = d["nrg"]
 
-        scatter(ulr,0.0,c="r")
-        scatter(ulr,all_nrgs[2] - all_nrgs[1],c="r")
+        append!(g2s,[all_nrgs[2] - all_nrgs[1]])
+        append!(ulrs_g2,[ulr])
 
         for i in 3:length(all_nrgs)
-            scatter(ulr,all_nrgs[i] - all_nrgs[1],c="k")
+            append!(g3s,[all_nrgs[i] - all_nrgs[1]])
+            append!(ulrs_g3,[ulr])
         end
+
+        #scatter(ulr,0.0,c=cols[1])
+        #scatter(ulr,all_nrgs[2] - all_nrgs[1],c=cols[2])
+
+        #for i in 3:length(all_nrgs)
+        #    scatter(ulr,all_nrgs[i] - all_nrgs[1],c=cols[3])
+        #end
     end
-    xlabel("Interaction Strength")
+    fig = figure()
+    scatter(ulrs_g3[1],g3s[1],c=cols[3],label="E2") # do this first to make E2 in legend on top
+    scatter(ulrs_g2,g2s,c=cols[2],label="E1")
+    scatter(ulrs_g3,g3s,c=cols[3]) # put them after so points are on top of E1
+    scatter(ulrs_g2,zeros(length(ulrs_g2)),c=cols[1],label="E0")
+    xlabel(L"U_{ir} / t")
     ylabel("E - E0")
-    title("Energy Spectrum $(lx)x$(ly) N=$(n)")
-    #ylim(-0.02,0.6)
+    #title("Energy Gap $(lx)x$(ly) N=$(n)")
+    legend()
+    ylim([-0.02,0.65])
+
 
 end
 #plot_closedgap_8x4_ed()
@@ -345,6 +430,8 @@ function plot_finitesplitting_scaling(ulr::Float64=0.0)
 
         # 16x8 is not converged yet
         Lx == 16 && continue
+        # 12x6 is not converged yet
+        Lx == 12 && continue
 
         if (params["particles"] / Lx != 0.5) || (Lx != 2*Ly) || Lx <= 10
             continue
@@ -375,7 +462,7 @@ function plot_finitesplitting_scaling(ulr::Float64=0.0)
 
     return gaps,lxs
 end
-rez_gaps,rez_lxs = plot_finitesplitting_scaling(0.0)
+#rez_gaps,rez_lxs = plot_finitesplitting_scaling(0.0)
 
 # finite size scaling of the topological gap
 # still need 16x8 to get E3

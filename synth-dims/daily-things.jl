@@ -81,11 +81,11 @@ if false
 
 end=#
 
-#= rerun 16x8 laughlin to converge further
-if false
+# rerun 16x8 laughlin to converge further
+if true
     BLAS.set_num_threads(5)
 
-    lx,ly,n = 16,8,8
+    lx,ly,n = 12,6,6
     layers = Int(log(2,lx*ly))
     intstren = 0.0
     dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
@@ -95,7 +95,7 @@ if false
 
     newparas = Dict([("nrgtol",1e-7),("mdim",500)])
     rez = reconverge_ttn(joinpath(dataloc,all_files[1]); new_parameters=newparas)
-end=#
+end#
 
 #= data collection of 4pt MPO
 if false
@@ -128,7 +128,7 @@ if false
 end=#
 
 #= calculate entanglement spectrum for new data
-if true
+if false
     BLAS.set_num_threads(5)
     dataloc = get_folder_location("cluster-data/synth-dims/torus/")
     pdict = Dict([("layers",5),("particles",4),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
@@ -151,7 +151,8 @@ if true
 end=#
 
 # plot entanglement entropy to look for kDW phase transition
-if true
+#= no reason to suspect transition visible from here
+if false
     dataloc = get_folder_location("cluster-data/synth-dims/torus/")
     pdict = Dict([("layers",5),("particles",4),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc) 
@@ -165,6 +166,7 @@ if true
         append!(intstrens,[m["onsite_strength"]])
         for i in 1:4
             local_ent_spec = filter(x -> x != 0.0,entanglement_spectrum[i,:])
+            println("For ULR $(m["onsite_strength"]) and layer $(i) the smallest eigenvalue is ",minimum(local_ent_spec)," and has values ",length(local_ent_spec))
             #display(local_ent_spec)
             append!(entropies[string(i)],[entanglement_entropy(local_ent_spec)])
         end
@@ -175,7 +177,7 @@ if true
     xlabel("Interaction Strength")
     ylabel("Entanglement Entropy")
     legend()
-end#
+end=#
 
 
 #= check if expander is so required 8x4 and 16x8

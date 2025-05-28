@@ -19,7 +19,7 @@ using JLD2,LaTeXStrings
 include("../other-funcs/include-other-files.jl")
 include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","other-funcs/basic-2d-observables.jl","exact-diag/execute-ed.jl","exact-diag/observables.jl"])
 #include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
-#include_other_files(["other-funcs/basic-2d-plottings.jl","review-practice-codes/plottings.jl","exact-diag/plottings.jl"])
+include_other_files(["other-funcs/basic-2d-plottings.jl","review-practice-codes/plottings.jl","exact-diag/plottings.jl"])
 
 function plot_nrg_vs_intstren_fromdata_ttn(layers::Int64,which_strens::Union{String,Vector{Float64}}="all"; kwargs...)
     hanis = get(kwargs, :hopping_anisotropy, 1.0)
@@ -251,8 +251,8 @@ function focking_matrix(which_function::Function,wavefunc::TTN.TreeTensorNetwork
 end
 
 
-# test 4pt MPO on non-regular TTN
-if true
+#= test 4pt MPO on non-regular TTN
+if false
     lx,ly,n = 3,6,3
     intstren = 0.0
     pdict = Dict([("hopping_anisotropy",1.0),("if_check_fluxes",false),("make_smaller_lattice",[lx,ly]),("es_count",0),("expander_fraction",1e-5),("particles",n),("mdim",100),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
@@ -270,10 +270,10 @@ if true
     println("TTN fourpt: ",fourpt_rez)
     println("ED fourpt: ",fourpt_ed)
     println("Ratio Square is ",(fourpt_ed / fourpt_rez)^2)
-end#
+end=#
 
-#= plot rho1D NRG spectrum transition scaling in size
-if false
+# plot rho1D NRG spectrum transition scaling in size
+if true
     cols = ["b","r","k"]
     dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
     all_files = find_data_file(Dict([("hopping_anisotropy",1.0),("if_periodic_x",true),("if_periodic_y",true)]),"ed",dataloc; file_type="jld2")
@@ -282,30 +282,43 @@ if false
     g3s = []
     ulrs = []
     lxs = []
+    firstgaps = Dict()
     for f in all_files
         fparas = get_params_dict_from_filename(f)
         if fparas["Ly"] == 2*fparas["Lx"] && fparas["N"] == fparas["Lx"]
             d,m = read_data_jld2(joinpath(dataloc,f); output_level=0)
             lx = m["Lx"]
-            scatter(m["U"][end],0.0,c=cols[lx-2])
-            scatter(m["U"][end],d["nrg"][2] - d["nrg"][1],c=cols[lx-2])
-            scatter(m["U"][end],d["nrg"][3] - d["nrg"][1],c=cols[lx-2])
+            #scatter(m["U"][end],0.0,c=cols[lx-2])
+            #scatter(m["U"][end],d["nrg"][2] - d["nrg"][1],c=cols[lx-2])
+            #scatter(m["U"][end],d["nrg"][3] - d["nrg"][1],c=cols[lx-2])
 
             append!(g2s,[d["nrg"][2] - d["nrg"][1]])
             append!(g3s,[d["nrg"][3] - d["nrg"][1]])
             append!(ulrs,[m["U"][end]])
             append!(lxs,[lx])
+
+            if m["U"][end] == 0.0
+                firstgaps[string(lx)] = d["nrg"][3] - d["nrg"][1]
+            end
         end
     end
+
+    for (idx,lx) in enumerate(lxs)
+        col = cols[lx - 2]
+        scatter(ulrs[idx],0.0,c=col)
+        scatter(ulrs[idx],g2s[idx]/firstgaps[string(lx)],c=col)
+        scatter(ulrs[idx],g3s[idx]/firstgaps[string(lx)],c=col)
+    end
     scatter(0.0,0.0,c=cols[1],label="N=3")
-    scatter(0.0,0.0,c=cols[2],label="N=4") 
+    scatter(0.0,0.0,c=cols[2],label="N=4")
     scatter(0.0,0.0,c=cols[3],label="N=5")
+
     xlabel("Interaction Strength")
     ylabel("E - E0")
     title("Energy Spectrum Finite Size Scaling rho_1D = 1.0")
     legend()
 
-end=#
+end#
 
 #= see if excited TTNs restrict_size matches ED
 if false

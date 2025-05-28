@@ -13,8 +13,8 @@ Depends on:
 =#
 ######################################################
 
-#using Pkg
-#Pkg.activate(".")
+using Pkg
+Pkg.activate(".")
 using JLD2
 
 function find_center()
@@ -62,7 +62,7 @@ function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     else
         alpha_val = hamilt_params["alpha"]
     end
-    fdict = Dict([("Lx",lattice_params["Lx"]),("Ly",lattice_params["Ly"]),("N",lattice_params["N"]),("alpha",alpha_val),("hopping_anisotropy",hamilt_params["tx"]/hamilt_params["ty"]),("interaction_strength",intstren),("if_periodic_x",lattice_params["if_periodic_x"]),("if_periodic_y",lattice_params["if_periodic_y"])])
+    fdict::Dict{String,Any} = Dict([("Lx",lattice_params["Lx"]),("Ly",lattice_params["Ly"]),("N",lattice_params["N"]),("alpha",alpha_val),("hopping_anisotropy",hamilt_params["tx"]/hamilt_params["ty"]),("interaction_strength",intstren),("if_periodic_x",lattice_params["if_periodic_x"]),("if_periodic_y",lattice_params["if_periodic_y"])])
     if lattice_params["twist_angle"] != [0.0,0.0]
         fdict["twist_angle1"] = lattice_params["twist_angle"][1]
         fdict["twist_angle2"] = lattice_params["twist_angle"][2]
@@ -72,6 +72,10 @@ function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     end
     if haskey(hamilt_params,"if_pinning") && hamilt_params["if_pinning"]
         fdict["if_pinning"] = hamilt_params["if_pinning"]
+    end
+    if haskey(hamilt_params,"scaling_type") && hamilt_params["scaling_type"] != "flat"
+        fdict["scaling_type"] = hamilt_params["scaling_type"]
+        fdict["interaction_length"] = hamilt_params["corr_length"]
     end
     return fdict
 end
@@ -85,6 +89,7 @@ function get_lattice_params_from_metadata(metadata::Dict)
 end
 
 function get_normal_model_params_ed(params_dict::Dict)
+    opl::Int64 = get(params_dict, "output_level", 1)
 
     # set lattice parameters
     Lx::Int64 = get(params_dict, "Lx", 4)
@@ -108,40 +113,6 @@ function get_normal_model_params_ed(params_dict::Dict)
         twist_angle = tws
     end=#
     expected_dimHilb::Int64 = binomial(Lx*Ly,N)
-
-
-    # set running operation parameters
-    nev::Int64 = get(params_dict,"nev",1)
-    if_save_data::Bool = get(params_dict, "if_save_data", true)
-    if if_periodic_x && if_periodic_y
-		dataloc::String = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
-	elseif if_periodic_x || if_periodic_y
-		dataloc = get_folder_location("cluster-data/exact-diag")
-	elseif !if_periodic_x && !if_periodic_y
-		dataloc = get_folder_location("cluster-data/exact-diag/obc")
-	end
-    dataloc = get(params_dict, "dataloc", dataloc)
-    if occursin("geraghty1",dataloc)
-        basis_dataloc::String = "/p/project/netenesyquma/geraghty1/data/data-ed/basis-files"
-    else
-        basis_dataloc = get_folder_location("cluster-data/exact-diag")#dataloc
-    end
-    opl::Int64 = get(params_dict, "output_level", 1)
-    if_exact::Bool = get(params_dict, "if_exact", false)
-    if_densmat::Bool = get(params_dict, "if_densmat", false)
-    if_find_data::Bool = get(params_dict, "if_find_data", true)
-    if_function::Bool = get(params_dict, "if_function", false)
-    if_reading::Bool = get(params_dict, "if_reading", false)
-    running_args::NamedTuple = (nev=nev,
-                    if_exact=if_exact,
-                    if_function=if_function,
-                    if_reading=if_reading,
-                    if_densmat=if_densmat,
-                    if_find_data=if_find_data,
-                    if_save_data=if_save_data,
-                    dataloc=dataloc,
-                    basis_dataloc=basis_dataloc,
-                    output_level=opl)
 
 
     opl > 0 ? println("Using ",N," particles with density ",round(N/(Lx*Ly),digits=3)) : nothing
@@ -170,6 +141,7 @@ function get_normal_model_params_ed(params_dict::Dict)
         other_params_dict["blockade_radius"] = blockade_radius
     end
     us::Vector{Float64} = long_range_scaling(lr_dist,Ly,stren; dict_to_symbols(other_params_dict)...)
+    interaction_length = scaling_type == "flat" ? lr_dist : corr_length
 
     # get hopping anisotropy values
     hopping_anisotropy::Float64 = get(params_dict,"hopping_anisotropy",1.0)
@@ -227,9 +199,51 @@ function get_normal_model_params_ed(params_dict::Dict)
                         "disorder_strength"=>disorder_strength,
                         "pinning_strength"=>pinning_strength,
                         "U"=>us,
+                        "scaling_type"=>scaling_type,
+                        "corr_length"=>interaction_length,
                         "which_dir"=>which_dir,
                         "interaction_cutoff"=>int_cutoff)
 
+    
+    
+    # set running operation parameters
+    nev::Int64 = get(params_dict,"nev",1)
+    if_save_data::Bool = get(params_dict, "if_save_data", true)
+    if if_periodic_x && if_periodic_y
+		dataloc::String = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+	elseif if_periodic_x || if_periodic_y
+		dataloc = get_folder_location("cluster-data/exact-diag")
+	elseif !if_periodic_x && !if_periodic_y
+		dataloc = get_folder_location("cluster-data/exact-diag/obc")
+    end
+    if scaling_type != "flat"
+        dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/ulr-length")
+	end
+    dataloc = get(params_dict, "dataloc", dataloc)
+    if occursin("geraghty1",dataloc)
+        basis_dataloc::String = "/p/project/netenesyquma/geraghty1/data/data-ed/basis-files"
+    else
+        basis_dataloc = get_folder_location("cluster-data/exact-diag")#dataloc
+    end
+    if_exact::Bool = get(params_dict, "if_exact", false)
+    if_densmat::Bool = get(params_dict, "if_densmat", false)
+    if_find_data::Bool = get(params_dict, "if_find_data", true)
+    if_function::Bool = get(params_dict, "if_function", false)
+    if_reading::Bool = get(params_dict, "if_reading", false)
+    running_args::NamedTuple = (nev=nev,
+                    if_exact=if_exact,
+                    if_function=if_function,
+                    if_reading=if_reading,
+                    if_densmat=if_densmat,
+                    if_find_data=if_find_data,
+                    if_save_data=if_save_data,
+                    dataloc=dataloc,
+                    basis_dataloc=basis_dataloc,
+                    output_level=opl)
+    
+                        
+                    
+                    
     opl > 0 && println("Finished Building Model")
     return lattice_params,hamilt_params,running_args
 
@@ -314,7 +328,7 @@ function run_normal_ed(params_dict::Dict; kwargs...)
 end
 
 # run data collection with for loops
-if false
+if true
     
     args_dict = make_args_dict(ARGS)
     #which_one = args_dict["which_one"]
@@ -357,8 +371,9 @@ if false
     lx = args_dict["Lx"]
     ly = args_dict["Ly"]
     n = args_dict["N"]
-    tw2 = 0.0
-    tw1 = 0.0
+
+    xi = args_dict["corr_length"]
+
     #dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
     #tws = range(0.0,1.0,length=11)
     #tws2 = range(0.0,1.0,length=3)
@@ -376,7 +391,7 @@ if false
         #    continue
         #end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
+        params_dict = Dict([("output_level",1),("scaling_type","exp"),("corr_length",xi),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
         #params_dict = make_args_dict(ARGS)
 
         #println("Starting from here")

@@ -1,5 +1,5 @@
-using Pkg
-Pkg.activate("../synth-dims/")
+#using Pkg
+#Pkg.activate("../synth-dims/")
 include("../review-practice-codes/ttn.jl")
 include("../other-funcs/basic-2d-stuff.jl")
 include("../review-practice-codes/observables.jl")
@@ -1836,6 +1836,7 @@ function reconverge_ttn(filepath::String; kwargs...)
 
 	# pull out the old data
 	data,metadata_old = read_data(filepath)
+	println("Read Data")
 
 	
 	num_states = get_num_states_from_datadict(data)
@@ -1860,6 +1861,7 @@ function reconverge_ttn(filepath::String; kwargs...)
 			end
 		end
 	end
+	println("Found All Wavefuncs")
 	metadata_old["if_redo"] = true
 
 	# replace the old parameters with the new ones
@@ -1880,6 +1882,7 @@ function reconverge_ttn(filepath::String; kwargs...)
 	all_densmats = Vector{Matrix{ComplexF64}}(undef,num_states)
 	all_runtimes = zeros(num_states)
 	ttn_orthos::Vector{TTN.TreeTensorNetwork} = []
+	println("Prepped all structures, Starting DMRG")
 	for i in 1:length(all_wavefuncs)
 		println("Working on state $i")
 		
@@ -2095,7 +2098,7 @@ if false
 end
 
 # synth-dims for loop runnings
-if true
+if false
 	#BLAS.set_num_threads(open_cores)
 	cols = ["b","g","r"]
 	#nnst = 0.0
@@ -2116,25 +2119,25 @@ if true
 	#anises = range(1.0,5.0,length=10)
 	#strens = [0.0,0.25,0.5,0.75,1.0,1.5,2.0,5.0,10.0,20.0,50.0,100.0,300.0,1000.0]
 	
-	#=
+	#
 	args_dict = make_args_dict(ARGS)
 	stren = args_dict["onsite_strength"]
 	lx = args_dict["Lx"]
 	ly = args_dict["Ly"]
 	n = args_dict["particles"]
-	mdim = args_dict["mdim"]
-	if_pinning = "pinning_strength" in keys(args_dict)
-	pinstren = if_pinning ? args_dict["pinning_strength"] : 1e-3
-	dataloc = if_pinning ? get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling") : get_folder_location("cluster-data/synth-dims/torus/new-gauge")
-	=#
+	#mdim = args_dict["mdim"]
+	#if_pinning = "pinning_strength" in keys(args_dict)
+	#pinstren = if_pinning ? args_dict["pinning_strength"] : 1e-3
+	#dataloc = if_pinning ? get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling") : get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+	#
 
-	lx,ly,n = 16,8,8
+	#lx,ly,n = 12,6,6
 	#stren = 0.0
 	
 	#alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
-	strens = [0.25,0.5,0.75,1.25,1.5,3.0,4.0]#range(0.1,0.5,length=3)
+	#strens = [0.25,0.5,0.75,1.25,1.5,3.0,4.0]#range(0.1,0.5,length=3)
 	#for (idx,anis) in enumerate(anises)
-	for (idx,stren) in enumerate(strens)
+	#for (idx,stren) in enumerate(strens)
 	#tws = range(0.0,1.0,length=10)
 	#for tw1 in tws
 	#for tw2 in tws
@@ -2145,7 +2148,7 @@ if true
 		
 		#("if_pinning",if_pinning),("dataloc",dataloc),("pinning_strength",pinstren)
 		
-		params_dict = Dict([("hopping_anisotropy",1.0),("if_gpu",true),("make_smaller_lattice",[lx,ly]),("es_count",0),("expander_fraction",1e-5),("particles",n),("mdim",400),("if_save_data",true),("filling",0.5),("if_find_data",true),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("hopping_anisotropy",1.0),("make_smaller_lattice",[lx,ly]),("es_count",2),("expander_fraction",1e-5),("particles",n),("mdim",400),("if_save_data",true),("filling",0.5),("if_find_data",true),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		#open_cores = get(params_dict, "open_cores", 5)
@@ -2154,10 +2157,10 @@ if true
 		#	display(BLAS.get_config())
 		#end#
 
-		initialize_dmrg(params_dict["if_gpu"])
+		#initialize_dmrg(params_dict["if_gpu"])
 
 
-		CUDA.@allowscalar all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
+		all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
 		#nrgs = [all_results[3][i].nrg[end] for i in 1:params_dict["es_count"]+1]
 		#plot_spectrum(strens,nrgs,idx,params_dict["es_count"]+1,"Interaction Strength",true; plot_title=" Synth Rectangle TTN")
 
@@ -2253,7 +2256,7 @@ if true
 			fig = figure()
 			scatter(collect(1:mdim),-log.(specs))
 			=#
-	end
+	#end
 #end
 end
 
