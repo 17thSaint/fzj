@@ -6,8 +6,8 @@ include("../other-funcs/include-other-files.jl")
 
 include_other_files(["review-practice-codes/parton-model-syms.jl","other-funcs/data-storage-funcs.jl","review-practice-codes/overwriting-ttn.jl"])
 
-thetax_1,thetay_1 = 0.2, 0.12
-thetax_2,thetay_2 = 0.64,0.56
+#thetax_1,thetay_1 = 0.2, 0.12
+#thetax_2,thetay_2 = 0.64,0.56
 
 function get_flattened_index(b_list)
 	return sum(b_list .* [2^(length(b_list) - i) for i in 1:length(b_list)]) + 1
@@ -39,6 +39,7 @@ end
 function get_lattice_dims_from_layers(layers::Int; kwargs...)
 	if_synth_rectangle = get(kwargs, :if_synth_rectangle, false)
 
+	println("This is only for perfectly rectangular lattices")
 	if iseven(layers)
 		edge_length = Int(sqrt(2^layers))
 		return edge_length,edge_length
@@ -59,9 +60,18 @@ function get_site_count(ttn)
 	return 2^layers
 end
 
-function get_lattice_dims(input_data; kwargs...)
+# this function is only for perfectly rectangular lattices
+#=function get_lattice_dims(input_data; kwargs...)
 	num_layers = TTN.number_of_layers(input_data)
 	return get_lattice_dims_from_layers(num_layers; kwargs...)
+end=#
+
+function get_lattice_dims(net::TTN.BinaryNetwork)
+	return size(TTN.physical_lattice(net))
+end
+
+function get_lattice_dims(ttn::TTN.TreeTensorNetwork)
+	return get_lattice_dims(TTN.network(ttn))
 end
 
 #=function get_ydir_greenfunc(ttn; kwargs...)

@@ -108,7 +108,28 @@ function build_HH_net(num_layers::Int64; kwargs...)
 	return net
 end
 
+function build_HH_net(lat_size::Vector; kwargs...)
+	conserve_qns = get(kwargs, :syms, true)
+	max_occ = get(kwargs,:max_occ,1)
+
+	if all(log2.(lat_size) .% 1 .== 0)
+		return TTN.BinaryRectangularNetwork(Tuple(lat_size), TTN.ITensorNode, Boson; conserve_qns=conserve_qns,dim=max_occ+1)
+	else
+		# if given dimensions do not fit binary TTN, find minimally larger TTN to fit
+		ttn_lat_size = Int(ceil(log2(lat_size[1]))),Int(ceil(log2(lat_size[2])))
+		return TTN.BinaryRectangularNetwork(ttn_lat_size, TTN.ITensorNode, Boson; conserve_qns=conserve_qns,dim=max_occ+1)
+	end
+end
+
 function build_HH_net(model_paras::Dict)
+	if isnothing(model_paras[:seed_ttn])
+		return build_HH_net(model_paras[:make_smaller_lattice]; syms=model_paras[:syms], max_occ=model_paras[:max_occ])
+	else
+		return model_paras[:seed_ttn].net
+	end
+end
+
+#=function build_HH_net(model_paras::Dict)
 	if isnothing(model_paras[:seed_ttn])
 		num_layers = model_paras[:layers]
 		syms = model_paras[:syms]
@@ -117,7 +138,7 @@ function build_HH_net(model_paras::Dict)
 	else
 		return model_paras[:seed_ttn].net
 	end
-end
+end=#
 
 # isotropic not implemented for cylinder
 function get_interaction_coords(given_site,inter_dist,lat,if_per,which_dir) # written by ChatGPT 12.06.2023 then vastly edited 13.06.2023 by me
