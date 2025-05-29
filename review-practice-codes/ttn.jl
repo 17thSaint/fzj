@@ -39,7 +39,7 @@ end
 function get_tatami_lattice_dims(layers::Int; kwargs...)
 	if_synth_rectangle = get(kwargs, :if_synth_rectangle, false)
 
-	println("This is only for perfectly rectangular lattices")
+	#println("This is only for perfectly rectangular lattices")
 	if iseven(layers)
 		edge_length = Int(sqrt(2^layers))
 		return edge_length,edge_length
@@ -779,14 +779,14 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	end
 
 	
-	println("Prepping Bond Dims")
+	#println("Prepping Bond Dims")
 	# slowly grow bond dim to optimize more efficiently
 	if max_dim > 50 && !if_redo
 		max_dim = [Int(round(max_dim/4)),Int(round(max_dim/4)),Int(round(max_dim/2)),max_dim]
 	end
 
 	if sweep_type == "dmrg"
-		println("Before starting DMRG the bond dim is ",TTN.maxlinkdim(ttn))
+		#println("Before starting DMRG the bond dim is ",TTN.maxlinkdim(ttn))
 		#get_occupancy(ttn; plot_title="Before DMRG")
 		if isnothing(psi_ortho) || length(psi_ortho) == 0
 			sp::TTN.AbstractSweepHandler = TTN.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff, eigsolve_krylovdim=eigsolve_krylovdim, eigsolve_verbosity=eigsolve_verbosity)

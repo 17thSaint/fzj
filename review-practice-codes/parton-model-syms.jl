@@ -160,11 +160,12 @@ end
 function ttn_2d_mapping(size)
     path = get_2dttn_path(minimum(size))
     if size[1] != size[2]
-        path = add_rect_block(path,minimum(size))
+        for i in 1:Int(log2(maximum(size)/minimum(size)))
+            path = add_rect_block(path,Int(minimum(size)^i))
+        end
     end
     map2d::Vector{Int64} = []
     for i in 1:length(path)
-        
         site_idx = Int(get_site_number(path[i][2],path[i][1],size[2],size[1]))
         append!(map2d,[site_idx])
     end
