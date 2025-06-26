@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=gpu_16x8_ulr_range
-#SBATCH --output=log_file_16x8_ulr_range
-#SBATCH --error=log_file_16x8_ulr_range
-#SBATCH -p pgi-8-gpu-h100
+#SBATCH --job-name=ulr1p0_14x4_gpu
+#SBATCH --output=log_file_14x4_ulr_1p0
+#SBATCH --error=log_file_14x4_ulr_1p0
+#SBATCH -p pgi-8-gpu
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=5
-#SBATCH --mem=128G
-#SBATCH --gres=gpu:h100:1
+#SBATCH --mem=64G
+#SBATCH --gres=gpu:a100:1
 
-srun julia long-range-ttn.jl
+srun julia long-range-ttn.jl "Lx" 14 "Ly" 4 "particles" 7 "onsite_strength" 1.0

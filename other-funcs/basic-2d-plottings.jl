@@ -137,7 +137,7 @@ function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::
     us = cos.(plotting_omega)
     vs = sin.(plotting_omega)
     quiver(xs, ys, us, vs)
-    title("Phase of "*L"\Omega"*plot_title)
+    title("Phase of "*L"\Omega"*" "*plot_title)
     xlabel(L"\theta_x / 2\pi")
     ylabel(L"\theta_y / 2\pi")
     #xlim([minimum(theta_xs),maximum(theta_xs)])
@@ -193,7 +193,8 @@ function count_chern_number(theta_xs::Vector{Float64},theta_ys::Vector{Float64},
         fig = figure()
         imshow(vortex_counting ./ (1*pi); cmap="viridis", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)], vmax=1.0, vmin=-1.0)
         colorbar()
-        title(L"\sum \Omega"*plot_title)
+        #title(L"\sum \Omega"*plot_title)
+        title("Chern Number "*L"U_{ir}"*"=1000")
         xlabel(L"\theta_x / 2\pi")
         ylabel(L"\theta_y / 2\pi")
     end

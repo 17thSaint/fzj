@@ -61,28 +61,29 @@ end
 
 #= data collection for 4pt
 if false
-    lx,ly,n = 10,5,5
-    dataloc = get_folder_location("cluster-data/exact-diag/torus")
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",0.0),("if_periodic_x",true),("if_periodic_y",true)])
+    lx,ly,n = 10,4,5
+    intstren = 0.0
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true)])
     
     all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
     display(all_files)
 
     for f in all_files
-        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+        d,m = read_data(dataloc * "/" * f; output_level=0)
         lattice_params = get_lattice_params_from_metadata(m)
 
-        #=if haskey(m,"fourpt_momentum")
+        if haskey(m,"fourpt_momentum")
             println("Already has 4pt data")
             continue
         else
             fourpt_vals = four_point(d["state"][1],lattice_params)
             datadict = Dict([("fourpt_momentum",fourpt_vals)])
-            modify_data(datadict,filepath,"metadata")
-        end=#
-        two_fourpts = [ft_fourpt(d["state"][1],[0.0,n/ly],[0.0,n/ly],lattice_params) for n in 0:1]
-        datadict = Dict([("fourpt_momentum_diag",two_fourpts)])
-        modify_data(datadict,filepath,"metadata"; output_level=0)
+            modify_data(datadict,joinpath(dataloc,f),"metadata")
+        end
+        #two_fourpts = [ft_fourpt(d["state"][1],[0.0,n/ly],[0.0,n/ly],lattice_params) for n in 0:1]
+        #datadict = Dict([("fourpt_momentum_diag",two_fourpts)])
+        #modify_data(datadict,filepath,"metadata"; output_level=0)
     end
 end=#
 
@@ -109,24 +110,234 @@ if false
 
 end=#
 
-# find if xi_crit depends on system size
+# testing for adiabatic condition
+if true
+    lx,ly,n = 6,3,3
+    txs = [1e-3,1e-2,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
+    #=intstren = 300.0
+    intstrens = range(1.0,300.0,length=11)
+    fuirs = zeros(Float64,length(intstrens),length(txs))
+    ftxs = zeros(Float64,length(intstrens),length(txs))
+    for (idx2,tx) in enumerate(txs)
+        for (idx,intstren) in enumerate(intstrens)
+            pdict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("tx",tx),("ty",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+            states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
+
+            #plot_spectrum(txs,nrgs,idx2,pdict["nev"],"Physical Hopping, tx",true; plot_title=" $(lx)x$(ly) N=$n ULR=$intstren")
+            fuir_2,ogval_uir2 = uir_adiabatic_condition(states[1],states[3],nrgs[3] - nrgs[1],lattice_params,hamilt_params,nothing)
+            fuirs[idx,idx2] = fuir_2
+
+            ftx_2,ogval_tx2 = tx_adiabatic_condition(states[1],states[3],nrgs[3] - nrgs[1],lattice_params,hamilt_params)
+            ftxs[idx,idx2] = ftx_2
+        end
+    end=#
+    rez = sqrt.(ftxs .^2 .+ fuirs .^ 2)
+    fig = figure()
+    imshow(log.(rez), origin="lower")
+    colorbar()
+    ylabel("Interaction Strength")
+    xlabel("Hopping Anisotropy")
+
+    fig = figure()
+    imshow(log.(fuirs), origin="lower")
+    title("Adiabatic Condition ULR")
+    colorbar()
+    ylabel("Interaction Strength")
+    xlabel("Hopping Anisotropy")
+
+    fig = figure()
+    imshow(log.(ftxs), origin="lower")
+    title("Adiabatic Condition Physical Hopping")
+    colorbar()
+    ylabel("Interaction Strength")
+    xlabel("Hopping Anisotropy")
+end#
+
+#= look at ranging Lx and fixed Ly
+if false
+    ly = 4
+    n = 3
+    lx = 2*n
+
+    intstrens = range(0.0,10.0,length=21)
+    laughlin = 0.0
+    for (idx,intstren) in enumerate(intstrens)
+        pdict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
+
+        fourpt_diag = four_point_diag(states[1],lattice_params; if_plot=false)
+        if intstren == 0.0
+            global laughlin = maximum(fourpt_diag)
+        end
+        scatter(intstren,maximum(fourpt_diag) / laughlin,c="b")
+        xlabel("Interaction Strength")
+        ylabel("Max 4pt Diagonal")
+    end
+
+    lx = 8
+    n = 4
+
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("hopping_anisotropy",1.0)])
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    all_diags = []
+    all_intstrens = []
+    for f in all_files
+        d,m = read_data(dataloc * "/" * f; output_level=0)
+        lattice_params = get_lattice_params_from_metadata(m)
+
+        if haskey(m,"fourpt_momentum_diag")
+            fourpt_diag = m["fourpt_momentum_diag"]
+        elseif haskey(m,"fourpt_momentum")
+            fourpt_diag = diag(m["fourpt_momentum"])
+        else
+            fourpt_diag = four_point_diag(d["state"][1],lattice_params; if_plot=false)
+        end
+
+        #scatter(m["U"][end],maximum(fourpt_diag) / laughlin,c="r")
+        append!(all_diags,[maximum(fourpt_diag)])
+        append!(all_intstrens,[m["U"][end]])
+    end
+
+    laughlin_8 = all_diags[findfirst(x -> all_intstrens[x] == 0.0,1:length(all_intstrens))]
+    scatter(all_intstrens,all_diags ./ laughlin_8,c="r",label="N=4")
+    
+end=#
+
+#= plot energy gap ranging intstren and tx
+if false
+    lx,ly,n = 8,4,4
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    intstrens = [100.0,200.0,300.0,400.0,500.0]
+    anises = [1e-4,1e-3,1e-2,1e-1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
+    xs_plot = zeros(Float64,length(intstrens)*length(anises))
+    ys_plot = zeros(Float64,length(intstrens)*length(anises))
+    gaps = zeros(Float64,length(intstrens)*length(anises))
+    for (idx,intstren) in enumerate(intstrens)
+        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren)])
+        all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+        for f in all_files
+            d,m = read_data(joinpath(dataloc,f); output_level=0)
+
+            anis_index = findfirst(x -> anises[x] == m["tx"], 1:length(anises))
+
+            #println("Stren index is $(idx), Anis index is $(anis_index), and linear index is $(length(intstrens)*(idx-1) + anis_index)")
+
+            xs_plot[length(anises)*(idx-1) + anis_index] = m["tx"]
+            ys_plot[length(anises)*(idx-1) + anis_index] = intstren
+
+            gaps[length(anises)*(idx-1) + anis_index] = d["nrg"][3] - d["nrg"][1]
+        end
+    end
+
+    bin_count = 100
+    data_dict = bin_values(gaps,bin_count)
+    bv = [data_dict[val] for val in gaps] .* maximum(gaps) / bin_count
+
+    scatter(xs_plot, ys_plot, c=bv, cmap="viridis")
+    colorbar()
+    xlabel("Physical Hopping, tx")
+    ylabel("Interaction Strength")
+    title("Energy Gap for $(lx)x$(ly) N=$(n)")
+end=#
+
+#= energy scaling fixed Ly
+if false
+    ly = 4
+    intstren = 300.0
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
+    splittings = []
+    gaps = []
+    lxs = []
+    for n in [3,4,5]
+        lx = 2*n
+        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+        all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+        display(all_files)
+        d,m = read_data(dataloc * "/" * all_files[1]; output_level=0)
+        append!(lxs,[lx])
+        append!(splittings,[d["nrg"][2] - d["nrg"][1]])
+        append!(gaps,[d["nrg"][3] - d["nrg"][1]])
+    end
+
+    fig = figure()
+    scatter(lxs,splittings,c="b")
+    xlabel("Lx")
+    ylabel("E1 - E0")
+    title("Energy Splitting for Ly=$ly, ULR=$intstren")
+    yscale("log")
+
+    fig = figure()
+    scatter(lxs,gaps,c="r")
+    xlabel("Lx")
+    ylabel("E2 - E0")
+    title("Energy Gap for Ly=$ly, ULR=$intstren")
+    ylim([-0.05,1.1*maximum(gaps)])
+end=#
+
+#= plot hatsugai for poster
+if false
+    lx,ly,n = 8,4,4
+    intstren = 1000.0
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    display(all_files)
+
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+
+    tw1s = m["tw1s"]
+    tw2s = m["tw2s"]
+    omegas = m["omegas"]
+
+    which_to_keep = []
+    for (idx,tw1) in enumerate(tw1s)
+        if round(tw1,digits=1) == tw1 && round(tw2s[idx],digits=1) == tw2s[idx]
+            append!(which_to_keep,[idx])
+        end
+    end
+
+    squaresize = Int(sqrt(length(which_to_keep)))
+    new_tw1s = unique(tw1s[which_to_keep]) 
+    new_tw2s = unique(tw2s[which_to_keep]) .- 0.5
+    new_wrongshape_omegas = reshape(omegas[which_to_keep],squaresize,squaresize)
+    new_omegas = zeros(ComplexF64,squaresize,squaresize)
+    new_omegas[:,1:5] = new_wrongshape_omegas[:,7:end]
+    new_omegas[:,6:end] = new_wrongshape_omegas[:,1:6]
+    
+
+    rez = plot_omega(new_tw1s,new_tw2s,new_omegas; plot_title=L"U_{ir}"*"=$intstren")
+    
+end=#
+
+#= find if xi_crit depends on system size
 if false
     intstren = 2.0
 
-    for n in [3,4]
+    cols = ["b","g","r","c"]
+    for n in [3,4,5]
         lx = n
         ly = 2n
-        xis = range(0.01,ly,length=11)
-
+        dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/ulr-length")
+        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+        all_files = readdir(dataloc)
+        filter!(x -> occursin("Lx-$lx",x),all_files)
+        display(all_files)
         fig = figure()
-        for (idx,xi) in enumerate(xis)
-            pdict = Dict([("output_level",1),("scaling_type","exp"),("corr_length",xi),("if_check_fluxes",false),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
-            states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
-            plot_spectrum(xis,nrgs,idx,pdict["nev"],"Interaction Scale",true; plot_title="")
+        for (idx,f) in enumerate(all_files)
+            d,m = read_data(joinpath(dataloc,f); output_level=0)
+            xi = m["corr_length"]
+
+            for i in 1:4
+                scatter(xi,d["nrg"][i] - d["nrg"][1],c=cols[i])
+            end
+            
         end
-        title("Energy Spectrum $(lx)x$(ly) N=$(n) ULR=$(intstren)")
+        xlabel("Interaction Length")
+        ylabel("E - E0")
+        title("Spectrum Lx=$lx, Ly=$ly, N=$n")
     end
-end
+end=#
 
 #= redo gamma/omega calcs for all files
 if false

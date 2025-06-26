@@ -62,6 +62,41 @@ function get_reference_multiplets(Lx::Int64,Ly::Int64,particles::Int64; kwargs..
     return reference_multiplets,found_data1[2]["filename"],found_data2[2]["filename"]
 end
 
+function collate_hatsugai_data(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
+    intstren::Float64 = get(kwargs,:intstren,0.0)
+    hanis::Float64 = get(kwargs,:hanis,1.0)
+    if_pinning::Bool = get(kwargs,:if_pinning,false)
+
+    dataloc::String = get_folder_location("cluster-data/exact-diag/torus")
+    pdict = Dict([("Lx",Lx),("Ly",Ly),("N",N),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis),("interaction_strength",intstren)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    #display(all_files)
+    storing_file::String = ""
+
+    tw1s::Vector{Float64} = Float64[]
+    tw2s::Vector{Float64} = Float64[]
+    omegas::Vector{ComplexF64} = ComplexF64[]
+    lambda1s::Vector{ComplexF64} = ComplexF64[]
+    lambda2s::Vector{ComplexF64} = ComplexF64[]
+    for f in all_files
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+        m["twist_angle"] == [0.0,0.0] && (storing_file = f)
+        if haskey(m,"omega")
+            append!(tw1s,m["twist_angle"][1])
+            append!(tw2s,m["twist_angle"][2])
+            append!(omegas,m["omega"])
+            append!(lambda1s,m["gamma1"])
+            append!(lambda2s,m["gamma2"])
+        else
+            println("No omega data found")
+        end
+    end
+    display(tw1s)
+    datadict = Dict([("tw1s",tw1s),("tw2s",tw2s),("omegas",omegas),("lambda1s",lambda1s),("lambda2s",lambda2s)])
+    modify_data(datadict,dataloc * "/" * storing_file,"metadata"; output_level=0)
+
+end
+
 function save_hatsugai_data(data_dict::Dict{String,Any},filepath::String,ref_multis_filenames::Vector{String})
     # put in some checks on the filepath
     for (idx,rmf) in enumerate(ref_multis_filenames)

@@ -292,6 +292,13 @@ function long_range_scaling(x_final::Int64,virt_edge_length::Int64,initial_stren
 	return strengths
 end
 
+function get_corr_length_from_Us(us::Vector{Float64})
+    init_stren = us[1]
+    all_cs = -1 ./ (log.(us[2:end] ./ init_stren) ./ collect(1:length(us)-1))
+    return sum(all_cs) / (length(all_cs))
+end
+
+
 function get_hopping_strengths(t_strength::Float64,hopping_anisotropy::Float64)
 	if hopping_anisotropy < 1.0
 		t_strength_synth::Float64 = t_strength / hopping_anisotropy
@@ -300,6 +307,9 @@ function get_hopping_strengths(t_strength::Float64,hopping_anisotropy::Float64)
 		t_strength_phys = t_strength * hopping_anisotropy
 		t_strength_synth = t_strength
 	end
+
+    #t_strength_phys = hopping_anisotropy
+    #t_strength_synth = t_strength
 
 	return t_strength_phys,t_strength_synth
 end

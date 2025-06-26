@@ -157,17 +157,17 @@ function add_rect_block(path,edge_size)
     return [path; second_block]
 end
 
-function ttn_2d_mapping(size)
-    path = get_2dttn_path(minimum(size))
-    if size[1] != size[2]
-        for i in 1:Int(log2(maximum(size)/minimum(size)))
-            path = add_rect_block(path,Int(minimum(size)^i))
+function ttn_2d_mapping(ttn_size)
+    path::Vector{Tuple} = get_2dttn_path(minimum(ttn_size))
+    if ttn_size[1] != ttn_size[2]
+        for i in 1:Int(log2(maximum(ttn_size)/minimum(ttn_size)))
+            path = add_rect_block(path,Int(minimum(ttn_size)*i))
         end
     end
     map2d::Vector{Int64} = []
     for i in 1:length(path)
-        site_idx = Int(get_site_number(path[i][2],path[i][1],size[2],size[1]))
-        append!(map2d,[site_idx])
+        site_idx = get_site_number(path[i][2],path[i][1],ttn_size[2],ttn_size[1])
+        append!(map2d,[Int(site_idx)])
     end
     return map2d
 end

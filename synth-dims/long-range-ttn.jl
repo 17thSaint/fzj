@@ -1,5 +1,5 @@
-#using Pkg
-#Pkg.activate("../synth-dims/")
+using Pkg
+Pkg.activate("../synth-dims/")
 include("../review-practice-codes/ttn.jl")
 include("../other-funcs/basic-2d-stuff.jl")
 include("../review-practice-codes/observables.jl")
@@ -1570,7 +1570,7 @@ function get_normal_model_params(params_dict::Dict)
 	if_synth_rectangle = get(params_dict, "if_synth_rectangle", false)
 	Lx::Int = get(params_dict, "Lx", 4)
 	Ly::Int = get(params_dict, "Ly", 4)
-	num_particles::Int = get(params_dict, "particles", Int(Lx/2))
+	num_particles::Int = get(params_dict, "particles", Int(ceil(Lx/2)))
 	ttn_size = get_ttn_dims([Lx,Ly])
 	layer_count = get_layers_from_dims([Lx,Ly])
 	
@@ -1584,6 +1584,7 @@ function get_normal_model_params(params_dict::Dict)
 
 	# Hamiltonian parameters
 	if_pfaffian = get(params_dict, "if_pfaffian", false)
+	if_pfaffian && (max_occ = 3)
 	alpha = get(params_dict, "alpha", nothing)
 	flux_direction = get(params_dict,"flux_direction", "synth")
 	if_synth_rectangle ? flux_direction = "synth" : nothing
@@ -2140,20 +2141,21 @@ if true
 	stren = args_dict["onsite_strength"]
 	lx = args_dict["Lx"]
 	ly = args_dict["Ly"]
-	n = args_dict["particles"]
+	n = args_dict["particles"]#
 	#mdim = args_dict["mdim"]
 	#if_pinning = "pinning_strength" in keys(args_dict)
 	#pinstren = if_pinning ? args_dict["pinning_strength"] : 1e-3
 	#dataloc = if_pinning ? get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling") : get_folder_location("cluster-data/synth-dims/torus/new-gauge")
 	#
 
-	#lx,ly,n = 16,4,8
-	#stren = 0.0
+	#lx,ly,n = 12,6,6
+	#stren = 10.0
 	
-	#alphas = [4/(0.5*64)]#range(4/(0.2*64),4/(0.8*64),length=20)
+	#alphas = range(0.1,0.30,length=41)
 	#strens = [0.25,0.5,0.75,1.25,1.5,3.0,4.0]#range(0.1,0.5,length=3)
 	#for (idx,anis) in enumerate(anises)
 	#for (idx,stren) in enumerate(strens)
+	#for (idx,alpha) in enumerate(alphas)
 	#tws = range(0.0,1.0,length=10)
 	#for tw1 in tws
 	#for tw2 in tws
@@ -2164,7 +2166,7 @@ if true
 		
 		#("if_pinning",if_pinning),("dataloc",dataloc),("pinning_strength",pinstren)
 		
-		params_dict = Dict([("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",2),("expander_fraction",1e-5),("particles",n),("mdim",400),("if_save_data",true),("filling",0.5),("if_find_data",true),("onsite_strength",stren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("if_gpu",true),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-5),("particles",n),("mdim",400),("if_save_data",true),("filling",0.5),("if_find_data",true),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		#open_cores = get(params_dict, "open_cores", 5)
@@ -2182,8 +2184,8 @@ if true
 
 
 		all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
-		#nrgs = [all_results[3][i].nrg[end] for i in 1:params_dict["es_count"]+1]
-		#plot_spectrum(strens,nrgs,idx,params_dict["es_count"]+1,"Interaction Strength",true; plot_title=" Synth Rectangle TTN")
+		#nrgs = [all_obs[i].nrg[end] for i in 1:params_dict["es_count"]+1]
+		#plot_spectrum(alphas,nrgs,idx,params_dict["es_count"]+1,"Flux Density",true; plot_title="Pfaffian")
 
 		#=for i in 1:params_dict["es_count"]+1
 			scatter(tw1,all_results[3][i].nrg[end],c=cols[i])

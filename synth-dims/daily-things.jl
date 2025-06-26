@@ -81,48 +81,49 @@ if false
 
 end=#
 
-# rerun 16x8 laughlin to converge further
-if true
+#= rerun 16x8 laughlin to converge further
+if false
     BLAS.set_num_threads(5)
 
     lx,ly,n = 12,6,6
-    layers = Int(log(2,lx*ly))
-    intstren = 0.0
-    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
-    pdict = Dict([("layers",layers),("onsite_strength",intstren),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    #layers = Int(log(2,lx*ly))
+    intstren = 300.0
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
+    pdict = Dict([("Lx",lx),("Ly",ly),("onsite_strength",intstren),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc)
     display(all_files)
 
     newparas = Dict([("nrgtol",1e-7),("mdim",500)])
     rez = reconverge_ttn(joinpath(dataloc,all_files[1]); new_parameters=newparas)
-end#
+end=#
 
 #= data collection of 4pt MPO
 if false
-    lx,ly,n = 16,8,8
-    layers = Int(log(2,lx*ly))
-    intstren = 2.0
+    lx,ly,n = 16,4,8
+    #layers = Int(log(2,lx*ly))
+    #intstren = 0.0
 
     dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
-    pdict = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    pdict = Dict([("particles",n),("Lx",lx),("Ly",ly),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc)
     display(all_files)
     #f = all_files[1]
     for f in all_files
         d,m = read_data(dataloc * "/wavefunc" * f; output_level=0)
 
-        if "fourpt_momentum" in keys(m)
-            continue
-        end
+        #if "fourpt_momentum" in keys(m)
+        #    continue
+        #end
 
         psi1 = d["ttn"]
-        #psi2 = d["ttn_1"]
+        psi2 = d["ttn_1"]
 
         #fourpt_mpo = four_point([psi1,psi2]; output_level=0)
-        fourpt_mpo = four_point(psi1; output_level=0)
+        fourpt_mpo = four_point(psi1; output_level=1)
+        fourpt_mpo_2 = four_point(psi2; output_level=1)
 
-        #datadict = Dict([("fourpt_momentum",fourpt_mpo[1]),("fourpt_momentum_1",fourpt_mpo[2])])
-        datadict = Dict([("fourpt_momentum",fourpt_mpo)])
+        datadict = Dict([("fourpt_momentum",fourpt_mpo),("fourpt_momentum_1",fourpt_mpo_2)])
+        #datadict = Dict([("fourpt_momentum",fourpt_mpo)])
         modify_data(datadict,dataloc * "/" * f,"metadata"; output_level=0)
     end
 end=#
@@ -220,23 +221,31 @@ if false
      
     lx,ly,n = 16,8,8
     layers = Int(log(2,lx*ly))
-    intstren = 0.0
+    #intstren = 0.0
 
     dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
-    pdict = Dict([("layers",layers),("onsite_strength",intstren),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    pdict = Dict([("layers",layers),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc)
 
-    f = all_files[1]    
+    f = all_files[5]
     d,m = read_data(joinpath(dataloc,f))
 
     fourpt_vals = m["fourpt_momentum"]
-    plot_four_point(fourpt_vals; plot_title="GS1 16x8 N=8 ULR=$(m["onsite_strength"])")
+    #plot_four_point(fourpt_vals; plot_title="GS1 16x8 N=8 ULR=$(m["onsite_strength"])")
 
-    fourpt_vals2 = m["fourpt_momentum_1"]
-    plot_four_point(fourpt_vals2; plot_title="GS2 16x8 N=8 ULR=$(m["onsite_strength"])")
+    #fourpt_vals2 = m["fourpt_momentum_1"]
+    fourpt_vals2 = zeros(Float64,size(fourpt_vals))
+    for i in 1:size(fourpt_vals,1)-1
+        for j in 1:size(fourpt_vals,2)-1
+            fourpt_vals2[i,j] = fourpt_vals[i+1,j+1]
+        end
+    end
+    fourpt_vals2[end,:] = vcat(fourpt_vals[1,:][2:end],fourpt_vals[1,:][1])
+    fourpt_vals2[:,end] = vcat(fourpt_vals[:,1][2:end],fourpt_vals[:,1][1])
+    #plot_four_point(fourpt_vals2; plot_title="GS2 16x8 N=8 ULR=$(m["onsite_strength"])")
 
-    #=mixed_fourpt = 0.5 .* (fourpt_vals .+ fourpt_vals2)
-    plot_four_point(mixed_fourpt; plot_title="GS1+GS2 16x8 N=8 ULR=$(m["onsite_strength"])")=#
+    mixed_fourpt = 0.5 .* (fourpt_vals .+ fourpt_vals2)
+    #plot_four_point(mixed_fourpt; plot_title="GS1+GS2 16x8 N=8 ULR=$(m["onsite_strength"])")
     
 
 end=#

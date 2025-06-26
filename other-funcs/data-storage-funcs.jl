@@ -113,6 +113,8 @@ function make_parameters_filename(param_dict)
 		else
 			if typeof(param_dict[key]) == Float64 && param_dict[key] < 0
 				value = "n" * string(abs(param_dict[key]))
+			elseif typeof(param_dict[key]) == Float64
+				value = string(round(param_dict[key],digits=10))
 			else
 				value = string(param_dict[key])
 			end
@@ -230,6 +232,8 @@ function find_data_file(params_dict,calc_type,location::String="/home/patrick/fz
 	end
 	deleteat!(file_choices,remove_indices)
 
+
+
 	# remove all files that do not have the correct parameters
 	remove_indices = []
 	# this is for finding a single file with all the correct parameters in the filename
@@ -250,7 +254,7 @@ function find_data_file(params_dict,calc_type,location::String="/home/patrick/fz
 			current_file_params_dict = get_params_dict_from_filename(current_file)
 			for params in keys(params_dict)
 				try
-					current_file_params_dict[params] in params_dict[params] ? nothing : append!(remove_indices,i)
+					!(current_file_params_dict[params] in params_dict[params]) && append!(remove_indices,i)
 				catch
 					#=try
 						#println("Error in first Attempt, $current_file")
@@ -670,6 +674,7 @@ end
 
 function read_data_hdf5(file_name; kwargs...)
 	file_name = make_sure_file_type(file_name,"h5")
+	opl = get(kwargs, :output_level, 1)
 	
 	data::Dict{String,Any} = Dict()
 	metadata::Dict{String,Any} = Dict()
@@ -685,7 +690,7 @@ function read_data_hdf5(file_name; kwargs...)
 		end
 		g_metadata = open_group(f,"metadata")
 		for metadatum_key in keys(f["metadata"])
-			if occursin("ttn",metadatum_key)
+			if occursin("ttn",metadatum_key) && !occursin("size",metadatum_key)
 				metadata[metadatum_key] = read(g_metadata, metadatum_key, TTN.TreeTensorNetwork)
 			elseif occursin("observer",metadatum_key)
 				metadata[metadatum_key] = read(g_metadata, metadatum_key, TTN.ITensorMPS.AbstractObserver)
@@ -699,7 +704,7 @@ function read_data_hdf5(file_name; kwargs...)
 		end
 	end
 
-	println("Data Extracted, File Closed: $file_name")
+	opl > 0 && println("Data Extracted, File Closed: $file_name")
 	return data,metadata
 end
 

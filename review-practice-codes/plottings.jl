@@ -15,7 +15,7 @@ using PyPlot,LaTeXStrings
 
 include("../other-funcs/include-other-files.jl")
 
-include_other_files(["other-funcs/basic-2d-stuff.jl","review-practice-codes/ttn.jl","review-practice-codes/observables.jl"])
+include_other_files(["other-funcs/basic-2d-stuff.jl","review-practice-codes/ttn.jl","review-practice-codes/observables.jl","other-funcs/basic-2d-plottings.jl"])
 
 #### Generic Plotting
 

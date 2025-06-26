@@ -253,27 +253,29 @@ end
 
 #= test 4pt MPO on non-regular TTN
 if false
-    lx,ly,n = 3,6,3
+    lx,ly,n = 5,3,3
     intstren = 0.0
-    pdict = Dict([("hopping_anisotropy",1.0),("if_check_fluxes",false),("make_smaller_lattice",[lx,ly]),("es_count",0),("expander_fraction",1e-5),("particles",n),("mdim",100),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
+    pdict = Dict([("hopping_anisotropy",1.0),("Ly",ly),("if_check_fluxes",false),("Lx",lx),("es_count",0),("expander_fraction",1e-5),("particles",n),("mdim",100),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",intstren),("lr","all"),("if_periodic_phys",true),("if_periodic_synth",true)])
     all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(pdict)
 
     m1 = [0.0,1/ly]
     m2 = [0.0,0/ly]
-    fourpt_rez = four_point(all_states,m1,m2,[lx,ly])
+    #fourpt_rez = four_point(all_states,m1,m2,[lx,ly])
+    fourpt_rez = four_point(all_states,[lx,ly]; if_plot=true, plot_title=" TTN")
 
     pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren),("nev",10),("hopping_anisotropy",1.0),("if_check_fluxes",false),("if_save_data",false),("if_find_data",false)])
     states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict_ed; output_level=1)
 
-    fourpt_ed = ft_fourpt(states[1],m1,m2,lattice_params)
+    #fourpt_ed = ft_fourpt(states[1],m1,m2,lattice_params)
+    fourpt_ed = four_point(states[1],lattice_params; if_plot=true,plot_title=" ED")
 
     println("TTN fourpt: ",fourpt_rez)
     println("ED fourpt: ",fourpt_ed)
-    println("Ratio Square is ",(fourpt_ed / fourpt_rez)^2)
+    println("If equal: ",isapprox(fourpt_rez,fourpt_ed,atol=1e-5))
 end=#
 
-# plot rho1D NRG spectrum transition scaling in size
-if true
+#= plot rho1D NRG spectrum transition scaling in size
+if false
     cols = ["b","r","k"]
     dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
     all_files = find_data_file(Dict([("hopping_anisotropy",1.0),("if_periodic_x",true),("if_periodic_y",true)]),"ed",dataloc; file_type="jld2")
@@ -318,7 +320,7 @@ if true
     title("Energy Spectrum Finite Size Scaling rho_1D = 1.0")
     legend()
 
-end#
+end=#
 
 #= see if excited TTNs restrict_size matches ED
 if false
@@ -334,8 +336,116 @@ if false
 
 end=#
 
-#= look at finite size scaling of commensurate filling interaction strength spectrum
+#= energy scaling Lx with fixed Ly
 if false
+    intstren = 300.0
+    ns = [3,4,5,6,7,8]
+    splittings = zeros(Float64,length(ns))
+    gaps = zeros(Float64,length(ns))
+    for n in ns
+        lx,ly = 2*n,4
+        
+        if n < 6    
+            pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren),("nev",10),("hopping_anisotropy",1.0),("if_save_data",false),("if_find_data",true)])
+            states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict_ed; output_level=1)
+            splittings[n-2] = nrgs[2] - nrgs[1]
+            gaps[n-2] = nrgs[3] - nrgs[1]
+        else
+            dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+            pdict_ttn = Dict([("Lx",lx),("Ly",ly),("particles",n),("onsite_strength",intstren),("hopping_anisotropy",1.0),("if_periodic_phys",true),("if_periodic_synth",true)])
+            all_files = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
+            length(all_files) == 0 && continue
+            d,m = read_data(joinpath(dataloc_ttn,all_files[1]); output_level=0)
+            splittings[n-2] = abs(m["energies_1"][end] - m["energies"][end])
+            if haskey(m,"energies_2")
+                gaps[n-2] = abs(m["energies_2"][end] - m["energies"][end])
+            end
+        end
+    end
+
+    fig = figure()
+    plot(2 .* ns,splittings,"p",c="b")
+    xlabel("Lx")
+    ylabel("E2 - E1")
+    title("Topological Degeneracy Splitting Scaling ULR=$intstren")
+    yscale("log")
+
+    fig = figure()
+    plot(2 .* ns,gaps,"p",c="r")
+    xlabel("Lx")
+    ylabel("E3 - E1")
+    title("Topological Gap Scaling ULR=$intstren")
+    ylim([-0.05,1.1*maximum(gaps)])
+end=#
+
+# max fourpt diag transition scaling Lx with fixed Ly
+if true
+    ns = [4,6,7,8]
+    cols = ["b","r","k","g"]
+    ly = 4
+    maxdiags_dict = Dict{String,Vector{Float64}}()
+    visibs_dict = Dict{String,Vector{Float64}}()
+    intstrens_dict = Dict{String,Vector{Float64}}()
+    for (idx,n) in enumerate(ns)
+        lx = 2*n
+        intstrens = []
+        maxdiags = []
+        visibs = []
+        if n < 6
+            dataloc_ed = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+            pdict_ed = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+            all_files_ed = find_data_file(pdict_ed,"ed",dataloc_ed; file_type="jld2")
+            for f in all_files_ed
+                d,m = read_data(joinpath(dataloc_ed,f); output_level=0)
+                if haskey(m,"fourpt_momentum")
+                    append!(intstrens,[m["U"][end]])
+                    append!(maxdiags,[maximum(diag(m["fourpt_momentum"]))])
+                    append!(visibs,visibility_fourpt(m["fourpt_momentum"]))
+                elseif haskey(m,"fourpt_momentum_diag")
+                    append!(intstrens,[m["U"][end]])
+                    append!(maxdiags,[maximum(m["fourpt_momentum_diag"])])
+                end
+            end
+        else
+            dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+            pdict_ttn = Dict([("Lx",lx),("Ly",ly),("particles",n),("hopping_anisotropy",1.0),("if_periodic_phys",true),("if_periodic_synth",true)])
+            all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
+            for f in all_files_ttn
+                d,m = read_data(joinpath(dataloc_ttn,f); output_level=0)
+                if haskey(m,"fourpt_momentum")
+                    append!(intstrens,[m["onsite_strength"]])
+                    if haskey(m,"fourpt_momentum_1")
+                        append!(maxdiags,[0.5*maximum(diag(m["fourpt_momentum"] + m["fourpt_momentum_1"]))])
+                        append!(visibs,visibility_fourpt(m["fourpt_momentum"]))
+                    else
+                        append!(maxdiags,[maximum(diag(m["fourpt_momentum"]))])
+                        append!(visibs,visibility_fourpt(m["fourpt_momentum"]))
+                    end
+                end
+            end                    
+        end
+        println("N=$n, Intstrens: ",intstrens)
+        length(intstrens) == 0 && continue
+        
+        #=laughlin = maxdiags[findfirst(x -> intstrens[x] == 0.0,1:length(intstrens))]
+        scatter(intstrens,maxdiags ./ laughlin,c=cols[idx],label="N=$n")
+        ylabel("Max["*L"a_{k}^{\dagger}a_{k}^{\dagger}a_{k}a_{k}"*"]")=#
+
+        laughlin = visibs[findfirst(x -> intstrens[x] == 0.0,1:length(intstrens))]
+        scatter(intstrens,visibs ./ laughlin,c=cols[idx],label="N=$n")
+        ylabel("Visibility, min/max (normalized)")
+        
+        xlabel("Interaction Strength")
+        title("k-DW Transition Experimental Finite Size Scaling")
+        legend()
+        maxdiags_dict[string(n)] = maxdiags
+        intstrens_dict[string(n)] = intstrens
+        visibs_dict[string(n)] = visibs
+    end
+end#
+
+#= look at finite size scaling of commensurate filling interaction strength spectrum
+if true
     eight_xs, eight_ys = plot_nrg_vs_intstren_fromdata_ttn(6; particles=8, if_gap=true,if_plot=false)
     four_xs, four_ys = plot_nrg_vs_intstren_fromdata_ed(4,8; particles=4, if_gap=true,if_plot=false)
     three_xs, three_ys = plot_nrg_vs_intstren_fromdata_ed(3,8; particles=3, if_gap=true,if_plot=false)
@@ -359,9 +469,9 @@ if false
     legend()
     xlabel("Interaction Strength")
     ylabel("E3 - E2")
-end
+end=#
 
-# check the NRGs of synth-rectangle TTNs vs ED
+#= check the NRGs of synth-rectangle TTNs vs ED
 if false
     ttn_intstrens,ttn_nrgs = plot_nrg_vs_intstren_fromdata_ttn(5; particles=4, if_plot=false)
     ed_intstrens,ed_nrgs = plot_nrg_vs_intstren_fromdata_ed(4,8; particles=4, if_plot=false)

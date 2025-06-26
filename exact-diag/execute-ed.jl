@@ -13,8 +13,8 @@ Depends on:
 =#
 ######################################################
 
-using Pkg
-Pkg.activate(".")
+#using Pkg
+#Pkg.activate(".")
 using JLD2
 
 function find_center()
@@ -144,14 +144,18 @@ function get_normal_model_params_ed(params_dict::Dict)
     interaction_length = scaling_type == "flat" ? lr_dist : corr_length
 
     # get hopping anisotropy values
+    tx::Union{Float64,Nothing} = get(params_dict,"tx",nothing)
+    ty::Union{Float64,Nothing} = get(params_dict,"ty",nothing)
     hopping_anisotropy::Float64 = get(params_dict,"hopping_anisotropy",1.0)
-    if hopping_anisotropy < 1.0
-		ty::Float64 = 1.0 / hopping_anisotropy
-		tx::Float64 = 1.0
-	else
-		tx = 1.0 * hopping_anisotropy
-		ty = 1.0
-	end
+    if isnothing(tx) && isnothing(ty)
+        if hopping_anisotropy < 1.0
+            ty = 1.0 / hopping_anisotropy
+            tx = 1.0
+        else
+            tx = 1.0 * hopping_anisotropy
+            ty = 1.0
+        end
+    end
     #=println("Using Alberto's Hopping Anisotropy")
     tx = hopping_anisotropy
     ty = 1/hopping_anisotropy=#
@@ -328,61 +332,33 @@ function run_normal_ed(params_dict::Dict; kwargs...)
 end
 
 # run data collection with for loops
-if true
+if false
     
-    args_dict = make_args_dict(ARGS)
+    
     #which_one = args_dict["which_one"]
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
-    #lx,ly,n = 5,10,5
-    #for (idx,n) in enumerate([2,3,4,5])
-    #intstrens = vcat(range(0.0,1.0,length=6),exp10.(range(0.0,log10(1000),length=19)))#[3,4,5,6,7,8,9,20,30,40,70,150,200,300,400]
-    #intstrens = range(0.0,2.0,length=11)
-    #other_intstrens = range(2.0,10.0,length=37)
-    #intstrens = sort([intstrens; other_intstrens])
-    #all_nrgs = zeros(Float64,length(thetas))
-    #anises = range(1.0,5.0,length=20)
-    #nus = range(0.4,0.6,length=100)
-    #alphas = range(0.16,2*3/(6*5),length=30)
-    #for (idx,alpha) in enumerate(alphas)
-    #for (idx,ly) in enumerate(lys)
-    #for (idx,nu) in enumerate(nus)
-    #for (idx,anis) in enumerate(anises)
-    #    anis = 1/anis
-    #prev_states = []
+    lx,ly,n = 10,4,5
+    anises = [1e-4,1e-3,1e-2,1e-1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
+    intstren = 300.0
     #cols = ["b","g","r","c","y","orange","purple","pink","brown","gray"]
+    #intstrens = range(0.0,10.0,length=21)
     #for (idx,intstren) in enumerate(intstrens)
-    #for (idx2,sigma) in enumerate(sigmas)
-    #lls = range(0.01,ly,length=2)
-    #for (idx,ll) in enumerate(lls)
-    #for lrd in [0,1]
-    #intstren = 300.0
+    for (idx,anis) in enumerate(anises)
 
-    #= set number of open cores
-    open_cores = 5#get(params_dict, "open_cores", 5)
-    if typeof(open_cores) != String
-        BLAS.set_num_threads(open_cores)
-        display(BLAS.get_config())
-    end=#
     
-    BLAS.set_num_threads(5)
-
+    #=BLAS.set_num_threads(5)
+    args_dict = make_args_dict(ARGS)
     intstren = args_dict["interaction_strength"]
     lx = args_dict["Lx"]
     ly = args_dict["Ly"]
-    n = args_dict["N"]
+    n = args_dict["N"]=#
+    #xi = args_dict["corr_length"]
 
-    xi = args_dict["corr_length"]
 
     #dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
     #tws = range(0.0,1.0,length=11)
     #tws2 = range(0.0,1.0,length=3)
-    #fts = zeros(Float64,length(tws),length(tws))
-    #omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
-    #gammas1::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
-    #gammas2::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws))
-    #ref_multiplets,rm1_name,rm2_name = get_reference_multiplets(lx,ly,n; interaction_strength=intstren,if_pinning=true)
-    #cps = zeros(Float64,length(tws))    tws[args_dict["which_twist_angle"]]
     #for (idx,tw1) in enumerate(tws)
     #for (idx2,tw2) in enumerate(tws)
     #for tw1 in tws
@@ -391,7 +367,7 @@ if true
         #    continue
         #end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("scaling_type","exp"),("corr_length",xi),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
+        params_dict = Dict([("output_level",1),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",20),("if_find_data",true),("if_save_data",true)])
         #params_dict = make_args_dict(ARGS)
 
         #println("Starting from here")
@@ -399,6 +375,14 @@ if true
         if true
             states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
         end
+
+        #=d,m = read_data(filepath; output_level=0)
+        if !haskey(m,"fourpt_momentum")
+            fourpt = four_point(states[1],lattice_params; if_plot=false)
+            fourpt_2 = four_point(states[2],lattice_params; if_plot=false)
+            datadict = Dict([("fourpt_momentum",fourpt),("fourpt_momentum_1",fourpt_2)])
+            modify_data(datadict,filepath,"metadata")
+        end=#
 
         #=if idx == 1
             for i in 1:params_dict["nev"]
@@ -455,7 +439,7 @@ if true
         #plot_spectrum(lls,nrgs,idx,params_dict["nev"],"Interaction Length",true; plot_title="")
         #plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title="")
         #plot_spectrum(tws,nrgs,idx,params_dict["nev"],"Theta_x / 2pi",false; plot_title=" V=$intstren")
-        #plot_spectrum(anises,nrgs,idx,params_dict["nev"],"Hopping Anis",true; plot_title=" Cecille")
+        #plot_spectrum(anises,nrgs,idx,params_dict["nev"],"Hopping Anis",true; plot_title=" $(lx)x$(ly) N=$n ULR=$intstren")
 
         #=if true
             if idx == 1
@@ -493,7 +477,7 @@ if true
         #gammas1[idx,idx2] = gamma1
         #gammas2[idx,idx2] = gamma2
 
-    #end
+    end
     #end
 
     #=fig = figure()

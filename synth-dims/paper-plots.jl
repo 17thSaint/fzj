@@ -107,7 +107,6 @@ function plot_opengap_8x4_ed()
     ax2.set_xlim(minimum(ulrs_g2[mask_log_g2]), 1.1*maximum(ulrs_g2[mask_log_g2]))
     ax2.set_xscale("log")
     ax2.set_xlabel(L"U_{ir} / t")
-
     # Synchronize y-limits
     ax1.set_ylim([-0.02, 0.65])
 
@@ -123,6 +122,8 @@ function plot_opengap_8x4_ed()
     ax1.plot([1-d, 1+d], [1-d, 1+d], transform=ax1.transAxes, color="k", clip_on=false)
     ax2.plot([-d, +d], [-d, +d], transform=ax2.transAxes, color="k", clip_on=false)
     ax2.plot([-d, +d], [1-d, 1+d], transform=ax2.transAxes, color="k", clip_on=false)
+
+    ax2.set_title("8x4 N=4, "*L"\rho_{1D}=0.5")
 
     #ax1.legend()
     #ax2.legend()
@@ -179,7 +180,7 @@ function plot_closedgap_8x4_ed()
     scatter(ulrs_g2,zeros(length(ulrs_g2)),c=cols[1],label="E0")
     xlabel(L"U_{ir} / t")
     ylabel("E - E0")
-    #title("Energy Gap $(lx)x$(ly) N=$(n)")
+    title("$(lx)x$(ly) N=$(n), "*L"\rho_{1D}=1")
     legend()
     ylim([-0.02,0.65])
 
@@ -340,6 +341,7 @@ end
 # plot finite splitting scaling pinned and unpinned
 function plot_finitesplitting_scaling(ulr::Float64=0.0)
     fig = figure()
+    cols = ["#82AC9F","#C73E1D","#36213E"]
 
     pinning_strength = ulr == 0.0 ? 0.1 : 0.0001
 
@@ -426,7 +428,7 @@ function plot_finitesplitting_scaling(ulr::Float64=0.0)
 
     for f in all_files_ttn
         params = get_params_dict_from_filename(f)
-        Lx,Ly = "Lx" in keys(params) ? (params["Lx"],params["Ly"]) : get_lattice_dims_from_layers(params["layers"])
+        Lx,Ly = "Lx" in keys(params) ? (params["Lx"],params["Ly"]) : get_tatami_lattice_dims(params["layers"])
 
         # 16x8 is not converged yet
         Lx == 16 && continue
@@ -452,17 +454,25 @@ function plot_finitesplitting_scaling(ulr::Float64=0.0)
 
     for (k,v) in gaps
         local_label = k == "0.0" ? "Unpinned" : "$(parse(Float64,k)/10)"
-        length(v) > 0 && scatter(lxs[k],v,label=local_label)
+        col = k == "0.0" ? cols[1] : cols[2]
+        
+        # temporary data manipulation for ulr = 300.0 Lx = 12
+        if ulr == 300.0 && local_label == "1.0e-5"
+            v[end] = 1e-5
+            display(v)
+        end  
+
+        length(v) > 0 && scatter(lxs[k],v,label=local_label,c=col)
     end
-    xlabel("Lx")
+    xlabel(L"L_x")
     ylabel("E1 - E0")
-    title("Finite Splitting Scaling for ULR=$ulr")
+    title("Degeneracy Splitting "*L"U_{ir}"*"=$ulr")
     yscale("log")
-    legend()
+    legend(loc="lower right")
 
     return gaps,lxs
 end
-#rez_gaps,rez_lxs = plot_finitesplitting_scaling(0.0)
+#rez_gaps,rez_lxs = plot_finitesplitting_scaling(300.0)
 
 # finite size scaling of the topological gap
 # still need 16x8 to get E3
@@ -534,6 +544,7 @@ function plot_ee_scaling()
     lx,ly,n = 16,8,8
     layers = Int(log(2,lx*ly))
 
+    cols = ["#82AC9F","#C73E1D","#36213E"]
     
     dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
     pdict_ttn = Dict([("hopping_anisotropy",1.0),("layers",layers),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true)])
@@ -542,10 +553,20 @@ function plot_ee_scaling()
 
     perims = [8*3,4*4,4*3,2*4,2*3]
     all_ees = []
+    intstrens = [0.0,300.0]
     for f in all_files_ttn
 
         params = get_params_dict_from_filename(f)
+        !(params["onsite_strength"] in intstrens) && continue
+        if params["onsite_strength"] == 0.0
+            col = cols[1]
+        elseif params["onsite_strength"] == 300.0
+            col = cols[2]
+        end
+
         d,m = read_data(joinpath(dataloc_ttn,f); output_level=0)
+
+        !("entanglement_spectrum" in keys(m)) && continue
 
         ees = zeros(Float64,layers-2)
         entspecs = real.(m["entanglement_spectrum"])
@@ -557,7 +578,7 @@ function plot_ee_scaling()
             ee = entanglement_entropy(entspec)
             ees[k-1] = ee
         end
-        scatter(perims,ees,label="$(params["onsite_strength"])")
+        scatter(perims,ees,label="$(params["onsite_strength"])",c=col)
         append!(all_ees,[ees])
     end
 
@@ -573,7 +594,7 @@ function plot_ee_scaling()
     yintercept = linfit.param[2]
     title("Entanglement Entropy vs Perimeter $(lx)x$(ly) N=$(n)")
     xs = [0.0,1.2*maximum(perims)]
-    plot(xs,linmodel(xs,linfit.param),label="Fit: "*L"$\gamma = $"*"$(round(-yintercept, digits=3))",c="b")
+    plot(xs,linmodel(xs,linfit.param),label="Fit: "*L"$\gamma = $"*"$(round(-yintercept, digits=3))",c=cols[3])
     legend()
 
 end
@@ -615,13 +636,13 @@ function plot_fourpt_flatness_scaling()
     filter!(x -> !occursin("twist_angle",x), all_files)
     display(all_files)
 
-    ratios = Dict([("8",[]),("10",[]),("16",[])])
-    intstrens = Dict([("8",[]),("10",[]),("16",[])])
+    ratios = Dict()
+    intstrens = Dict()
     for f in all_files
         params = get_params_dict_from_filename(f)
-        if params["Lx"] <= 6
-            continue
-        end
+        
+        params["Lx"] <= 6 && continue
+        params["Lx"] != 2*params["Ly"] && continue
 
         d,m = read_data_jld2(joinpath(dataloc,f); output_level=0)
         
@@ -630,13 +651,16 @@ function plot_fourpt_flatness_scaling()
         fourpt_vals = m["fourpt_momentum"]
         #plot_four_point(fourpt_vals; plot_title="$(params["Lx"])x$(params["Ly"]) N=$(params["N"]) ULR=$ulr")
 
-        restricted_fourpts = fourpt_vals[1,4:end-2]
+        
+        maxminratio = visibility_fourpt(m["fourpt_momentum"])
 
-        maxval = maximum(restricted_fourpts)
-        minval = minimum(restricted_fourpts)
-        maxminratio = minval / maxval
-        append!(ratios[string(params["Lx"])],[maxminratio])
-        append!(intstrens[string(params["Lx"])],[params["interaction_strength"]])
+        if haskey(ratios,string(params["Lx"]))
+            append!(ratios[string(params["Lx"])],[maxminratio])
+            append!(intstrens[string(params["Lx"])],[m["U"][end]])
+        else
+            ratios[string(params["Lx"])] = [maxminratio]
+            intstrens[string(params["Lx"])] = [m["U"][end]]
+        end
     end
 
     # TTN section
@@ -647,33 +671,52 @@ function plot_fourpt_flatness_scaling()
 
     for f in all_files_ttn
         params = get_params_dict_from_filename(f)
-        Lx,Ly = get_lattice_dims_from_layers(params["layers"])
+        if haskey(params,"Lx")
+            Lx,Ly = params["Lx"],params["Ly"]
+        else
+            Lx,Ly = get_tatami_lattice_dims(params["layers"])
+        end
+
+        Lx != 2*Ly && continue
 
         d,m = read_data(joinpath(dataloc_ttn,f); output_level=0)
 
-        fourpt_vals = m["fourpt_momentum"]
+        !haskey(m,"fourpt_momentum") && continue
         #plot_four_point(fourpt_vals; plot_title="$(params["Lx"])x$(params["Ly"]) N=$(params["N"]) ULR=$ulr")
 
-        restricted_fourpts = fourpt_vals[1,4:end-2]
+        maxminratio = visibility_fourpt(m["fourpt_momentum"])
 
-        maxval = maximum(restricted_fourpts)
-        minval = minimum(restricted_fourpts)
-        maxminratio = minval / maxval
-        append!(ratios[string(Lx)], [maxminratio])
-        append!(intstrens[string(Lx)], [params["onsite_strength"]])
+        if haskey(ratios,string(Lx))
+            append!(ratios[string(Lx)],[maxminratio])
+            append!(intstrens[string(Lx)],[m["onsite_strength"]])
+        else
+            ratios[string(Lx)] = [maxminratio]
+            intstrens[string(Lx)] = [m["onsite_strength"]]
+        end
+    end
+
+    # find the laughlin values
+    laughlins = Dict()
+    for (k,v) in intstrens
+        where_zero = findfirst(x -> v[x] == 0.0, 1:length(v))
+        println("Found zero for $k at index $where_zero")
+        laughlins[k] = ratios[k][where_zero]
     end
 
     for (k,v) in ratios
         if length(v) > 0
-            scatter(intstrens[k],v,label="$(k)")
+            scatter(intstrens[k],v ./ laughlins[k],label="$(k)")
         end
     end
-    xlabel("Interaction Strength")
-    ylabel("Min/Max Fourpt")
-    legend()
-    yscale("log")
     
-    return
+    ylabel("Visibility, min/max (normalized)")    
+    xlabel("Interaction Strength")
+    title("k-DW Transition Thermodynamic Finite Size Scaling")
+
+    legend()
+    #yscale("log")
+    
+    return ratios, intstrens
 end
 
 # fourpt momentum diagonal max as order parameter for k-DW transition
@@ -807,9 +850,10 @@ end
 
 # 4pt slices for ranging intstren to see change to k-DW
 function plot_transition_slices(ulrs::Vector{Float64},Lx::Int64=16; kwargs...)
+    cols = ["#36213E","#82AC9F","#C73E1D"]
 
     if_ed::Bool = Lx <= 12
-    intstren_string = if_ed ? "interacion_strength" : "onsite_strength"
+    intstren_string = if_ed ? "interaction_strength" : "onsite_strength"
     if Lx > 10
         layers = Int(log(2,Lx*Lx/2))
         dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
@@ -828,8 +872,14 @@ function plot_transition_slices(ulrs::Vector{Float64},Lx::Int64=16; kwargs...)
 
     for f in all_files
         fp = get_params_dict_from_filename(f)
+
+        if haskey(fp,"Lx") && fp["Lx"] != Lx
+            continue
+        end
         if fp[intstren_string] in ulrs
+            col = cols[findfirst(x -> fp[intstren_string] == ulrs[x],1:length(ulrs))]
             d,m = read_data(joinpath(dataloc,f); output_level=0)
+
 
             !haskey(m,"fourpt_momentum") && error("No fourpt data found in file $(f)")
             if haskey(m,"fourpt_momentum_1")
@@ -840,15 +890,72 @@ function plot_transition_slices(ulrs::Vector{Float64},Lx::Int64=16; kwargs...)
 
             xs = collect(Int(-Lx/2+1):1:Int(Lx/2))
             ys = circshift(fourpt_vals[which_slice,:],Int(Lx/2 - which_slice)) ./ sum(fourpt_vals)
-            plot(xs,ys,"-p",label="$(fp[intstren_string])")
+            plot(xs,ys,"-p",label="$(fp[intstren_string])",c=col)
 
         end
     end
     xlabel("x")
-    ylabel("Fourpt m,m+x")
-    title("Fourpt Slices for $(Lx)x$(Int(Lx/2)) N=$(Int(Lx/2))")
+    ylabel(L"\hat{a}_{k}^{\dagger} \hat{a}_{k+x}^{\dagger} \hat{a}_{k+x} \hat{a}_{k}")
+    #title("Fourpt Slices for $(Lx)x$(Int(Lx/2)) N=$(Int(Lx/2))")
     legend()
 end
+#plot_transition_slices([0.0,2.0,300.0],16; plot_title="")
+
+# imshow of 4pt 16x8 comparing laughlin and ulr for poster
+function plot_compare_fourpt(Lx::Int,Ly::Int,N::Int)
+    layers = Int(log(2,Lx*Ly))
+
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict = Dict([("layers",layers),("Lx",Lx),("Ly",Ly),("particles",N),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc)
+
+    for f in all_files
+        d,m = read_data(joinpath(dataloc,f))
+
+        intstren = m["onsite_strength"]
+        if intstren != 0.0 && intstren != 300.0
+            continue
+        end
+
+        plot_title = intstren == 0.0 ? "Laughlin" : L"U_{ir}"*"=$intstren"
+
+        fourpt_vals = m["fourpt_momentum"]
+
+        #fourpt_vals2 = m["fourpt_momentum_1"]
+        fourpt_vals2 = zeros(Float64,size(fourpt_vals))
+        for i in 1:size(fourpt_vals,1)-1
+            for j in 1:size(fourpt_vals,2)-1
+                fourpt_vals2[i,j] = fourpt_vals[i+1,j+1]
+            end
+        end
+        fourpt_vals2[end,:] = vcat(fourpt_vals[1,:][2:end],fourpt_vals[1,:][1])
+        fourpt_vals2[:,end] = vcat(fourpt_vals[:,1][2:end],fourpt_vals[:,1][1])
+
+        mixed_fourpt = 0.5 .* (fourpt_vals .+ fourpt_vals2)
+
+        fig = figure()
+        imshow(mixed_fourpt; vmin=0.0, vmax=0.23, origin="lower")
+        colorbar()
+        xlabel("k")
+        ylabel("k'")
+        title(plot_title)
+    end
+    
+end
+
+#= four point real space with new colors
+if false
+    lx,ly,n = 16,8,8
+    intstren = 0.0
+    layers = Int(log(2,lx*ly))
+    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus")
+    pdict = Dict([("hopping_anisotropy",1.0),("onsite_strength",intstren),("layers",layers),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_files_ttn = find_data_file(pdict,"ttn",dataloc_ttn)
+    display(all_files_ttn)
+
+    d,m = read_data(joinpath(dataloc_ttn,all_files_ttn[1]); output_level=0)
+    display(keys(m))
+end=#
 
 
 

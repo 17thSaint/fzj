@@ -220,7 +220,7 @@ function naive_build_ham(lattice_params::Dict,hamilt_params::Dict; kwargs...)
 end
 =#
 
-# builds up the full basis of N hard-core particles in a Lx by Ly lattice (no symmetries yet)
+#= builds up the full basis of N hard-core particles in a Lx by Ly lattice (no symmetries yet)
 function generate_basis_naive(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
 
     output_level = get(kwargs,:output_level,1)
@@ -662,7 +662,7 @@ function density_matrix_slow(x::Vector{ComplexF64},lattice_params::Dict{String,A
 
     return rho
 
-end
+end=#
 
 ######## This is the better working way to do things ########
 

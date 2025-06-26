@@ -1144,6 +1144,170 @@ function ft_twopt_matrix(wavefunc::Vector{ComplexF64},momentum1::Vector{Float64}
 end
 
 
+# find number of times synth dim interaction hits in a given basis
+function basis_interaction_output(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict,U::Vector{Float64}; kwargs...)
+    Lx,Ly = lattice_params["Lx"],lattice_params["Ly"]
+    Ls = (Lx,Ly)
+    interaction_cutoff = hamilt_params["interaction_cutoff"]
+    basis_state = lattice_params["full_basis"][:,which_basis]
+    particle_locations_linear = basis_state
+    particle_locations_coordinate = coordinate.(particle_locations_linear,Lx,Ly)
+    which_dir = hamilt_params["which_dir"]
+
+
+    output_weights = Array{ComplexF64,1}(undef,0)
+
+    lr_dist = sum(abs.(U) .> interaction_cutoff) - 1
+    if length(particle_locations_linear) > 1 && lr_dist > 0
+        #println("Doing Interactions")
+        if which_dir == "virt"
+            which_loc = 1
+            other_loc = 2
+        elseif which_dir == "phys"
+            which_loc = 2
+            other_loc = 1
+        else
+            error("which_dir must be either 'virt' or 'phys'")
+        end
+        for loc in 1:Ls[which_loc]
+
+            # find interacting particles at given physical site
+            interacting_particles = findall(x->x[which_loc]==loc,particle_locations_coordinate)
+
+            if length(interacting_particles) > 1 # need more than 1 particle to interact
+                for i in 1:length(interacting_particles) # loop over all pairs of interacting particles
+                    for j in i+1:length(interacting_particles)
+                        dist = abs(particle_locations_coordinate[interacting_particles[i]][other_loc] - particle_locations_coordinate[interacting_particles[j]][other_loc])
+                        #if if_per[other_loc] && which_loc == 2
+                        #    dist = min(dist,Ls[other_loc]-dist)
+                        #end
+                        if dist <= lr_dist && abs(U[dist+1]) > interaction_cutoff
+                            #println("Interacting between ",particle_locations_coordinate[interacting_particles[i]]," and ",particle_locations_coordinate[interacting_particles[j]])
+                            push!(output_weights,U[dist+1])
+                        end
+                    end
+                end
+            end
+
+        end
+    end
+
+    return output_weights
+end
+
+# operator for synth dims interaction energy
+function interaction_operator(lattice_params::Dict,hamilt_params::Dict,U; kwargs...)
+    output_level = get(kwargs,:output_level,1)
+    full_basis = lattice_params["full_basis"]
+
+    if isnothing(U)
+        U = ones(Float64,lattice_params["Ly"])
+    end
+
+    int_op = spzeros(ComplexF64,size(full_basis)[2])
+
+    for j in 1:size(full_basis)[2]
+        output_weights = basis_interaction_output(j,lattice_params,hamilt_params,U)
+        int_op[j] = sum(output_weights)
+        if output_level > 0 && isapprox(j/size(full_basis)[2]*100 % 10,0.0,atol=1e-4)
+            println(round(j/size(full_basis)[2]*100,digits=2),"% done.")
+        end
+    end
+
+    return spdiagm(int_op)
+end
+
+# get adiabatic condition for U_ir for given spectrum
+function uir_adiabatic_condition(groundstate::Vector{ComplexF64},excited_state::Vector{ComplexF64},energy_gap::Float64,lattice_params::Dict,hamilt_params::Dict,U; kwargs...)
+    int_op = interaction_operator(lattice_params,hamilt_params,U; kwargs...)
+
+    expectation_value = abs(adjoint(groundstate) * (int_op * excited_state))
+
+    return expectation_value / (energy_gap^2), expectation_value
+end
+
+# tx operator for single basis
+function basis_tx_output(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
+    Lx,Ly = lattice_params["Lx"],lattice_params["Ly"]
+    basis_state = lattice_params["full_basis"][:,which_basis]
+    particle_locations_linear = basis_state
+    particle_locations_coordinate = coordinate.(particle_locations_linear,Lx,Ly)
+    alpha = hamilt_params["alpha"]
+    if_periodic_x = lattice_params["if_periodic_x"]
+    tx = 1.0
+
+    output_states = Array{Int64,1}(undef,0)
+    output_weights = Array{ComplexF64,1}(undef,0)
+
+    for (idx,starting_site) in enumerate(particle_locations_coordinate)
+
+        for (did,dir) in enumerate([(1,0),(-1,0)])
+
+            # skip if at boundary and no periodic boundary
+            # x-direction
+            if !if_periodic_x && ((starting_site .+ dir)[1] < 1 || (starting_site .+ dir)[1] > Lx)
+                continue
+            end
+
+            # find the next site modulo the system size
+            next_site = (mod1(starting_site[1]+dir[1],Lx),mod1(starting_site[2]+dir[2],Ly))
+
+            # enforce hard-core constraint
+            if next_site in particle_locations_coordinate
+                continue
+            end
+
+            # hopping amplitude
+            coeff = -tx
+
+            # flux attachment
+            coeff *= exp(im*dot(alpha,dir)*dot(starting_site .- 1,abs.(reverse(dir)))*2*pi)
+
+            #println("Hopping from ",starting_site," to ",next_site," with coeff ",coeff)
+
+            output_basis_state = zeros(Int64,length(basis_state)) + basis_state
+            output_basis_state[idx] = linear_index(next_site,Lx,Ly)
+            sort!(output_basis_state,rev=true)
+            output_basis_state_index = find_basis_index(output_basis_state)
+            push!(output_states,output_basis_state_index)
+            push!(output_weights,coeff)
+
+        end
+    end
+
+    return output_states,output_weights
+end
+
+# operator for all physical hoppings
+function tx_operator(lattice_params::Dict,hamilt_params::Dict; kwargs...)
+    output_level::Int64 = get(kwargs,:output_level,1)
+
+    full_basis = lattice_params["full_basis"]
+
+    tx_op = spzeros(ComplexF64,size(full_basis)[2],size(full_basis)[2])
+
+    for j in 1:size(full_basis)[2]
+        output_states,output_weights = basis_tx_output(j,lattice_params,hamilt_params)
+        for (idx,state) in enumerate(output_states)
+            tx_op[j,state] += output_weights[idx]
+        end
+        if output_level > 0 && isapprox(j/size(full_basis)[2]*100 % 10,0.0,atol=1e-4)
+            println(round(j/size(full_basis)[2]*100,digits=2),"% done.")
+        end
+    end
+
+    return tx_op
+end
+
+# get adiabatic condition for t_x for given spectrum
+function tx_adiabatic_condition(groundstate::Vector{ComplexF64},excited_state::Vector{ComplexF64},energy_gap::Float64,lattice_params::Dict,hamilt_params::Dict; kwargs...)
+    tx_op = tx_operator(lattice_params,hamilt_params; kwargs...)
+
+    expectation_value = abs(adjoint(groundstate) * (tx_op * excited_state))
+
+    return expectation_value / (energy_gap^2), expectation_value
+end
+
 
 
 

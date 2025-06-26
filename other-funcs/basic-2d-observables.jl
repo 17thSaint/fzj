@@ -165,8 +165,24 @@ function diocane(phys_site::Tuple,momentum::Vector,op_type::String; kwargs...)
         dag_sign::Int = op_type == "Adag" ? 1 : -1
         return exp(dag_sign * 2*pi*im*momentum[2]*(phys_site[2]-1)) / sqrt(Ly)
     else
-        return 0.00000000000000001
+        return 0.00000000000000001 + im*0.0
     end
+end
+
+function visibility_fourpt(four_point_moms::Matrix{Float64}; kwargs...)
+    @assert size(four_point_moms,2) > 6 "Lattice must be larger than 6 to see visibility"
+
+    restricted_fourpts = four_point_moms[1,4:end-2]
+
+    if maximum(restricted_fourpts) < 1e-7
+        restricted_fourpts = four_point_moms[2,4:end-2]
+    end
+
+    maxval = maximum(restricted_fourpts)
+    minval = minimum(restricted_fourpts)
+    maxminratio = minval / maxval
+
+    return maxminratio
 end
 
 
