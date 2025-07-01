@@ -59,6 +59,22 @@ function datacollection_flatness(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
 end
 
 
+#= set ham in data file to nothing
+if false
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    all_files = readdir(dataloc)
+    filter!(x -> occursin("jld2",x),all_files)
+    for f in all_files
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+
+        if !isnothing(m["H"])
+            println("Modifying file: $f")
+            modify_data(Dict([("H",nothing)]),joinpath(dataloc,f),"metadata"; output_level=0)
+        end
+
+    end
+end=#
+
 #= data collection for 4pt
 if false
     lx,ly,n = 10,4,5
@@ -110,28 +126,104 @@ if false
 
 end=#
 
-# testing for adiabatic condition
+# plot adiabatic condition
 if true
-    lx,ly,n = 6,3,3
-    txs = [1e-3,1e-2,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
-    #=intstren = 300.0
-    intstrens = range(1.0,300.0,length=11)
+    ly = 4
+    for lx in [8,10]
+    #lx,ly,n = 8,4,4
+    n = Int(lx/2)
+    txs = []
+    intstren = 300.0
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    adiabs = []
+    for f in all_files
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+        
+        if haskey(m,"fuir_12") && haskey(m,"ftx_12")
+            append!(txs,[m["tx"]])
+            fuir = m["fuir_12"]
+            ftx = m["ftx_12"]
+            append!(adiabs,[sqrt(fuir^2 + ftx^2)])
+        else
+            continue
+        end
+    end
+    #fig = figure()
+    scatter(txs,adiabs,label="Lx=$lx")
+    xlabel("Hopping Anisotropy, "*L"t_x")
+    ylabel(L"\sqrt{F_{uir}^2 + F_{tx}^2}")
+    title("Adiabatic Condition for ULR=$intstren")
+    yscale("log")
+    legend()
+    end
+
+end#
+
+# testing for adiabatic condition
+if false
+    lx,ly,n = 8,4,4
+    txs = [1e-3,1e-2,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.0]
+    #intstren = 300.0
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    intstrens = [300]#[0.0,10.0,50.0,100.0,150.0,200.0,250.0,300.0,350.0,400.0,450.0,500.0]
     fuirs = zeros(Float64,length(intstrens),length(txs))
     ftxs = zeros(Float64,length(intstrens),length(txs))
     for (idx2,tx) in enumerate(txs)
         for (idx,intstren) in enumerate(intstrens)
-            pdict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("tx",tx),("ty",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+            pdict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("tx",tx),("ty",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
             states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
 
-            #plot_spectrum(txs,nrgs,idx2,pdict["nev"],"Physical Hopping, tx",true; plot_title=" $(lx)x$(ly) N=$n ULR=$intstren")
-            fuir_2,ogval_uir2 = uir_adiabatic_condition(states[1],states[3],nrgs[3] - nrgs[1],lattice_params,hamilt_params,nothing)
-            fuirs[idx,idx2] = fuir_2
+            if if_found
+                d,m = read_data(filepath; output_level=0)
+                if haskey(m,"fuir_12") && haskey(m,"ftx_12")
+                    fuirs[idx,idx2] = m["fuir_12"]
+                    ftxs[idx,idx2] = m["ftx_12"]
+                else
+                    states = d["state"]
+                    nrgs = d["nrg"]
 
-            ftx_2,ogval_tx2 = tx_adiabatic_condition(states[1],states[3],nrgs[3] - nrgs[1],lattice_params,hamilt_params)
-            ftxs[idx,idx2] = ftx_2
+                    fuir_2,ogval_uir2 = uir_adiabatic_condition(states[2],states[3],nrgs[3] - nrgs[2],lattice_params,hamilt_params,nothing)
+                    fuirs[idx,idx2] = fuir_2
+
+                    ftx_2,ogval_tx2 = tx_adiabatic_condition(states[2],states[3],nrgs[3] - nrgs[2],lattice_params,hamilt_params)
+                    ftxs[idx,idx2] = ftx_2
+                    
+                    datadict = Dict([("fuir_12",fuir_2),("ftx_12",ftx_2)])
+                    modify_data(datadict,filepath,"metadata"; output_level=0)
+                end
+                
+            else
+                fuir_2,ogval_uir2 = uir_adiabatic_condition(states[2],states[3],nrgs[3] - nrgs[2],lattice_params,hamilt_params,nothing)
+                fuirs[idx,idx2] = fuir_2
+
+                ftx_2,ogval_tx2 = tx_adiabatic_condition(states[2],states[3],nrgs[3] - nrgs[2],lattice_params,hamilt_params)
+                ftxs[idx,idx2] = ftx_2
+                
+                datadict = Dict([("fuir_12",fuir_2),("ftx_12",ftx_2)])
+                modify_data(datadict,filepath,"metadata"; output_level=0)
+            end
+
+            #pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",tx)])
+            #all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2")
+            #display(all_files)
+            #f = all_files[1]
+            #d,m = read_data(joinpath(dataloc,f); output_level=0)
+            #states = d["state"]
+            #nrgs = d["nrg"]
+            #lattice_params,hamilt_params = make_latticehamilt_params_from_metadata(m)
+
+            
+
+
+            #plot_spectrum(txs,nrgs,idx2,pdict["nev"],"Physical Hopping, tx",true; plot_title=" $(lx)x$(ly) N=$n ULR=$intstren")
+
+            
         end
-    end=#
-    rez = sqrt.(ftxs .^2 .+ fuirs .^ 2)
+    end#
+    #plot_adiabatic_condition(txs,intstrens,fuirs,ftxs; plot_title="$(lx)x$(ly) N=$(n)")
+    #=rez = sqrt.(ftxs .^2 .+ fuirs .^ 2)
     fig = figure()
     imshow(log.(rez), origin="lower")
     colorbar()
@@ -150,7 +242,7 @@ if true
     title("Adiabatic Condition Physical Hopping")
     colorbar()
     ylabel("Interaction Strength")
-    xlabel("Hopping Anisotropy")
+    xlabel("Hopping Anisotropy")=#
 end#
 
 #= look at ranging Lx and fixed Ly
@@ -210,9 +302,10 @@ if false
     dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
     intstrens = [100.0,200.0,300.0,400.0,500.0]
     anises = [1e-4,1e-3,1e-2,1e-1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
-    xs_plot = zeros(Float64,length(intstrens)*length(anises))
-    ys_plot = zeros(Float64,length(intstrens)*length(anises))
-    gaps = zeros(Float64,length(intstrens)*length(anises))
+    #xs_plot = zeros(Float64,length(intstrens)*length(anises))
+    #ys_plot = zeros(Float64,length(intstrens)*length(anises))
+    #gaps = zeros(Float64,length(intstrens)*length(anises))
+    gaps = zeros(Float64,length(intstrens),length(anises))
     for (idx,intstren) in enumerate(intstrens)
         pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren)])
         all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
@@ -223,21 +316,24 @@ if false
 
             #println("Stren index is $(idx), Anis index is $(anis_index), and linear index is $(length(intstrens)*(idx-1) + anis_index)")
 
-            xs_plot[length(anises)*(idx-1) + anis_index] = m["tx"]
-            ys_plot[length(anises)*(idx-1) + anis_index] = intstren
+            #xs_plot[length(anises)*(idx-1) + anis_index] = m["tx"]
+            #ys_plot[length(anises)*(idx-1) + anis_index] = intstren
+            #gaps[length(anises)*(idx-1) + anis_index] = d["nrg"][3] - d["nrg"][1]
 
-            gaps[length(anises)*(idx-1) + anis_index] = d["nrg"][3] - d["nrg"][1]
+            gaps[idx,anis_index] = d["nrg"][3] - d["nrg"][1]
         end
     end
 
-    bin_count = 100
-    data_dict = bin_values(gaps,bin_count)
-    bv = [data_dict[val] for val in gaps] .* maximum(gaps) / bin_count
+    #bin_count = 100
+    #data_dict = bin_values(gaps,bin_count)
+    #bv = [data_dict[val] for val in gaps] .* maximum(gaps) / bin_count
+    #scatter(xs_plot, ys_plot, c=bv, cmap="viridis")
 
-    scatter(xs_plot, ys_plot, c=bv, cmap="viridis")
+    pcolormesh(anises,intstrens,gaps; shading="auto",vmin=0.0)
+    
     colorbar()
-    xlabel("Physical Hopping, tx")
-    ylabel("Interaction Strength")
+    xlabel("Physical Hopping, "*L"t_x")
+    ylabel("IR Interaction Strength, "*L"U_{ir}")
     title("Energy Gap for $(lx)x$(ly) N=$(n)")
 end=#
 
