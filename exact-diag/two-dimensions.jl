@@ -948,12 +948,21 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
         end
     end
     
-
+    # disorder
     if hamilt_params["disorder_strength"] != 0.0
         local_disorder_strength = rand() * hamilt_params["disorder_strength"] * 2 - hamilt_params["disorder_strength"]
         push!(output_weights,local_disorder_strength)
         push!(output_states,which_basis)
     end#
+
+    # physical periodic potential
+    if hamilt_params["periodic_potential_strength"] != 0.0
+        for (px,py) in particle_locations_coordinate
+            local_strength = iseven(px) ? -hamilt_params["periodic_potential_strength"] : 0.0
+            push!(output_weights, local_strength)
+            push!(output_states,which_basis)
+        end
+    end
 
     return output_states,output_weights
 end
@@ -1239,16 +1248,26 @@ end
 function make_latticehamilt_params_from_metadata(metadata::Dict)
     hamilt_params = Dict([("tx",metadata["tx"]),("ty",metadata["ty"]),("hopping_anisotropy",metadata["hopping_anisotropy"]),("alpha",metadata["alpha"]),("U",metadata["U"]),("interaction_cutoff",metadata["interaction_cutoff"]),("which_dir",metadata["which_dir"])])
     lattice_params = get_lattice_params_from_metadata(metadata)
+
     flux_dir = get(metadata,"flux_direction","x")
     if lattice_params["if_periodic_y"] && !lattice_params["if_periodic_x"]
         flux_dir = "y"
     elseif !lattice_params["if_periodic_y"] && lattice_params["if_periodic_x"]
         flux_dir = "x"
     end
+    
     hamilt_params["flux_direction"] = flux_dir
+    
     hamilt_params["disorder_strength"] = "disorder_strength" in keys(metadata) ? metadata["disorder_strength"] : 0.0
+    
     if haskey(metadata,"if_pinning") && metadata["if_pinning"]
         hamilt_params["if_pinning"] = true
+    end
+
+    if haskey(metadata,"periodic_potential_strength")
+        hamilt_params["periodic_potential_strength"] = metadata["periodic_potential_strength"]
+    else
+        hamilt_params["periodic_potential_strength"] = 0.0
     end
 
     return lattice_params,hamilt_params

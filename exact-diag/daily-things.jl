@@ -126,8 +126,55 @@ if false
 
 end=#
 
-# plot adiabatic condition
+# track overlap with periodic potential
 if true
+    anises = [1e-4,1e-2,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.0]
+    intstren = 300.0
+    lx,ly,n = 8,4,4
+    #=overlaps = Dict{String,Vector{Float64}}([("s1",Float64[]),("s2",Float64[]),("plus",Float64[]),("minus",Float64[])])
+    for (idx,anis) in enumerate(anises)
+        pdict_found = Dict([("output_level",1),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict_found; output_level=1)
+
+        pdict_pp = Dict([("output_level",1),("periodic_potential_strength",1e-2),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+        states_pp,nrgs_pp,rhos_pp,filepath_pp,if_found_pp,lattice_params_pp,hamilt_params_pp = run_normal_ed(pdict_pp; output_level=1)
+
+        append!(overlaps["s1"],abs2(adjoint(states[1]) * states_pp[1]))
+        append!(overlaps["s2"],abs2(adjoint(states[2]) * states_pp[1]))
+
+        mixedplus = (1/sqrt(2)) .* (states[1] + states[2])
+        append!(overlaps["plus"],abs2(adjoint(mixedplus) * states_pp[1]))
+
+        mixed_minus = (1/sqrt(2)) .* (states[1] - states[2])
+        append!(overlaps["minus"],abs2(adjoint(mixed_minus) * states_pp[1]))
+
+        if idx == 1
+            scatter(anis,overlaps["s1"][end],c="b",label="s1")
+            scatter(anis,overlaps["s2"][end],c="g",label="s2")
+            scatter(anis,overlaps["plus"][end],c="r",label="plus")
+            scatter(anis,overlaps["minus"][end],c="m",label="minus")
+            xlabel("Hopping Anisotropy, "*L"t_x")
+            ylabel("Overlap with Periodic Potential")
+            legend()
+        else
+            scatter(anis,overlaps["s1"][end],c="b")
+            scatter(anis,overlaps["s2"][end],c="g")
+            scatter(anis,overlaps["plus"][end],c="r")
+            scatter(anis,overlaps["minus"][end],c="m")
+        end
+    end=#
+    fig = figure()
+    plot(anises,overlaps["s1"],"-o",label="State 1")
+    plot(anises,overlaps["s2"],"-o",label="State 2")
+    xlabel("Hopping Anisotropy, "*L"t_x")
+    ylabel(L"\vert \langle \psi_{GSi} \vert \psi_{GS1}^{PP} \rangle \vert^2")
+    title("Overlap with Periodic Potential GS1 for $(lx)x$(ly) N=$n ULR=$intstren")
+    legend()
+        
+end
+
+#= plot adiabatic condition
+if false
     ly = 4
     for lx in [8,10]
     #lx,ly,n = 8,4,4
@@ -159,9 +206,9 @@ if true
     legend()
     end
 
-end#
+end=#
 
-# testing for adiabatic condition
+#= testing for adiabatic condition
 if false
     lx,ly,n = 8,4,4
     txs = [1e-3,1e-2,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.0]
@@ -243,7 +290,7 @@ if false
     colorbar()
     ylabel("Interaction Strength")
     xlabel("Hopping Anisotropy")=#
-end#
+end=#
 
 #= look at ranging Lx and fixed Ly
 if false

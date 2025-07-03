@@ -243,7 +243,7 @@ end
 
 function plot_occupancy(exp_occ; kwargs...)
     vmax = get(kwargs,:vmax,nothing)
-    exp_occ = transpose(exp_occ)
+    #exp_occ = transpose(exp_occ)
 	fig = figure()
 	isnothing(vmax) ? imshow(exp_occ,origin="lower",vmin=0) : imshow(exp_occ,origin="lower",vmin=0,vmax=vmax)
 	colorbar()

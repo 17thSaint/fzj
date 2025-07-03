@@ -44,7 +44,7 @@ end
 
 
 include_other_files(["other-funcs/basic-2d-stuff.jl","other-funcs/basic-2d-observables.jl","exact-diag/two-dimensions.jl","exact-diag/observables.jl","exact-diag/hatsugai-mbcn.jl"])
-#include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
+include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
 
 function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     if hamilt_params["U"][2] == 0.0
@@ -194,6 +194,9 @@ function get_normal_model_params_ed(params_dict::Dict)
 
     disorder_strength::Float64 = get(params_dict,"disorder_strength",0.0)
     if_pinning::Bool = get(params_dict,"if_pinning",false)
+
+    periodic_potential_strength::Float64 = get(params_dict,"periodic_potential_strength",0.0)
+
     hamilt_params::Dict{String,Any} = Dict("alpha"=>alpha,
                         "flux_direction"=>flux_dir,
                         "if_pinning"=>if_pinning,
@@ -201,6 +204,7 @@ function get_normal_model_params_ed(params_dict::Dict)
                         "ty"=>ty,
                         "hopping_anisotropy"=>hopping_anisotropy,
                         "disorder_strength"=>disorder_strength,
+                        "periodic_potential_strength"=>periodic_potential_strength,
                         "pinning_strength"=>pinning_strength,
                         "U"=>us,
                         "scaling_type"=>scaling_type,
@@ -332,19 +336,19 @@ function run_normal_ed(params_dict::Dict; kwargs...)
 end
 
 # run data collection with for loops
-if false
+if true
     
     
     #which_one = args_dict["which_one"]
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
-    lx,ly,n = 10,4,5
-    anises = [1e-4,1e-3,1e-2,1e-1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
+    lx,ly,n = 8,4,4
+    anis = 1.0
     intstren = 300.0
     #cols = ["b","g","r","c","y","orange","purple","pink","brown","gray"]
     #intstrens = range(0.0,10.0,length=21)
     #for (idx,intstren) in enumerate(intstrens)
-    for (idx,anis) in enumerate(anises)
+    #for (idx,anis) in enumerate(anises)
 
     
     #=BLAS.set_num_threads(5)
@@ -367,7 +371,7 @@ if false
         #    continue
         #end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",20),("if_find_data",true),("if_save_data",true)])
+        params_dict = Dict([("output_level",1),("periodic_potential_strength",1e-2),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
         #println("Starting from here")
@@ -439,7 +443,7 @@ if false
         #plot_spectrum(lls,nrgs,idx,params_dict["nev"],"Interaction Length",true; plot_title="")
         #plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title="")
         #plot_spectrum(tws,nrgs,idx,params_dict["nev"],"Theta_x / 2pi",false; plot_title=" V=$intstren")
-        #plot_spectrum(anises,nrgs,idx,params_dict["nev"],"Hopping Anis",true; plot_title=" $(lx)x$(ly) N=$n ULR=$intstren")
+        #plot_spectrum(anises,nrgs,idx,params_dict["nev"],"Physical Hopping",true; plot_title=" with PP $(lx)x$(ly) N=$n ULR=$intstren")
 
         #=if true
             if idx == 1
@@ -477,7 +481,7 @@ if false
         #gammas1[idx,idx2] = gamma1
         #gammas2[idx,idx2] = gamma2
 
-    end
+    #end
     #end
 
     #=fig = figure()
