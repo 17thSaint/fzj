@@ -1308,6 +1308,49 @@ function tx_adiabatic_condition(groundstate::Vector{ComplexF64},excited_state::V
     return expectation_value / (energy_gap^2), expectation_value
 end
 
+# single basis periodic potential output
+function basis_periodicpotential_output(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict; kwargs...)
+    Lx,Ly = lattice_params["Lx"],lattice_params["Ly"]
+    basis_state = lattice_params["full_basis"][:,which_basis]
+    particle_locations_linear = basis_state
+    particle_locations_coordinate = coordinate.(particle_locations_linear,Lx,Ly)
+    
+    output_weights = Array{Float64,1}(undef,0)
+    for (px,py) in particle_locations_coordinate
+        local_strength = 1.0 * (-1)^(px)
+        push!(output_weights, local_strength)
+    end
+
+    return output_weights
+end
+
+# operator for periodic potential
+function periodic_potential_operator(lattice_params::Dict,hamilt_params::Dict; kwargs...)
+    output_level::Int64 = get(kwargs,:output_level,1)
+    full_basis = lattice_params["full_basis"]
+
+    pp_op = spzeros(Float64,size(full_basis)[2],size(full_basis)[2])
+
+    for j in 1:size(full_basis)[2]
+        output_weights = basis_periodicpotential_output(j,lattice_params,hamilt_params; kwargs...)
+        pp_op[j,j] = sum(output_weights)
+        if output_level > 0 && isapprox(j/size(full_basis)[2]*100 % 10,0.0,atol=1e-4)
+            println(round(j/size(full_basis)[2]*100,digits=2),"% done.")
+        end
+    end
+
+    return pp_op
+end
+
+# get adiabatic condition for periodic potential for given spectrum
+function periodic_potential_adiabatic_condition(groundstate::Vector{ComplexF64},excited_state::Vector{ComplexF64},energy_gap::Float64,lattice_params::Dict,hamilt_params::Dict; kwargs...)
+    pp_op = periodic_potential_operator(lattice_params,hamilt_params; kwargs...)
+
+    expectation_value = abs(adjoint(groundstate) * (pp_op * excited_state))
+
+    return expectation_value / (energy_gap^2), expectation_value
+end
+
 
 
 

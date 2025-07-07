@@ -77,6 +77,10 @@ function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
         fdict["scaling_type"] = hamilt_params["scaling_type"]
         fdict["interaction_length"] = hamilt_params["corr_length"]
     end
+    if haskey(hamilt_params,"periodic_potential_strength") && hamilt_params["periodic_potential_strength"] != 0.0
+        fdict["periodic_potential_strength"] = hamilt_params["periodic_potential_strength"]
+    end
+
     return fdict
 end
 
@@ -227,6 +231,9 @@ function get_normal_model_params_ed(params_dict::Dict)
     if scaling_type != "flat"
         dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/ulr-length")
 	end
+    if periodic_potential_strength != 0.0
+        dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/periodic-potential")
+    end
     dataloc = get(params_dict, "dataloc", dataloc)
     if occursin("geraghty1",dataloc)
         basis_dataloc::String = "/p/project/netenesyquma/geraghty1/data/data-ed/basis-files"
@@ -336,14 +343,14 @@ function run_normal_ed(params_dict::Dict; kwargs...)
 end
 
 # run data collection with for loops
-if true
+if false
     
     
     #which_one = args_dict["which_one"]
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
     lx,ly,n = 8,4,4
-    anis = 1.0
+    anis = 1e-4
     intstren = 300.0
     #cols = ["b","g","r","c","y","orange","purple","pink","brown","gray"]
     #intstrens = range(0.0,10.0,length=21)
@@ -371,7 +378,7 @@ if true
         #    continue
         #end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("periodic_potential_strength",1e-2),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+        params_dict = Dict([("output_level",1),("periodic_potential_strength",1e-2),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
         #println("Starting from here")

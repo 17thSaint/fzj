@@ -958,7 +958,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
     # physical periodic potential
     if hamilt_params["periodic_potential_strength"] != 0.0
         for (px,py) in particle_locations_coordinate
-            local_strength = iseven(px) ? -hamilt_params["periodic_potential_strength"] : 0.0
+            local_strength = hamilt_params["periodic_potential_strength"] * (-1)^(px)
             push!(output_weights, local_strength)
             push!(output_states,which_basis)
         end

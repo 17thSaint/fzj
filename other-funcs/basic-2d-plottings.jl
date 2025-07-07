@@ -312,6 +312,7 @@ function plot_adiabatic_condition(xs::Vector{Float64},ys::Vector{Float64},f1s::M
     fig = figure()
     
     pcolormesh(xs,ys,log10.(fs_mag); shading="auto")
+    #imshow(log10.(fs_mag); cmap="viridis", origin="lower", extent=[minimum(xs),maximum(xs),minimum(ys),maximum(ys)])
     colorbar()
 
     #us = cos.(fs_angle)

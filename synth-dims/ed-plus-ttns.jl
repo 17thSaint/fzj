@@ -378,8 +378,8 @@ if false
     ylim([-0.05,1.1*maximum(gaps)])
 end=#
 
-# max fourpt diag transition scaling Lx with fixed Ly
-if true
+#= max fourpt diag transition scaling Lx with fixed Ly
+if false
     ns = [4,6,7,8]
     cols = ["b","r","k","g"]
     ly = 4
@@ -442,7 +442,7 @@ if true
         intstrens_dict[string(n)] = intstrens
         visibs_dict[string(n)] = visibs
     end
-end#
+end=#
 
 #= look at finite size scaling of commensurate filling interaction strength spectrum
 if true

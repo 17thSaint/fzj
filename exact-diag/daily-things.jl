@@ -126,52 +126,137 @@ if false
 
 end=#
 
-# track overlap with periodic potential
+# examine 4pt momentum varying potential strength
 if true
-    anises = [1e-4,1e-2,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.0]
+    lx,ly,n = 8,4,4
+    intstren = 300.0
+    hanis = 1e-4
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/periodic-potential")
+    potstrens = round.(vcat(1e-3,1e-4,10 .^ range(-2,2,length=10)),digits=4)
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis),("interaction_strength",intstren)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    display(all_files)
+    for f in all_files
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+
+        latparas = get_lattice_params_from_metadata(m)
+
+        fourpt = four_point(d["state"][1],latparas; if_plot=true,plot_title="$(lx)x$(ly) N=$(n) ULR=$(intstren) tx=$(hanis) V0=$(m["periodic_potential_strength"])")
+
+        datadict = Dict([("fourpt_momentum",fourpt)])
+        modify_data(datadict,joinpath(dataloc,f),"metadata"; output_level=0)
+    end
+end#
+
+#= vary potential strength to look at occupancy visibility
+if true
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/periodic-potential")
     intstren = 300.0
     lx,ly,n = 8,4,4
-    #=overlaps = Dict{String,Vector{Float64}}([("s1",Float64[]),("s2",Float64[]),("plus",Float64[]),("minus",Float64[])])
-    for (idx,anis) in enumerate(anises)
-        pdict_found = Dict([("output_level",1),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
-        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict_found; output_level=1)
+    anises = [1e-4,1e-3,1e-2,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
+    cols = get_colors(length(anises))
+    potstrens = round.(vcat(1e-3,1e-4,10 .^ range(-2,2,length=10)),digits=4)
+    for (idx2,anis) in enumerate(anises)
+        for (idx,potstren) in enumerate(potstrens)
+            pdict_pp = Dict([("output_level",1),("dataloc",dataloc),("periodic_potential_strength",potstren),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",20),("if_find_data",true),("if_save_data",false)])
+            states_pp,nrgs_pp,rhos_pp,filepath_pp,if_found_pp,lattice_params_pp,hamilt_params_pp = run_normal_ed(pdict_pp; output_level=1)
 
-        pdict_pp = Dict([("output_level",1),("periodic_potential_strength",1e-2),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+            #=occs = get_occupancy(states_pp[1],lattice_params_pp; if_plot = false)
+            visibs[idx] = minimum(occs) / maximum(occs)
+            
+            if idx == 1
+                scatter(potstren,visibs[idx],c=cols[idx2],label="tx= $anis")
+            else
+                scatter(potstren,visibs[idx],c=cols[idx2])
+            end
+            xlabel("Periodic Potential Strenght "*L"V_0")
+            ylabel("Occs Flatness, Min(Occs) / Max(Occs)")
+            xscale("log")
+            title("Flatness vs Periodic Potential Strength, ULR = $intstren, $(lx)x$(ly) N=$n ")=#
+        
+        end
+    end
+end=#
+
+#= plot adiabatic condition for periodic potential
+if false
+    lx,ly,n = 8,4,4
+    intstren = 300.0
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/periodic-potential")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    potstrens = vcat([1e-4,1e-3],round.(10 .^ range(-2,2,length=10),digits=4),100.1)
+    anises = [1e-4,1e-3,1e-2,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0,1.1]
+    ftxs = zeros(Float64,length(anises)-1,length(potstrens)-1)
+    fpps = zeros(Float64,length(anises)-1,length(potstrens)-1)
+    for f in all_files
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+        
+        idx1 = findfirst(x -> x == m["tx"],anises)
+        idx2 = findfirst(x -> x == round(m["periodic_potential_strength"],digits=4),potstrens)
+
+        println("Found file with tx=$(m["tx"]), potstren=$(m["periodic_potential_strength"]) at indices idx1=$(idx1), idx2=$(idx2)")
+
+        ftxs[idx1,idx2] = length(m["ftx_01"]) != 1 ? m["ftx_01"][1] : m["ftx_01"]
+        fpps[idx1,idx2] = length(m["fpp_01"]) != 1 ? m["fpp_01"][1] : m["fpp_01"]
+
+    end
+    plot_adiabatic_condition(potstrens,anises,ftxs,fpps; plot_title="$(lx)x$(ly) N=$(n) ULR=$intstren")
+    xlabel("Periodic Potential Strength, "*L"V_0")
+    ylabel("Physical Hopping, "*L"t_x")
+    xscale("log")
+end=#
+
+#= track overlap with periodic potential
+if true
+    anises = [1e-4,1e-3,1e-2,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.0]
+    intstren = 300.0
+    lx,ly,n = 8,4,4
+    all_overlaps1 = Matrix{Float64}(undef,20,length(anises))
+    all_overlaps2 = Matrix{Float64}(undef,20,length(anises))
+    for (idx,anis) in enumerate(anises)
+        #pdict_found = Dict([("output_level",1),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
+        #states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict_found; output_level=1)
+
+        #plot_spectrum(anises,nrgs,idx,pdict_found["nev"],"Physical Hopping",true; plot_title=" $(lx)x$(ly) N=$n ULR=$intstren")
+
+        pdict_pp = Dict([("output_level",1),("periodic_potential_strength",1e-2),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
         states_pp,nrgs_pp,rhos_pp,filepath_pp,if_found_pp,lattice_params_pp,hamilt_params_pp = run_normal_ed(pdict_pp; output_level=1)
 
-        append!(overlaps["s1"],abs2(adjoint(states[1]) * states_pp[1]))
-        append!(overlaps["s2"],abs2(adjoint(states[2]) * states_pp[1]))
+        plot_spectrum(anises,nrgs_pp,idx,pdict_pp["nev"],"Physical Hopping",true; plot_title=" with PP $(lx)x$(ly) N=$n ULR=$intstren")
 
-        mixedplus = (1/sqrt(2)) .* (states[1] + states[2])
-        append!(overlaps["plus"],abs2(adjoint(mixedplus) * states_pp[1]))
+        #for i in 1:20
+        #    all_overlaps1[i,idx] = abs2(dot(states[1],states_pp[i]))
+        #    all_overlaps2[i,idx] = abs2(dot(states[2],states_pp[i]))
+        #end
+        
 
-        mixed_minus = (1/sqrt(2)) .* (states[1] - states[2])
-        append!(overlaps["minus"],abs2(adjoint(mixed_minus) * states_pp[1]))
-
-        if idx == 1
-            scatter(anis,overlaps["s1"][end],c="b",label="s1")
-            scatter(anis,overlaps["s2"][end],c="g",label="s2")
-            scatter(anis,overlaps["plus"][end],c="r",label="plus")
-            scatter(anis,overlaps["minus"][end],c="m",label="minus")
+        #=if idx == 1
+            scatter(anis,overlaps["s11"][end],c="b",label="s11")
+            scatter(anis,overlaps["s21"][end],c="g",label="s21")
+            scatter(anis,overlaps["s12"][end],c="r",label="s12")
+            scatter(anis,overlaps["s22"][end],c="m",label="s22")
             xlabel("Hopping Anisotropy, "*L"t_x")
             ylabel("Overlap with Periodic Potential")
             legend()
         else
-            scatter(anis,overlaps["s1"][end],c="b")
-            scatter(anis,overlaps["s2"][end],c="g")
-            scatter(anis,overlaps["plus"][end],c="r")
-            scatter(anis,overlaps["minus"][end],c="m")
-        end
-    end=#
-    fig = figure()
-    plot(anises,overlaps["s1"],"-o",label="State 1")
-    plot(anises,overlaps["s2"],"-o",label="State 2")
+            scatter(anis,overlaps["s11"][end],c="b")
+            scatter(anis,overlaps["s21"][end],c="g")
+            scatter(anis,overlaps["s12"][end],c="r")
+            scatter(anis,overlaps["s22"][end],c="m")
+        end=#
+    end
+    #=fig = figure()
+    plot(anises,overlaps["s11"],"-o",label="State 11")
+    plot(anises,overlaps["s21"],"-o",label="State 21")
+    plot(anises,overlaps["s12"],"-o",label="State 12")
+    plot(anises,overlaps["s22"],"-o",label="State 22")
     xlabel("Hopping Anisotropy, "*L"t_x")
-    ylabel(L"\vert \langle \psi_{GSi} \vert \psi_{GS1}^{PP} \rangle \vert^2")
-    title("Overlap with Periodic Potential GS1 for $(lx)x$(ly) N=$n ULR=$intstren")
-    legend()
+    ylabel(L"\vert \langle \psi_{GSi} \vert \psi_{GSj}^{PP} \rangle \vert^2")
+    title("Overlap with Periodic Potential GS1/2 for $(lx)x$(ly) N=$n ULR=$intstren")
+    legend()=#
         
-end
+end=#
 
 #= plot adiabatic condition
 if false
