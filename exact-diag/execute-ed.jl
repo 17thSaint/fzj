@@ -44,6 +44,7 @@ end
 
 
 include_other_files(["other-funcs/basic-2d-stuff.jl","other-funcs/basic-2d-observables.jl","exact-diag/two-dimensions.jl","exact-diag/observables.jl","exact-diag/hatsugai-mbcn.jl"])
+include_other_files(["exact-diag/time-evolution.jl"])
 include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
 
 function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
@@ -90,6 +91,58 @@ function get_lattice_params_from_metadata(metadata::Dict)
         lat_paras["full_basis"] = n_particle_basis(lat_paras; output_level=0)
     end
     return lat_paras
+end
+
+function get_normal_params_from_lattham(lattice_params::Dict,hamilt_params::Dict,other_params::Dict)
+    # get interaction strength
+    if hamilt_params["U"][2] == 0.0
+        intstren = 0.0
+    else
+        intstren = hamilt_params["U"][1]
+    end
+
+    nev = get(other_params,"nev",10)
+    if_save_data = other_params["if_save_data"]
+    if_find_data = get(other_params,"if_find_data",false)
+
+    new_params = Dict("Lx"=>lattice_params["Lx"],
+                "Ly"=>lattice_params["Ly"],
+                "N"=>lattice_params["N"],
+                "if_periodic_x"=>lattice_params["if_periodic_x"],
+                "if_periodic_y"=>lattice_params["if_periodic_y"],
+                "twist_angle"=>lattice_params["twist_angle"],
+                "interaction_strength"=>intstren,
+                "filling"=>0.5,
+                "tx"=>hamilt_params["tx"],
+                "ty"=>hamilt_params["ty"],
+                "hopping_anisotropy"=>hamilt_params["hopping_anisotropy"],
+                "if_reading"=>false,
+                "lr"=>"all",
+                "nev"=>nev,
+                "if_save_data"=>if_save_data,
+                "if_find_data"=>if_find_data,
+                "periodic_potential_strength"=>hamilt_params["periodic_potential_strength"])
+
+    for (k,v) in other_params
+        new_params[k] = v
+    end
+
+    return new_params
+end
+
+function get_quick_running_args(nev::Int)
+    # set running operation parameters    
+    running_args::NamedTuple = (nev=nev,
+                    if_exact=false,
+                    if_function=false,
+                    if_reading=false,
+                    if_densmat=false,
+                    if_find_data=false,
+                    if_save_data=false,
+                    dataloc="",
+                    output_level=0)
+
+    return running_args
 end
 
 function get_normal_model_params_ed(params_dict::Dict)
@@ -256,9 +309,7 @@ function get_normal_model_params_ed(params_dict::Dict)
                     basis_dataloc=basis_dataloc,
                     output_level=opl)
     
-                        
-                    
-                    
+                  
     opl > 0 && println("Finished Building Model")
     return lattice_params,hamilt_params,running_args
 
@@ -335,9 +386,9 @@ function run_normal_ed(params_dict::Dict; kwargs...)
     filepath = make_sure_file_type(filepath,"jld2")
 
     if running_args.if_function
-        return states,nrgs,rhos,hh,filepath,if_exists,lattice_params,hamilt_params
-    else
         return states,nrgs,rhos,filepath,if_exists,lattice_params,hamilt_params
+    else
+        return states,nrgs,rhos,filepath,if_exists,lattice_params,hamilt_params,hh
     end
 
 end
@@ -530,6 +581,48 @@ if false
     title("Gamma2 Magnitude")=#
 
 end
+
+# testing time evolution
+lx,ly,n = 4,4,2
+anis = 1.0
+intstren = 300.0
+ppstren = 0.1
+end_ppstren = 0.01
+
+params_dict = Dict([("output_level",1),("periodic_potential_strength",ppstren),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",30),("if_find_data",false),("if_save_data",false)])
+#states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params,fullham = run_normal_ed(params_dict; output_level=1)
+
+gs = states[1]
+
+ramptime = 0.0001
+speccount = 30
+
+tevo_pdict = Dict([("dt",0.00001),("tmax",ramptime),("periodic_potential_strength",(linear_ramp,(starting_value=params_dict["periodic_potential_strength"],ending_value=end_ppstren,ending_time=ramptime)))])
+tevo_dict = make_tevo_params(tevo_pdict)
+tevo_gs,instspec = time_evolution(gs,fullham,tevo_dict,lattice_params,hamilt_params; output_level=1, nev=speccount)
+
+fig = figure()
+fulldata = zeros(Float64, size(tevo_gs, 2))
+for i in 1:speccount
+    intspec = instspec[string(i)]
+    all_overlaps = zeros(Float64,size(tevo_gs,2))
+    for t in 1:size(tevo_gs,2)
+        all_overlaps[t] = abs2(dot(tevo_gs[:,t],intspec[:,t]))
+        fulldata[t] += all_overlaps[t]
+    end
+    plot(collect(1:length(all_overlaps)) .* tevo_dict["dt"],all_overlaps; label="$i")
+    xlabel("Time")
+    ylabel("Overlap with Instantaneous Spectrum")
+    title("Overlap with Instantaneous Spectrum for dt $(tevo_dict["dt"])")
+    yscale("log")
+    legend()
+end
+#=plot(collect(1:length(fulldata)) .* tevo_dict["dt"],fulldata)
+xlabel("Time")
+title("Total Overlap with Instantaneous Spectrum")
+yscale("log")=#
+
+
 
 
 

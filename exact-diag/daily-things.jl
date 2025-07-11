@@ -126,28 +126,6 @@ if false
 
 end=#
 
-# examine 4pt momentum varying potential strength
-if true
-    lx,ly,n = 8,4,4
-    intstren = 300.0
-    hanis = 1e-4
-    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/periodic-potential")
-    potstrens = round.(vcat(1e-3,1e-4,10 .^ range(-2,2,length=10)),digits=4)
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis),("interaction_strength",intstren)])
-    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
-    display(all_files)
-    for f in all_files
-        d,m = read_data(joinpath(dataloc,f); output_level=0)
-
-        latparas = get_lattice_params_from_metadata(m)
-
-        fourpt = four_point(d["state"][1],latparas; if_plot=true,plot_title="$(lx)x$(ly) N=$(n) ULR=$(intstren) tx=$(hanis) V0=$(m["periodic_potential_strength"])")
-
-        datadict = Dict([("fourpt_momentum",fourpt)])
-        modify_data(datadict,joinpath(dataloc,f),"metadata"; output_level=0)
-    end
-end#
-
 #= vary potential strength to look at occupancy visibility
 if true
     dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/periodic-potential")
@@ -178,6 +156,45 @@ if true
     end
 end=#
 
+#= save adiabatic condition data for periodic potential
+if false
+    lx,ly,n = 8,4,4
+    intstren = 300.0
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/periodic-potential")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    potstrens = vcat([1e-4,1e-3],round.(10 .^ range(-2,2,length=10),digits=4),100.1)
+    anises = [1e-4,1e-3,1e-2,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0,1.1]
+    ftxs = zeros(Float64,length(anises)-1,length(potstrens)-1)
+    fpps = zeros(Float64,length(anises)-1,length(potstrens)-1)
+    for f in all_files
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+
+        lattice_params,hamilt_params = make_latticehamilt_params_from_metadata(m)
+        
+        #idx1 = findfirst(x -> x == m["tx"],anises)
+        #idx2 = findfirst(x -> x == round(m["periodic_potential_strength"],digits=4),potstrens)
+
+        #println("Found file with tx=$(m["tx"]), potstren=$(m["periodic_potential_strength"]) at indices idx1=$(idx1), idx2=$(idx2)")
+
+        nrg_gaps = d["nrg"][2:end] .- d["nrg"][1]
+
+        ftxs_0,ogtxs = tx_adiabatic_condition(d["state"][1],d["state"][2:end],nrg_gaps,lattice_params,hamilt_params)
+        fpps_0,ogpps = periodic_potential_adiabatic_condition(d["state"][1],d["state"][2:end],nrg_gaps,lattice_params,hamilt_params)
+
+        datadict = Dict([("ftx_0",ftxs_0),("fpp_0",fpps_0)])
+        modify_data(datadict,joinpath(dataloc,f),"metadata"; output_level=0)
+
+        #ftxs[idx1,idx2] = magval_tx
+        #fpps[idx1,idx2] = magval_pp
+
+    end
+    #plot_adiabatic_condition(potstrens,anises,ftxs,fpps; plot_title="$(lx)x$(ly) N=$(n) ULR=$intstren")
+    #xlabel("Periodic Potential Strength, "*L"V_0")
+    #ylabel("Physical Hopping, "*L"t_x")
+    #xscale("log")
+end=#
+
 #= plot adiabatic condition for periodic potential
 if false
     lx,ly,n = 8,4,4
@@ -197,8 +214,14 @@ if false
 
         println("Found file with tx=$(m["tx"]), potstren=$(m["periodic_potential_strength"]) at indices idx1=$(idx1), idx2=$(idx2)")
 
-        ftxs[idx1,idx2] = length(m["ftx_01"]) != 1 ? m["ftx_01"][1] : m["ftx_01"]
-        fpps[idx1,idx2] = length(m["fpp_01"]) != 1 ? m["fpp_01"][1] : m["fpp_01"]
+        ftx_val,ftx_ind = findmax(m["ftx_0"])
+        fpp_val,fpp_ind = findmax(m["fpp_0"])
+
+        display(m["ftx_0"])
+        display(m["fpp_0"])
+
+        ftxs[idx1,idx2] = ftx_val
+        fpps[idx1,idx2] = fpp_val
 
     end
     plot_adiabatic_condition(potstrens,anises,ftxs,fpps; plot_title="$(lx)x$(ly) N=$(n) ULR=$intstren")
@@ -206,6 +229,39 @@ if false
     ylabel("Physical Hopping, "*L"t_x")
     xscale("log")
 end=#
+
+# look at higher adiabatic conditions
+if true
+    lx,ly,n = 8,4,4
+    hanis = 1.0
+    #ppstren = 1e-2
+    intstren = 300.0
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/periodic-potential")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis),("interaction_strength",intstren)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    #display(all_files)
+    for f in all_files
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+
+        lattice_params,hamilt_params = make_latticehamilt_params_from_metadata(m)
+        ops = Dict([("nev",50),("if_save_data",false),("if_find_data",false)])
+        normparas = get_normal_params_from_lattham(lattice_params,hamilt_params,ops)
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(normparas; output_level=1)
+
+        nrg_gaps = nrgs[2:end] .- nrgs[1]
+        
+        ftxs_0,ogtxs = tx_adiabatic_condition(states[1],states[2:end],nrg_gaps,lattice_params,hamilt_params)
+        #fpps_0,ogpps = periodic_potential_adiabatic_condition(states[1],states[2:end],nrg_gaps,lattice_params,hamilt_params)
+
+        scatter(1:length(ftxs_0),ftxs_0,label=L"V_0="*"$(round(m["periodic_potential_strength"],digits=4))")
+        xlabel("Excited State Index")
+        ylabel("Adiabatic Condition, "*L"F_{tx}")
+        title("AC for Higher States: $(lx)x$(ly) ULR=$intstren, tx=$hanis")
+        legend()
+        #yscale("log")
+        
+    end
+end
 
 #= track overlap with periodic potential
 if true

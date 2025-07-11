@@ -1095,6 +1095,8 @@ function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwa
     output_level > 0 ? display(metadata_displaying) : nothing
 
     dimHilb = size(lattice_params["full_basis"])[2]
+
+    kd::Int = nev > 20 ? nev + 10 : 30
     
     start_time = time()
     if if_function
@@ -1132,12 +1134,15 @@ function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwa
         metadata_dict["H"] = H
         output_level > 0 ? println("Sparsity = ",SparseArrays.nnz(H)/size(H)[1]^2) : nothing
 
+        #println("Using Krylov dimension: ",kd)
+
         if if_exact
             everything = eigen(Matrix(H))
             rez = (everything.values,everything.vectors)
         else
             x0 = rand(Float64,size(lattice_params["full_basis"])[2])
-            rez = eigsolve(H,x0,nev,:SR,Lanczos())
+            #rez = eigsolve(H,x0,nev,:SR,Lanczos())
+            rez = eigsolve(H,x0,nev,:SR; krylovdim=kd)
         end
     end
     output_level > 0 ? println("Ground State: Elapsed time: ",time()-start_time) : nothing
@@ -1177,6 +1182,8 @@ function rerun_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict,met
     output_level > 0 ? display(metadata_displaying) : nothing
     
     dimHilb = size(lattice_params["full_basis"])[2]
+
+    kd::Integer = nev > 20 ? nev + 10 : 30
 
     start_time = time()
     if if_function

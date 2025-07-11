@@ -78,6 +78,8 @@ function plot_spectrum(xxs::Vector,nrgs::Vector,idx::Int,nev::Int,xstring::Abstr
         change = abs(xxs[1] - xxs[2])
         xval = xxs[idx]
         shift = (i - nev/2) * ((0.1*change)/(nev/2))
+        display(xval)
+        display(nrgs[i] - if_diff*nrgs[1])
         scatter(xval + shift,nrgs[i] - if_diff*nrgs[1],c=cols[i])
     end
     xlabel(xstring)
@@ -317,7 +319,7 @@ function plot_adiabatic_condition(xs::Vector{Float64},ys::Vector{Float64},f1s::M
 
     #us = cos.(fs_angle)
     #vs = sin.(fs_angle)
-    #quiver(xs, ys, us, vs)
+    #quiver(xs[1:end-1], ys[1:end-1], us, vs)
     title("Adiabatic Condition "*plot_title)
     xlabel("Physical Hopping, "*L"t_x")
     ylabel("IR Interaction Strength, "*L"U_{ir}")

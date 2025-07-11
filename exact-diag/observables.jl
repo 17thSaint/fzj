@@ -1226,6 +1226,21 @@ function uir_adiabatic_condition(groundstate::Vector{ComplexF64},excited_state::
     return expectation_value / (energy_gap^2), expectation_value
 end
 
+# get adiabatic condition for U_ir for full spectrum
+function uir_adiabatic_condition(groundstate::Vector{ComplexF64},excited_states::Vector{Vector{ComplexF64}},energy_gaps::Vector{Float64},lattice_params::Dict,hamilt_params::Dict,U; kwargs...)
+    opl::Int = get(kwargs,:output_level,1)
+    
+    int_op = interaction_operator(lattice_params,hamilt_params,U; kwargs...)
+
+    expectation_values = zeros(Float64,length(excited_states))
+    for (idx,excited_state) in enumerate(excited_states)
+        expectation_values[idx] = abs(adjoint(groundstate) * (int_op * excited_state))
+        opl > 0 && println("Working on state $(idx)")
+    end
+
+    return expectation_values ./ (energy_gaps .^ 2), expectation_values
+end
+
 # tx operator for single basis
 function basis_tx_output(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
     Lx,Ly = lattice_params["Lx"],lattice_params["Ly"]
@@ -1308,6 +1323,21 @@ function tx_adiabatic_condition(groundstate::Vector{ComplexF64},excited_state::V
     return expectation_value / (energy_gap^2), expectation_value
 end
 
+# get adiabatic condition for t_x for full spectrum
+function tx_adiabatic_condition(groundstate::Vector{ComplexF64},excited_states::Vector{Vector{ComplexF64}},energy_gaps::Vector{Float64},lattice_params::Dict,hamilt_params::Dict; kwargs...)
+    opl::Int = get(kwargs,:output_level,1)
+
+    tx_op = tx_operator(lattice_params,hamilt_params; kwargs...)
+
+    expectation_values = zeros(Float64,length(excited_states))
+    for (idx,excited_state) in enumerate(excited_states)
+        expectation_values[idx] = abs(adjoint(groundstate) * (tx_op * excited_state))
+        opl > 0 && println("Working on state $(idx)")
+    end
+
+    return expectation_values ./ (energy_gaps .^ 2), expectation_values
+end
+
 # single basis periodic potential output
 function basis_periodicpotential_output(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict; kwargs...)
     Lx,Ly = lattice_params["Lx"],lattice_params["Ly"]
@@ -1349,6 +1379,21 @@ function periodic_potential_adiabatic_condition(groundstate::Vector{ComplexF64},
     expectation_value = abs(adjoint(groundstate) * (pp_op * excited_state))
 
     return expectation_value / (energy_gap^2), expectation_value
+end
+
+# get adiabatic condition for periodic potential for full spectrum
+function periodic_potential_adiabatic_condition(groundstate::Vector{ComplexF64},excited_states::Vector{Vector{ComplexF64}},energy_gaps::Vector{Float64},lattice_params::Dict,hamilt_params::Dict; kwargs...)
+    opl::Int = get(kwargs,:output_level,1)
+    
+    pp_op = periodic_potential_operator(lattice_params,hamilt_params; kwargs...)
+
+    expectation_values = zeros(Float64,length(excited_states))
+    for (idx,excited_state) in enumerate(excited_states)
+        expectation_values[idx] = abs(adjoint(groundstate) * (pp_op * excited_state))
+        opl > 0 && println("Working on state $(idx)")
+    end
+
+    return expectation_values ./ (energy_gaps .^ 2), expectation_values
 end
 
 
