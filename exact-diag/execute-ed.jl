@@ -586,42 +586,45 @@ end
 lx,ly,n = 4,4,2
 anis = 1.0
 intstren = 300.0
-ppstren = 0.1
-end_ppstren = 0.01
+ppstren = 100
+end_ppstren = 0.0
 
 params_dict = Dict([("output_level",1),("periodic_potential_strength",ppstren),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",30),("if_find_data",false),("if_save_data",false)])
-#states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params,fullham = run_normal_ed(params_dict; output_level=1)
+states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params,fullham = run_normal_ed(params_dict; output_level=1)
 
 gs = states[1]
 
-ramptime = 0.0001
+#ramptime = 0.01
 speccount = 30
+dt = 0.0005
 
-tevo_pdict = Dict([("dt",0.00001),("tmax",ramptime),("periodic_potential_strength",(linear_ramp,(starting_value=params_dict["periodic_potential_strength"],ending_value=end_ppstren,ending_time=ramptime)))])
-tevo_dict = make_tevo_params(tevo_pdict)
-tevo_gs,instspec = time_evolution(gs,fullham,tevo_dict,lattice_params,hamilt_params; output_level=1, nev=speccount)
+# in these cases it seems that you sometimes jump to the second state, but it looks like we can go even faster
+ramptimes = range(0.001,0.01,length=10)
+for ramptime in ramptimes
 
-fig = figure()
-fulldata = zeros(Float64, size(tevo_gs, 2))
-for i in 1:speccount
-    intspec = instspec[string(i)]
-    all_overlaps = zeros(Float64,size(tevo_gs,2))
+    tevo_pdict = Dict([("dt",dt),("tmax",ramptime),("periodic_potential_strength",(linear_ramp,(starting_value=params_dict["periodic_potential_strength"],ending_value=end_ppstren,ending_time=ramptime)))])
+    tevo_dict = make_tevo_params(tevo_pdict)
+    tevo_gs,instspec = time_evolution(gs,fullham,tevo_dict,lattice_params,hamilt_params; output_level=1, nev=speccount)
+
+    #fig = figure()
+
+    maxidxs = []
     for t in 1:size(tevo_gs,2)
-        all_overlaps[t] = abs2(dot(tevo_gs[:,t],intspec[:,t]))
-        fulldata[t] += all_overlaps[t]
+        all_overlaps = zeros(Float64,speccount)
+        for i in 1:speccount
+            intspec = instspec[string(i)]
+            all_overlaps[i] = abs2(dot(tevo_gs[:,t],intspec[:,t]))
+        end
+        maxval,maxidx = findmax(all_overlaps)
+        append!(maxidxs,maxidx)
     end
-    plot(collect(1:length(all_overlaps)) .* tevo_dict["dt"],all_overlaps; label="$i")
-    xlabel("Time")
-    ylabel("Overlap with Instantaneous Spectrum")
-    title("Overlap with Instantaneous Spectrum for dt $(tevo_dict["dt"])")
-    yscale("log")
-    legend()
-end
-#=plot(collect(1:length(fulldata)) .* tevo_dict["dt"],fulldata)
-xlabel("Time")
-title("Total Overlap with Instantaneous Spectrum")
-yscale("log")=#
 
+    plot(dt * (1:length(maxidxs)),maxidxs,"-p",label="$ramptime")
+    xlabel("Time")
+    ylabel("Index of Max Overlap")
+    legend()
+
+end
 
 
 
