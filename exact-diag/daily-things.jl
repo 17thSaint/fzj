@@ -230,20 +230,26 @@ if false
     xscale("log")
 end=#
 
-# look at higher adiabatic conditions
-if true
+#= look at higher adiabatic conditions
+if false
     lx,ly,n = 8,4,4
     hanis = 1.0
     #ppstren = 1e-2
     intstren = 300.0
     dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/periodic-potential")
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis),("interaction_strength",intstren)])
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren)])
     all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
-    #display(all_files)
+    display(all_files)
+    txs = []
+    pps = []
+    ftxs = []
+    fpps = []
+    max_ftxs = []
+    max_fpps = []
     for f in all_files
         d,m = read_data(joinpath(dataloc,f); output_level=0)
 
-        lattice_params,hamilt_params = make_latticehamilt_params_from_metadata(m)
+        #=lattice_params,hamilt_params = make_latticehamilt_params_from_metadata(m)
         ops = Dict([("nev",50),("if_save_data",false),("if_find_data",false)])
         normparas = get_normal_params_from_lattham(lattice_params,hamilt_params,ops)
         states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(normparas; output_level=1)
@@ -251,17 +257,78 @@ if true
         nrg_gaps = nrgs[2:end] .- nrgs[1]
         
         ftxs_0,ogtxs = tx_adiabatic_condition(states[1],states[2:end],nrg_gaps,lattice_params,hamilt_params)
-        #fpps_0,ogpps = periodic_potential_adiabatic_condition(states[1],states[2:end],nrg_gaps,lattice_params,hamilt_params)
+        fpps_0,ogpps = periodic_potential_adiabatic_condition(states[1],states[2:end],nrg_gaps,lattice_params,hamilt_params)
+        #fuirs_0,ogfuirs = uir_adiabatic_condition(states[1],states[2:end],nrg_gaps,lattice_params,hamilt_params,nothing)
 
-        scatter(1:length(ftxs_0),ftxs_0,label=L"V_0="*"$(round(m["periodic_potential_strength"],digits=4))")
+        mags = sqrt.(ftxs_0 .^2 .+ fpps_0 .^ 2)=#
+
+        if haskey(m,"fpp_0") && haskey(m,"ftx_0")
+            append!(txs,[m["tx"]])
+            append!(pps,[m["periodic_potential_strength"]])
+            max_ftx,maxidx_ftx = findmax(m["ftx_0"])
+            max_fpp,maxidx_fpp = findmax(m["fpp_0"])
+            append!(ftxs,[max_ftx])
+            append!(fpps,[max_fpp])
+            append!(max_ftxs,[maxidx_ftx])
+            append!(max_fpps,[maxidx_fpp])
+        else
+            continue
+        end
+        
+        #=scatter(1:length(ftxs_0),ftxs_0,label=L"V_0="*"$(round(m["periodic_potential_strength"],digits=4))")
+        scatter(1:length(mags),mags,label=L"V_0="*"$(round(m["periodic_potential_strength"],digits=4))")
         xlabel("Excited State Index")
-        ylabel("Adiabatic Condition, "*L"F_{tx}")
+        ylabel("Adiabatic Condition, "*L"F_{tx}, F_{pp}")
         title("AC for Higher States: $(lx)x$(ly) ULR=$intstren, tx=$hanis")
         legend()
-        #yscale("log")
+        yscale("log")=#
         
     end
-end
+
+    plotting_txs = sort(unique(txs))
+    plotting_pps = sort(unique(pps))
+    plotting_ftxs = zeros(Float64,length(plotting_txs),length(plotting_pps))
+    plotting_fpps = zeros(Float64,length(plotting_txs),length(plotting_pps))
+    plotting_maxftxs = zeros(Float64,length(plotting_txs),length(plotting_pps))
+    plotting_maxfpps = zeros(Float64,length(plotting_txs),length(plotting_pps))
+    plotting_txs = vcat(plotting_txs,[plotting_txs[end] + 0.01])
+    plotting_pps = vcat(plotting_pps,[plotting_pps[end] + 0.01])
+    for i in 1:length(mags)
+        tx = findfirst(x -> x == txs[i],plotting_txs)
+        pp = findfirst(x -> x == pps[i],plotting_pps)
+        plotting_ftxs[tx,pp] = ftxs[i]
+        plotting_fpps[tx,pp] = fpps[i]
+        plotting_maxftxs[tx,pp] = max_ftxs[i]
+        plotting_maxfpps[tx,pp] = max_fpps[i]
+    end
+    #=pcolormesh(plotting_pps,plotting_txs,log10.(plotting_mags))
+    colorbar()
+    ylabel("Hopping Anisotropy, "*L"t_x")
+    xlabel("Periodic Potential Strength, "*L"V_0")=#
+    #=plot_adiabatic_condition(plotting_pps,plotting_txs,plotting_fpps,plotting_ftxs; plot_title="$(lx)x$(ly) N=$(n) ULR=$intstren")
+    xlabel("Periodic Potential Strength, "*L"V_0")
+    ylabel("Hopping Anisotropy, "*L"t_x")
+    xscale("log")=#
+    
+    fig = figure()
+    pcolormesh(plotting_pps,plotting_txs,plotting_maxftxs)
+    xlabel("Periodic Potential Strength, "*L"V_0")
+    ylabel("Hopping Anisotropy, "*L"t_x")
+    xscale("log")
+    title("Most Relevant Excited State F_tx, $(lx)x$(ly) N=$(n) ULR=$intstren")
+    colorbar()
+
+    fig = figure()
+    pcolormesh(plotting_pps,plotting_txs,plotting_maxfpps)
+    xlabel("Periodic Potential Strength, "*L"V_0")
+    ylabel("Hopping Anisotropy, "*L"t_x")
+    xscale("log")
+    title("Most Relevant Excited State F_pp, $(lx)x$(ly) N=$(n) ULR=$intstren")
+    colorbar()
+
+
+
+end=#
 
 #= track overlap with periodic potential
 if true
@@ -312,6 +379,34 @@ if true
     title("Overlap with Periodic Potential GS1/2 for $(lx)x$(ly) N=$n ULR=$intstren")
     legend()=#
         
+end=#
+
+#= plot adiabatic condition for uir
+if true
+    lx,ly,n = 8,4,4
+    hanis = 1.0
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis)])
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    #display(all_files)
+    uirs = []
+    intstrens = []
+    for f in all_files
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+
+        if haskey(m,"fuir_12")
+            fuir = m["fuir_12"]
+            append!(uirs,[fuir])
+            intstren = m["U"][end]
+            append!(intstrens,[intstren])
+        else
+            continue
+        end
+        scatter(intstren,fuir,c="b")
+        xlabel("Interaction Strength, "*L"U_{IR}")
+        ylabel(L"F_{uir}")
+        title("Adiabatic Condition for UIR, $(lx)x$(ly) N=$(n)")
+    end
 end=#
 
 #= plot adiabatic condition

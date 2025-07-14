@@ -583,49 +583,70 @@ if false
 end
 
 # testing time evolution
-lx,ly,n = 4,4,2
-anis = 1.0
-intstren = 300.0
-ppstren = 100
-end_ppstren = 0.0
+if true
+    lx,ly,n = 4,4,2
+    anis = 1e-4
+    intstren = 300.0
+    ppstren = 100
+    end_tx = 1.0
 
-params_dict = Dict([("output_level",1),("periodic_potential_strength",ppstren),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",30),("if_find_data",false),("if_save_data",false)])
-states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params,fullham = run_normal_ed(params_dict; output_level=1)
+    params_dict = Dict([("output_level",1),("periodic_potential_strength",ppstren),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",30),("if_find_data",false),("if_save_data",false)])
+    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params,fullham = run_normal_ed(params_dict; output_level=1)
 
-gs = states[1]
+    gs = states[1]
 
-#ramptime = 0.01
-speccount = 30
-dt = 0.0005
+    ramptime = 0.1
+    speccount = 30
+    dt = 0.0005
 
-# in these cases it seems that you sometimes jump to the second state, but it looks like we can go even faster
-ramptimes = range(0.001,0.01,length=10)
-for ramptime in ramptimes
+    # in these cases it seems that you sometimes jump to the second state, but it looks like we can go even faster
+    #ramptimes = range(0.01,0.1,length=3)
+    #for ramptime in ramptimes
 
-    tevo_pdict = Dict([("dt",dt),("tmax",ramptime),("periodic_potential_strength",(linear_ramp,(starting_value=params_dict["periodic_potential_strength"],ending_value=end_ppstren,ending_time=ramptime)))])
-    tevo_dict = make_tevo_params(tevo_pdict)
-    tevo_gs,instspec = time_evolution(gs,fullham,tevo_dict,lattice_params,hamilt_params; output_level=1, nev=speccount)
+        tevo_pdict = Dict([("dt",dt),("tmax",ramptime+0.1),("tx",(linear_ramp,(starting_value=params_dict["tx"],ending_value=end_tx,ending_time=ramptime)))])
+        tevo_dict = make_tevo_params(tevo_pdict)
+        tevo_gs,instspec = time_evolution(gs,fullham,tevo_dict,lattice_params,hamilt_params; output_level=1, nev=speccount)
 
-    #fig = figure()
+        #fig = figure()
 
-    maxidxs = []
-    for t in 1:size(tevo_gs,2)
-        all_overlaps = zeros(Float64,speccount)
-        for i in 1:speccount
-            intspec = instspec[string(i)]
-            all_overlaps[i] = abs2(dot(tevo_gs[:,t],intspec[:,t]))
+        #=maxidxs = []
+        for t in 1:size(tevo_gs,2)
+            all_overlaps = zeros(Float64,speccount)
+            for i in 1:speccount
+                intspec = instspec[string(i)]
+                all_overlaps[i] = abs2(dot(tevo_gs[:,t],intspec[:,t]))
+            end
+            maxval,maxidx = findmax(all_overlaps)
+            append!(maxidxs,maxidx)
+        end=#
+
+        plot(dt * (1:length(maxidxs)),maxidxs,"-p",label="$ramptime")
+        xlabel("Time")
+        ylabel("Index of Max Overlap")
+        legend()
+
+        fig = figure()
+        inst_vals = zeros(Float64,size(tevo_gs,2))
+        tevo_vals = zeros(Float64,size(tevo_gs,2))
+        for i in 1:size(tevo_gs,2)
+            occs = get_occupancy(Vector(tevo_gs[:,i]),lattice_params; if_plot=false)
+            rat = minimum(occs) / maximum(occs)
+            tevo_vals[i] = rat
+            
+            occs_instgs = get_occupancy(Vector(instspec[string(1)][:,i]),lattice_params; if_plot=false)
+            rat_instgs = minimum(occs_instgs) / maximum(occs_instgs)
+            inst_vals[i] = rat_instgs
+
         end
-        maxval,maxidx = findmax(all_overlaps)
-        append!(maxidxs,maxidx)
-    end
 
-    plot(dt * (1:length(maxidxs)),maxidxs,"-p",label="$ramptime")
-    xlabel("Time")
-    ylabel("Index of Max Overlap")
-    legend()
+        plot(dt * (1:length(tevo_vals)),tevo_vals ./ inst_vals[end],"-p",label="TEVO")
+        plot(dt * (1:length(inst_vals)),inst_vals ./ inst_vals[end],"-p",label="Instantaneous")
+        xlabel("Time")
+        ylabel("Occupancy Ratio")
+        legend()
 
-end
-
+    #end
+end#
 
 
 

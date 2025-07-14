@@ -305,7 +305,7 @@ function plot_four_point(results::Vector{Float64},mp::Int64; kwargs...)
     return nothing
 end
 
-function plot_adiabatic_condition(xs::Vector{Float64},ys::Vector{Float64},f1s::Matrix{Float64},f2s::Matrix{Float64}; kwargs...)
+function plot_adiabatic_condition(xs::Vector,ys::Vector,f1s::Matrix{Float64},f2s::Matrix{Float64}; kwargs...)
     plot_title::String = get(kwargs,:plot_title,"")
 
     fs_angle::Matrix{Float64} = atan.(f1s,f2s)
@@ -317,9 +317,9 @@ function plot_adiabatic_condition(xs::Vector{Float64},ys::Vector{Float64},f1s::M
     #imshow(log10.(fs_mag); cmap="viridis", origin="lower", extent=[minimum(xs),maximum(xs),minimum(ys),maximum(ys)])
     colorbar()
 
-    #us = cos.(fs_angle)
-    #vs = sin.(fs_angle)
-    #quiver(xs[1:end-1], ys[1:end-1], us, vs)
+    us = cos.(fs_angle)
+    vs = sin.(fs_angle)
+    quiver(xs[1:end-1], ys[1:end-1], us, vs)
     title("Adiabatic Condition "*plot_title)
     xlabel("Physical Hopping, "*L"t_x")
     ylabel("IR Interaction Strength, "*L"U_{ir}")
