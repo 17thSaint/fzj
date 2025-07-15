@@ -202,6 +202,45 @@ function linear_ramp(nsteps::Int,dt::Float64; kwargs...)
     return vcat(starting_value .* ones(steps_until_start), range(starting_value, ending_value, length = steps_until_end - steps_until_start + 1), ending_value .* ones(nsteps - steps_until_end + 1))
 end
 
+function get_dt(tmax::Float64; kwargs...)
+    default_dt = get(kwargs, :default_dt, 0.0005)
+    default_nsteps = Int(ceil(tmax / default_dt))
+    if default_nsteps < 100
+        dt = tmax / 100
+    else
+        dt = default_dt
+    end
+    return dt
+end
+
+function run_timeevo(starting_gs::Vector{ComplexF64},time_params::Dict,lattice_dict::Dict,hamilt_dict::Dict; kwargs...)
+    
+    max_ramp_time::Float64 = time_evo_dict["ramptime"]
+    tmax::Float64 = 5*max_ramp_time
+    
+    dt::Float64 = get_dt(tmax; kwargs...)
+
+    tevo_pdict = Dict([("dt",dt),("tmax",tmax),("tx",(linear_ramp,(starting_value=params_dict["tx"],ending_value=end_tx,ending_time=ramptime)))])
+
+    # structure the control parameter values
+    for (k,v) in time_params
+        if k != "dt" && k != "tmax"
+            if length(v) == 4
+                tevo_pdict[k] = (v[1],(starting_value=v[2],ending_value=v[3],starting_time=0.0,ending_time=v[4]))
+            elseif length(v) == 5    
+                tevo_pdict[k] = (v[1],(starting_value=v[2],ending_value=v[3],starting_time=v[4],ending_time=v[5]))
+            else
+                error("Invalid length of time evolution parameter $k: $(length(v))")
+            end
+        end
+    end
+
+    tevo_dict = make_tevo_params(tevo_pdict)
+    
+    tevo_groundstate,instantaneous_spectrum = time_evolution(starting_gs,hamilt_dict["H"],tevo_dict,lattice_dict,hamilt_dict; kwargs...) #output_level=1, nev=speccount
+
+    return tevo_groundstate,tevo_dict,instantaneous_spectrum
+end
 
 
 
