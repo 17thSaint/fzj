@@ -156,6 +156,51 @@ if true
     end
 end=#
 
+# little plot for 4x4 n=2 adiabatic condition tx and periodic potential strength
+if true
+    lx,ly,n = 4,4,2
+    intstren = 300.0
+    potstrens = vcat([1e-4,1e-3],round.(10 .^ range(-2,2,length=10),digits=4),100.1)
+    anises = [1e-4,1e-3,1e-2,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0,1.1]
+    ftxs_max = zeros(Float64,length(anises)-1,length(potstrens)-1)
+    fpps_max = zeros(Float64,length(anises)-1,length(potstrens)-1)
+    ftxs_first = zeros(Float64,length(anises)-1,length(potstrens)-1)
+    fpps_first = zeros(Float64,length(anises)-1,length(potstrens)-1)
+    for (i2,v0) in enumerate(potstrens[1:end-1])
+        #fig = figure()
+        for (i1,tx) in enumerate(anises[1:end-1])
+            params_dict = Dict([("output_level",1),("periodic_potential_strength",v0),("tx",tx),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",40),("if_find_data",true),("if_save_data",false)])
+            states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+
+            #plot_spectrum(anises,nrgs,i1,params_dict["nev"],"Physical Hopping",true; plot_title=" $(lx)x$(ly) V0=$v0")
+
+            nrg_gaps = nrgs[2:end] .- nrgs[1]
+
+            ftxs_0,ogtxs = tx_adiabatic_condition(states[1],states[2:end],nrg_gaps,lattice_params,hamilt_params)
+            fpps_0,ogpps = periodic_potential_adiabatic_condition(states[1],states[2:end],nrg_gaps,lattice_params,hamilt_params)
+
+            ftxs_max[i1,i2] = maximum(ftxs_0)
+            fpps_max[i1,i2] = maximum(fpps_0)
+
+            ftxs_first[i1,i2] = ftxs_0[2]
+            fpps_first[i1,i2] = fpps_0[2]
+        end
+    end
+
+    plot_adiabatic_condition(potstrens,anises,ftxs_max,fpps_max; plot_title="Max Value $(lx)x$(ly)")
+    xlabel("Periodic Potential Strength, "*L"V_0")
+    ylabel("Physical Hopping, "*L"t_x")
+    xscale("log")
+
+    fig = figure()
+    plot_adiabatic_condition(potstrens,anises,ftxs_first,fpps_first; plot_title="First Excited State $(lx)x$(ly)")
+    xlabel("Periodic Potential Strength, "*L"V_0")
+    ylabel("Physical Hopping, "*L"t_x")
+    xscale("log")
+
+
+end#
+
 #= save adiabatic condition data for periodic potential
 if false
     lx,ly,n = 8,4,4

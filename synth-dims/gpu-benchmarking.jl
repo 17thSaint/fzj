@@ -301,7 +301,7 @@ function benchmark_model_params(args_dict::Dict{String,Any})
     return model_paras
 end
 
-#=args_dict = Dict([("benchmark_type","cpu"),("model","J1J2"),("min_mdim",50),("max_mdim",60),("count_mdim",2),("if_save_data",false)])
+#args_dict = Dict([("benchmark_type","cpu"),("model","J1J2"),("min_mdim",50),("max_mdim",60),("count_mdim",2),("if_save_data",false)])
 args_dict = make_args_dict(ARGS)
 
 # make model parameters

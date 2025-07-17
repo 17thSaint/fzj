@@ -378,6 +378,7 @@ function run_normal_ed(params_dict::Dict; kwargs...)
                 states,nrgs,rhos = find_eigenstates(running_args.nev,lattice_params,hamilt_params; running_args...)
             else
                 states,nrgs,rhos,hh = find_eigenstates(running_args.nev,lattice_params,hamilt_params; running_args...)
+                hamilt_params["H"] = hh
             end
         end
     end
@@ -393,7 +394,7 @@ function run_normal_ed(params_dict::Dict; kwargs...)
 
 end
 
-# run data collection with for loops
+#= run data collection with for loops
 if false
     
     
@@ -580,7 +581,7 @@ if false
     colorbar()
     title("Gamma2 Magnitude")=#
 
-end
+end=#
 
 # testing time evolution
 if true
@@ -591,61 +592,59 @@ if true
     end_tx = 1.0
 
     params_dict = Dict([("output_level",1),("periodic_potential_strength",ppstren),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",30),("if_find_data",false),("if_save_data",false)])
-    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params,fullham = run_normal_ed(params_dict; output_level=1)
+    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
 
     gs = states[1]
 
-    ramptime = 0.1
     speccount = 30
-    dt = 0.0005
+    time_running_args = (nev=speccount,output_level=1,)
 
-    # in these cases it seems that you sometimes jump to the second state, but it looks like we can go even faster
-    #ramptimes = range(0.01,0.1,length=3)
-    #for ramptime in ramptimes
+    ramptimes = range(0.01,0.1,length=50)
 
-        tevo_pdict = Dict([("dt",dt),("tmax",ramptime+0.1),("tx",(linear_ramp,(starting_value=params_dict["tx"],ending_value=end_tx,ending_time=ramptime)))])
-        tevo_dict = make_tevo_params(tevo_pdict)
-        tevo_gs,instspec = time_evolution(gs,fullham,tevo_dict,lattice_params,hamilt_params; output_level=1, nev=speccount)
+    for (idx,ramptime) in enumerate(ramptimes)
 
-        #fig = figure()
+        tevo_params = Dict([ ("tx",(linear_ramp,params_dict["tx"],end_tx,ramptime)) ])
+        tevo_gs,tevo_dict,instspec = run_timeevo(gs,tevo_params,lattice_params,hamilt_params; time_running_args...)
 
-        #=maxidxs = []
-        for t in 1:size(tevo_gs,2)
-            all_overlaps = zeros(Float64,speccount)
-            for i in 1:speccount
-                intspec = instspec[string(i)]
-                all_overlaps[i] = abs2(dot(tevo_gs[:,t],intspec[:,t]))
+        ending_inst_occs = get_occupancy(Vector(instspec["1"][:,end]),lattice_params; if_plot=false)
+        stable_ending_occratio = minimum(ending_inst_occs) / maximum(ending_inst_occs)
+
+        length_average_times = Int(ceil(size(tevo_gs,2) * 0.8))
+        max_val = nothing
+        min_val = nothing
+        for i in 0:length_average_times-1
+
+            #= CDW flatness oscillation
+            local_occs = get_occupancy(Vector(tevo_gs[:,end-i]),lattice_params; if_plot=false)
+            local_ratio = (minimum(local_occs) / maximum(local_occs)) / stable_ending_occratio            
+            #scatter(tevo_dict["nsteps"]-i,local_ratio,c="b")
+            #xlabel("Time Step")
+            #ylabel("Occupancy Ratio")=#
+
+            local_val = abs2(adjoint(gs) * tevo_gs[:,end-i])
+            #scatter(size(tevo_gs,2)-i,inst_overlap,c="b")
+            #xlabel("Time Step")
+            #ylabel("Overlap with Instantaneous GS")
+
+            if isnothing(max_val) || local_val > max_val
+                max_val = local_val
             end
-            maxval,maxidx = findmax(all_overlaps)
-            append!(maxidxs,maxidx)
-        end=#
+            if isnothing(min_val) || local_val < min_val
+                min_val = local_val
+            end
 
-        plot(dt * (1:length(maxidxs)),maxidxs,"-p",label="$ramptime")
-        xlabel("Time")
-        ylabel("Index of Max Overlap")
-        legend()
-
-        fig = figure()
-        inst_vals = zeros(Float64,size(tevo_gs,2))
-        tevo_vals = zeros(Float64,size(tevo_gs,2))
-        for i in 1:size(tevo_gs,2)
-            occs = get_occupancy(Vector(tevo_gs[:,i]),lattice_params; if_plot=false)
-            rat = minimum(occs) / maximum(occs)
-            tevo_vals[i] = rat
-            
-            occs_instgs = get_occupancy(Vector(instspec[string(1)][:,i]),lattice_params; if_plot=false)
-            rat_instgs = minimum(occs_instgs) / maximum(occs_instgs)
-            inst_vals[i] = rat_instgs
 
         end
 
-        plot(dt * (1:length(tevo_vals)),tevo_vals ./ inst_vals[end],"-p",label="TEVO")
-        plot(dt * (1:length(inst_vals)),inst_vals ./ inst_vals[end],"-p",label="Instantaneous")
-        xlabel("Time")
-        ylabel("Occupancy Ratio")
-        legend()
+        #amplitude = max_val - min_val
+        #scatter(ramptime,amplitude,c="b")
+        scatter(ramptime,1-min_val,c="b")
+        xlabel("Ramp Time")
+        #ylabel("Amplitude of Occupancy Ratio Oscillation")
+        ylabel("Deviation from 1 of Overlap Oscillation")
 
-    #end=#
+    end
+    
 end#
 
 

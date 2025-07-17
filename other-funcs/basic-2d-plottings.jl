@@ -78,8 +78,8 @@ function plot_spectrum(xxs::Vector,nrgs::Vector,idx::Int,nev::Int,xstring::Abstr
         change = abs(xxs[1] - xxs[2])
         xval = xxs[idx]
         shift = (i - nev/2) * ((0.1*change)/(nev/2))
-        display(xval)
-        display(nrgs[i] - if_diff*nrgs[1])
+        #display(xval)
+        #display(nrgs[i] - if_diff*nrgs[1])
         scatter(xval + shift,nrgs[i] - if_diff*nrgs[1],c=cols[i])
     end
     xlabel(xstring)

@@ -202,25 +202,56 @@ function linear_ramp(nsteps::Int,dt::Float64; kwargs...)
     return vcat(starting_value .* ones(steps_until_start), range(starting_value, ending_value, length = steps_until_end - steps_until_start + 1), ending_value .* ones(nsteps - steps_until_end + 1))
 end
 
-function get_dt(tmax::Float64; kwargs...)
+function get_dt(tmax::Float64,leastramptime::Float64; kwargs...)
     default_dt = get(kwargs, :default_dt, 0.0005)
     default_nsteps = Int(ceil(tmax / default_dt))
     if default_nsteps < 100
         dt = tmax / 100
+        #println("Using default dt = $dt for tmax = $tmax")
     else
         dt = default_dt
+        #println("Using default dt = $dt for tmax = $tmax and default_nsteps = $default_nsteps")
     end
+
+    if dt >= leastramptime
+        #println("Least ramp time $leastramptime is larger than dt $dt, using leastramptime / 3 instead")
+        dt = leastramptime / 3
+    end
+
+    #println("Using time step dt = $dt for tmax = $tmax and least ramp time = $leastramptime")
+
     return dt
+end
+
+function get_maxramptime(time_params::Dict)
+    all_ramptimes = []
+    for (k,v) in time_params
+        if k != "dt" && k != "tmax"
+            push!(all_ramptimes,v[end])
+        end
+    end
+    return maximum(all_ramptimes)
+end
+
+function get_leastramptime(time_params::Dict)
+    all_ramptimes = []
+    for (k,v) in time_params
+        if k != "dt" && k != "tmax"
+            push!(all_ramptimes,v[end])
+        end
+    end
+    return minimum(all_ramptimes)
 end
 
 function run_timeevo(starting_gs::Vector{ComplexF64},time_params::Dict,lattice_dict::Dict,hamilt_dict::Dict; kwargs...)
     
-    max_ramp_time::Float64 = time_evo_dict["ramptime"]
-    tmax::Float64 = 5*max_ramp_time
+    max_ramp_time::Float64 = get_maxramptime(time_params)
+    least_ramp_time::Float64 = get_leastramptime(time_params)
+    tmax::Float64 = max(10*max_ramp_time,0.5)
     
-    dt::Float64 = get_dt(tmax; kwargs...)
+    dt::Float64 = get_dt(tmax,least_ramp_time; kwargs...)
 
-    tevo_pdict = Dict([("dt",dt),("tmax",tmax),("tx",(linear_ramp,(starting_value=params_dict["tx"],ending_value=end_tx,ending_time=ramptime)))])
+    tevo_pdict::Dict{String,Any} = Dict([("dt",dt),("tmax",tmax)])
 
     # structure the control parameter values
     for (k,v) in time_params
