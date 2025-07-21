@@ -1,8 +1,10 @@
-using Pkg
-Pkg.activate(".")
+#using Pkg
+#Pkg.activate("../synth-dims")
 include("../review-practice-codes/ttn.jl")
+include("../other-funcs/basic-2d-stuff.jl")
+include("../review-practice-codes/observables.jl")
 using Statistics,MKL
-using PyPlot
+#using PyPlot
 
 function find_next_nearest_neighbors(layers,if_periodic=false)
 	nn_neighbors = []
@@ -39,14 +41,14 @@ function get_j1j2_hamilt(layers,j2,j1=1; kwargs...)
 	else
 		lat_size = (Int(sqrt(2^(layers+1))),Int(sqrt(2^(layers-1))))
 	end
-	lat = TTNKit.SimpleLattice(lat_size,TTNKit.ITensorNode,"Qubit")
+	lat = TTN.SimpleLattice(lat_size,TTN.ITensorNode,"Qubit")
 	resulting_ham = []
 	
 	if j1 != 0.0
-		j1_term = TTNKit.OpSum()
-		for (s1,s2) in TTNKit.nearest_neighbours(lat,collect(1:TTNKit.number_of_sites(lat)); periodic=if_periodic)
-			s1_coord = TTNKit.coordinate(lat,s1)
-			s2_coord = TTNKit.coordinate(lat,s2)
+		j1_term = TTN.OpSum()
+		for (s1,s2) in TTN.nearest_neighbours(lat,collect(1:TTN.number_of_sites(lat)); periodic=if_periodic)
+			s1_coord = TTN.coordinate(lat,s1)
+			s2_coord = TTN.coordinate(lat,s2)
 			
 			j1_term += (j1,"Sx",s1_coord,"Sx",s2_coord)
 			j1_term += (j1,"Sy",s1_coord,"Sy",s2_coord)
@@ -56,7 +58,7 @@ function get_j1j2_hamilt(layers,j2,j1=1; kwargs...)
 	end
 	
 	if j2 != 0.0
-		j2_term = TTNKit.OpSum()
+		j2_term = TTN.OpSum()
 		for (s1,s2) in find_next_nearest_neighbors(layers,if_periodic)
 			j2_term += (j2,"Sx",s1,"Sx",s2)
 			j2_term += (j2,"Sy",s1,"Sy",s2)
@@ -66,7 +68,7 @@ function get_j1j2_hamilt(layers,j2,j1=1; kwargs...)
 	end
 
 	if if_mag_orientation
-		mag_term = TTNKit.OpSum()
+		mag_term = TTN.OpSum()
 		if j2 > 1.0
 			mag_term -= (1000.0,"Sz",(1,1))
 			mag_term -= mag_direction == 1 ? (1000.0,"Sz",(2,1)) : (1000.0,"Sz",(1,2))
@@ -83,10 +85,10 @@ function get_j1j2_hamilt(layers,j2,j1=1; kwargs...)
 	end
 end
 
-function get_spin_texture(ttn::TTNKit.TreeTensorNetwork; kwargs...)
+function get_spin_texture(ttn::TTN.TreeTensorNetwork; kwargs...)
 	if_sign = get(kwargs, :if_sign, false)
 	
-	exp_occ = real.(TTNKit.expect(ttn,"Sz"))
+	exp_occ = real.(TTN.expect(ttn,"Sz"))
 	if_sign ? exp_occ = sign.(exp_occ) : nothing
 	
 	if_plot = get(kwargs, :if_plot, true)
@@ -152,11 +154,11 @@ function get_pitch_vector(wavefunc; kwargs...)
 end
 
 function allsitescorrelation(wavefunc,op::String)
-	num_sites = TTNKit.number_of_sites(TTNKit.network(wavefunc))
+	num_sites = TTN.number_of_sites(TTN.network(wavefunc))
 	corrmat = zeros(num_sites,num_sites).*im
 	for i in 1:num_sites
 		for j in 1:i
-			corrmat[i,j] = TTNKit.correlation(wavefunc,op,op,i,j)
+			corrmat[i,j] = TTN.correlation(wavefunc,op,op,i,j)
 			corrmat[j,i] = corrmat[i,j]
 		end
 	end
@@ -180,14 +182,14 @@ function distance_correlation(wavefunc,op::String; kwargs...)
 	if_plot = get(kwargs, :if_plot, true)
 	starting_site = get(kwargs, :starting_site, 1)
 	
-	lat = TTNKit.physical_lattice(TTNKit.network(wavefunc))
-	num_sites = TTNKit.number_of_sites(TTNKit.network(wavefunc))
+	lat = TTN.physical_lattice(TTN.network(wavefunc))
+	num_sites = TTN.number_of_sites(TTN.network(wavefunc))
 	corrmat = []
 	distances = []
 	for i in 1:num_sites
-		dist_btw = distance_btw(TTNKit.coordinate(lat,starting_site),TTNKit.coordinate(lat,i),size(lat); kwargs...)
+		dist_btw = distance_btw(TTN.coordinate(lat,starting_site),TTN.coordinate(lat,i),size(lat); kwargs...)
 		if dist_btw != 0.0
-			append!(corrmat,[abs(TTNKit.correlation(wavefunc,op,op,starting_site,i))])
+			append!(corrmat,[abs(TTN.correlation(wavefunc,op,op,starting_site,i))])
 			append!(distances,[dist_btw])
 		end
 	end
@@ -216,15 +218,15 @@ function plot_distance_correlation(distances,corrmat,op::String; kwargs...)
 	title(title_string)
 end
 
-function spinspin_structure_factor(wavefunc::TTNKit.TreeTensorNetwork; kwargs...)
-	lat = TTNKit.physical_lattice(TTNKit.network(wavefunc))
+function spinspin_structure_factor(wavefunc::TTN.TreeTensorNetwork; kwargs...)
+	lat = TTN.physical_lattice(TTN.network(wavefunc))
 	num_sites = prod(size(lat))
 	corr_mat = allsitescorrelation(wavefunc,"Sx") .+ allsitescorrelation(wavefunc,"Sy") .+ allsitescorrelation(wavefunc,"Sz")
 	pitch_vector = get(kwargs, :pitch_vector, get_pitch_vector(wavefunc)[1])
 	exp_mat = zeros(size(corr_mat)).*im
 	for i in 1:size(exp_mat)[1]
 		for j in 1:i
-			phase_part = dot(pitch_vector,TTNKit.coordinate(lat,i) .- TTNKit.coordinate(lat,j))
+			phase_part = dot(pitch_vector,TTN.coordinate(lat,i) .- TTN.coordinate(lat,j))
 			exp_mat[i,j] = exp(im * phase_part)
 			exp_mat[j,i] = exp(-im * phase_part)
 		end
@@ -232,23 +234,23 @@ function spinspin_structure_factor(wavefunc::TTNKit.TreeTensorNetwork; kwargs...
 	return real(sum(exp_mat .* corr_mat) / (num_sites*(num_sites+2)))#, exp_mat
 end
 
-function get_commutator_hamilt(wavefunc::TTNKit.TreeTensorNetwork,ham_op,which_op::String,squared_val,nrg0,s1::Int64)
-	#sz_expval = TTNKit.expect(wavefunc,which_op,s1)
+function get_commutator_hamilt(wavefunc::TTN.TreeTensorNetwork,ham_op,which_op::String,squared_val,nrg0,s1::Int64)
+	#sz_expval = TTN.expect(wavefunc,which_op,s1)
 
-	net = TTNKit.network(wavefunc)
-	ttnc1 = TTNKit.copy(wavefunc)
-	ttnc2 = TTNKit.copy(wavefunc)
+	net = TTN.network(wavefunc)
+	ttnc1 = TTN.copy(wavefunc)
+	ttnc2 = TTN.copy(wavefunc)
 
-	idx_1 = TTNKit.siteinds(net)[s1]
-	O1 = TTNKit.convert_cu(TTNKit.op(which_op,idx_1),wavefunc[(1,1)])
+	idx_1 = TTN.siteinds(net)[s1]
+	O1 = TTN.convert_cu(TTN.op(which_op,idx_1),wavefunc[(1,1)])
 	ch_pos1 = (0,s1)
-	parent_pos1 = TTNKit.parent_node(net,ch_pos1)
-	TTNKit.move_ortho!(ttnc1,parent_pos1)
+	parent_pos1 = TTN.parent_node(net,ch_pos1)
+	TTN.move_ortho!(ttnc1,parent_pos1)
 	T1 = ttnc1[parent_pos1]
-	first_application = TTNKit.noprime(O1*T1)
+	first_application = TTN.noprime(O1*T1)
 	ttnc1[parent_pos1] = first_application
 
-	TTNKit.move_ortho!(ttnc1,(1,1))
+	TTN.move_ortho!(ttnc1,(1,1))
 	sz_nrg = calculate_energy(ttnc1,ham_op)
 	println("Operated Energy = ",sz_nrg)
 
@@ -256,7 +258,135 @@ function get_commutator_hamilt(wavefunc::TTNKit.TreeTensorNetwork,ham_op,which_o
 	return commutator
 end
 
-if false
+function make_j1j2_filename(params_dict::Dict)
+	# Create a filename based on the parameters
+	
+	print("Filename making Not implemented yet")
+	return ""
+end
+
+function get_j1j2_model_params(params_dict::Dict)
+
+	# DMRG parameters
+	sweep_type = get(params_dict, "sweep_type", "dmrg")
+	nrgtol = get(params_dict, "nrgtol", 5E-5)
+	cutoff = get(params_dict, "cutoff", 1E-8)
+	evolve = get(params_dict, "evolve", true)
+	expander_fraction = get(params_dict, "expander_fraction", 0.0)
+	expan = TTN.DefaultExpander(expander_fraction)
+	noise = get(params_dict, "noise", [0.0])
+	nswps = get(params_dict, "num_sweeps", 100)
+	output_level = get(params_dict, "output_level", 1)
+	seed_ttn = get(params_dict, "seed_ttn", nothing)
+
+
+	# Lattice/TTN Parameters
+	mdim = get(params_dict, "mdim", 300)
+	if_periodic_y = get(params_dict, "if_periodic_y", true)
+	if_periodic_x = get(params_dict, "if_periodic_x", true)
+	Lx::Int = get(params_dict, "Lx", 4)
+	Ly::Int = get(params_dict, "Ly", 4)
+	num_particles::Int = get(params_dict, "particles", Int(Lx*Ly/2))
+	ttn_size = get_ttn_dims([Lx,Ly])
+	layer_count = get_layers_from_dims([Lx,Ly])
+	particle_type = "Qubit"
+	syms = get(params_dict, "syms", true)
+
+
+	# Hamiltonian parameters
+
+	j1 = get(params_dict, "j1", 1.0)
+	j2 = get(params_dict, "j2", 0.0)
+
+	if_mag_orientation = get(params_dict,"if_mag_orientation",true)
+	mag_direction = get(params_dict,"mag_direction",1.0)
+
+
+	mu = get(params_dict, "chem_strength", 0.0)
+	
+	# What to calculate
+	if_redo = get(params_dict, "if_redo", false)
+	if_densmat = get(params_dict, :if_densmat, false)
+	save_data = get(params_dict, "if_save_data", true)
+	if_cluster = any([occursin("local",pwd()),occursin("Local",pwd()),occursin("geraghty",pwd())])
+	if_continuous_saving = get(params_dict,"if_continuous_saving",if_cluster || layer_count >= 7)
+	save_data ? nothing : if_continuous_saving = false
+	#es_count = get(params_dict, "es_count", 0)
+
+
+	dataloc = get_folder_location("cluster-data/j1j2")
+	loc = get(params_dict, "dataloc", dataloc)
+	
+
+
+	# hardware parameters
+	if_gpu = get(params_dict, "if_gpu", false)
+	
+
+	
+	
+	model_paras_dict = Dict("layers"=>layer_count,
+						"particles"=>num_particles,
+						"j1"=>j1,
+						"j2"=>j2,
+						"if_mag_orientation"=>if_mag_orientation,
+						"mag_direction"=>mag_direction,
+						"expander_fraction"=>expander_fraction,
+						"syms"=>syms,
+						"part_type"=>particle_type,
+						"cutoff"=>cutoff,
+						"seed_ttn"=>seed_ttn,
+						"if_continuous_saving"=>if_continuous_saving,
+						"output_level"=>output_level,
+						"nrgtol"=>nrgtol,
+						"if_densmat"=>if_densmat,
+						"if_redo"=>if_redo,
+						"lattice_size"=>[Lx,Ly],
+						"ttn_size"=>ttn_size,
+						"if_periodic_y"=>if_periodic_y,
+						"if_periodic_x"=>if_periodic_x,
+						"chem_strength"=>mu,
+						"if_gpu"=>if_gpu,
+						"noise"=>noise,
+						"if_save_data"=>save_data,
+						"if_sweep"=>evolve,
+						"sweep_type"=>sweep_type,
+						"expander"=>expan,
+						"mdim"=>mdim,
+						"num_sweeps"=>nswps,
+						"output_level"=>0,
+						"location"=>loc)
+		
+	filename = make_j1j2_filename(model_paras_dict)
+	model_paras_dict["name"] = "ttn-"*filename
+	
+	return dict_to_symbols(model_paras_dict)
+end
+
+
+# periodic boundaries sPEPS comparison
+if true
+	lx,ly = 4,4
+	mdim = 200
+	j1 = 1.0
+	j2 = 0.0
+
+	params_dict = Dict([("Lx",lx),("Ly",ly),("mdim",mdim),("expander_fraction",0.5),("j1",j1),("j2",j2),("if_save_data",false),("if_periodic_x",true),("if_periodic_y",true),("if_gpu",false)])
+	model_paras = get_j1j2_model_params(params_dict)
+	metadata_dict = named_tuple_to_dict(model_paras)
+
+	starting = time()
+	net = TTN.BinaryRectangularNetwork(model_paras[:layers], TTN.ITensorNode, "Qubit", conserve_qns=model_paras[:syms])
+	hamj1j2 = get_j1j2_hamilt(model_paras[:layers],j2; model_paras...)
+
+	state, hamilt, sp, obs, runtime = find_ground_state(model_paras[:layers],model_paras[:particles]; ttn_net=net,ham=hamj1j2,model_paras...,metadata=merge(metadata_dict,Dict([("ham",hamj1j2)])))
+	total_time = time() - starting
+	println("Total running time: $runtime")
+
+end
+
+
+#=if false
 
 ll = 4
 j_two = 0.0
@@ -299,7 +429,7 @@ if_redo = get(params_dict,"if_redo",false)
 
 noise = get(params_dict,"noise",0.0)
 expander_val = get(params_dict,"expander_val",1.0)
-expander = TTNKit.DefaultExpander(expander_val)
+expander = TTN.DefaultExpander(expander_val)
 
 
 filename_dict = Dict([("layers",layers),("j2",j2),("mdim",mdim),("if_mag_orientation",if_mag_orientation),("if_periodic",if_periodic)])
@@ -339,7 +469,7 @@ if if_exists
 	
 	if if_redo 
 		starting = time()
-		net = TTNKit.BinaryRectangularNetwork(layers, TTNKit.ITensorNode, "Qubit", conserve_qns=syms)
+		net = TTN.BinaryRectangularNetwork(layers, TTN.ITensorNode, "Qubit", conserve_qns=syms)
 		hamj1j2 = get_j1j2_hamilt(layers,j2; model_paras...)
 
 		og_ttn, hamilt, dm_sp, rezobs, runtime = find_ground_state(layers,num_parts; ttn_net=net,ham_op=hamj1j2,model_paras...,if_redo=true,metadata=merge(metadata_dict,Dict([("ham",hamj1j2),("net",net)])))
@@ -350,7 +480,7 @@ if if_exists
 
 else		
 	starting = time()
-	net = TTNKit.BinaryRectangularNetwork(layers, TTNKit.ITensorNode, "Qubit", conserve_qns=syms)
+	net = TTN.BinaryRectangularNetwork(layers, TTN.ITensorNode, "Qubit", conserve_qns=syms)
 	hamj1j2 = get_j1j2_hamilt(layers,j2; model_paras...)
 
 	og_ttn, hamilt, dm_sp, rezobs, runtime = find_ground_state(layers,num_parts; ttn_net=net,ham_op=hamj1j2,model_paras...,metadata=merge(metadata_dict,Dict([("ham",hamj1j2),("net",net)])))
@@ -363,10 +493,10 @@ end
 #append!(all_wavefuncs,[wavefunc])
 
 #=if j2 > 1.0
-	shift = idx == 1 ? 1000*TTNKit.expect(wavefunc,"Sz",(2,1)) : 1000*TTNKit.expect(wavefunc,"Sz",(1,2))
-	final_energy = (rezobs.nrg[end] + shift + 1000*TTNKit.expect(wavefunc,"Sz",(1,1))) / 2^layers
+	shift = idx == 1 ? 1000*TTN.expect(wavefunc,"Sz",(2,1)) : 1000*TTN.expect(wavefunc,"Sz",(1,2))
+	final_energy = (rezobs.nrg[end] + shift + 1000*TTN.expect(wavefunc,"Sz",(1,1))) / 2^layers
 else=#
-	#final_energy = if_mag_orientation ? (rezobs.nrg[end] + 1000*mag_direction*TTNKit.expect(wavefunc,"Sz",(1,1))) / 2^layers : rezobs.nrg[end] / 2^layers
+	#final_energy = if_mag_orientation ? (rezobs.nrg[end] + 1000*mag_direction*TTN.expect(wavefunc,"Sz",(1,1))) / 2^layers : rezobs.nrg[end] / 2^layers
 #end
 
 #text = get_spin_texture(wavefunc; if_sign = false,plot_title = "J2 = $j2, ")#NRG = $(round(real(final_energy),digits=5))")#
@@ -374,11 +504,11 @@ else=#
 #append!(all_wavefuncs,[wavefunc])
 
 #println("Energy per site = ",round(final_energy,digits=5))
-#scatter(1/TTNKit.maxlinkdim(wavefunc),final_energy,c="b")
+#scatter(1/TTN.maxlinkdim(wavefunc),final_energy,c="b")
 #xscale("log")
 #end
 
-end
+end=#
 
 #ham_here = get_j1j2_hamilt(layers,j2; model_paras...)#if_exists ? metadata["ham"] : hamj1j2
 #comval = get_commutator_hamilt(wavefunc,ham_here,"Sz",1.0,rezobs.nrg[end],1)
@@ -389,28 +519,28 @@ end
 #=which_wavefunc = 1
 s1 = 1
 s2 = 2
-net = TTNKit.network(all_wavefuncs[which_wavefunc])
-ttnc1 = TTNKit.copy(all_wavefuncs[which_wavefunc])
-ttnc2 = TTNKit.copy(all_wavefuncs[which_wavefunc])
+net = TTN.network(all_wavefuncs[which_wavefunc])
+ttnc1 = TTN.copy(all_wavefuncs[which_wavefunc])
+ttnc2 = TTN.copy(all_wavefuncs[which_wavefunc])
 
-idx_1 = TTNKit.siteinds(net)[s1]
-O1 = TTNKit.convert_cu(TTNKit.op("Sz",idx_1),all_wavefuncs[which_wavefunc][(1,1)])
+idx_1 = TTN.siteinds(net)[s1]
+O1 = TTN.convert_cu(TTN.op("Sz",idx_1),all_wavefuncs[which_wavefunc][(1,1)])
 ch_pos1 = (0,s1)
-parent_pos1 = TTNKit.parent_node(net,ch_pos1)
-TTNKit.move_ortho!(ttnc1,parent_pos1)
+parent_pos1 = TTN.parent_node(net,ch_pos1)
+TTN.move_ortho!(ttnc1,parent_pos1)
 T1 = ttnc1[parent_pos1]
-first_application = TTNKit.noprime(O1*T1)
+first_application = TTN.noprime(O1*T1)
 ttnc1[parent_pos1] = first_application
 
-idx_2 = TTNKit.siteinds(net)[s2]
-O2 = TTNKit.convert_cu(TTNKit.op("Sz",idx_2),all_wavefuncs[which_wavefunc][(1,1)])
+idx_2 = TTN.siteinds(net)[s2]
+O2 = TTN.convert_cu(TTN.op("Sz",idx_2),all_wavefuncs[which_wavefunc][(1,1)])
 ch_pos2 = (0,s2)
-parent_pos2 = TTNKit.parent_node(net,ch_pos2)
-TTNKit.move_ortho!(ttnc1,parent_pos2)
+parent_pos2 = TTN.parent_node(net,ch_pos2)
+TTN.move_ortho!(ttnc1,parent_pos2)
 T2 = ttnc1[parent_pos2]
-second_application = TTNKit.noprime(O2*first_application)
+second_application = TTN.noprime(O2*first_application)
 
-TTNKit.move_ortho!(ttnc2,parent_pos2)
+TTN.move_ortho!(ttnc2,parent_pos2)
 
 T = ttnc2[parent_pos2]
 res = dot(T, second_application)
