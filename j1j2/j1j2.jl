@@ -1,9 +1,9 @@
-#using Pkg
-#Pkg.activate("../synth-dims")
+using Pkg
+Pkg.activate("../synth-dims")
 include("../review-practice-codes/ttn.jl")
 include("../other-funcs/basic-2d-stuff.jl")
 include("../review-practice-codes/observables.jl")
-using Statistics,MKL
+using Statistics,MKL,CUDA
 #using PyPlot
 
 function find_next_nearest_neighbors(layers,if_periodic=false)
@@ -258,11 +258,31 @@ function get_commutator_hamilt(wavefunc::TTN.TreeTensorNetwork,ham_op,which_op::
 	return commutator
 end
 
-function make_j1j2_filename(params_dict::Dict)
+function make_j1j2_filename(model_parameters::Dict)
 	# Create a filename based on the parameters
+
+	# Start with the usual stuff for every filename
+	Lx,Ly = model_parameters["lattice_size"]
+	j1 = model_parameters["j1"]
+	j2 = model_parameters["j2"]
+	if_periodic_x = model_parameters["if_periodic_x"]
+	if_periodic_y = model_parameters["if_periodic_y"]
+	bonddim = model_parameters["mdim"]
 	
-	print("Filename making Not implemented yet")
-	return ""
+	filename_dict = Dict("Lx"=>Lx,
+						"Ly"=>Ly,
+						"j1"=>j1,
+						"j2"=>j2,
+						"if_periodic_x"=>if_periodic_x,
+						"if_periodic_y"=>if_periodic_y,
+						"mdim"=>bonddim)
+
+	if model_parameters["if_gpu"]
+		filename_dict["if_gpu"] = true
+	end
+
+	return make_parameters_filename(filename_dict)*".h5"	
+
 end
 
 function get_j1j2_model_params(params_dict::Dict)
@@ -284,6 +304,7 @@ function get_j1j2_model_params(params_dict::Dict)
 	mdim = get(params_dict, "mdim", 300)
 	if_periodic_y = get(params_dict, "if_periodic_y", true)
 	if_periodic_x = get(params_dict, "if_periodic_x", true)
+	if_periodic = if_periodic_x && if_periodic_y
 	Lx::Int = get(params_dict, "Lx", 4)
 	Ly::Int = get(params_dict, "Ly", 4)
 	num_particles::Int = get(params_dict, "particles", Int(Lx*Ly/2))
@@ -298,7 +319,7 @@ function get_j1j2_model_params(params_dict::Dict)
 	j1 = get(params_dict, "j1", 1.0)
 	j2 = get(params_dict, "j2", 0.0)
 
-	if_mag_orientation = get(params_dict,"if_mag_orientation",true)
+	if_mag_orientation = get(params_dict,"if_mag_orientation",false)
 	mag_direction = get(params_dict,"mag_direction",1.0)
 
 
@@ -345,6 +366,7 @@ function get_j1j2_model_params(params_dict::Dict)
 						"ttn_size"=>ttn_size,
 						"if_periodic_y"=>if_periodic_y,
 						"if_periodic_x"=>if_periodic_x,
+						"if_periodic"=>if_periodic,
 						"chem_strength"=>mu,
 						"if_gpu"=>if_gpu,
 						"noise"=>noise,
@@ -366,12 +388,21 @@ end
 
 # periodic boundaries sPEPS comparison
 if true
-	lx,ly = 4,4
-	mdim = 200
+	args_dict = make_args_dict(ARGS)
+	lx = args_dict["Lx"]
+	ly = args_dict["Ly"]
+	mdim = args_dict["mdim"]
+	j1 = 1.0
+	j2 = args_dict["j2"]
+	if_gpu = args_dict["if_gpu"]
+
+	#=lx,ly = 4,4
+	mdim = 100
 	j1 = 1.0
 	j2 = 0.0
+	if_gpu = false=#
 
-	params_dict = Dict([("Lx",lx),("Ly",ly),("mdim",mdim),("expander_fraction",0.5),("j1",j1),("j2",j2),("if_save_data",false),("if_periodic_x",true),("if_periodic_y",true),("if_gpu",false)])
+	params_dict = Dict([("Lx",lx),("Ly",ly),("mdim",mdim),("expander_fraction",1.0),("j1",j1),("j2",j2),("if_save_data",true),("if_periodic_x",true),("if_periodic_y",true),("if_gpu",if_gpu)])
 	model_paras = get_j1j2_model_params(params_dict)
 	metadata_dict = named_tuple_to_dict(model_paras)
 
@@ -379,9 +410,12 @@ if true
 	net = TTN.BinaryRectangularNetwork(model_paras[:layers], TTN.ITensorNode, "Qubit", conserve_qns=model_paras[:syms])
 	hamj1j2 = get_j1j2_hamilt(model_paras[:layers],j2; model_paras...)
 
-	state, hamilt, sp, obs, runtime = find_ground_state(model_paras[:layers],model_paras[:particles]; ttn_net=net,ham=hamj1j2,model_paras...,metadata=merge(metadata_dict,Dict([("ham",hamj1j2)])))
+	CUDA.@allowscalar state, hamilt, sp, obs, runtime = find_ground_state(model_paras[:layers],model_paras[:particles]; ttn_net=net,ham=hamj1j2,model_paras...,metadata=merge(metadata_dict,Dict([("ham",hamj1j2)])))
 	total_time = time() - starting
 	println("Total running time: $runtime")
+
+	shifted_nrg = obs.nrg[end]
+	println("Energy per site = ",round(shifted_nrg / 2^model_paras[:layers],digits=5))
 
 end
 

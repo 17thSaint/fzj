@@ -1016,7 +1016,7 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 			end
 		end
 		
-		if_densmat ? densmat = density_matrix(sp.ttn) : nothing
+		densmat = if_densmat ? density_matrix(sp.ttn) : zeros(ComplexF64,2,2)
 
 		end_time::Float64 = time()
 		
@@ -1376,9 +1376,11 @@ function save_initial_ttn(ttn::TTN.TreeTensorNetwork,metadata::Dict; kwargs...)
 		end
 	else
 		if if_gpu
-			actual_filename = write_data("wavefunc"*filename,Dict([("ttn",back2cpu(ttn))]),location,metadata)
+			write_data("wavefunc"*filename,Dict([("ttn",back2cpu(ttn))]),location,metadata)
+			actual_filename = write_data(filename,Dict([("densmat",nothing)]),location,metadata)
 		else
-			actual_filename = write_data("wavefunc"*filename,Dict([("ttn",ttn)]),location,metadata)
+			write_data("wavefunc"*filename,Dict([("ttn",ttn)]),location,metadata)
+			actual_filename = write_data(filename,Dict([("densmat",nothing)]),location,metadata)
 		end
 		actual_filename = remove_wavefunc_from_filename(actual_filename)
 	end

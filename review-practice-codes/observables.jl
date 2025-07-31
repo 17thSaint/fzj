@@ -593,10 +593,22 @@ function save_tee(gamma::Float64,tee_data::Dict{String,Float64},cutlink_data::Di
     modify_data(Dict([("tee",gamma),("tee_data",tee_data),("tee_cutlink_data",cutlink_data)]),filepath,"metadata"; output_level=0)
 end
 
+function find_particle_type(ttn::TTN.TreeTensorNetwork)
+    if join(split(split(string(TTN.tags(TTN.inds(ttn[1,1])[1])),",")[1],"")[2:end]) == "Boson"
+        return "Boson"
+    else
+        return "Fermion"
+    end
+end
+
 function density_matrix(ttn::TTN.TreeTensorNetwork; kwargs...)
-	if_fermion::Bool = get(kwargs, :if_fermion, false)
-	creation = if_fermion ? "Cdag" : "Adag"
-	annihilation = if_fermion ? "C" : "A"
+	
+    if find_particle_type(ttn) != "Boson"
+        return zeros(ComplexF64,2,2)
+    end
+
+	creation = "Adag"
+	annihilation = "A"
 	output_level = get(kwargs, :output_level, false)
 	
 	lat = TTN.physical_lattice(TTN.network(ttn))

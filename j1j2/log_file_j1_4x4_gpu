@@ -1,0 +1,94 @@
+pgi8cluster22: Using Ethernet for MPI communication.
+pgi8cluster22: Using Ethernet for MPI communication.
+The latest version of Julia in the `release` channel is 1.11.6+0.x64.linux.gnu. You currently have `1.11.3+0.x64.linux.gnu` installed. Run:
+
+  juliaup update
+
+in your terminal shell to install Julia 1.11.6+0.x64.linux.gnu and update the `release` channel to that version.
+  Activating project at `/local/geraghty/synth-dims`
+Dict{String, Any} with 34 entries:
+  "if_gpu" => true
+  "expander_fraction" => 1.0
+  "ttn_size" => [4, 4]
+  "if_continuous_saving" => true
+  "particles" => 8
+  "if_redo" => false
+  "if_densmat" => false
+  "max_occ" => 1
+  "if_sweep" => true
+  "if_save_data" => true
+  "j2" => 0.0
+  "lattice_size" => [4, 4]
+  "location" => "/local/geraghty/cluster-data/j1j2"
+  "cutoff" => 1.0e-8
+  "name" => "ttn-if_gpu-true-Ly-4-j2-0.0-Lx-4-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+  "if_periodic_y" => true
+  "noise" => [0.0]
+  "j1" => 1.0
+  "nrgtol" => 5.0e-5
+  "mdim" => 300
+  "output_level" => 0
+  "if_periodic_x" => true
+  "sweep_type" => "dmrg"
+  "particle_type" => "Qubit"
+  "if_periodic" => true
+  "layers" => 4
+  "if_mag_orientation" => false
+  "num_sweeps" => 100
+  "mag_direction" => 1.0
+  "conserve_qns" => true
+  "expander" => DefaultExpander{Float64}(1.0, 1, 10, 1.0e-5)
+  "chem_strength" => 0.0
+  "part_type" => "Qubit"
+  "syms" => true
+Finished Building Network
+reorthogonalize = true
+Data Added, File Closed: /local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-4-j2-0.0-Lx-4-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5
+Doing GPU TTN
+Added States
+Built Hamiltonian
+"/local/geraghty/cluster-data/j1j2/wavefuncwavefuncttn-if_gpu-true-Ly-4-j2-0.0-Lx-4-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+ERROR: LoadError: unable to determine if /local/geraghty/cluster-data/j1j2/wavefuncwavefuncttn-if_gpu-true-Ly-4-j2-0.0-Lx-4-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5 is accessible in the HDF5 format (file may not exist)
+Stacktrace:
+  [1] error(s::String)
+    @ Base ./error.jl:35
+  [2] h5open(filename::String, mode::String, fapl::HDF5.FileAccessProperties, fcpl::HDF5.FileCreateProperties; swmr::Bool)
+    @ HDF5 /local/geraghty/.julia/packages/HDF5/Z859u/src/file.jl:48
+  [3] h5open
+    @ /local/geraghty/.julia/packages/HDF5/Z859u/src/file.jl:20 [inlined]
+  [4] h5open(filename::String, mode::String; swmr::Bool, fapl::HDF5.FileAccessProperties, fcpl::HDF5.FileCreateProperties, pv::@Kwargs{})
+    @ HDF5 /local/geraghty/.julia/packages/HDF5/Z859u/src/file.jl:75
+  [5] h5open(filename::String, mode::String)
+    @ HDF5 /local/geraghty/.julia/packages/HDF5/Z859u/src/file.jl:63
+  [6] #h5open#16
+    @ /local/geraghty/.julia/packages/HDF5/Z859u/src/file.jl:95 [inlined]
+  [7] h5open
+    @ /local/geraghty/.julia/packages/HDF5/Z859u/src/file.jl:94 [inlined]
+  [8] #modify_data_hdf5#228
+    @ /local/geraghty/other-funcs/data-storage-funcs.jl:732 [inlined]
+  [9] modify_data_hdf5
+    @ /local/geraghty/other-funcs/data-storage-funcs.jl:729 [inlined]
+ [10] modify_data(to_modify_dict::Dict{String, Any}, file_path::String, which_group::String; kwargs::@Kwargs{})
+    @ Main /local/geraghty/other-funcs/data-storage-funcs.jl:813
+ [11] modify_data
+    @ /local/geraghty/other-funcs/data-storage-funcs.jl:808 [inlined]
+ [12] measure!(o::SavingNRGVarObserver; kwargs::@Kwargs{sweep_handler::TTN.SimpleSweepHandler, outputlevel::Int64, dt::Float64})
+    @ Main /local/geraghty/review-practice-codes/ttn.jl:1451
+ [13] measure!
+    @ /local/geraghty/review-practice-codes/ttn.jl:1442 [inlined]
+ [14] sweep(psi0::TreeTensorNetwork{BinaryNetwork{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, ITensors.ITensor}, sp::TTN.SimpleSweepHandler; kwargs::@Kwargs{number_of_sweeps::Int64, maxdims::Vector{Int64}, noise::Vector{Float64}, output_level::Int64, observer::SavingNRGVarObserver, cutoff::Float64, eigsolve_krylovdim::Int64, eigsolve_verbosity::Int64})
+    @ TTN /local/geraghty/.julia/packages/TTN/src/algorithms/sweeps.jl:50
+ [15] sweep
+    @ /local/geraghty/.julia/packages/TTN/src/algorithms/sweeps.jl:17 [inlined]
+ [16] dmrg(psi0::TreeTensorNetwork{BinaryNetwork{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, ITensors.ITensor}, tpo::TPO{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}; expander::DefaultExpander{Float64}, kwargs::@Kwargs{number_of_sweeps::Int64, maxdims::Vector{Int64}, noise::Vector{Float64}, output_level::Int64, observer::SavingNRGVarObserver, cutoff::Float64, eigsolve_krylovdim::Int64, eigsolve_verbosity::Int64})
+    @ TTN /local/geraghty/.julia/packages/TTN/src/algorithms/sweeps.jl:111
+ [17] do_sweep(ttn::TreeTensorNetwork{BinaryNetwork{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, ITensors.ITensor}, ham::TPO{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, sweep_type::String; kwargs::@Kwargs{ttn_net::BinaryNetwork{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, ham::Sum{Scaled{ComplexF64, Prod{Op}}}, if_continuous_saving::Bool, j2::Float64, lattice_size::Vector{Int64}, if_gpu::Bool, location::String, num_sweeps::Int64, j1::Float64, particles::Int64, cutoff::Float64, if_sweep::Bool, expander_fraction::Float64, if_redo::Bool, expander::DefaultExpander{Float64}, chem_strength::Float64, if_periodic_x::Bool, name::String, if_mag_orientation::Bool, ttn_size::Vector{Int64}, mag_direction::Float64, noise::Vector{Float64}, if_save_data::Bool, if_periodic::Bool, if_densmat::Bool, nrgtol::Float64, part_type::String, mdim::Int64, if_periodic_y::Bool, sweep_type::String, layers::Int64, seed_ttn::Nothing, syms::Bool, output_level::Int64, metadata::Dict{String, Any}, file_path::String})
+    @ Main /local/geraghty/review-practice-codes/ttn.jl:792
+ [18] find_ground_state(num_layers::Int64, particle_count::Int64; kwargs::@Kwargs{ttn_net::BinaryNetwork{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, ham::Sum{Scaled{ComplexF64, Prod{Op}}}, if_continuous_saving::Bool, j2::Float64, lattice_size::Vector{Int64}, if_gpu::Bool, location::String, num_sweeps::Int64, j1::Float64, particles::Int64, cutoff::Float64, if_sweep::Bool, expander_fraction::Float64, if_redo::Bool, expander::DefaultExpander{Float64}, chem_strength::Float64, if_periodic_x::Bool, name::String, if_mag_orientation::Bool, ttn_size::Vector{Int64}, mag_direction::Float64, noise::Vector{Float64}, if_save_data::Bool, if_periodic::Bool, if_densmat::Bool, nrgtol::Float64, part_type::String, mdim::Int64, if_periodic_y::Bool, sweep_type::String, layers::Int64, seed_ttn::Nothing, syms::Bool, output_level::Int64, metadata::Dict{String, Any}})
+    @ Main /local/geraghty/review-practice-codes/ttn.jl:994
+ [19] macro expansion
+    @ /local/geraghty/.julia/packages/GPUArraysCore/aNaXo/src/GPUArraysCore.jl:206 [inlined]
+ [20] top-level scope
+    @ /local/geraghty/j1j2/j1j2.jl:407
+in expression starting at /local/geraghty/j1j2/j1j2.jl:390
+srun: error: pgi8cluster22: task 0: Exited with exit code 1

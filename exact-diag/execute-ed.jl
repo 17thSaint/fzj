@@ -44,7 +44,7 @@ end
 
 
 include_other_files(["other-funcs/basic-2d-stuff.jl","other-funcs/basic-2d-observables.jl","exact-diag/two-dimensions.jl","exact-diag/observables.jl","exact-diag/hatsugai-mbcn.jl"])
-include_other_files(["exact-diag/time-evolution.jl"])
+#include_other_files(["exact-diag/time-evolution.jl"])
 include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
 
 function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
@@ -583,8 +583,8 @@ if false
 
 end=#
 
-# testing time evolution
-if true
+#= testing time evolution
+if false
     lx,ly,n = 4,4,2
     anis = 1e-4
     intstren = 300.0
@@ -599,9 +599,14 @@ if true
     speccount = 30
     time_running_args = (nev=speccount,output_level=1,)
 
-    ramptimes = range(0.01,0.1,length=50)
+    
 
-    for (idx,ramptime) in enumerate(ramptimes)
+
+    #fig = figure()
+    #ramptimes = range(0.00001,0.00009,length=4)
+    #for (idx,ramptime) in enumerate(ramptimes)
+
+    ramptime = 0.00001
 
         tevo_params = Dict([ ("tx",(linear_ramp,params_dict["tx"],end_tx,ramptime)) ])
         tevo_gs,tevo_dict,instspec = run_timeevo(gs,tevo_params,lattice_params,hamilt_params; time_running_args...)
@@ -609,7 +614,7 @@ if true
         ending_inst_occs = get_occupancy(Vector(instspec["1"][:,end]),lattice_params; if_plot=false)
         stable_ending_occratio = minimum(ending_inst_occs) / maximum(ending_inst_occs)
 
-        length_average_times = Int(ceil(size(tevo_gs,2) * 0.8))
+        length_average_times = Int(ceil(size(tevo_gs,2) * 1.0))
         max_val = nothing
         min_val = nothing
         for i in 0:length_average_times-1
@@ -622,30 +627,30 @@ if true
             #ylabel("Occupancy Ratio")=#
 
             local_val = abs2(adjoint(gs) * tevo_gs[:,end-i])
-            #scatter(size(tevo_gs,2)-i,inst_overlap,c="b")
-            #xlabel("Time Step")
-            #ylabel("Overlap with Instantaneous GS")
+            scatter(size(tevo_gs,2)-i,local_val,c="b")
+            xlabel("Time Step")
+            ylabel("Overlap with Instantaneous GS")
 
-            if isnothing(max_val) || local_val > max_val
+            #=if isnothing(max_val) || local_val > max_val
                 max_val = local_val
             end
             if isnothing(min_val) || local_val < min_val
                 min_val = local_val
-            end
+            end=#
 
 
         end
 
         #amplitude = max_val - min_val
         #scatter(ramptime,amplitude,c="b")
-        scatter(ramptime,1-min_val,c="b")
-        xlabel("Ramp Time")
+        #scatter(ramptime,1-min_val,c="b")
+        #xlabel("Ramp Time")
         #ylabel("Amplitude of Occupancy Ratio Oscillation")
-        ylabel("Deviation from 1 of Overlap Oscillation")
+        #ylabel("Deviation from 1 of Overlap Oscillation")
 
-    end
+    #end
     
-end#
+end=#
 
 
 

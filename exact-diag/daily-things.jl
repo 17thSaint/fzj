@@ -156,8 +156,8 @@ if true
     end
 end=#
 
-# little plot for 4x4 n=2 adiabatic condition tx and periodic potential strength
-if true
+#= little plot for 4x4 n=2 adiabatic condition tx and periodic potential strength
+if false
     lx,ly,n = 4,4,2
     intstren = 300.0
     potstrens = vcat([1e-4,1e-3],round.(10 .^ range(-2,2,length=10),digits=4),100.1)
@@ -199,7 +199,7 @@ if true
     xscale("log")
 
 
-end#
+end=#
 
 #= save adiabatic condition data for periodic potential
 if false
@@ -374,6 +374,38 @@ if false
 
 
 end=#
+
+# real/momentum space 4pt for all ulrs and txs
+if true
+    lx,ly,n = 8,4,4
+    hanis = 1e-3
+    intstren = 0.0
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren),("hopping_anisotropy",hanis)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    display(all_files)
+    
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    latparas = get_lattice_params_from_metadata(m)
+    
+    #=r4pt = realspace_fourpoint_full(d["state"][1],latparas; output_level=1)
+    fig = figure()
+    imshow(real.(sum(r4pt, dims=[3,4])[:,:,1,1]); origin="lower",vmin=0.0,vmax=0.5)
+    xlabel("x")
+    ylabel("x'")
+    colorbar()
+    title("Real Space 4pt for $(lx)x$(ly) N=$(n) tx=$hanis ULR=$intstren")=#
+
+    m4pt = four_point(d["state"][1],latparas; if_plot=false)
+    fig = figure()
+    imshow(m4pt; origin="lower",vmin=0.0,vmax=0.5)
+    xlabel("k_x")
+    ylabel("k_x'")
+    colorbar()
+    title("Momentum Space 4pt for $(lx)x$(ly) N=$(n) tx=$hanis ULR=$intstren")
+
+end
+
 
 #= track overlap with periodic potential
 if true

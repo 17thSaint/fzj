@@ -11,7 +11,7 @@ This file contains GPU testing and benchmarking on TTNs
 
 using TTN
 include("../other-funcs/include-other-files.jl")
-include_other_files(["other-funcs/data-storage-funcs.jl","review-practice-codes/overwriting-ttn.jl"])
+include_other_files(["other-funcs/data-storage-funcs.jl"])
 
 #using CUDA
 using LinearAlgebra
@@ -301,8 +301,8 @@ function benchmark_model_params(args_dict::Dict{String,Any})
     return model_paras
 end
 
-#args_dict = Dict([("benchmark_type","cpu"),("model","J1J2"),("min_mdim",50),("max_mdim",60),("count_mdim",2),("if_save_data",false)])
-args_dict = make_args_dict(ARGS)
+args_dict = Dict([("benchmark_type","cpu"),("model","J1J2"),("min_mdim",50),("max_mdim",60),("count_mdim",2),("if_save_data",false)])
+#=args_dict = make_args_dict(ARGS)
 
 # make model parameters
 model_paras = benchmark_model_params(args_dict)
@@ -335,7 +335,7 @@ for (idx,mdim) in enumerate(mdims)
 end=#
 
 
-# plot benchmarking results
+#= plot benchmarking results
 if true
     using PyPlot,LaTeXStrings
     layers = 6
@@ -393,7 +393,7 @@ if true
     legend()
     xscale("log")
     yscale("log")
-end
+end=#
 
 #=dataloc = get_folder_location("cluster-data/gpu-benchmarking")
 for f in all_files

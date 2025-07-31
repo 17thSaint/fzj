@@ -1,0 +1,16 @@
+pgi8cluster44: Using Ethernet for MPI communication.
+pgi8cluster44: Using Ethernet for MPI communication.
+The latest version of Julia in the `release` channel is 1.11.5+0.x64.linux.gnu. You currently have `1.11.3+0.x64.linux.gnu` installed. Run:
+
+  juliaup update
+
+in your terminal shell to install Julia 1.11.5+0.x64.linux.gnu and update the `release` channel to that version.
+ERROR: SystemError: opening file "/local/geraghty/exact-diag/long-range-ttn.jl": No such file or directory
+Stacktrace:
+ [1] include(mod::Module, _path::String)
+   @ Base ./Base.jl:557
+ [2] exec_options(opts::Base.JLOptions)
+   @ Base ./client.jl:323
+ [3] _start()
+   @ Base ./client.jl:531
+srun: error: pgi8cluster44: task 0: Exited with exit code 1

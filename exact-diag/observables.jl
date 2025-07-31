@@ -788,6 +788,32 @@ function four_point_operator(site1::Int64,site2::Int64,site3::Int64,site4::Int64
     return dubhop
 end
 
+function realspace_fourpoint_full(psi::Vector{ComplexF64},lattice_params::Dict; kwargs...)
+    Lx::Int64 = lattice_params["Lx"]
+    Ly::Int64 = lattice_params["Ly"]
+
+    opl::Int = get(kwargs,:output_level,1)
+
+    fourpt::Array{ComplexF64} = zeros(ComplexF64,Lx,Lx,Ly,Ly)
+    for x1 in 1:Lx
+        for x2 in 1:Lx
+            opl > 0 && println("Working on x1=$(x1) x2=$(x2)")
+            for y1 in 1:Ly
+                for y2 in 1:Ly
+                    opl > 1 && println("Working on y1=$(y1) y2=$(y2)")
+                    s1 = linear_index((x1,y1),Lx,Ly)
+                    s2 = linear_index((x2,y2),Lx,Ly)
+                    big_operator = four_point_operator(s1,s2,s2,s1,lattice_params)
+                    expectval = (adjoint(psi) * (big_operator * psi))
+                    fourpt[x1,x2,y1,y2] = expectval
+                end
+            end
+        end
+    end
+
+    return fourpt
+end
+
 function ft_fourpt(psi::Vector{ComplexF64},momentum1::Vector{Float64},momentum2::Vector{Float64},lattice_params::Dict; kwargs...)
     Lx::Int64 = lattice_params["Lx"]
     Ly::Int64 = lattice_params["Ly"]

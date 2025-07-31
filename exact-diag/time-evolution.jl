@@ -247,7 +247,7 @@ function run_timeevo(starting_gs::Vector{ComplexF64},time_params::Dict,lattice_d
     
     max_ramp_time::Float64 = get_maxramptime(time_params)
     least_ramp_time::Float64 = get_leastramptime(time_params)
-    tmax::Float64 = max(10*max_ramp_time,0.5)
+    tmax::Float64 = max(10*max_ramp_time,0.1)
     
     dt::Float64 = get_dt(tmax,least_ramp_time; kwargs...)
 

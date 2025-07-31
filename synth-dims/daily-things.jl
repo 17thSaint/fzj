@@ -180,7 +180,6 @@ if false
     legend()
 end=#
 
-
 #= check if expander is so required 8x4 and 16x8
 if false
     lx,ly,n = 8,4,4
