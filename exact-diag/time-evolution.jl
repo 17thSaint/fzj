@@ -17,7 +17,7 @@ function timeham(timestep::Int,t_evo_params::Dict,lattice_params::Dict,hamilt_pa
 
     # reset hamilt_params given the timestep from the t_evo_params
     for (k,v) in t_evo_params
-        if k != "dt" && k != "nsteps" && k != "tmax"
+        if k != "dt" && k != "nsteps" && k != "tmax" && k != "when_dt_ends"
             hamilt_params[k] = v[timestep]
         end
     end
@@ -170,18 +170,15 @@ function make_tevo_params(given_parameters::Dict)
     # initialize the time evolution parameters
     t_evo_params::Dict = Dict{String,Any}()
 
-    # set the time step and number of steps
-    t_evo_params["dt"] = get(given_parameters, "dt", 0.01)
-    if haskey(given_parameters, "nsteps")
-        t_evo_params["nsteps"] = 2*given_parameters["nsteps"] - 1
-        t_evo_params["tmax"] = t_evo_params["nsteps"] * t_evo_params["dt"]
-    else
-        t_evo_params["nsteps"] = 2*Int(ceil(given_parameters["tmax"] / t_evo_params["dt"])) - 1
-    end
+    t_evo_params["dt"] = [given_parameters["other_dt"], given_parameters["dt"]]
+    t_evo_params["when_dt_ends"] = [given_parameters["when_change_dt"],given_parameters["nsteps"]]
+    
+    t_evo_params["nsteps"] = 2*given_parameters["nsteps"] - 1
+    t_evo_params["tmax"] = t_evo_params["nsteps"] * t_evo_params["dt"]
 
     for (k,v) in given_parameters
-        if k != "dt" && k != "nsteps" && k != "tmax"
-            t_evo_params[k] = v[1](t_evo_params["nsteps"],t_evo_params["dt"]; v[2]...)
+        if k != "dt" && k != "nsteps" && k != "tmax" && k != "when_change_dt" && k != "other_dt"
+            t_evo_params[k] = v[1](t_evo_params["nsteps"],t_evo_params["dt"][1]; v[2]...)
         end
     end
 
@@ -202,9 +199,31 @@ function linear_ramp(nsteps::Int,dt::Float64; kwargs...)
     return vcat(starting_value .* ones(steps_until_start), range(starting_value, ending_value, length = steps_until_end - steps_until_start + 1), ending_value .* ones(nsteps - steps_until_end + 1))
 end
 
+function find_when_change_dt(tmax::Float64,leastramptime::Float64; kwargs...)
+    max_nsteps::Int = get(kwargs, :max_nsteps, 1e4)
+
+    dt = leastramptime / 3
+    current_nsteps = Int(ceil(tmax / dt))
+
+    if current_nsteps > max_nsteps
+        steps_to_10x_ramptime = Int(ceil(leastramptime * 10 / dt))
+        midtime = steps_to_10x_ramptime * dt
+        remaining_steps = max_nsteps - steps_to_10x_ramptime
+        other_dt = (tmax - midtime) / remaining_steps
+    else
+        other_dt = dt
+        steps_to_10x_ramptime = 1
+    end
+
+    return steps_to_10x_ramptime, other_dt
+end
+
 function get_dt(tmax::Float64,leastramptime::Float64; kwargs...)
+    
     default_dt = get(kwargs, :default_dt, 0.0005)
     default_nsteps = Int(ceil(tmax / default_dt))
+    when_change_dt::Int = 1
+
     if default_nsteps < 100
         dt = tmax / 100
         #println("Using default dt = $dt for tmax = $tmax")
@@ -213,14 +232,17 @@ function get_dt(tmax::Float64,leastramptime::Float64; kwargs...)
         #println("Using default dt = $dt for tmax = $tmax and default_nsteps = $default_nsteps")
     end
 
+    other_dt::Float64 = dt
+
     if dt >= leastramptime
         #println("Least ramp time $leastramptime is larger than dt $dt, using leastramptime / 3 instead")
         dt = leastramptime / 3
+        when_change_dt,other_dt = find_when_change_dt(tmax,leastramptime; kwargs...)
     end
 
     #println("Using time step dt = $dt for tmax = $tmax and least ramp time = $leastramptime")
 
-    return dt
+    return dt,when_change_dt,other_dt
 end
 
 function get_maxramptime(time_params::Dict)
@@ -247,11 +269,12 @@ function run_timeevo(starting_gs::Vector{ComplexF64},time_params::Dict,lattice_d
     
     max_ramp_time::Float64 = get_maxramptime(time_params)
     least_ramp_time::Float64 = get_leastramptime(time_params)
-    tmax::Float64 = max(10*max_ramp_time,0.1)
+    tmax::Float64 = max(100*max_ramp_time,0.1)
+    max_nsteps::Int = get(kwargs, :max_nsteps, 1e4)
     
-    dt::Float64 = get_dt(tmax,least_ramp_time; kwargs...)
+    dt::Float64,when_change_dt,other_dt = get_dt(tmax,least_ramp_time; kwargs...)
 
-    tevo_pdict::Dict{String,Any} = Dict([("dt",dt),("tmax",tmax)])
+    tevo_pdict::Dict{String,Any} = Dict([("dt",dt),("tmax",tmax),("nsteps",max_nsteps),("when_change_dt",when_change_dt),("other_dt",other_dt)])
 
     # structure the control parameter values
     for (k,v) in time_params
