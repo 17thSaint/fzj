@@ -17,7 +17,7 @@ function timeham(timestep::Int,t_evo_params::Dict,lattice_params::Dict,hamilt_pa
 
     # reset hamilt_params given the timestep from the t_evo_params
     for (k,v) in t_evo_params
-        if k != "dt" && k != "nsteps" && k != "tmax" && k != "when_dt_ends"
+        if k != "dt" && k != "nsteps" && k != "tmax" && k != "when_dt_ends" && k != "current_dt"
             hamilt_params[k] = v[timestep]
         end
     end
@@ -49,7 +49,7 @@ function k2(wavefunc::Vector{ComplexF64},k1::Vector{ComplexF64},timestep::Int,t_
     ht = timeham(timestep+1,t_evo_params,lattice_params,hamilt_params; kwargs...)
 
     # calculate the k2 vector
-    k2 = -im * (ht * (wavefunc + ((0.5 * t_evo_params["dt"]) .* k1)))
+    k2 = -im * (ht * (wavefunc + ((0.5 * t_evo_params["current_dt"]) .* k1)))
 
     opl > 2 && println("Finished k2")
 
@@ -63,7 +63,7 @@ function k3(wavefunc::Vector{ComplexF64},k2::Vector{ComplexF64},ht::SparseMatrix
     #ht = timeham(timestep+1,t_evo_params,lattice_params,hamilt_params; kwargs...)
 
     # calculate the k3 vector
-    k3 = -im * (ht * (wavefunc + ((0.5 * t_evo_params["dt"]) .* k2)))
+    k3 = -im * (ht * (wavefunc + ((0.5 * t_evo_params["current_dt"]) .* k2)))
 
     opl > 2 && println("Finished k3")
 
@@ -77,7 +77,7 @@ function k4(wavefunc::Vector{ComplexF64},k3::Vector{ComplexF64},timestep::Int,t_
     ht = timeham(timestep+2,t_evo_params,lattice_params,hamilt_params; kwargs...)
 
     # calculate the k4 vector
-    k4 = -im * (ht * (wavefunc + (t_evo_params["dt"] .* k3)))
+    k4 = -im * (ht * (wavefunc + (t_evo_params["current_dt"] .* k3)))
 
     opl > 2 && println("Finished k4")
 
@@ -87,6 +87,9 @@ end
 function runge_kutta_step(wavefunc::Vector{ComplexF64},ht_prev::SparseMatrixCSC,timestep::Int,t_evo_params::Dict,lattice_params::Dict,hamilt_params::Dict; kwargs...)
     opl::Int = get(kwargs, :output_level, 1)
 
+    t_evo_params["current_dt"] = t_evo_params["dt"][1]
+    timestep > t_evo_params["when_dt_ends"][1] && (t_evo_params["current_dt"] = t_evo_params["dt"][2])
+
     # calculate the k1, k2, k3 and k4 vectors
     k1_val = k1(wavefunc,ht_prev,timestep,t_evo_params,lattice_params,hamilt_params; kwargs...)
     k2_val,ht_half = k2(wavefunc,k1_val,timestep,t_evo_params,lattice_params,hamilt_params; kwargs...)
@@ -94,7 +97,7 @@ function runge_kutta_step(wavefunc::Vector{ComplexF64},ht_prev::SparseMatrixCSC,
     k4_val,ht_next = k4(wavefunc,k3_val,timestep,t_evo_params,lattice_params,hamilt_params; kwargs...)
 
     # update the wavefunction
-    new_wavefunc = wavefunc + ((t_evo_params["dt"] / 6) .* (k1_val + (2 .* k2_val) + (2 .* k3_val) + k4_val))
+    new_wavefunc = wavefunc + ((t_evo_params["current_dt"] / 6) .* (k1_val + (2 .* k2_val) + (2 .* k3_val) + k4_val))
 
     opl > 2 && println("Finished Runge-Kutta step")
 
@@ -170,7 +173,7 @@ function make_tevo_params(given_parameters::Dict)
     # initialize the time evolution parameters
     t_evo_params::Dict = Dict{String,Any}()
 
-    t_evo_params["dt"] = [given_parameters["other_dt"], given_parameters["dt"]]
+    t_evo_params["dt"] = [given_parameters["dt"], given_parameters["other_dt"]]
     t_evo_params["when_dt_ends"] = [given_parameters["when_change_dt"],given_parameters["nsteps"]]
     
     t_evo_params["nsteps"] = 2*given_parameters["nsteps"] - 1
@@ -218,19 +221,24 @@ function find_when_change_dt(tmax::Float64,leastramptime::Float64; kwargs...)
     return steps_to_10x_ramptime, other_dt
 end
 
+function make_times(dts::Vector{Float64},when_dt_ends::Vector{Int})
+    alltimes = zeros(Float64,when_dt_ends[end])
+    for i in 2:when_dt_ends[1]
+        alltimes[i] = alltimes[i-1] + dts[1]
+    end
+    for i in when_dt_ends[1]+1:when_dt_ends[2]
+        alltimes[i] = alltimes[i-1] + dts[2]
+    end
+    return alltimes
+end
+
 function get_dt(tmax::Float64,leastramptime::Float64; kwargs...)
     
     default_dt = get(kwargs, :default_dt, 0.0005)
     default_nsteps = Int(ceil(tmax / default_dt))
     when_change_dt::Int = 1
 
-    if default_nsteps < 100
-        dt = tmax / 100
-        #println("Using default dt = $dt for tmax = $tmax")
-    else
-        dt = default_dt
-        #println("Using default dt = $dt for tmax = $tmax and default_nsteps = $default_nsteps")
-    end
+    dt = default_dt
 
     other_dt::Float64 = dt
 
@@ -269,8 +277,8 @@ function run_timeevo(starting_gs::Vector{ComplexF64},time_params::Dict,lattice_d
     
     max_ramp_time::Float64 = get_maxramptime(time_params)
     least_ramp_time::Float64 = get_leastramptime(time_params)
-    tmax::Float64 = max(100*max_ramp_time,0.1)
-    max_nsteps::Int = get(kwargs, :max_nsteps, 1e4)
+    tmax::Float64 = max(100*max_ramp_time,1e-2)
+    max_nsteps::Int = get(kwargs, :max_nsteps, 1e3)
     
     dt::Float64,when_change_dt,other_dt = get_dt(tmax,least_ramp_time; kwargs...)
 
@@ -288,6 +296,8 @@ function run_timeevo(starting_gs::Vector{ComplexF64},time_params::Dict,lattice_d
             end
         end
     end
+
+    display(tevo_pdict)
 
     tevo_dict = make_tevo_params(tevo_pdict)
     

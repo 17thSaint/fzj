@@ -156,8 +156,8 @@ if true
     end
 end=#
 
-#= little plot for 4x4 n=2 adiabatic condition tx and periodic potential strength
-if false
+# little plot for 4x4 n=2 adiabatic condition tx and periodic potential strength
+if true
     lx,ly,n = 4,4,2
     intstren = 300.0
     potstrens = vcat([1e-4,1e-3],round.(10 .^ range(-2,2,length=10),digits=4),100.1)
@@ -192,14 +192,13 @@ if false
     ylabel("Physical Hopping, "*L"t_x")
     xscale("log")
 
-    fig = figure()
     plot_adiabatic_condition(potstrens,anises,ftxs_first,fpps_first; plot_title="First Excited State $(lx)x$(ly)")
     xlabel("Periodic Potential Strength, "*L"V_0")
     ylabel("Physical Hopping, "*L"t_x")
     xscale("log")
 
 
-end=#
+end#
 
 #= save adiabatic condition data for periodic potential
 if false
@@ -375,8 +374,8 @@ if false
 
 end=#
 
-# real/momentum space 4pt for all ulrs and txs
-if true
+#= real/momentum space 4pt for all ulrs and txs
+if false
     lx,ly,n = 8,4,4
     hanis = 1e-3
     intstren = 0.0
@@ -404,7 +403,7 @@ if true
     colorbar()
     title("Momentum Space 4pt for $(lx)x$(ly) N=$(n) tx=$hanis ULR=$intstren")
 
-end
+end=#
 
 
 #= track overlap with periodic potential

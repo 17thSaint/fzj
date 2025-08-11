@@ -402,10 +402,9 @@ if false
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
     lx,ly,n = 8,4,4
-    anis = 1e-4
-    intstren = 300.0
+    #anis = 1e-4
+    #intstren = 300.0
     #cols = ["b","g","r","c","y","orange","purple","pink","brown","gray"]
-    #intstrens = range(0.0,10.0,length=21)
     #for (idx,intstren) in enumerate(intstrens)
     #for (idx,anis) in enumerate(anises)
 
@@ -430,7 +429,7 @@ if false
         #    continue
         #end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("periodic_potential_strength",1e-2),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",false)])
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
         #params_dict = make_args_dict(ARGS)
 
         #println("Starting from here")
@@ -588,7 +587,7 @@ if false
     lx,ly,n = 4,4,2
     anis = 1e-4
     intstren = 300.0
-    ppstren = 100
+    ppstren = 0.0
     end_tx = 1.0
 
     params_dict = Dict([("output_level",1),("periodic_potential_strength",ppstren),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",30),("if_find_data",false),("if_save_data",false)])
@@ -599,17 +598,17 @@ if false
     speccount = 30
     time_running_args = (nev=speccount,output_level=1,)
 
-    
-
 
     #fig = figure()
-    #ramptimes = range(0.00001,0.00009,length=4)
-    #for (idx,ramptime) in enumerate(ramptimes)
+    ramptimes = 10 .^ Float64[-8,-7,-6,-5,-4]
+    for (idx,ramptime) in enumerate(ramptimes)
 
-    ramptime = 0.00001
+    #ramptime = 1e-6
 
         tevo_params = Dict([ ("tx",(linear_ramp,params_dict["tx"],end_tx,ramptime)) ])
         tevo_gs,tevo_dict,instspec = run_timeevo(gs,tevo_params,lattice_params,hamilt_params; time_running_args...)
+
+        times = make_times(tevo_dict["dt"],tevo_dict["when_dt_ends"])
 
         ending_inst_occs = get_occupancy(Vector(instspec["1"][:,end]),lattice_params; if_plot=false)
         stable_ending_occratio = minimum(ending_inst_occs) / maximum(ending_inst_occs)
@@ -617,6 +616,8 @@ if false
         length_average_times = Int(ceil(size(tevo_gs,2) * 1.0))
         max_val = nothing
         min_val = nothing
+        xs = []
+        ys = []
         for i in 0:length_average_times-1
 
             #= CDW flatness oscillation
@@ -627,9 +628,12 @@ if false
             #ylabel("Occupancy Ratio")=#
 
             local_val = abs2(adjoint(gs) * tevo_gs[:,end-i])
-            scatter(size(tevo_gs,2)-i,local_val,c="b")
-            xlabel("Time Step")
-            ylabel("Overlap with Instantaneous GS")
+            #scatter(size(tevo_gs,2)-i,1-local_val,c="b")
+            append!(xs,times[size(tevo_gs,2)-i])
+            append!(ys,1-local_val)
+            #xlabel("Time Step")
+            #ylabel("Instantaneous Infidelity")
+            #yscale("log")
 
             #=if isnothing(max_val) || local_val > max_val
                 max_val = local_val
@@ -641,6 +645,15 @@ if false
 
         end
 
+
+        plot(xs,ys,label="$ramptime")
+        xlabel("Time Step")
+        ylabel("Instantaneous Infidelity")
+        yscale("log")
+        legend()
+        xscale("log")
+        xlim([1e-8,1.1])
+
         #amplitude = max_val - min_val
         #scatter(ramptime,amplitude,c="b")
         #scatter(ramptime,1-min_val,c="b")
@@ -648,7 +661,7 @@ if false
         #ylabel("Amplitude of Occupancy Ratio Oscillation")
         #ylabel("Deviation from 1 of Overlap Oscillation")
 
-    #end
+    end
     
 end=#
 
