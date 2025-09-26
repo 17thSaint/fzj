@@ -156,8 +156,8 @@ if true
     end
 end=#
 
-# little plot for 4x4 n=2 adiabatic condition tx and periodic potential strength
-if true
+#= little plot for 4x4 n=2 adiabatic condition tx and periodic potential strength
+if false
     lx,ly,n = 4,4,2
     intstren = 300.0
     potstrens = vcat([1e-4,1e-3],round.(10 .^ range(-2,2,length=10),digits=4),100.1)
@@ -198,7 +198,7 @@ if true
     xscale("log")
 
 
-end#
+end=#
 
 #= save adiabatic condition data for periodic potential
 if false
@@ -280,7 +280,7 @@ if false
     hanis = 1.0
     #ppstren = 1e-2
     intstren = 300.0
-    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/periodic-potential")
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")#/periodic-potential")
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren)])
     all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
     display(all_files)
@@ -377,8 +377,8 @@ end=#
 #= real/momentum space 4pt for all ulrs and txs
 if false
     lx,ly,n = 8,4,4
-    hanis = 1e-3
-    intstren = 0.0
+    hanis = 1.0
+    intstren = 300.0
     dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren),("hopping_anisotropy",hanis)])
     all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
@@ -387,13 +387,13 @@ if false
     d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
     latparas = get_lattice_params_from_metadata(m)
     
-    #=r4pt = realspace_fourpoint_full(d["state"][1],latparas; output_level=1)
+    r4pt = realspace_fourpoint_full(d["state"][1],latparas; output_level=1)
     fig = figure()
     imshow(real.(sum(r4pt, dims=[3,4])[:,:,1,1]); origin="lower",vmin=0.0,vmax=0.5)
     xlabel("x")
     ylabel("x'")
     colorbar()
-    title("Real Space 4pt for $(lx)x$(ly) N=$(n) tx=$hanis ULR=$intstren")=#
+    title("Real Space 4pt for $(lx)x$(ly) N=$(n) tx=$hanis ULR=$intstren")
 
     m4pt = four_point(d["state"][1],latparas; if_plot=false)
     fig = figure()
@@ -402,7 +402,6 @@ if false
     ylabel("k_x'")
     colorbar()
     title("Momentum Space 4pt for $(lx)x$(ly) N=$(n) tx=$hanis ULR=$intstren")
-
 end=#
 
 
@@ -458,7 +457,7 @@ if true
 end=#
 
 #= plot adiabatic condition for uir
-if true
+if false
     lx,ly,n = 8,4,4
     hanis = 1.0
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis)])
@@ -733,8 +732,8 @@ end=#
 #= plot hatsugai for poster
 if false
     lx,ly,n = 8,4,4
-    intstren = 1000.0
-    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    intstren = 0.0
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
     display(all_files)
@@ -745,7 +744,7 @@ if false
     tw2s = m["tw2s"]
     omegas = m["omegas"]
 
-    which_to_keep = []
+    #=which_to_keep = []
     for (idx,tw1) in enumerate(tw1s)
         if round(tw1,digits=1) == tw1 && round(tw2s[idx],digits=1) == tw2s[idx]
             append!(which_to_keep,[idx])
@@ -759,9 +758,10 @@ if false
     new_omegas = zeros(ComplexF64,squaresize,squaresize)
     new_omegas[:,1:5] = new_wrongshape_omegas[:,7:end]
     new_omegas[:,6:end] = new_wrongshape_omegas[:,1:6]
-    
+    rez = plot_omega(new_tw1s,new_tw2s,new_omegas; plot_title=L"U_{ir}"*"=$intstren")=#
 
-    rez = plot_omega(new_tw1s,new_tw2s,new_omegas; plot_title=L"U_{ir}"*"=$intstren")
+    
+    rez = plot_omega(tw1s,tw2s,omegas; plot_title=L"U_{ir}"*"=$intstren")
     
 end=#
 
@@ -1037,48 +1037,42 @@ if false
     end
 
 
-end
+end=#
 
 # hatsugai data collection from including ed data
-if false
-    lx,ly,n = 3,7,3
-    nev = 3
+if true
+    lx,ly,n = 6,5,3
+    nev = 10
     #tws = range(-0.5,0.5,length=11)
     #tws2 = range(-0.75,-0.25,length=11)
-    tws = range(0.0,1.0,length=10)
+    tws = range(0.0,1.0,length=11)
     tws2 = tws
-    intstrens = range(0.0,2.0,length=11)
+    intstren = 100.0
 
-    for intstren in intstrens
-        #lambda1s::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
-        #lambda2s::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
-        #omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
-        #ref_multis,rm1,rm2 = get_reference_multiplets(lx,ly,n; interaction_strength=intstren)
-        for (idx,tw1) in enumerate(tws)
-            for (idx2,tw2) in enumerate(tws2)
-                params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("nev",nev),("tw2",tw2),("tw1",tw1),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("if_find_data",true),("if_save_data",true)])
-                states,nrgs,rhos,filepath,if_found,latpara,hamiltpara = run_normal_ed(params_dict; output_level=1)
+    lambda1s::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
+    lambda2s::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
+    omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
+    ref_multis,rm1,rm2 = get_reference_multiplets(lx,ly,n; interaction_strength=intstren)
+    for (idx,tw1) in enumerate(tws)
+        for (idx2,tw2) in enumerate(tws2)
+            params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("nev",nev),("filling",0.5),("tw2",tw2),("tw1",tw1),("lr","all"),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("if_reading",false),("if_find_data",false),("if_save_data",false)])
+            states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
 
-                #scatter3D(tw1,tw2,nrgs[1],c="b")
-                #scatter3D(tw1,tw2,nrgs[2],c="g")
-                #scatter3D(tw1,tw2,nrgs[3],c="r")
-
-                #lambda1s[idx,idx2],lambda2s[idx,idx2],omegas[idx,idx2] = get_hatsugaifull(states[1],states[2],ref_multis; if_save=true,filepath=filepath,ref_multis_filenames=[rm1,rm2])
-            end
+            lambda1s[idx,idx2],lambda2s[idx,idx2],omegas[idx,idx2] = get_hatsugaifull(states[1],states[2],ref_multis; if_save=false,filepath=filepath,ref_multis_filenames=[rm1,rm2])
         end
-        #xlabel(L"\theta_x / 2 \pi")
-        #ylabel(L"\theta_y / 2 \pi")
-        #zlabel("Energy")
-        #title("Energy Spectrum $(lx)x$(ly) N=$(n) ULR=$intstren")
+    end#
+    #xlabel(L"\theta_x / 2 \pi")
+    #ylabel(L"\theta_y / 2 \pi")
+    #zlabel("Energy")
+    #title("Energy Spectrum $(lx)x$(ly) N=$(n) ULR=$intstren")
 
-        #plot_omega(tws,tws2,omegas; plot_title=" $(lx)x$(ly) N=$(n) ULR=$intstren")
-        #plot_gamma(tws,tws2,lambda1s,1; plot_title=" $(lx)x$(ly) N=$(n) ULR=$intstren")
-        #plot_gamma(tws,tws2,lambda2s,2; plot_title=" $(lx)x$(ly) N=$(n) ULR=$intstren")
-    end
+    plot_omega(tws,tws2,omegas; plot_title=" $(lx)x$(ly) N=$(n) ULR=$intstren")
+    plot_gamma(tws,tws2,lambda1s,1; plot_title=" $(lx)x$(ly) N=$(n) ULR=$intstren")
+    plot_gamma(tws,tws2,lambda2s,2; plot_title=" $(lx)x$(ly) N=$(n) ULR=$intstren")
 
-end
+end#
 
-function get_closing_strength(intstrens,flatnesses::Vector{Float64})
+#=function get_closing_strength(intstrens,flatnesses::Vector{Float64})
     if length(intstrens) < 4
         which_y = 2
     else

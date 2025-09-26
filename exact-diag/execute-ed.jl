@@ -45,7 +45,7 @@ end
 
 include_other_files(["other-funcs/basic-2d-stuff.jl","other-funcs/basic-2d-observables.jl","exact-diag/two-dimensions.jl","exact-diag/observables.jl","exact-diag/hatsugai-mbcn.jl"])
 #include_other_files(["exact-diag/time-evolution.jl"])
-include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
+#include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
 
 function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     if hamilt_params["U"][2] == 0.0
@@ -389,7 +389,7 @@ function run_normal_ed(params_dict::Dict; kwargs...)
     if running_args.if_function
         return states,nrgs,rhos,filepath,if_exists,lattice_params,hamilt_params
     else
-        return states,nrgs,rhos,filepath,if_exists,lattice_params,hamilt_params,hh
+        return states,nrgs,rhos,filepath,if_exists,lattice_params,hamilt_params
     end
 
 end

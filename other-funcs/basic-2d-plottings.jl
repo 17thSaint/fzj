@@ -196,7 +196,7 @@ function count_chern_number(theta_xs::Vector{Float64},theta_ys::Vector{Float64},
         imshow(vortex_counting ./ (1*pi); cmap="viridis", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)], vmax=1.0, vmin=-1.0)
         colorbar()
         #title(L"\sum \Omega"*plot_title)
-        title("Chern Number "*L"U_{ir}"*"=1000")
+        title("Chern Number "*plot_title)
         xlabel(L"\theta_x / 2\pi")
         ylabel(L"\theta_y / 2\pi")
     end
@@ -308,7 +308,7 @@ end
 function plot_adiabatic_condition(xs::Vector,ys::Vector,f1s::Matrix{Float64},f2s::Matrix{Float64}; kwargs...)
     plot_title::String = get(kwargs,:plot_title,"")
 
-    fs_angle::Matrix{Float64} = atan.(f1s,f2s)
+    fs_angle::Matrix{Float64} = atan.(f2s,f1s)
     fs_mag::Matrix{Float64} = sqrt.(f1s.^2 .+ f2s.^2)
     
     fig = figure()
