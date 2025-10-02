@@ -1039,8 +1039,26 @@ if false
 
 end=#
 
-# hatsugai data collection from including ed data
+# sanity check that twistings are making different hams
 if true
+    lx,ly,n = 8,4,4
+    intstren = 0.0
+    
+    tw11,tw21 = 0.2,0.3
+    pdict1 = Dict([("Lx",lx),("Ly",ly),("N",n),("nev",nev),("filling",0.5),("tw2",tw21),("tw1",tw11),("lr","all"),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("if_find_data",false),("if_save_data",false)])
+    lats1,hams1,runs1 = get_normal_model_params_ed(pdict1)
+    lats1["full_basis"] = n_particle_basis(lats1; output_level=0,dataloc=runs1.basis_dataloc)
+    fullham1 = buildHam(lats1,hams1; output_level=1)
+
+    tw12,tw22 = 0.3,0.2
+    pdict2 = Dict([("Lx",lx),("Ly",ly),("N",n),("nev",nev),("filling",0.5),("tw2",tw22),("tw1",tw12),("lr","all"),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("if_find_data",false),("if_save_data",false)])
+    lats2,hams2,runs2 = get_normal_model_params_ed(pdict2)
+    lats2["full_basis"] = n_particle_basis(lats2; output_level=0,dataloc=runs2.basis_dataloc)
+    fullham2 = buildHam(lats2,hams2; output_level=1)
+end
+
+#= hatsugai data collection from including ed data
+if false
     lx,ly,n = 6,5,3
     nev = 10
     #tws = range(-0.5,0.5,length=11)
@@ -1052,10 +1070,10 @@ if true
     lambda1s::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
     lambda2s::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
     omegas::Matrix{ComplexF64} = zeros(ComplexF64,length(tws),length(tws2))
-    ref_multis,rm1,rm2 = get_reference_multiplets(lx,ly,n; interaction_strength=intstren)
+    ref_multis,rm1,rm2 = get_reference_multiplets(lx,ly,n; interaction_strength=intstren,if_save=false)
     for (idx,tw1) in enumerate(tws)
         for (idx2,tw2) in enumerate(tws2)
-            params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("nev",nev),("filling",0.5),("tw2",tw2),("tw1",tw1),("lr","all"),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("if_reading",false),("if_find_data",false),("if_save_data",false)])
+            params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("nev",nev),("filling",0.5),("tw2",tw2),("tw1",tw1),("lr","all"),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("if_find_data",false),("if_save_data",false)])
             states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
 
             lambda1s[idx,idx2],lambda2s[idx,idx2],omegas[idx,idx2] = get_hatsugaifull(states[1],states[2],ref_multis; if_save=false,filepath=filepath,ref_multis_filenames=[rm1,rm2])
@@ -1070,7 +1088,7 @@ if true
     plot_gamma(tws,tws2,lambda1s,1; plot_title=" $(lx)x$(ly) N=$(n) ULR=$intstren")
     plot_gamma(tws,tws2,lambda2s,2; plot_title=" $(lx)x$(ly) N=$(n) ULR=$intstren")
 
-end#
+end=#
 
 #=function get_closing_strength(intstrens,flatnesses::Vector{Float64})
     if length(intstrens) < 4

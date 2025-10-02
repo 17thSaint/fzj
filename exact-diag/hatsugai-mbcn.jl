@@ -18,9 +18,10 @@ function make_new_reference_multiplets(Lx::Int64,Ly::Int64,particles::Int64; kwa
     lr_dist::Int = get(kwargs,:lr,0)
     (intstren != 0.0 && lr_dist == 0) ? lr_dist = Ly-1 : nothing
     if_pinning::Bool = get(kwargs,:if_pinning,false)
+    if_save::Bool = get(kwargs,:if_save,true)
 
-    params_dict1 = Dict([("Lx",Lx),("Ly",Ly),("N",particles),("tw1",tw1),("tw2",tw2),("if_pinning",if_pinning),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis),("interaction_strength",intstren),("lr",lr_dist),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
-    params_dict2 = Dict([("Lx",Lx),("Ly",Ly),("N",particles),("tw1",tw2),("tw2",tw1),("if_pinning",if_pinning),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis),("interaction_strength",intstren),("lr",lr_dist),("filling",0.5),("nev",10),("if_find_data",true),("if_save_data",true)])
+    params_dict1 = Dict([("Lx",Lx),("Ly",Ly),("N",particles),("tw1",tw1),("tw2",tw2),("if_pinning",if_pinning),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis),("interaction_strength",intstren),("lr",lr_dist),("filling",0.5),("nev",10),("if_find_data",if_save),("if_save_data",if_save)])
+    params_dict2 = Dict([("Lx",Lx),("Ly",Ly),("N",particles),("tw1",tw2),("tw2",tw1),("if_pinning",if_pinning),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis),("interaction_strength",intstren),("lr",lr_dist),("filling",0.5),("nev",10),("if_find_data",if_save),("if_save_data",if_save)])
 
     rez1 = run_normal_ed(params_dict1)
     rez2 = run_normal_ed(params_dict2)
@@ -44,8 +45,8 @@ function get_reference_multiplets(Lx::Int64,Ly::Int64,particles::Int64; kwargs..
     params_dict1::Dict{String,Any} = Dict([("Lx",Lx),("Ly",Ly),("N",particles),("if_periodic_x",true),("if_periodic_y",true),("twist_angle1",tw1),("twist_angle2",tw2),("interaction_strength",intstren),("hopping_anisotropy",hanis),("if_pinning",if_pinning)])
     params_dict2::Dict{String,Any} = Dict([("Lx",Lx),("Ly",Ly),("N",particles),("if_periodic_x",true),("if_periodic_y",true),("twist_angle1",tw2),("twist_angle2",tw1),("interaction_strength",intstren),("hopping_anisotropy",hanis),("if_pinning",if_pinning)])
 
-    if_exists1::Bool,found_data1::Union{Vector{Dict},Nothing} = check_data_exists(params_dict1,"ed"; location=dataloc,output_level=false)
-    if_exists2::Bool,found_data2::Union{Vector{Dict},Nothing} = check_data_exists(params_dict2,"ed"; location=dataloc,output_level=false)
+    if_exists1::Bool,found_data1::Union{Vector{Dict},Nothing} = check_data_exists(params_dict1,"ed"; location=dataloc,output_level=false,file_type="jld2")
+    if_exists2::Bool,found_data2::Union{Vector{Dict},Nothing} = check_data_exists(params_dict2,"ed"; location=dataloc,output_level=false,file_type="jld2")
 
     if if_exists1 && if_exists2
         reference_multiplets[1:2] = found_data1[1]["state"][1:2]
@@ -53,7 +54,7 @@ function get_reference_multiplets(Lx::Int64,Ly::Int64,particles::Int64; kwargs..
     else
         if if_make_new
             println("Need to make new Hatsugai reference multiplets")
-            return make_new_reference_multiplets(Lx,Ly,particles; tw1=tw1,tw2=tw2,hopping_anisotropy=hanis,interaction_strength=intstren,if_pinning=if_pinning)
+            return make_new_reference_multiplets(Lx,Ly,particles; kwargs...,tw1=tw1,tw2=tw2,hopping_anisotropy=hanis,interaction_strength=intstren,if_pinning=if_pinning)
         else
             error("Reference multiplets not found and if_make_new is false")
         end
