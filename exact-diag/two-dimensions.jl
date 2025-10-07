@@ -1204,13 +1204,19 @@ function rerun_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict,met
         rez = eigsolve(ham_func,x0,nev,:SR; krylovdim=kdim)
     else
         H = metadata["H"]
+
+        if isnothing(H)
+            H = buildHam(lattice_params,hamilt_params; output_level=output_level)
+        end
+
         output_level > 0 ? println("Sparsity = ",nnz(H)/size(H)[1]^2) : nothing
         if if_exact
             everything = eigen(Matrix(H))
             rez = (everything.values,everything.vectors)
         else
             x0 = rand(Float64,size(lattice_params["full_basis"])[2])
-            rez = eigsolve(H,x0,nev,:SR,Lanczos())
+            #rez = eigsolve(H,x0,nev,:SR,Lanczos())
+            rez = eigsolve(H,x0,nev,:SR; krylovdim=kd)
         end
     end
     previous_nev = metadata["nev"]

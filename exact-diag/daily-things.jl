@@ -274,6 +274,71 @@ if false
     xscale("log")
 end=#
 
+# look at higher ACs for dominant parameter(tx/ULR) and make paper plot
+if false
+    lx,ly,n = 8,4,4
+    hanis = 1.0
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",hanis)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    display(all_files)
+
+    f_ulrs = []
+    allgaps = []
+    ulrs = []
+
+    for f in all_files
+
+        fileparams = get_params_dict_from_filename(f)
+        fileparams["interaction_strength"] > 10.0 && continue
+
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+
+        lattice_params,hamilt_params = make_latticehamilt_params_from_metadata(m)
+        #=ops = Dict([("nev",50),("if_save_data",true),("if_find_data",true)])
+        normparas = get_normal_params_from_lattham(lattice_params,hamilt_params,ops)
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(normparas; output_level=1)=#
+
+        nrg_gaps = d["nrg"][3:end] .- d["nrg"][2]
+        states = d["state"]
+
+        fuirs_1,ogfuirs1 = uir_adiabatic_condition(states[2],states[3:end],nrg_gaps,lattice_params,hamilt_params,nothing)
+
+        fuirs_0 = m["fuir_0"]
+
+        fuirs_avg = [0.5 .* (fuirs_0[i+1][1] .+ fuirs_1[i][1]) for i in 1:length(fuirs_1)]
+
+        datadict = Dict([("fuir_1",fuirs_1)])
+        modify_data(datadict,joinpath(dataloc,f),"metadata"; output_level=0)
+
+        append!(allgaps,[[nrg_gaps]])
+        append!(f_ulrs,[[fuirs_avg]])
+        append!(ulrs,[m["U"][end]])
+
+    end
+
+    clog = [log10.(f_ulrs[i][1]) for i in 1:length(f_ulrs)]
+
+    cols = ["#82AC9F","#C73E1D","#36213E"]
+
+    target = cols[3]
+    whitetohex = matplotlib.colors.LinearSegmentedColormap.from_list(
+        "white_to_hex", ["#ffffff", target]
+    )
+
+    for i in 1:length(ulrs)
+        xs = ulrs[i] .* ones(length(allgaps[i][1]))
+        ys = allgaps[i][1]
+        scatter(xs,ys,c=clog[i],cmap=whitetohex)
+    end
+    colorbar().set_label(L"log_{10} (F_{U_{IR}})")
+    xlabel("Interaction Strength, "*L"U_{LR}")
+    ylabel("Energy Gap")
+
+    
+
+end
+
 #= look at higher adiabatic conditions
 if false
     lx,ly,n = 8,4,4
@@ -1013,7 +1078,7 @@ if false
 end
 
 # compare twisting for ED/1DeffMPS 4x4 n=2
-if false
+if false-
     nev = 3
     #intstrens = range(0.0,4.0,length=21)
     tws = range(-0.1,0.1,length=21)
@@ -1039,8 +1104,8 @@ if false
 
 end=#
 
-# sanity check that twistings are making different hams
-if true
+#= sanity check that twistings are making different hams
+if false
     lx,ly,n = 8,4,4
     intstren = 0.0
     
@@ -1055,7 +1120,7 @@ if true
     lats2,hams2,runs2 = get_normal_model_params_ed(pdict2)
     lats2["full_basis"] = n_particle_basis(lats2; output_level=0,dataloc=runs2.basis_dataloc)
     fullham2 = buildHam(lats2,hams2; output_level=1)
-end
+end=#
 
 #= hatsugai data collection from including ed data
 if false

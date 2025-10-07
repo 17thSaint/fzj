@@ -2114,8 +2114,8 @@ if false
 	all_results = run_synth_dims_generic(params_dict)
 end=#
 
-# synth-dims for loop runnings
-if true
+#= synth-dims for loop runnings
+if false
 	#BLAS.set_num_threads(open_cores)
 	cols = ["b","g","r"]
 	#nnst = 0.0
@@ -2281,7 +2281,7 @@ if true
 			=#
 	#end
 #end
-end
+end=#
 
 #
 #plot(strens,real.(centermoms),"-p")

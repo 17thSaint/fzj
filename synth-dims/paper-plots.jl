@@ -339,8 +339,9 @@ function plot_finitesize_gapscaling_pinned(ulr::Float64=300.0)
 end
 
 # plot finite splitting scaling pinned and unpinned
-function plot_finitesplitting_scaling(ulr::Float64=0.0)
-    fig = figure()
+function plot_finitesplitting_scaling(ulr::Float64=0.0; kwargs...)
+    if_plot = get(kwargs, :if_plot, true)
+
     cols = ["#82AC9F","#C73E1D","#36213E"]
 
     pinning_strength = ulr == 0.0 ? 0.1 : 0.0001
@@ -451,28 +452,76 @@ function plot_finitesplitting_scaling(ulr::Float64=0.0)
     #
 
 
+    if if_plot
+        fig = figure()
+        for (k,v) in gaps
+            local_label = k == "0.0" ? "Unpinned" : "$(parse(Float64,k)/10)"
+            col = k == "0.0" ? cols[1] : cols[2]
+            
+            # temporary data manipulation for ulr = 300.0 Lx = 12
+            if ulr == 300.0 && local_label == "1.0e-5"
+                v[end] = 1e-5
+                display(v)
+            end  
 
-    for (k,v) in gaps
-        local_label = k == "0.0" ? "Unpinned" : "$(parse(Float64,k)/10)"
-        col = k == "0.0" ? cols[1] : cols[2]
-        
-        # temporary data manipulation for ulr = 300.0 Lx = 12
-        if ulr == 300.0 && local_label == "1.0e-5"
-            v[end] = 1e-5
-            display(v)
-        end  
-
-        length(v) > 0 && scatter(lxs[k],v,label=local_label,c=col)
+            length(v) > 0 && scatter(lxs[k],v,label=local_label,c=col)
+        end
+        xlabel(L"L_x")
+        ylabel("E1 - E0")
+        title("Degeneracy Splitting "*L"U_{ir}"*"=$ulr")
+        yscale("log")
+        legend(loc="lower right")
     end
-    xlabel(L"L_x")
-    ylabel("E1 - E0")
-    title("Degeneracy Splitting "*L"U_{ir}"*"=$ulr")
-    yscale("log")
-    legend(loc="lower right")
 
     return gaps,lxs
 end
 #rez_gaps,rez_lxs = plot_finitesplitting_scaling(300.0)
+
+# plot finite splitting for ULR=0 and ULR=300 in same figure separate plots
+function plot_paper_finitesplitting_scaling()
+    gaps_laughlin,lxs_laughlin = plot_finitesplitting_scaling(0.0; if_plot=false)
+    gaps_mblc,lxs_mblc = plot_finitesplitting_scaling(300.0; if_plot=false)
+
+    cols = ["#82AC9F","#C73E1D","#36213E"]
+
+    fig = figure()
+    subplot(1,2,1)
+    for (k,v) in gaps_laughlin
+        local_label = k == "0.0" ? "Unpinned" : "$(parse(Float64,k)/10)"
+        col = k == "0.0" ? cols[1] : cols[2]
+
+        length(v) > 0 && scatter(lxs_laughlin[k],v,label=local_label,c=col)
+    end
+    xlabel(L"L_x")
+    ylabel("E1 - E0")
+    yscale("log")
+    legend(loc="upper right")
+    title("ULR=0.0")
+
+    subplot(1,2,2)
+    for (k,v) in gaps_mblc
+        local_label = k == "0.0" ? "Unpinned" : "$(parse(Float64,k)/10)"
+        col = k == "0.0" ? cols[1] : cols[2]
+        
+        # temporary data manipulation for ulr = 300.0 Lx = 12
+        if local_label == "1.0e-5"
+            v[end] = 1e-5
+            display(v)
+        end  
+
+        length(v) > 0 && scatter(lxs_mblc[k],v,label=local_label,c=col)
+    end
+    xlabel(L"L_x")
+    ylabel("E1 - E0")
+    yscale("log")
+    legend(loc="upper right")
+    title("ULR=300.0")
+
+    tight_layout()
+
+end
+
+
 
 # finite size scaling of the topological gap
 # still need 16x8 to get E3
@@ -796,7 +845,7 @@ function plot_overlapslices_fourpt(Lx::Int64,ulr::Float64; kwargs...)
     if Lx > 10
         layers = Int(log(2,Lx*Lx/2))
         dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
-        pdict_ttn = Dict([("hopping_anisotropy",1.0),("onsite_strength",ulr),("layers",layers),("if_periodic_phys",true),("if_periodic_synth",true)])
+        pdict_ttn = Dict([("hopping_anisotropy",1.0),("onsite_strength",ulr),("Lx",Lx),("if_periodic_phys",true),("if_periodic_synth",true)])
         all_files = find_data_file(pdict_ttn,"ttn",dataloc)
         display(all_files)
     else
@@ -902,13 +951,14 @@ end
 #plot_transition_slices([0.0,2.0,300.0],16; plot_title="")
 
 # imshow of 4pt 16x8 comparing laughlin and ulr for poster
-function plot_compare_fourpt(Lx::Int,Ly::Int,N::Int)
+function plot_compare_fourpt(Lx::Int,Ly::Int,ulr::Float64)
     layers = Int(log(2,Lx*Ly))
 
     dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
-    pdict = Dict([("layers",layers),("Lx",Lx),("Ly",Ly),("particles",N),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    pdict = Dict([("hopping_anisotropy",1.0),("onsite_strength",ulr),("Lx",Lx),("if_periodic_phys",true),("if_periodic_synth",true)])
     all_files = find_data_file(pdict,"ttn",dataloc)
 
+    mixed_fourpts = []
     for f in all_files
         d,m = read_data(joinpath(dataloc,f))
 
@@ -931,16 +981,74 @@ function plot_compare_fourpt(Lx::Int,Ly::Int,N::Int)
         fourpt_vals2[end,:] = vcat(fourpt_vals[1,:][2:end],fourpt_vals[1,:][1])
         fourpt_vals2[:,end] = vcat(fourpt_vals[:,1][2:end],fourpt_vals[:,1][1])
 
-        mixed_fourpt = 0.5 .* (fourpt_vals .+ fourpt_vals2)
+        mixed_fourpt = 0.25 .* (fourpt_vals .+ fourpt_vals2)
 
         fig = figure()
-        imshow(mixed_fourpt; vmin=0.0, vmax=0.23, origin="lower")
+        imshow(mixed_fourpt; vmin=0.0, vmax=0.5, origin="lower")
         colorbar()
         xlabel("k")
         ylabel("k'")
         title(plot_title)
+
+        append!(mixed_fourpts,[[mixed_fourpt]])
     end
+
+    return mixed_fourpts
     
+end
+
+# energy spectrum where color of scatter point is the adiabatic condition matrix element with the groundstate manifold
+function plot_adiabatic_spectrum(Lx::Int64)
+    
+    Ly,N = Int(Lx/2),Int(Lx/2)
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict = Dict([("Lx",Lx),("Ly",Ly),("N",N),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    display(all_files)
+
+    f_ulrs = []
+    ulrs = []
+    allgaps = []
+
+    for f in all_files
+        fileparams = get_params_dict_from_filename(f)
+        fileparams["interaction_strength"] > 10.0 && continue
+
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+
+        gaps = d["nrg"][3:end] .- d["nrg"][1]
+
+        fuirs_0 = m["fuir_0"][2:end]
+        fuirs_1 = m["fuir_1"]
+
+        fuirs_avg = 0.5 .* (fuirs_0 .+ fuirs_1)
+
+        append!(ulrs,[fileparams["interaction_strength"]])
+        append!(f_ulrs,[[fuirs_avg]])
+        append!(allgaps,[[gaps]])
+    end
+
+
+    clog = [log10.(f_ulrs[i][1]) for i in 1:length(f_ulrs)]
+
+    cols = ["#82AC9F","#C73E1D","#36213E"]
+
+    target = cols[3]
+    whitetohex = matplotlib.colors.LinearSegmentedColormap.from_list(
+        "white_to_hex", ["#ffffff", target]
+    )
+
+    for i in 1:length(ulrs)
+        xs = ulrs[i] .* ones(length(allgaps[i][1]))
+        ys = allgaps[i][1]
+        scatter(xs,ys,c=clog[i],cmap=whitetohex)
+    end
+    colorbar().set_label(L"log_{10} (F_{U_{IR}})")
+    xlabel("Interaction Strength, "*L"U_{LR}")
+    ylabel("Energy Gap")
+    ylim([-0.05,1.05])
+
+    return ulrs,allgaps,clog
 end
 
 #= four point real space with new colors
