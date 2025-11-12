@@ -1556,7 +1556,7 @@ function get_normal_model_params(params_dict::Dict)
 	nswps = get(params_dict, "num_sweeps", 100)
 	if_old_excited = get(params_dict, "if_old_excited", false)
 	if_memobs = get(params_dict, "if_memobs", false)
-	output_level = get(params_dict, "output_level", 1)
+	outputlevel = get(params_dict, "outputlevel", 1)
 	seed_ttn = get(params_dict, "seed_ttn", nothing)
 
 
@@ -1628,7 +1628,7 @@ function get_normal_model_params(params_dict::Dict)
 		mag_off = alpha == 0.0
 	end
 	if_check_fluxes = get(params_dict, "if_check_fluxes", true)
-	if_check_fluxes ? check_fluxes(alpha,Lx,Ly,if_periodic_phys,if_periodic_synth,flux_direction; output_level=output_level) : nothing
+	if_check_fluxes ? check_fluxes(alpha,Lx,Ly,if_periodic_phys,if_periodic_synth,flux_direction; output_level=outputlevel) : nothing
 
 
 	# What to calculate
@@ -1688,7 +1688,7 @@ function get_normal_model_params(params_dict::Dict)
 						"seed_ttn"=>seed_ttn,
 						"twist_angle"=>twist_angle,
 						"if_continuous_saving"=>if_continuous_saving,
-						"output_level"=>output_level,
+						"outputlevel"=>outputlevel,
 						"nrgtol"=>nrgtol,
 						"if_densmat"=>if_densmat,
 						"if_redo"=>if_redo,
@@ -2164,7 +2164,7 @@ if true
 		
 		#("if_pinning",if_pinning),("dataloc",dataloc),("pinning_strength",pinstren)
 		
-		params_dict = Dict([("if_gpu",false),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",1e-5),("particles",n),("mdim",100),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("if_gpu",false),("outputlevel",1),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",2),("expander_fraction",1e-5),("particles",n),("mdim",100),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		#open_cores = get(params_dict, "open_cores", 5)

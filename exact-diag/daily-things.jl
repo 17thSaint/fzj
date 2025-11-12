@@ -1965,24 +1965,11 @@ if true
 end=#
 
 if true
-    lx,ly,n = 8,4,4
-    intstrens = range(0.0,5.0,length=11)
-    for (idx,intstren) in enumerate(intstrens)
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
-        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
-
-        if idx == 1
-            occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="$(lx)x$(ly) N=$n ULR=$(intstren)")
-            fig = figure()
-        end
-
-        plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title="")
-
-        if idx == length(intstrens)
-            fig = figure()
-            occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="$(lx)x$(ly) N=$n ULR=$(intstren)")
-        end
-    end
+    lx,ly,n = 4,4,2
+    intstren = 10
+    
+    params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("if_check_fluxes",false),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
+    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; outputlevel=1)
 end
 
 

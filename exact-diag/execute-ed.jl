@@ -396,8 +396,8 @@ function run_normal_ed(params_dict::Dict; kwargs...)
 
 end
 
-# run data collection with for loops
-if true
+#= run data collection with for loops
+if false
     
     
     #which_one = args_dict["which_one"]
@@ -592,7 +592,7 @@ if true
     colorbar()
     title("Gamma2 Magnitude")=#
 
-end#
+end=#
 
 #= testing time evolution
 if false

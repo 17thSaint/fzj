@@ -742,7 +742,7 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	if_old_excited = get(kwargs, :if_old_excited, false)
 	weight = get(kwargs, :weight, 10.0)
 	if_redo = get(kwargs, :if_redo, false)
-	opl::Int = get(kwargs, :output_level, 0)
+	opl::Int = get(kwargs, :outputlevel, 1)
 	cutoff::Float64 = get(kwargs, :cutoff, 10^-8)
 	max_dim = get(kwargs, :mdim, 10)
 	num_sweeps::Int = get(kwargs, :num_sweeps, 1)
@@ -790,14 +790,14 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 		#println("Before starting DMRG the bond dim is ",TTN.maxlinkdim(ttn))
 		#get_occupancy(ttn; plot_title="Before DMRG")
 		if isnothing(psi_ortho) || length(psi_ortho) == 0
-			sp::TTN.AbstractSweepHandler = TTN.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff, eigsolve_krylovdim=eigsolve_krylovdim, eigsolve_verbosity=eigsolve_verbosity, use_gpu=if_gpu)
+			sp::TTN.AbstractSweepHandler = TTN.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, outputlevel=opl,observer=observer, cutoff=cutoff, eigsolve_krylovdim=eigsolve_krylovdim, eigsolve_verbosity=eigsolve_verbosity, use_gpu=if_gpu)
 		else
 			# prep the orthogonal states before starting DMRG
 			for ortho_state in psi_ortho
 				TTN.move_ortho!(ortho_state,ttn.ortho_center)
 			end
 		
-			sp = TTN.dmrg(ttn,psi_ortho,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl, observer=observer, cutoff=cutoff, weight=weight, if_old_excited=if_old_excited, eigsolve_krylovdim=eigsolve_krylovdim, eigsolve_verbosity=eigsolve_verbosity, use_gpu=if_gpu)
+			sp = TTN.dmrg(ttn,psi_ortho,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, outputlevel=opl, observer=observer, cutoff=cutoff, weight=weight, if_old_excited=if_old_excited, eigsolve_krylovdim=eigsolve_krylovdim, eigsolve_verbosity=eigsolve_verbosity, use_gpu=if_gpu)
 		end
 	elseif sweep_type == "simple"
 		proj_tpo = TTN.ProjectedTensorProductOperator(ttn,ham)
