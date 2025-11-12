@@ -280,6 +280,10 @@ function long_range_scaling(x_final::Int64,virt_edge_length::Int64,initial_stren
 		strengths = map(1:virt_edge_length) do x
 			initial_strength * exp(-(x-1)/corr_length)	
 		end
+        if corr_length == 0.0
+            strengths = zeros(virt_edge_length)
+            strengths[1] = initial_strength
+        end
 	elseif scaling_func == "rydberg"
 		blockade_radius = get(kwargs, :blockade_radius, 1.0)
 		strengths = map(0:virt_edge_length-1) do x

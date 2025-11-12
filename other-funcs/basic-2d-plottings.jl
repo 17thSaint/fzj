@@ -119,6 +119,7 @@ function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::
     if_mag::Bool = get(kwargs,:if_mag,false)
     if_perfect_grid::Bool = get(kwargs,:if_perfect_grid,true)
     if_count_chern::Bool = get(kwargs,:if_count_chern,true)
+    if_plot::Bool = get(kwargs,:if_plot,true)
 
     omegas_phase::Matrix{Float64} = zeros(Float64,length(theta_xs),length(theta_ys))
     for i in 1:length(theta_xs)
@@ -129,31 +130,35 @@ function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::
     #omegas_phase[1,1] = 0.0
 
     plotting_omega = reverse(transpose(omegas_phase),dims=1)
-    fig = figure()
-    if if_perfect_grid
-        imshow(plotting_omega; cmap="hsv", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)], vmax=2*pi, vmin=0)
-        colorbar()
-    end
-    xs = transpose(repeat(theta_xs,1,length(theta_ys)))
-    ys = reverse(repeat(theta_ys,1,length(theta_xs)),dims=1)
-    us = cos.(plotting_omega)
-    vs = sin.(plotting_omega)
-    quiver(xs, ys, us, vs)
-    title("Phase of "*L"\Omega"*" "*plot_title)
-    xlabel(L"\theta_x / 2\pi")
-    ylabel(L"\theta_y / 2\pi")
-    #xlim([minimum(theta_xs),maximum(theta_xs)])
-    #ylim([minimum(theta_ys),maximum(theta_ys)])
+    if if_plot
 
-    if if_mag
+
         fig = figure()
-        imshow(abs.(omegas); cmap="viridis", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)])
-        colorbar()
-        title("Magnitude of Omega"*plot_title)
-        xlabel("Theta_x / 2pi")
-        ylabel("Theta_y / 2pi")
-        xlim([minimum(theta_xs),maximum(theta_xs)])
-        ylim([minimum(theta_ys),maximum(theta_ys)])
+        if if_perfect_grid
+            imshow(plotting_omega; cmap="hsv", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)], vmax=2*pi, vmin=0)
+            colorbar()
+        end
+        xs = transpose(repeat(theta_xs,1,length(theta_ys)))
+        ys = reverse(repeat(theta_ys,1,length(theta_xs)),dims=1)
+        us = cos.(plotting_omega)
+        vs = sin.(plotting_omega)
+        quiver(xs, ys, us, vs)
+        title("Phase of "*L"\Omega"*" "*plot_title)
+        xlabel(L"\theta_x / 2\pi")
+        ylabel(L"\theta_y / 2\pi")
+        #xlim([minimum(theta_xs),maximum(theta_xs)])
+        #ylim([minimum(theta_ys),maximum(theta_ys)])
+
+        if if_mag
+            fig = figure()
+            imshow(abs.(omegas); cmap="viridis", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)])
+            colorbar()
+            title("Magnitude of Omega"*plot_title)
+            xlabel("Theta_x / 2pi")
+            ylabel("Theta_y / 2pi")
+            xlim([minimum(theta_xs),maximum(theta_xs)])
+            ylim([minimum(theta_ys),maximum(theta_ys)])
+        end
     end
 
     if_count_chern ? count_chern_number(theta_xs,theta_ys,plotting_omega; kwargs...) : nothing
@@ -201,7 +206,7 @@ function count_chern_number(theta_xs::Vector{Float64},theta_ys::Vector{Float64},
         ylabel(L"\theta_y / 2\pi")
     end
 
-    return sum(vortex_counting) / (2*pi)
+    return sum(vortex_counting) / (2*pi), vortex_counting, theta_xs, theta_ys
 end
 
 # plotting the minimum amount the GSs go into the excited states as a function of interaction strength

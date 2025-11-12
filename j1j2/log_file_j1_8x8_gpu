@@ -1,0 +1,329 @@
+pgi8cluster22: Using Ethernet for MPI communication.
+pgi8cluster22: Using Ethernet for MPI communication.
+The latest version of Julia in the `release` channel is 1.11.6+0.x64.linux.gnu. You currently have `1.11.3+0.x64.linux.gnu` installed. Run:
+
+  juliaup update
+
+in your terminal shell to install Julia 1.11.6+0.x64.linux.gnu and update the `release` channel to that version.
+  Activating project at `/local/geraghty/synth-dims`
+Dict{String, Any} with 34 entries:
+  "if_gpu" => true
+  "expander_fraction" => 0.0001
+  "ttn_size" => [8, 8]
+  "if_continuous_saving" => true
+  "particles" => 32
+  "if_redo" => false
+  "if_densmat" => false
+  "max_occ" => 1
+  "if_sweep" => true
+  "if_save_data" => true
+  "j2" => 0.0
+  "lattice_size" => [8, 8]
+  "location" => "/local/geraghty/cluster-data/j1j2"
+  "cutoff" => 1.0e-8
+  "name" => "ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+  "if_periodic_y" => true
+  "noise" => [0.0]
+  "j1" => 1.0
+  "nrgtol" => 5.0e-5
+  "mdim" => 300
+  "output_level" => 0
+  "if_periodic_x" => true
+  "sweep_type" => "dmrg"
+  "particle_type" => "Qubit"
+  "if_periodic" => true
+  "layers" => 6
+  "if_mag_orientation" => false
+  "num_sweeps" => 100
+  "mag_direction" => 1.0
+  "conserve_qns" => true
+  "expander" => DefaultExpander{Float64}(0.0001, 1, 10, 1.0e-5)
+  "chem_strength" => 0.0
+  "part_type" => "Qubit"
+  "syms" => true
+Finished Building Network
+reorthogonalize = true
+Data Added, File Closed: /local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5
+Data Added, File Closed: /local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5
+Doing GPU TTN
+Added States
+Built Hamiltonian
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 1. Needed Time 4084.461s
+	Current energy: -42.323155197090330.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 2. Needed Time 2014.529s
+	Current energy: -42.347257643633547.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 3. Needed Time 1987.935s
+	Current energy: -42.367810633130809.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 4. Needed Time 1969.910s
+	Current energy: -42.387122194033189.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 5. Needed Time 2024.924s
+	Current energy: -42.405064958942013.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 6. Needed Time 2062.536s
+	Current energy: -42.419908238070398.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 7. Needed Time 2036.024s
+	Current energy: -42.435701038652454.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 8. Needed Time 2104.144s
+	Current energy: -42.450809675613456.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 9. Needed Time 2176.815s
+	Current energy: -42.464375005051458.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 10. Needed Time 2184.623s
+	Current energy: -42.477164562681097.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 11. Needed Time 2243.492s
+	Current energy: -42.489061527451980.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 12. Needed Time 2309.394s
+	Current energy: -42.499801425490119.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 13. Needed Time 2388.208s
+	Current energy: -42.510040415584633.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 14. Needed Time 2460.050s
+	Current energy: -42.519895133457723.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 15. Needed Time 2541.430s
+	Current energy: -42.529338989045385.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 16. Needed Time 2610.086s
+	Current energy: -42.538006982737215.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 17. Needed Time 2683.391s
+	Current energy: -42.546405344304020.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 18. Needed Time 2760.716s
+	Current energy: -42.554030413051862.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 19. Needed Time 2861.125s
+	Current energy: -42.561406224103422.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 20. Needed Time 2956.444s
+	Current energy: -42.568171560497262.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 21. Needed Time 3049.978s
+	Current energy: -42.574718920999516.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 22. Needed Time 3140.965s
+	Current energy: -42.581123933534087.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 23. Needed Time 3250.110s
+	Current energy: -42.586742941525152.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 24. Needed Time 3377.862s
+	Current energy: -42.592313245592990.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 25. Needed Time 3498.245s
+	Current energy: -42.598468874874499.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 26. Needed Time 3610.207s
+	Current energy: -42.604334813472335.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 27. Needed Time 3719.586s
+	Current energy: -42.609874838279126.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 28. Needed Time 3857.145s
+	Current energy: -42.616682599538095.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 29. Needed Time 4060.360s
+	Current energy: -42.622910888535380.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 30. Needed Time 4262.781s
+	Current energy: -42.629970111804056.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 31. Needed Time 4426.077s
+	Current energy: -42.636805150850904.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 32. Needed Time 4703.470s
+	Current energy: -42.643724886963327.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 33. Needed Time 4932.672s
+	Current energy: -42.649537427448877.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 34. Needed Time 5198.810s
+	Current energy: -42.657917316068804.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 35. Needed Time 5603.536s
+	Current energy: -42.667028351475601.
+
+"/local/geraghty/cluster-data/j1j2/wavefuncttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+"/local/geraghty/cluster-data/j1j2/ttn-if_gpu-true-Ly-8-j2-0.0-Lx-8-mdim-300-if_periodic_x-true-if_periodic_y-true-j1-1.0.h5"
+Finished sweep 36. Needed Time 6013.796s
+	Current energy: -42.674669925686501.
+
+ERROR: LoadError: Out of GPU memory trying to allocate 12.814 GiB
+Effective GPU memory usage: 55.17% (43.726 GiB/79.252 GiB)
+Memory pool usage: 28.245 GiB (43.219 GiB reserved)
+
+Stacktrace:
+  [1] _pool_alloc
+    @ /local/geraghty/.julia/packages/CUDA/LhtzZ/src/memory.jl:666 [inlined]
+  [2] macro expansion
+    @ /local/geraghty/.julia/packages/CUDA/LhtzZ/src/memory.jl:623 [inlined]
+  [3] macro expansion
+    @ ./timing.jl:421 [inlined]
+  [4] pool_alloc
+    @ /local/geraghty/.julia/packages/CUDA/LhtzZ/src/memory.jl:622 [inlined]
+  [5] (::CUDA.var"#1139#1141"{CUDA.DeviceMemory, Int64})()
+    @ CUDA /local/geraghty/.julia/packages/CUDA/LhtzZ/src/array.jl:92
+  [6] cached_alloc(f::CUDA.var"#1139#1141"{CUDA.DeviceMemory, Int64}, key::Tuple{UnionAll, CuDevice, DataType, Int64})
+    @ GPUArrays /local/geraghty/.julia/packages/GPUArrays/uiVyU/src/host/alloc_cache.jl:36
+  [7] CuArray{ComplexF64, 1, CUDA.DeviceMemory}(::UndefInitializer, dims::Tuple{Int64})
+    @ CUDA /local/geraghty/.julia/packages/CUDA/LhtzZ/src/array.jl:91
+  [8] similar
+    @ /local/geraghty/.julia/packages/CUDA/LhtzZ/src/array.jl:184 [inlined]
+  [9] copy
+    @ /local/geraghty/.julia/packages/CUDA/LhtzZ/src/array.jl:192 [inlined]
+ [10] copy
+    @ /local/geraghty/.julia/packages/NDTensors/Q9Zpu/src/blocksparse/blocksparse.jl:75 [inlined]
+ [11] Tensor
+    @ /local/geraghty/.julia/packages/NDTensors/Q9Zpu/src/tensor/tensor.jl:75 [inlined]
+ [12] Tensor
+    @ /local/geraghty/.julia/packages/NDTensors/Q9Zpu/src/tensor/tensor.jl:87 [inlined]
+ [13] similar(tensortype::Type{NDTensors.BlockSparseTensor{ComplexF64, 4, NTuple{4, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, NDTensors.BlockSparse{ComplexF64, CuArray{ComplexF64, 1, CUDA.DeviceMemory}, 4}}}, blockoffsets::Dictionaries.Dictionary{NDTensors.Block{4}, Int64}, dims::NTuple{4, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}})
+    @ NDTensors /local/geraghty/.julia/packages/NDTensors/Q9Zpu/src/blocksparse/similar.jl:27
+ [14] contraction_output(tensor1::NDTensors.BlockSparseTensor{ComplexF64, 3, Tuple{ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, NDTensors.BlockSparse{ComplexF64, CuArray{ComplexF64, 1, CUDA.DeviceMemory}, 3}}, labelstensor1::Tuple{Int64, Int64, Int64}, tensor2::NDTensors.BlockSparseTensor{ComplexF64, 3, Tuple{ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, NDTensors.BlockSparse{ComplexF64, CuArray{ComplexF64, 1, CUDA.DeviceMemory}, 3}}, labelstensor2::Tuple{Int64, Int64, Int64}, labelsR::NTuple{4, Int64})
+    @ NDTensors /local/geraghty/.julia/packages/NDTensors/Q9Zpu/src/blocksparse/contract.jl:39
+ [15] contract(tensor1::NDTensors.BlockSparseTensor{ComplexF64, 3, Tuple{ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, NDTensors.BlockSparse{ComplexF64, CuArray{ComplexF64, 1, CUDA.DeviceMemory}, 3}}, labelstensor1::Tuple{Int64, Int64, Int64}, tensor2::NDTensors.BlockSparseTensor{ComplexF64, 3, Tuple{ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, NDTensors.BlockSparse{ComplexF64, CuArray{ComplexF64, 1, CUDA.DeviceMemory}, 3}}, labelstensor2::Tuple{Int64, Int64, Int64}, labelsR::NTuple{4, Int64})
+    @ NDTensors /local/geraghty/.julia/packages/NDTensors/Q9Zpu/src/blocksparse/contract.jl:10
+ [16] _contract(A::NDTensors.BlockSparseTensor{ComplexF64, 3, Tuple{ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, NDTensors.BlockSparse{ComplexF64, CuArray{ComplexF64, 1, CUDA.DeviceMemory}, 3}}, B::NDTensors.BlockSparseTensor{ComplexF64, 3, Tuple{ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}, ITensors.Index{Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, NDTensors.BlockSparse{ComplexF64, CuArray{ComplexF64, 1, CUDA.DeviceMemory}, 3}})
+    @ ITensors /local/geraghty/.julia/packages/ITensors/AOPBm/src/tensor_operations/tensor_algebra.jl:3
+ [17] _contract(A::ITensors.ITensor, B::ITensors.ITensor)
+    @ ITensors /local/geraghty/.julia/packages/ITensors/AOPBm/src/tensor_operations/tensor_algebra.jl:9
+ [18] contract(A::ITensors.ITensor, B::ITensors.ITensor)
+    @ ITensors /local/geraghty/.julia/packages/ITensors/AOPBm/src/tensor_operations/tensor_algebra.jl:74
+ [19] *(A::ITensors.ITensor, B::ITensors.ITensor)
+    @ ITensors /local/geraghty/.julia/packages/ITensors/AOPBm/src/tensor_operations/tensor_algebra.jl:61
+ [20] update!(sp::TTN.SimpleSweepHandler, pos::Tuple{Int64, Int64}; svd_alg::Nothing)
+    @ TTN /local/geraghty/.julia/packages/TTN/src/algorithms/SweepHandler/SimpleSweepHandler.jl:229
+ [21] update!
+    @ /local/geraghty/.julia/packages/TTN/src/algorithms/SweepHandler/SimpleSweepHandler.jl:69 [inlined]
+ [22] sweep(psi0::TreeTensorNetwork{BinaryNetwork{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, ITensors.ITensor}, sp::TTN.SimpleSweepHandler; kwargs::@Kwargs{number_of_sweeps::Int64, maxdims::Vector{Int64}, noise::Vector{Float64}, output_level::Int64, observer::SavingNRGVarObserver, cutoff::Float64, eigsolve_krylovdim::Int64, eigsolve_verbosity::Int64})
+    @ TTN /local/geraghty/.julia/packages/TTN/src/algorithms/sweeps.jl:41
+ [23] sweep
+    @ /local/geraghty/.julia/packages/TTN/src/algorithms/sweeps.jl:17 [inlined]
+ [24] dmrg(psi0::TreeTensorNetwork{BinaryNetwork{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, ITensors.ITensor}, tpo::TPO{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}; expander::DefaultExpander{Float64}, kwargs::@Kwargs{number_of_sweeps::Int64, maxdims::Vector{Int64}, noise::Vector{Float64}, output_level::Int64, observer::SavingNRGVarObserver, cutoff::Float64, eigsolve_krylovdim::Int64, eigsolve_verbosity::Int64})
+    @ TTN /local/geraghty/.julia/packages/TTN/src/algorithms/sweeps.jl:111
+ [25] do_sweep(ttn::TreeTensorNetwork{BinaryNetwork{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, ITensors.ITensor}, ham::TPO{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, sweep_type::String; kwargs::@Kwargs{ttn_net::BinaryNetwork{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, ham::Sum{Scaled{ComplexF64, Prod{Op}}}, if_continuous_saving::Bool, j2::Float64, lattice_size::Vector{Int64}, if_gpu::Bool, location::String, num_sweeps::Int64, j1::Float64, particles::Int64, cutoff::Float64, if_sweep::Bool, expander_fraction::Float64, if_redo::Bool, expander::DefaultExpander{Float64}, chem_strength::Float64, if_periodic_x::Bool, name::String, if_mag_orientation::Bool, ttn_size::Vector{Int64}, mag_direction::Float64, noise::Vector{Float64}, if_save_data::Bool, if_periodic::Bool, if_densmat::Bool, nrgtol::Float64, part_type::String, mdim::Int64, if_periodic_y::Bool, sweep_type::String, layers::Int64, seed_ttn::Nothing, syms::Bool, output_level::Int64, metadata::Dict{String, Any}, file_path::String})
+    @ Main /local/geraghty/review-practice-codes/ttn.jl:792
+ [26] find_ground_state(num_layers::Int64, particle_count::Int64; kwargs::@Kwargs{ttn_net::BinaryNetwork{TTN.SimpleLattice{2, ITensors.Index, Vector{Pair{ITensors.QuantumNumbers.QN, Int64}}}}, ham::Sum{Scaled{ComplexF64, Prod{Op}}}, if_continuous_saving::Bool, j2::Float64, lattice_size::Vector{Int64}, if_gpu::Bool, location::String, num_sweeps::Int64, j1::Float64, particles::Int64, cutoff::Float64, if_sweep::Bool, expander_fraction::Float64, if_redo::Bool, expander::DefaultExpander{Float64}, chem_strength::Float64, if_periodic_x::Bool, name::String, if_mag_orientation::Bool, ttn_size::Vector{Int64}, mag_direction::Float64, noise::Vector{Float64}, if_save_data::Bool, if_periodic::Bool, if_densmat::Bool, nrgtol::Float64, part_type::String, mdim::Int64, if_periodic_y::Bool, sweep_type::String, layers::Int64, seed_ttn::Nothing, syms::Bool, output_level::Int64, metadata::Dict{String, Any}})
+    @ Main /local/geraghty/review-practice-codes/ttn.jl:994
+ [27] macro expansion
+    @ /local/geraghty/.julia/packages/GPUArraysCore/aNaXo/src/GPUArraysCore.jl:206 [inlined]
+ [28] top-level scope
+    @ /local/geraghty/j1j2/j1j2.jl:413
+in expression starting at /local/geraghty/j1j2/j1j2.jl:390
+srun: error: pgi8cluster22: task 0: Exited with exit code 1

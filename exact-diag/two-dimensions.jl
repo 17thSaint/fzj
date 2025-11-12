@@ -1249,8 +1249,9 @@ function save_eigenstates(states,densmats,nrgs,metadata::Dict)
     dataloc = get(metadata,"dataloc",get_folder_location("cluster-data/exact-diag"))
     data_dict = Dict([("state",states),("nrg",nrgs),("densmat",densmats)])
     lattice_params,hamilt_params = make_latticehamilt_params_from_metadata(metadata)
-    filename_dict = make_filename_dict(lattice_params,hamilt_params)
-    filename = join(["ed",make_parameters_filename(filename_dict)],"-")
+    #filename_dict = make_filename_dict(lattice_params,hamilt_params)
+    #filename = join(["ed",make_parameters_filename(filename_dict)],"-")
+    filename = metadata["filename"]
     metadata["filename"] = filename
     full_loc = join([dataloc,filename],"/")
     println("Filename: ",full_loc)

@@ -64,8 +64,8 @@ function turn_string_into_bool(input)
 			input = true
 		elseif input == "false"
 			input = false
-		else
-			println("Input is not true or false, Input = $input")
+		#else
+			#println("Input is not true or false, Input = $input")
 		end
 	end
 	return input
@@ -125,8 +125,10 @@ function make_parameters_filename(param_dict)
 	return param_filename
 end
 
-function get_params_dict_from_filename(filename)
+function get_params_dict_from_filename(filename_before)
 	params_dict = Dict()
+
+	loc,filename = separate_filename_location(filename_before)
 	
 	file_type = split(filename,".")[end]
 	if file_type == "png" || file_type == "jld2" || file_type == "h5"
@@ -186,7 +188,7 @@ function separate_filename_location(filename::String)
 		actual_filename = fullsplit[end]
 		return location,actual_filename
 	else
-		println("No directory splits in input: $filename")
+		#println("No directory splits in input: $filename")
 		return nothing,filename
 	end
 end

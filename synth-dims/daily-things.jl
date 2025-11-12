@@ -683,44 +683,6 @@ if false
 
 end
 
-# spatial entanglement spectrum for 16x8
-if false
-    dataloc = get_folder_location("cluster-data/synth-dims/torus")
-    pdict = Dict([("layers",5),("particles",4),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
-    all_files = find_data_file(pdict,"ttn",dataloc) 
-    #filter!(x -> !occursin("0.25",x),all_files)
-
-    intstrens = zeros(Float64,length(all_files))
-    for (idx,f) in enumerate(all_files)
-        filenamedict = get_params_dict_from_filename(f)
-        intstrens[idx] = filenamedict["onsite_strength"]
-    end
-
-    ee = zeros(Float64,length(all_files))
-    for (idx,f) in enumerate(all_files)
-        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
-
-        #plot_spectrum(intstrens,m["entanglement_spectrum"][1:20],idx,20,"Interaction Strength",false)
-        
-        if !haskey(m,"entanglement_spectrum")
-            d_wavefunc,m_wavefunc = read_data_jld2(dataloc * "/wavefunc" * f; output_level=0)
-            entspec = spatial_entanglement_spectrum(d_wavefunc["ttn"]; if_save=true,filepath=dataloc * "/" * f)
-        else
-            ee[idx] = entanglement_entropy(m["entanglement_spectrum"])
-        end
-
-    end
-    #yscale("log")
-    #title("Entanglement Spectrum")
-
-    fig = figure()
-    scatter(intstrens,ee)
-    xlabel("Interaction Strength")
-    title("Entanglement Entropy for 16x8 N=8")
-
-
-end
-
 # doing scaling of bipartition size
 if false
     dataloc = get_folder_location("cluster-data/synth-dims/torus")
@@ -841,6 +803,48 @@ if false
 
 end
 =#
+
+#= spatial entanglement spectrum for 16x8
+if false
+    lx,ly,n = 16,8,8
+    dataloc = get_folder_location("cluster-data/synth-dims/torus")
+    pdict = Dict([("layers",7),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc) 
+
+    for (idx,f) in enumerate(all_files)
+        d,m = read_data_jld2(dataloc * "/" * f; output_level=0)
+
+        #plot_spectrum(intstrens,m["entanglement_spectrum"][1:20],idx,20,"Interaction Strength",false)
+        
+        if !haskey(m,"entanglement_spectrum")
+            d_wavefunc,m_wavefunc = read_data(dataloc * "/wavefunc" * f; output_level=0)
+            entspec = spatial_entanglement_spectrum(d_wavefunc["ttn"]; if_save=true,filepath=dataloc * "/" * f)
+        end
+
+    end
+
+end=#
+
+#= test Noah's GPU implementation for accuracy comparing to CPU
+if false
+    lx,ly,n = 4,4,2
+    intstren = 10.0
+    #=layers = Int(log(2,lx*ly))
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc)
+    filter!(x -> occursin("if_gpu-true",x),all_files)
+    f = all_files[1]
+    d_gpu,m_gpu = read_data(joinpath(dataloc,f); output_level=0)
+    d_wavefunc_gpu,m_wavefunc_gpu = read_data(joinpath(dataloc,"wavefunc"*f); output_level=0)=#
+
+
+    params_dict = Dict([("if_gpu",true),("nrgtol",1e-6),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",1.0),("particles",n),("mdim",100),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true)])
+    CUDA.@allowscalar all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
+
+    
+end=#
+
 
 
 

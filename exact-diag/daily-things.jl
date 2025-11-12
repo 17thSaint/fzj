@@ -274,7 +274,7 @@ if false
     xscale("log")
 end=#
 
-# look at higher ACs for dominant parameter(tx/ULR) and make paper plot
+#= look at higher ACs for dominant parameter(tx/ULR) and make paper plot
 if false
     lx,ly,n = 8,4,4
     hanis = 1.0
@@ -302,14 +302,19 @@ if false
         nrg_gaps = d["nrg"][3:end] .- d["nrg"][2]
         states = d["state"]
 
-        fuirs_1,ogfuirs1 = uir_adiabatic_condition(states[2],states[3:end],nrg_gaps,lattice_params,hamilt_params,nothing)
+        #fuirs_1,ogfuirs1 = uir_adiabatic_condition(states[2],states[3:end],nrg_gaps,lattice_params,hamilt_params,nothing)
+        fuirs_1,ogfuirs1 = uir_adiabatic_condition(states[1],states[1],0.0,lattice_params,hamilt_params,nothing)
+        fuirs_2,ogfuirs2 = uir_adiabatic_condition(states[2],states[2],0.0,lattice_params,hamilt_params,nothing)
 
-        fuirs_0 = m["fuir_0"]
+        println("OG F_UIR 1: $ogfuirs1")
+        println("OG F_UIR 2: $ogfuirs2")
 
-        fuirs_avg = [0.5 .* (fuirs_0[i+1][1] .+ fuirs_1[i][1]) for i in 1:length(fuirs_1)]
+        #fuirs_0 = m["fuir_0"]
 
-        datadict = Dict([("fuir_1",fuirs_1)])
-        modify_data(datadict,joinpath(dataloc,f),"metadata"; output_level=0)
+        #fuirs_avg = [0.5 .* (fuirs_0[i+1][1] .+ fuirs_1[i][1]) for i in 1:length(fuirs_1)]
+
+        #datadict = Dict([("fuir_1",fuirs_1)])
+        #modify_data(datadict,joinpath(dataloc,f),"metadata"; output_level=0)
 
         append!(allgaps,[[nrg_gaps]])
         append!(f_ulrs,[[fuirs_avg]])
@@ -317,7 +322,7 @@ if false
 
     end
 
-    clog = [log10.(f_ulrs[i][1]) for i in 1:length(f_ulrs)]
+    #=clog = [log10.(f_ulrs[i][1]) for i in 1:length(f_ulrs)]
 
     cols = ["#82AC9F","#C73E1D","#36213E"]
 
@@ -333,11 +338,11 @@ if false
     end
     colorbar().set_label(L"log_{10} (F_{U_{IR}})")
     xlabel("Interaction Strength, "*L"U_{LR}")
-    ylabel("Energy Gap")
+    ylabel("Energy Gap")=#
 
     
 
-end
+end=#
 
 #= look at higher adiabatic conditions
 if false
@@ -794,41 +799,6 @@ if false
     ylim([-0.05,1.1*maximum(gaps)])
 end=#
 
-#= plot hatsugai for poster
-if false
-    lx,ly,n = 8,4,4
-    intstren = 0.0
-    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
-    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
-    display(all_files)
-
-    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
-
-    tw1s = m["tw1s"]
-    tw2s = m["tw2s"]
-    omegas = m["omegas"]
-
-    #=which_to_keep = []
-    for (idx,tw1) in enumerate(tw1s)
-        if round(tw1,digits=1) == tw1 && round(tw2s[idx],digits=1) == tw2s[idx]
-            append!(which_to_keep,[idx])
-        end
-    end
-
-    squaresize = Int(sqrt(length(which_to_keep)))
-    new_tw1s = unique(tw1s[which_to_keep]) 
-    new_tw2s = unique(tw2s[which_to_keep]) .- 0.5
-    new_wrongshape_omegas = reshape(omegas[which_to_keep],squaresize,squaresize)
-    new_omegas = zeros(ComplexF64,squaresize,squaresize)
-    new_omegas[:,1:5] = new_wrongshape_omegas[:,7:end]
-    new_omegas[:,6:end] = new_wrongshape_omegas[:,1:6]
-    rez = plot_omega(new_tw1s,new_tw2s,new_omegas; plot_title=L"U_{ir}"*"=$intstren")=#
-
-    
-    rez = plot_omega(tw1s,tw2s,omegas; plot_title=L"U_{ir}"*"=$intstren")
-    
-end=#
 
 #= find if xi_crit depends on system size
 if false
@@ -1925,6 +1895,95 @@ if false
 
 end=#
 
+#= Felix Palm, looking at interaction length and fourpt momentum flatness as order parameter
+if true
+    lx,ly,n = 8,4,4
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/ulr-length")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    
+    xis = range(0.0,4.0,length=11)
+    intstrens = range(0.0,4.0,length=11)[2:end]
+    flatnesses = ones(Float64,length(intstrens),length(xis))
+    gaps = ones(Float64,length(intstrens),length(xis))
+    splittings = ones(Float64,length(intstrens),length(xis))
+    for f in all_files
+
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+
+        xi = m["corr_length"]
+
+        xi_index = findfirst(x -> xis[x] == xi,1:11)
+        intstren_index = findfirst(x -> intstrens[x] == m["U"][1],1:11)
+
+        #=if !haskey(m,"fourpt_momentum_1")
+            continue
+        end
+
+        fourpt1 = m["fourpt_momentum"]
+        fourpt2 = m["fourpt_momentum_1"]
+
+        fourpt_mixed = 0.5 * (fourpt1 .+ fourpt2)
+
+        subset_fourpt = vcat([diag(fourpt_mixed,i) for i in 3:lx-3]...)
+        flatness = minimum(subset_fourpt) / maximum(subset_fourpt)
+
+        
+
+        flatnesses[intstren_index,xi_index] = flatness=#
+
+
+        gaps[intstren_index,xi_index] = d["nrg"][3] - d["nrg"][2]
+        splittings[intstren_index,xi_index] = d["nrg"][2] - d["nrg"][1]
+
+    end
+
+    #= normalize from laughlin tao-thouless
+    for i in 1:length(intstrens)
+        flatnesses[i,:] ./= flatnesses[i,1]
+    end
+
+    imshow(flatnesses,extent=(minimum(xis),maximum(xis),minimum(intstrens),maximum(intstrens)),origin="lower",aspect="auto",vmin=0.0,vmax=1.0)
+    xlabel("Interaction Length")
+    ylabel("Interaction Strength")
+    title("Normalized Fourpt Flatness for 8x4 N=4")
+    colorbar()=#
+
+    fig = figure()
+    imshow(gaps,extent=(minimum(xis),maximum(xis),minimum(intstrens),maximum(intstrens)),origin="lower",aspect="auto",vmin=0.0)
+    xlabel("Interaction Length")
+    ylabel("Interaction Strength")
+    title("Energy Gap")
+    colorbar()
+
+    fig = figure()
+    imshow(log.(splittings),extent=(minimum(xis),maximum(xis),minimum(intstrens),maximum(intstrens)),origin="lower",aspect="auto")
+    xlabel("Interaction Length")
+    ylabel("Interaction Strength")
+    title("Groundstate Splitting")
+    colorbar().set_label(L"log_{10} (\Delta_{01})")
+end=#
+
+if true
+    lx,ly,n = 8,4,4
+    intstrens = range(0.0,5.0,length=11)
+    for (idx,intstren) in enumerate(intstrens)
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+
+        if idx == 1
+            occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="$(lx)x$(ly) N=$n ULR=$(intstren)")
+            fig = figure()
+        end
+
+        plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title="")
+
+        if idx == length(intstrens)
+            fig = figure()
+            occs = get_occupancy(states[1],lattice_params; if_plot=true,plot_title="$(lx)x$(ly) N=$n ULR=$(intstren)")
+        end
+    end
+end
 
 
 

@@ -1505,7 +1505,7 @@ function make_synthdims_filename(model_parameters::Dict)
 	anis = model_parameters["hopping_anisotropy"]
 	if_synth_rectangle = model_parameters["if_synth_rectangle"]
 	
-	filename_dict = Dict([("layers",layer_count),("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_phys",if_periodic_phys),("if_periodic_synth",if_periodic_synth),("onsite_strength",onsite_strength),("hopping_anisotropy",anis)])
+	filename_dict = Dict([("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_phys",if_periodic_phys),("if_periodic_synth",if_periodic_synth),("onsite_strength",onsite_strength),("hopping_anisotropy",anis)])
 
 	if model_parameters["scaling"] != "flat"
 		filename_dict["scaling"] = model_parameters["scaling"]
@@ -1532,10 +1532,8 @@ function make_synthdims_filename(model_parameters::Dict)
 		filename_dict["max_occ"] = model_parameters["max_occ"]
 	end
 
-	if !all(model_parameters["lattice_size"] .== get_tatami_lattice_dims(layer_count))
-		filename_dict["Lx"] = model_parameters["lattice_size"][1]
-		filename_dict["Ly"] = model_parameters["lattice_size"][2]
-	end
+	filename_dict["Lx"] = model_parameters["lattice_size"][1]
+	filename_dict["Ly"] = model_parameters["lattice_size"][2]
 
 	if model_parameters["if_pinning"]
 		filename_dict["if_pinning"] = true
@@ -2114,8 +2112,8 @@ if false
 	all_results = run_synth_dims_generic(params_dict)
 end=#
 
-#= synth-dims for loop runnings
-if false
+# synth-dims for loop runnings
+if true
 	#BLAS.set_num_threads(open_cores)
 	cols = ["b","g","r"]
 	#nnst = 0.0
@@ -2166,7 +2164,7 @@ if false
 		
 		#("if_pinning",if_pinning),("dataloc",dataloc),("pinning_strength",pinstren)
 		
-		params_dict = Dict([("if_gpu",false),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-5),("particles",n),("mdim",100),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("if_gpu",false),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",1e-5),("particles",n),("mdim",100),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		#open_cores = get(params_dict, "open_cores", 5)
@@ -2281,7 +2279,7 @@ if false
 			=#
 	#end
 #end
-end=#
+end#
 
 #
 #plot(strens,real.(centermoms),"-p")

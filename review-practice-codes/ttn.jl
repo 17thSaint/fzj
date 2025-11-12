@@ -753,6 +753,7 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 	file_path::String = get(kwargs, :file_path, "")
 	measurements = get(kwargs,:measurements,[])
 	measurement_functions = get(kwargs,:measurement_functions,[])
+	if_gpu::Bool = get(kwargs, :if_gpu, false)
 
 	eigsolve_krylovdim = 15#get(kwargs, :eigsolve_krylovdim, TTN.DEFAULT_KRYLOVDIM_DMRG)
 	eigsolve_verbosity = 0#get(kwargs, :eigsolve_verbosity, TTN.DEFAULT_VERBOSITY_DMRG)
@@ -789,14 +790,14 @@ function do_sweep(ttn,ham,sweep_type; kwargs...)
 		#println("Before starting DMRG the bond dim is ",TTN.maxlinkdim(ttn))
 		#get_occupancy(ttn; plot_title="Before DMRG")
 		if isnothing(psi_ortho) || length(psi_ortho) == 0
-			sp::TTN.AbstractSweepHandler = TTN.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff, eigsolve_krylovdim=eigsolve_krylovdim, eigsolve_verbosity=eigsolve_verbosity)
+			sp::TTN.AbstractSweepHandler = TTN.dmrg(ttn,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl,observer=observer, cutoff=cutoff, eigsolve_krylovdim=eigsolve_krylovdim, eigsolve_verbosity=eigsolve_verbosity, use_gpu=if_gpu)
 		else
 			# prep the orthogonal states before starting DMRG
 			for ortho_state in psi_ortho
 				TTN.move_ortho!(ortho_state,ttn.ortho_center)
 			end
 		
-			sp = TTN.dmrg(ttn,psi_ortho,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl, observer=observer, cutoff=cutoff, weight=weight, if_old_excited=if_old_excited, eigsolve_krylovdim=eigsolve_krylovdim, eigsolve_verbosity=eigsolve_verbosity)
+			sp = TTN.dmrg(ttn,psi_ortho,ham; expander=expander, number_of_sweeps=num_sweeps, maxdims=max_dim, noise=noise, output_level=opl, observer=observer, cutoff=cutoff, weight=weight, if_old_excited=if_old_excited, eigsolve_krylovdim=eigsolve_krylovdim, eigsolve_verbosity=eigsolve_verbosity, use_gpu=if_gpu)
 		end
 	elseif sweep_type == "simple"
 		proj_tpo = TTN.ProjectedTensorProductOperator(ttn,ham)
@@ -984,7 +985,8 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 	end
 	println("Added States")
 	
-	ham::TTN.AbstractTensorProductOperator = TTN.TPO(ham_operator,lat)
+
+	ham = TTN.TPO_GPU(ham_operator,lat)# : TTN.TPO(ham_operator,lat)
 	println("Built Hamiltonian")
 	sp = 0.0
 	times::Vector{Float64} = []
@@ -1148,7 +1150,7 @@ function find_excited_states(num_layers::Int,num_excited_states::Int,particle_co
 	if isnothing(ham_operator)
 		ham_operator = metadata["ham"]
 	end
-	ham::TTN.AbstractTensorProductOperator = TTN.TPO(ham_operator,lat)
+	ham::TTN.AbstractTensorProductOperator = if_gpu ? TTN.TPO_GPU(ham_operator,lat) : TTN.TPO(ham_operator,lat)
 	println("Built Hamiltonian")
 
 	es_start = length(ortho_states)
@@ -1414,7 +1416,7 @@ function TTN.ITensorMPS.measure!(o::NRGVarObserver; kwargs...)
     nrgs = o.nrg
     var_tol = o.var_tol
     dmrg = kwargs[:sweep_handler]
-	println("Link dimension right now is ",TTN.maxlinkdim(dmrg.ttn)," while the maxdim is ",TTN.maxdim(dmrg))
+	dmrg.current_sweep > 0 && println("Link dimension right now is ",TTN.maxlinkdim(dmrg.ttn)," while the maxdim is ",TTN.maxdim(dmrg))
     append!(o.nrg,[dmrg.current_energy])
 end
 

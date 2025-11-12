@@ -490,7 +490,7 @@ function plot_paper_finitesplitting_scaling()
         local_label = k == "0.0" ? "Unpinned" : "$(parse(Float64,k)/10)"
         col = k == "0.0" ? cols[1] : cols[2]
 
-        length(v) > 0 && scatter(lxs_laughlin[k],v,label=local_label,c=col)
+        length(v) > 0 && scatter(lxs_laughlin[k],v,label=local_label,c=col,marker="^")
     end
     xlabel(L"L_x")
     ylabel("E1 - E0")
@@ -509,7 +509,7 @@ function plot_paper_finitesplitting_scaling()
             display(v)
         end  
 
-        length(v) > 0 && scatter(lxs_mblc[k],v,label=local_label,c=col)
+        length(v) > 0 && scatter(lxs_mblc[k],v,label=local_label,c=col,marker="o")
     end
     xlabel(L"L_x")
     ylabel("E1 - E0")
@@ -521,6 +521,103 @@ function plot_paper_finitesplitting_scaling()
 
 end
 
+# plot finite splitting for ULR=0 and ULR=300 in same figure separate plots
+function plot_paper_finitesplitting_scaling_oneplot()
+    gaps_laughlin,lxs_laughlin = plot_finitesplitting_scaling(0.0; if_plot=false)
+    gaps_mblc,lxs_mblc = plot_finitesplitting_scaling(300.0; if_plot=false)
+
+    cols = ["#82AC9F","#C73E1D","#36213E"]
+
+    fig = figure()
+    for (k,v) in gaps_laughlin
+        local_label = k == "0.0" ? "Unpinned" : "$(parse(Float64,k)/10)"
+        col = k == "0.0" ? cols[1] : cols[2]
+
+        fc = k == "0.0" ? col : "none"
+
+        length(v) > 0 && scatter(lxs_laughlin[k],v,label=local_label,marker="^",facecolors=fc,edgecolors=col)
+    end
+    xlabel(L"L_x")
+    ylabel("E1 - E0")
+    yscale("log")
+    legend(loc="upper right")
+    title("ULR=0.0")
+
+    for (k,v) in gaps_mblc
+        local_label = k == "0.0" ? "Unpinned" : "$(parse(Float64,k)/10)"
+        col = k == "0.0" ? cols[1] : cols[2]
+        
+        # temporary data manipulation for ulr = 300.0 Lx = 12
+        if local_label == "1.0e-5"
+            v[end] = 1e-5
+            display(v)
+        end  
+
+        fc = k == "0.0" ? col : "none"
+
+        length(v) > 0 && scatter(lxs_mblc[k],v,label=local_label,marker="o",facecolors=fc,edgecolors=col)
+    end
+    xlabel(L"L_x")
+    ylabel("E1 - E0")
+    yscale("log")
+    legend(loc="upper right")
+    title("ULR=300.0")
+
+    tight_layout()
+
+end
+
+
+# plot finite splitting for ULR=0 and ULR=300 in same figure separate plots
+function plot_paper_finitesplitting_scaling_newplot()
+    gaps_laughlin,lxs_laughlin = plot_finitesplitting_scaling(0.0; if_plot=false)
+    gaps_mblc,lxs_mblc = plot_finitesplitting_scaling(300.0; if_plot=false)
+
+    cols = ["#82AC9F","#C73E1D","#36213E"]
+
+    fig = figure()
+    subplot(1,2,1)
+    scatter(lxs_laughlin["0.0"],gaps_laughlin["0.0"],label=L"U_{ir}=0",c=cols[2],marker="^")
+    scatter(lxs_mblc["0.0"],gaps_mblc["0.0"],label=L"U_{ir}=300",c=cols[1],marker="o")
+    xlabel(L"L_x")
+    ylabel("E1 - E0")
+    yscale("log")
+    legend(loc="upper right")
+    title("Unpinned")
+
+    subplot(1,2,2)
+    for (k,v) in gaps_laughlin
+        local_label = k == "0.0" ? "Unpinned" : "$(parse(Float64,k)/10)"
+        
+        if k == "0.0"
+            continue
+        end
+
+        length(v) > 0 && scatter(lxs_laughlin[k],v,label=L"\delta="*"$(local_label)",c=cols[2],marker="^")
+    end
+    for (k,v) in gaps_mblc
+        local_label = k == "0.0" ? "Unpinned" : "$(parse(Float64,k)/10)"
+        
+        if k == "0.0"
+            continue
+        end
+
+        # temporary data manipulation for ulr = 300.0 Lx = 12
+        if local_label == "1.0e-5"
+            v[end] = 1e-5
+            display(v)
+        end  
+
+        length(v) > 0 && scatter(lxs_mblc[k],v,label=L"\delta"*"=$(local_label)",c=cols[1],marker="o")
+    end
+    xlabel(L"L_x")
+    ylabel("E1 - E0")
+    yscale("log")
+    legend(loc="upper right")
+    title("Pinned")
+
+    tight_layout()
+end
 
 
 # finite size scaling of the topological gap
@@ -608,9 +705,11 @@ function plot_ee_scaling()
         params = get_params_dict_from_filename(f)
         !(params["onsite_strength"] in intstrens) && continue
         if params["onsite_strength"] == 0.0
-            col = cols[1]
-        elseif params["onsite_strength"] == 300.0
             col = cols[2]
+            mm = "^"
+        elseif params["onsite_strength"] == 300.0
+            col = cols[1]
+            mm = "o"
         end
 
         d,m = read_data(joinpath(dataloc_ttn,f); output_level=0)
@@ -627,7 +726,7 @@ function plot_ee_scaling()
             ee = entanglement_entropy(entspec)
             ees[k-1] = ee
         end
-        scatter(perims,ees,label="$(params["onsite_strength"])",c=col)
+        scatter(perims,ees,label="$(params["onsite_strength"])",c=col,marker=mm)
         append!(all_ees,[ees])
     end
 
@@ -997,9 +1096,39 @@ function plot_compare_fourpt(Lx::Int,Ly::Int,ulr::Float64)
     
 end
 
-# energy spectrum where color of scatter point is the adiabatic condition matrix element with the groundstate manifold
-function plot_adiabatic_spectrum(Lx::Int64)
+# four point slices with both 0 and 300 and correct markers/colors
+function plot_four_point_slices_both()
+    cols = ["#82AC9F","#C73E1D","#36213E"]
+
+    d_300,m_300 = read_data("../cluster-data/synth-dims/torus/new-gauge/ttn-if_periodic_phys-true-onsite_strength-300.0-lr-7-particles-8-alpha-0.125-if_periodic_synth-true-layers-7-hopping_anisotropy-1.0.h5");
+    fourpt_1_300 = m_300["fourpt_momentum"]
     
+    d_0,m_0 = read_data("../cluster-data/synth-dims/torus/new-gauge/ttn-if_periodic_phys-true-onsite_strength-0.0-lr-7-particles-8-alpha-0.125-if_periodic_synth-true-layers-7-hopping_anisotropy-1.0.h5");
+    fourpt_1_0 = m_0["fourpt_momentum"]
+    fourpt_2_0 = m_0["fourpt_momentum_1"]
+    mixed_fourpt = 0.5 .* (fourpt_1_0 .+ fourpt_2_0)
+    
+    xs = collect(-7:7)
+
+    ys_0 = circshift(mixed_fourpt[1,:],7)[1:end-1]
+    
+    ys_300 = circshift(fourpt_1_300[7,:],1)[1:end-1] ./ 2
+
+
+    fig = figure()
+    plot(xs,ys_0,"-p",c=cols[2],label=L"U_{ir}=0",marker="^")
+    plot(xs,ys_300,"-p",c=cols[1],label=L"U_{ir}=300")
+    legend()
+    xlabel("Momentum "*L"k_y")
+    ylabel(L"\langle \hat{a}_{k_y}^{\dagger} \hat{a}_{k_{y}^{'}}^{\dagger} \hat{a}_{k_{y}^{'}} \hat{a}_{k_{y}} \rangle / \langle \hat{n}_{k_{y}^{'}} \rangle \langle \hat{n}_{k_{y}} \rangle")
+
+
+end
+
+# energy spectrum where color of scatter point is the adiabatic condition matrix element with the groundstate manifold
+function plot_ULR_adiabatic_spectrum(Lx::Int64)
+#if true    
+    #=Lx = 8
     Ly,N = Int(Lx/2),Int(Lx/2)
     dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
     pdict = Dict([("Lx",Lx),("Ly",Ly),("N",N),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
@@ -1026,16 +1155,17 @@ function plot_adiabatic_spectrum(Lx::Int64)
         append!(ulrs,[fileparams["interaction_strength"]])
         append!(f_ulrs,[[fuirs_avg]])
         append!(allgaps,[[gaps]])
-    end
+    end=#
 
 
     clog = [log10.(f_ulrs[i][1]) for i in 1:length(f_ulrs)]
 
-    cols = ["#82AC9F","#C73E1D","#36213E"]
+    cols = ["#82AC9F","#C73E1D","#36213E","#B47EB3"]
 
-    target = cols[3]
+    target = cols[2]
+    starting = cols[1]
     whitetohex = matplotlib.colors.LinearSegmentedColormap.from_list(
-        "white_to_hex", ["#ffffff", target]
+        "c1_to_c2", ["#ffffff", target]
     )
 
     for i in 1:length(ulrs)
@@ -1043,8 +1173,8 @@ function plot_adiabatic_spectrum(Lx::Int64)
         ys = allgaps[i][1]
         scatter(xs,ys,c=clog[i],cmap=whitetohex)
     end
-    colorbar().set_label(L"log_{10} (F_{U_{IR}})")
-    xlabel("Interaction Strength, "*L"U_{LR}")
+    colorbar().set_label(L"log_{10} (F_{U_{i}})")
+    xlabel("Interaction Strength, "*L"U_{i}")
     ylabel("Energy Gap")
     ylim([-0.05,1.05])
 
@@ -1065,9 +1195,241 @@ if false
     display(keys(m))
 end=#
 
+# TEE as a function of ULR if there are enough data points
+function plot_tee_vs_ulr()
+#if true
+    lx,ly,n = 16,8,8
+    layers = 7
+    dataloc1 = get_folder_location("cluster-data/synth-dims/torus")
+    pdict = Dict([("hopping_anisotropy",1.0),("layers",layers),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_files1 = find_data_file(pdict,"ttn",dataloc1)
+    
+    dataloc2 = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    all_files2 = find_data_file(pdict,"ttn",dataloc2)
+
+    all_locs = (dataloc2*"/") .* all_files2
+    
+    linmodel(x,p) = p[1] .* x .+ p[2]
+    perims = [8*3,4*4,4*3,2*4,2*3]
+
+    yints = []
+    sigmas = []
+    ulrs = []
+    for (idx,f) in enumerate(all_locs)
+        d,m = read_data(f; output_level=0)
+
+        if !(m["onsite_strength"] in [0.0,10.0,300.0])
+            continue
+        end
+
+        if haskey(m,"entanglement_spectrum")
+            println("Processing file $idx / $(length(all_locs))")
+            params = get_params_dict_from_filename(f)
+            instren = haskey(m,"onsite_strength") ? m["onsite_strength"] : params["onsite_strength"]
+
+            ees = zeros(Float64,layers-2)
+            entspecs = real.(m["entanglement_spectrum"])
+
+            for k in 2:layers-1
+                entspec = filter(x -> x != 0.0, entspecs[k,:])
+                #display(entspec)
+
+                ee = entanglement_entropy(entspec)
+                ees[k-1] = ee
+            end
+            linfit = curve_fit(linmodel,perims,ees,[1.0,1.0])
+            sigma = stderror(linfit)[2]
+            yintercept = -linfit.param[2]
+            append!(yints,[yintercept])
+            append!(sigmas,[sigma])
+            append!(ulrs,[instren])
+        end
+    end
+
+
+    #=fig = figure()
+    errorbar(ulrs,yints,yerr=sigmas,fmt="o",c="b")
+    plot(range(0,1000,length=10),0.5 .* ones(10),"--",c="r")
+    ylim(-0.1,1.1)
+    xlabel(L"U_{ir}/t")
+    ylabel(L"\gamma")=#
 
 
 
+    # Split data for the two axis types
+    log_transition_ulr = 2.1
+    mask_linear = ulrs .<= log_transition_ulr
+    mask_log = ulrs .> log_transition_ulr
+
+    # Create subplots
+    fig, (ax1, ax2) = subplots(1, 2, sharey=true, gridspec_kw=Dict("width_ratios" => [1, 2]))
+
+    # Left: Linear scale
+    ax1.errorbar(ulrs[mask_linear], yints[mask_linear], yerr=sigmas[mask_linear], fmt="o", c=cols[3])
+    ax1.set_xlim(-0.2, log_transition_ulr)
+    ax1.set_xscale("linear")
+    ax1.set_ylabel(L"\gamma")
+    #ax1.set_xlabel(L"U_{ir} / t")
+
+    # Right: Log scale
+    ax2.errorbar(ulrs[mask_log], yints[mask_log], yerr=sigmas[mask_log], fmt="o", c=cols[3])
+    ax2.set_xlim(5.0, 1.1*1000.0)
+    ax2.set_xscale("log")
+    ax2.set_xlabel(L"U_{ir} / t")
+    ax1.set_ylim([-0.02, 1.1])
+
+    # Formatting tweaks
+    ax1.spines["right"].set_visible(false)
+    ax2.spines["left"].set_visible(false)
+    ax2.yaxis.tick_right()
+    ax2.yaxis.set_label_position("right")
+
+    ax1.plot(range(0,1.1*1000.0,length=10),0.5 .* ones(10),"--",c=cols[2])
+    ax2.plot(range(0,1.1*1000.0,length=10),0.5 .* ones(10),"--",c=cols[2])
+
+    # Optional: break marks
+    d = .015
+    ax1.plot([1-d, 1+d], [-d, +d], transform=ax1.transAxes, color="k", clip_on=false)
+    ax1.plot([1-d, 1+d], [1-d, 1+d], transform=ax1.transAxes, color="k", clip_on=false)
+    ax2.plot([-d, +d], [-d, +d], transform=ax2.transAxes, color="k", clip_on=false)
+    ax2.plot([-d, +d], [1-d, 1+d], transform=ax2.transAxes, color="k", clip_on=false)
+
+end
+
+function get_chern_number_plot(intstren::Float64)
+    lx,ly,n = 8,4,4
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    display(all_files)
+
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+
+    tw1s = m["tw1s"]
+    tw2s = m["tw2s"]
+    omegas = m["omegas"]
+
+    if intstren == 1000.0
+        which_to_keep = []
+        for (idx,tw1) in enumerate(tw1s)
+            if round(tw1,digits=1) == tw1 && round(tw2s[idx],digits=1) == tw2s[idx]
+                append!(which_to_keep,[idx])
+            end
+        end
+
+        squaresize = Int(sqrt(length(which_to_keep)))
+        new_tw1s = unique(tw1s[which_to_keep]) 
+        new_tw2s = unique(tw2s[which_to_keep]) .- 0.5
+        new_wrongshape_omegas = reshape(omegas[which_to_keep],squaresize,squaresize)
+        new_omegas = zeros(ComplexF64,squaresize,squaresize)
+        new_omegas[:,1:5] = new_wrongshape_omegas[:,7:end]
+        new_omegas[:,6:end] = new_wrongshape_omegas[:,1:6]
+        rez = plot_omega(new_tw1s,new_tw2s,new_omegas; plot_title=L"U_{ir}"*"=$intstren",if_plot=false)
+
+    else
+        rez = plot_omega(tw1s,tw2s,omegas; plot_title=L"U_{ir}"*"=$intstren",if_plot=false)
+    end
+
+    return rez[2:end]
+end
+
+# plot gap spectrum with Chern insets
+function plot_opengap_spectrum_with_chern()
+    lx,ly,n = 8,4,4
+    layers = Int(log(2,lx*ly))
+    cols = ["#82AC9F","#C73E1D","#36213E"]
+
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("hopping_anisotropy",1.0),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2")
+    filter!(x -> !occursin("twist_angle",x), all_files)
+    #display(all_files)
+
+    g2s = []
+    g3s = []
+    ulrs_g2 = []
+    ulrs_g3 = []
+    for f in all_files
+        d,m = read_data_jld2(joinpath(dataloc,f); output_level=0)
+        all_nrgs = d["nrg"]
+        
+        params = get_params_dict_from_filename(f)
+        ulr = params["interaction_strength"]
+
+        if ulr > 2.0 && round(ulr,digits=0) != ulr
+            continue
+        end
+
+        append!(g2s,[all_nrgs[2] - all_nrgs[1]])
+        append!(ulrs_g2,[ulr])
+
+        for i in 3:length(all_nrgs)
+            append!(g3s,[all_nrgs[i] - all_nrgs[1]])
+            append!(ulrs_g3,[ulr])
+        end
+    end
+
+
+    # Split data for the two axis types
+    log_transition_ulr = 2.1
+    mask_linear_g2 = ulrs_g2 .<= log_transition_ulr
+    mask_log_g2 = ulrs_g2 .> log_transition_ulr
+
+    mask_linear_g3 = ulrs_g3 .<= log_transition_ulr
+    mask_log_g3 = ulrs_g3 .> log_transition_ulr
+
+    # Create subplots
+    fig, (ax1, ax2) = subplots(1, 2, sharey=true, gridspec_kw=Dict("width_ratios" => [1, 2]))
+
+    # Left: Linear scale
+    ax1.scatter(ulrs_g3[mask_linear_g3][1], g3s[mask_linear_g3][1], c=cols[3],label="E2")
+    ax1.scatter(ulrs_g2[mask_linear_g2], g2s[mask_linear_g2], c=cols[2], label="E1")
+    ax1.scatter(ulrs_g3[mask_linear_g3], g3s[mask_linear_g3], c=cols[3])
+    ax1.scatter(ulrs_g2[mask_linear_g2], zeros(sum(mask_linear_g2)), c=cols[1], label="E0")
+    ax1.set_xlim(-0.2, log_transition_ulr)
+    ax1.set_xscale("linear")
+    ax1.set_ylabel("E - E₀")
+    #ax1.set_xlabel(L"U_{ir} / t")
+
+    # Right: Log scale
+    ax2.scatter(ulrs_g2[mask_log_g2], g2s[mask_log_g2], c=cols[2])
+    ax2.scatter(ulrs_g3[mask_log_g3], g3s[mask_log_g3], c=cols[3])
+    ax2.scatter(ulrs_g2[mask_log_g2], zeros(sum(mask_log_g2)), c=cols[1])
+    ax2.set_xlim(minimum(ulrs_g2[mask_log_g2]), 1.1*maximum(ulrs_g2[mask_log_g2]))
+    ax2.set_xscale("log")
+    ax2.set_xlabel(L"U_{ir} / t")
+    # Synchronize y-limits
+    ax1.set_ylim([-0.02, 0.5])
+
+    # Formatting tweaks
+    ax1.spines["right"].set_visible(false)
+    ax2.spines["left"].set_visible(false)
+    ax2.yaxis.tick_right()
+    ax2.yaxis.set_label_position("right")
+
+    # Optional: break marks
+    d = .015
+    ax1.plot([1-d, 1+d], [-d, +d], transform=ax1.transAxes, color="k", clip_on=false)
+    ax1.plot([1-d, 1+d], [1-d, 1+d], transform=ax1.transAxes, color="k", clip_on=false)
+    ax2.plot([-d, +d], [-d, +d], transform=ax2.transAxes, color="k", clip_on=false)
+    ax2.plot([-d, +d], [1-d, 1+d], transform=ax2.transAxes, color="k", clip_on=false)
+
+    #ax2.set_title("8x4 N=4, "*L"\rho_{1D}=0.5")
+
+
+    # get chern number calcs
+    chern_imshow_1000,chern_xs_1000,chern_ys_1000 = get_chern_number_plot(1000.0)
+
+
+    # inset plots
+    ax_tL = ax1.inset_axes([-0.5, 0.2, 2.0, 0.2])
+    ax_tL.imshow(chern_imshow_1000, cmap="viridis", origin="lower", extent=[0,1,0,1], vmax=1.0, vmin=-1.0)
+
+    ax_tR = ax2.inset_axes([0.6, 0.155, 0.25, 0.3])
+    ax_tR.imshow(chern_imshow_1000, cmap="viridis", origin="lower", extent=[0,1,0,1], vmax=1.0, vmin=-1.0)
+
+
+end
 
 
 

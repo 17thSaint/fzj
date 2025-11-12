@@ -45,7 +45,7 @@ end
 
 include_other_files(["other-funcs/basic-2d-stuff.jl","other-funcs/basic-2d-observables.jl","exact-diag/two-dimensions.jl","exact-diag/observables.jl","exact-diag/hatsugai-mbcn.jl"])
 #include_other_files(["exact-diag/time-evolution.jl"])
-#include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
+include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
 
 function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     if hamilt_params["U"][2] == 0.0
@@ -77,6 +77,7 @@ function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     if haskey(hamilt_params,"scaling_type") && hamilt_params["scaling_type"] != "flat"
         fdict["scaling_type"] = hamilt_params["scaling_type"]
         fdict["interaction_length"] = hamilt_params["corr_length"]
+        fdict["interaction_strength"] = hamilt_params["U"][1]
     end
     if haskey(hamilt_params,"periodic_potential_strength") && hamilt_params["periodic_potential_strength"] != 0.0
         fdict["periodic_potential_strength"] = hamilt_params["periodic_potential_strength"]
@@ -270,8 +271,9 @@ function get_normal_model_params_ed(params_dict::Dict)
                         "interaction_cutoff"=>int_cutoff)
 
     
-    
     # set running operation parameters
+    filename_dict::Dict{String,Any} = make_filename_dict(lattice_params,hamilt_params)
+    filename::String = join(["ed",make_parameters_filename(filename_dict)],"-")
     nev::Int64 = get(params_dict,"nev",1)
     if_save_data::Bool = get(params_dict, "if_save_data", true)
     if if_periodic_x && if_periodic_y
@@ -299,6 +301,7 @@ function get_normal_model_params_ed(params_dict::Dict)
     if_function::Bool = get(params_dict, "if_function", false)
     if_reading::Bool = get(params_dict, "if_reading", false)
     running_args::NamedTuple = (nev=nev,
+                    filename=filename,
                     if_exact=if_exact,
                     if_function=if_function,
                     if_reading=if_reading,
@@ -322,9 +325,8 @@ function run_normal_ed(params_dict::Dict; kwargs...)
     basis_dataloc = running_args.basis_dataloc
 
     # build filename dictionary
-    filename_dict::Dict{String,Any} = make_filename_dict(lattice_params,hamilt_params)
-    filename::String = join(["ed",make_parameters_filename(filename_dict)],"-")
-    output_level > 0 && display(filename)
+    output_level > 0 && display(running_args.filename)
+    filename_dict = make_filename_dict(lattice_params,hamilt_params)
     if_exists::Bool,found_data::Union{Vector{Dict},Nothing} = running_args.if_find_data ? check_data_exists(filename_dict,"ed"; location=running_args.dataloc,output_level=output_level-1,if_exact=true,file_type="jld2") : (false,nothing)
 
     # some old data has bad naming with int_stren = 1.0 even though rest of Us is zeros
@@ -383,7 +385,7 @@ function run_normal_ed(params_dict::Dict; kwargs...)
         end
     end
 
-    filepath = running_args.dataloc * "/" * filename
+    filepath = running_args.dataloc * "/" * running_args.filename
     filepath = make_sure_file_type(filepath,"jld2")
 
     if running_args.if_function
@@ -394,18 +396,19 @@ function run_normal_ed(params_dict::Dict; kwargs...)
 
 end
 
-#= run data collection with for loops
-if false
+# run data collection with for loops
+if true
     
     
     #which_one = args_dict["which_one"]
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
-    lx,ly,n = 8,4,4
+    lx,ly,n = 12,6,3
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
     #anis = 1e-4
-    #intstren = 300.0
+    intstrens = range(0.0,100.0,length=11)
     #cols = ["b","g","r","c","y","orange","purple","pink","brown","gray"]
-    #for (idx,intstren) in enumerate(intstrens)
+    for (idx,intstren) in enumerate(intstrens)
     #for (idx,anis) in enumerate(anises)
 
     
@@ -429,14 +432,23 @@ if false
         #    continue
         #end
         #println("Working on Twist Angle: $(round(tw1,digits=3)) and $(round(tw2,digits=3))")
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
-        #params_dict = make_args_dict(ARGS)
+        #params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+        
+        #other_params_dict = make_args_dict(ARGS)
+        #intstren = 3.2#other_params_dict["onsite_strength"]
+        #xi = 2.0#other_params_dict["corr_length"]
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
 
         #println("Starting from here")
 
         if true
             states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
         end
+
+        #=fourpt = four_point(states[1],lattice_params; if_plot=false)
+        fourpt_2 = four_point(states[2],lattice_params; if_plot=false)
+        datadict = Dict([("fourpt_momentum",fourpt),("fourpt_momentum_1",fourpt_2)])
+        modify_data(datadict,filepath,"metadata")=#
 
         #=d,m = read_data(filepath; output_level=0)
         if !haskey(m,"fourpt_momentum")
@@ -499,7 +511,7 @@ if false
         end=#
 
         #plot_spectrum(lls,nrgs,idx,params_dict["nev"],"Interaction Length",true; plot_title="")
-        #plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title="")
+        plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title="")
         #plot_spectrum(tws,nrgs,idx,params_dict["nev"],"Theta_x / 2pi",false; plot_title=" V=$intstren")
         #plot_spectrum(anises,nrgs,idx,params_dict["nev"],"Physical Hopping",true; plot_title=" with PP $(lx)x$(ly) N=$n ULR=$intstren")
 
@@ -539,7 +551,7 @@ if false
         #gammas1[idx,idx2] = gamma1
         #gammas2[idx,idx2] = gamma2
 
-    #end
+    end
     #end
 
     #=fig = figure()
@@ -580,7 +592,7 @@ if false
     colorbar()
     title("Gamma2 Magnitude")=#
 
-end=#
+end#
 
 #= testing time evolution
 if false
