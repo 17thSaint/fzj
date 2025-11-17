@@ -1964,13 +1964,13 @@ if true
     colorbar().set_label(L"log_{10} (\Delta_{01})")
 end=#
 
-if true
+#=if false
     lx,ly,n = 4,4,2
     intstren = 10
     
     params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("if_check_fluxes",false),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
     states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; outputlevel=1)
-end
+end=#
 
 
 

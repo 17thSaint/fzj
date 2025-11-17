@@ -102,15 +102,19 @@ end
 
 function plot_gamma(theta_xs::Vector{Float64},theta_ys::Vector{Float64},gammas::Matrix{ComplexF64},which_gamma::Int; kwargs...)
     plot_title = get(kwargs,:plot_title,"")
+    if_plot::Bool = get(kwargs,:if_plot,true)
 
     plotting_gamma = reverse(transpose(abs.(gammas)),dims=1)
 
-    fig = figure()
-    imshow(plotting_gamma; cmap="viridis", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)], vmin=0.0)
-    colorbar()
-    which_gamma == 1 ? title("Magnitude of "*L"\Lambda_1 "*plot_title) : title("Magnitude of "*L"\Lambda_2 "*plot_title)
-    ylabel(L"\theta_y / 2\pi")
-    xlabel(L"\theta_x / 2\pi")
+    if if_plot
+        fig = figure()
+        imshow(plotting_gamma; cmap="viridis", extent=[minimum(theta_xs),maximum(theta_xs),minimum(theta_ys),maximum(theta_ys)], vmin=0.0)
+        colorbar()
+        which_gamma == 1 ? title("Magnitude of "*L"\Lambda_1 "*plot_title) : title("Magnitude of "*L"\Lambda_2 "*plot_title)
+        ylabel(L"\theta_y / 2\pi")
+        xlabel(L"\theta_x / 2\pi")
+    end
+    return plotting_gamma
 end
 plot_gamma(theta_xs::StepRangeLen,theta_ys::StepRangeLen,gammas::Matrix{ComplexF64},which_gamma::Int; kwargs...) = plot_gamma(collect(theta_xs),collect(theta_ys),gammas,which_gamma; kwargs...)
 
@@ -162,6 +166,8 @@ function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::
     end
 
     if_count_chern ? count_chern_number(theta_xs,theta_ys,plotting_omega; kwargs...) : nothing
+
+    return plotting_omega
 end
 plot_omega(theta_xs::StepRangeLen,theta_ys::StepRangeLen,omegas::Matrix{ComplexF64}; kwargs...) = plot_omega(collect(theta_xs),collect(theta_ys),omegas; kwargs...)
 
