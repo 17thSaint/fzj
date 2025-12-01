@@ -1505,10 +1505,19 @@ function make_synthdims_filename(model_parameters::Dict)
 	anis = model_parameters["hopping_anisotropy"]
 	if_synth_rectangle = model_parameters["if_synth_rectangle"]
 	
-	filename_dict = Dict([("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_phys",if_periodic_phys),("if_periodic_synth",if_periodic_synth),("onsite_strength",onsite_strength),("hopping_anisotropy",anis)])
+	filename_dict::Dict{String,Any} = Dict([("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("if_periodic_phys",if_periodic_phys),("if_periodic_synth",if_periodic_synth),("onsite_strength",onsite_strength),("hopping_anisotropy",anis)])
 
 	if model_parameters["scaling"] != "flat"
 		filename_dict["scaling"] = model_parameters["scaling"]
+		if model_parameters["scaling"] == "gaussian"
+			filename_dict["sigma"] = model_parameters["sigma"]
+		elseif model_parameters["scaling"] == "exp"
+			filename_dict["corr_length"] = model_parameters["corr_length"]
+		elseif model_parameters["scaling"] == "rydberg"
+			filename_dict["blockade_radius"] = model_parameters["blockade_radius"]
+		else
+			error("ULR Scaling Type Not Recognized: $(model_parameters["scaling"])")
+		end
 	end
 
 	if model_parameters["ts"] != 1.0
