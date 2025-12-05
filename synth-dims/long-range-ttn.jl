@@ -1673,6 +1673,9 @@ function get_normal_model_params(params_dict::Dict)
 	if if_pfaffian
 		dataloc = get_folder_location("cluster-data/pfaffian")
 	end
+	if if_pinning
+		dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
+	end
 	loc = get(params_dict, "dataloc", dataloc)
 	
 
@@ -2155,8 +2158,8 @@ if false
 	#dataloc = if_pinning ? get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling") : get_folder_location("cluster-data/synth-dims/torus/new-gauge")
 	#
 
-	lx,ly,n = 4,4,2
-	stren = 10.0
+	lx,ly,n = 14,7,7
+	stren = 300.0
 	
 	#alphas = range(0.1,0.30,length=41)
 	#strens = [0.25,0.5,0.75,1.25,1.5,3.0,4.0]#range(0.1,0.5,length=3)
@@ -2173,7 +2176,7 @@ if false
 		
 		#("if_pinning",if_pinning),("dataloc",dataloc),("pinning_strength",pinstren)
 		
-		params_dict = Dict([("if_gpu",false),("outputlevel",1),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",2),("expander_fraction",1e-5),("particles",n),("mdim",100),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("if_gpu",true),("outputlevel",1),("lr","all"),("if_pinning",true),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",2),("expander_fraction",1e-5),("particles",n),("mdim",500),("if_save_data",true),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		#open_cores = get(params_dict, "open_cores", 5)
@@ -2190,7 +2193,7 @@ if false
 		#ham = long_range_HH_ham(net,model_paras[:ts],model_paras[:alpha]; model_paras...)
 
 
-		all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
+		CUDA.@allowscalar all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
 		#nrgs = [all_obs[i].nrg[end] for i in 1:params_dict["es_count"]+1]
 		#plot_spectrum(alphas,nrgs,idx,params_dict["es_count"]+1,"Flux Density",true; plot_title="Pfaffian")
 

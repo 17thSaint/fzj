@@ -1204,7 +1204,8 @@ if false
 end=#
 
 # TEE as a function of ULR if there are enough data points
-function plot_tee_vs_ulr()
+#function plot_tee_vs_ulr()
+if true
     cols = ["#82AC9F","#C73E1D","#36213E"]
 
     lx,ly,n = 16,8,8
@@ -1228,9 +1229,9 @@ function plot_tee_vs_ulr()
         perims = [8*3,4*4,4*3,2*4,2*3]
         d,m = read_data(f; output_level=0)
 
-        if !(m["onsite_strength"] in [0.0,10.0,100.0,300.0])
-            continue
-        end
+        #if !(m["onsite_strength"] in [0.0,10.0,100.0,300.0])
+        #    continue
+        #end
 
         if haskey(m,"entanglement_spectrum")
             println("Processing file $idx / $(length(all_locs))")
@@ -1248,10 +1249,10 @@ function plot_tee_vs_ulr()
                 ees[k-1] = ee
             end
 
-            if intstren == 100.0
-                perims = perims[2:end-1]
-                ees = ees[2:end-1]
-            end
+            #if intstren == 100.0
+            #    perims = perims[2:end-1]
+            #    ees = ees[2:end-1]
+            #end
 
             linfit = curve_fit(linmodel,perims,ees,[1.0,1.0])
             sigma = stderror(linfit)[2]
@@ -1263,8 +1264,8 @@ function plot_tee_vs_ulr()
             fig = figure()
             scatter(perims,ees)
             title("ULR=$intstren")
-            xlim([0,maximum(perims)])
-            ylim([-1,maximum(ees)])
+            xlim([0,1.1*maximum(perims)])
+            ylim([-1,1.1*maximum(ees)])
         end
     end
 
@@ -1425,6 +1426,12 @@ function plot_hatsugai_stepbystep()
     fig, axs = subplots(1,4; figsize=(13,3))
     cutoffval = 0.27
 
+    xticks = [0,0.25,0.5,0.75,1.0]
+    xlabels = ["0.0","0.25","0.5","0.75","1.0"]
+
+    yticks = [-0.5,-0.25,0,0.25,0.5]
+    ylabels = ["-0.5","-0.25","0.0","0.25","0.5"]
+
     fs = 14
 
     plotgamma2 = plot_gamma(new_tw1s,new_tw2s,new_lambda2,2; plot_title="ULR=$intstren", if_plot=false)
@@ -1437,6 +1444,8 @@ function plot_hatsugai_stepbystep()
     for i in 1:length(spline2[1])
         axs[1].plot(spline2[1][i],spline2[2][i],"-m",linewidth=2)
     end
+    axs[1].set_xticks(xticks,xlabels)
+    axs[1].set_yticks(yticks,ylabels)
 
     plotgamma1 = plot_gamma(new_tw1s,new_tw2s,new_lambda1,1; plot_title="ULR=$intstren", if_plot=false)
     im2 = axs[2].imshow(plotgamma1; extent=(minimum(new_tw1s), maximum(new_tw1s), minimum(new_tw2s), maximum(new_tw2s)), vmin=0.0, vmax=1.0, origin="lower")
@@ -1448,6 +1457,8 @@ function plot_hatsugai_stepbystep()
     for i in 1:length(spline1[1])
         axs[2].plot(spline1[1][i],spline1[2][i],"-k",linewidth=2)
     end
+    axs[2].set_xticks(xticks,xlabels)
+    axs[2].set_yticks(yticks,ylabels)
 
     plotomega = plot_omega(new_tw1s,new_tw2s,new_omegas; plot_title=L"U_{ir}"*"=$intstren", if_plot=false, if_count_chern=false)
     im3 = axs[3].imshow(plotomega; extent=(minimum(new_tw1s), maximum(new_tw1s), minimum(new_tw2s), maximum(new_tw2s)), vmin=0, vmax=2*pi, cmap="hsv", origin="lower")
@@ -1460,6 +1471,9 @@ function plot_hatsugai_stepbystep()
     axs[3].set_xlabel(L"\theta_x / 2\pi",fontsize=fs)
     fig.colorbar(im3, ax=axs[3])
     axs[3].set_title(L"\Omega_{\Phi \rightarrow \Phi'}",fontsize=fs+2)
+    axs[3].set_xticks(xticks,xlabels)
+    axs[3].set_yticks(yticks,ylabels)
+
 
     aa,plotcherns,bb,cc = count_chern_number(new_tw1s,new_tw2s,plotomega; if_plot=false)
     im4 = axs[4].imshow(plotcherns ./ (2*pi); extent=(minimum(new_tw1s), maximum(new_tw1s), minimum(new_tw2s), maximum(new_tw2s)), vmin=-1, vmax=1, cmap="bwr", origin="lower")
@@ -1473,7 +1487,10 @@ function plot_hatsugai_stepbystep()
     for i in 1:length(spline2[1])
         axs[4].plot(spline2[1][i],spline2[2][i],"-m",linewidth=2)
     end
+    axs[4].set_xticks(xticks,xlabels)
+    axs[4].set_yticks(yticks,ylabels)
 
+    tight_layout()
 
 end
 
@@ -1897,10 +1914,10 @@ function plot_finitesizescaling_ulr_phasetransition()
         if haskey(m,"fourpt_momentum")
             fourpt1 = m["fourpt_momentum"]
 
-            #fig = figure()
-            #imshow(fourpt1,extent=(1,16,1,16),origin="lower",vmin=0.0,vmax=0.2)
-            #colorbar()
-            #title("Four-Point Correlator 16x8 N=8 ULR Length = $(xi)")
+            fig = figure()
+            imshow(fourpt1,extent=(1,16,1,16),origin="lower",vmin=0.0)
+            colorbar()
+            title("Four-Point Correlator 16x8 N=8 ULR Length = $(xi)")
 
             subset_fourpt = vcat([diag(fourpt1,i) for i in 3:lx-3]...)
             flatness = minimum(subset_fourpt) / maximum(subset_fourpt)
@@ -1965,7 +1982,6 @@ function plot_finitesizescaling_ulr_phasetransition()
     ylim([-0.05,1.1])
 
 end
-
 
 
 

@@ -845,47 +845,6 @@ if false
     
 end=#
 
-#= Felix phase diagram for 16x8 TTN
-if false
-    lx,ly,n = 16,8,8
-    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/ulr-length")
-    pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
-    all_files = find_data_file(pdict,"ttn",dataloc) 
-    display(all_files)
-
-    xis = range(0.0,8.0,length=11)
-    flatnesses = ones(Float64,length(xis))
-    for f in all_files
-
-        d,m = read_data(joinpath(dataloc,f); output_level=0)
-
-        xi = m["corr_length"]
-
-        xi_index = findfirst(x -> xis[x] == xi,1:11)
-
-        fourpt1 = m["fourpt_momentum"]
-
-        fig = figure()
-        imshow(fourpt1,extent=(1,16,1,16),origin="lower",vmin=0.0,vmax=0.2)
-        colorbar()
-        title("Four-Point Correlator 16x8 N=8 ULR Length = $(xi)")
-
-        subset_fourpt = vcat([diag(fourpt1,i) for i in 3:lx-3]...)
-        flatness = minimum(subset_fourpt) / maximum(subset_fourpt)
-
-        flatnesses[xi_index] = flatness
-
-    end
-
-    # normalize from laughlin tao-thouless
-    flatnesses ./= flatnesses[1]
-
-    fig = figure()
-    plot(xis,flatnesses,"-o",c="b")
-    xlabel("Interaction Length")
-    ylabel("Normalized Fourpt Flatness for 8x4 N=4")
-end=#
-
 
 
 

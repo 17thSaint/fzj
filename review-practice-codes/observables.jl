@@ -427,11 +427,8 @@ function pairdistribution(psi::TTN.TreeTensorNetwork; kwargs...)
     return pairdist
 end
 
-function spatial_entanglement_spectrum(psi::TTN.TreeTensorNetwork; kwargs...)
-    if_save::Bool = get(kwargs,:if_save,false)
-    filepath::Union{String,Nothing} = get(kwargs,:filepath,nothing)
+function spatial_entanglement_spectrum(psi::TTN.TreeTensorNetwork,layers_down::Int; kwargs...)
     cap = get(kwargs,:if_cap,nothing)
-    layers_down = get(kwargs,:layers_down,0)
 
     numlayers = TTN.number_of_layers(psi)
     TTN.move_ortho!(psi,(numlayers - layers_down,1))
@@ -441,17 +438,31 @@ function spatial_entanglement_spectrum(psi::TTN.TreeTensorNetwork; kwargs...)
 
     result = isnothing(cap) ? spec.eigs : spec.eigs[1:cap]
 
-    if_save && save_spatialentanglementspectrum(result,filepath)
-
     return result
 end
 
-function save_spatialentanglementspectrum(spec::Vector{Float64},filepath::Nothing)
-    error("File Path not provided")
+function spatial_entanglement_spectrum(psi::TTN.TreeTensorNetwork; kwargs...)
+    if_save::Bool = get(kwargs,:if_save,false)
+    filepath::Union{Nothing,String} = get(kwargs,:filepath,nothing)
+
+    layer_count = TTN.number_of_layers(psi)
+    entspec = zeros(Float64,TTN.maxlinkdim(psi),layer_count-2)
+    
+    for ld in 2:(layer_count-1)
+        spec_vals = spatial_entanglement_spectrum(psi,layer_down=ld; kwargs...)
+        extra_length = size(entspec,1) - length(spec_vals)
+        entspec[:,ld-1] = vcat(spec_vals,zeros(extra_length))
+    end
+
+    if_save && save_spatial_entspec(entspec,filepath; kwargs...)
+
+    return entspec
 end
 
-function save_spatialentanglementspectrum(spec::Vector{Float64},filepath::String)
-    modify_data(Dict([("entanglement_spectrum",spec)]),filepath,"metadata"; output_level=0)
+function save_spatial_entspec(entspec::Matrix{Float64},filepath::String; kwargs...)
+    isnothing(filepath) && error("No filepath provided for saving")
+
+    modify_data(Dict([("entanglement_spectrum",entspec)]),filepath,"metadata"; output_level=0)
 end
 
 function calculate_perimeter(which_layer::Int64)
