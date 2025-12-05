@@ -444,12 +444,15 @@ end
 function spatial_entanglement_spectrum(psi::TTN.TreeTensorNetwork; kwargs...)
     if_save::Bool = get(kwargs,:if_save,false)
     filepath::Union{Nothing,String} = get(kwargs,:filepath,nothing)
+    output_level::Int64 = get(kwargs,:output_level,1)
 
     layer_count = TTN.number_of_layers(psi)
     entspec = zeros(Float64,TTN.maxlinkdim(psi),layer_count-2)
     
     for ld in 2:(layer_count-1)
-        spec_vals = spatial_entanglement_spectrum(psi,layer_down=ld; kwargs...)
+        output_level > 0 && println("Calculating Layer $(ld) Entanglement Spectrum")
+        
+        spec_vals = spatial_entanglement_spectrum(psi,ld; kwargs...)
         extra_length = size(entspec,1) - length(spec_vals)
         entspec[:,ld-1] = vcat(spec_vals,zeros(extra_length))
     end

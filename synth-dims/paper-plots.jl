@@ -1204,8 +1204,7 @@ if false
 end=#
 
 # TEE as a function of ULR if there are enough data points
-#function plot_tee_vs_ulr()
-if true
+function plot_tee_vs_ulr()
     cols = ["#82AC9F","#C73E1D","#36213E"]
 
     lx,ly,n = 16,8,8
@@ -1226,12 +1225,7 @@ if true
     sigmas = []
     ulrs = []
     for (idx,f) in enumerate(all_locs)
-        perims = [8*3,4*4,4*3,2*4,2*3]
         d,m = read_data(f; output_level=0)
-
-        #if !(m["onsite_strength"] in [0.0,10.0,100.0,300.0])
-        #    continue
-        #end
 
         if haskey(m,"entanglement_spectrum")
             println("Processing file $idx / $(length(all_locs))")
@@ -1239,20 +1233,15 @@ if true
             intstren = haskey(m,"onsite_strength") ? m["onsite_strength"] : params["onsite_strength"]
 
             ees = zeros(Float64,layers-2)
-            entspecs = real.(m["entanglement_spectrum"])
+            entspecs = m["entanglement_spectrum"]
 
             for k in 2:layers-1
-                entspec = filter(x -> x != 0.0, entspecs[k,:])
+                entspec = filter(x -> x != 0.0, entspecs[:,k-1])
                 #display(entspec)
 
                 ee = entanglement_entropy(entspec)
                 ees[k-1] = ee
             end
-
-            #if intstren == 100.0
-            #    perims = perims[2:end-1]
-            #    ees = ees[2:end-1]
-            #end
 
             linfit = curve_fit(linmodel,perims,ees,[1.0,1.0])
             sigma = stderror(linfit)[2]
@@ -1271,7 +1260,8 @@ if true
 
     fig = figure()
     errorbar(ulrs,yints,yerr=sigmas,fmt="o",c=cols[3])
-    plot(range(0,1000,length=10),0.5 .* ones(10),"--",c=cols[2])
+    plot(range(0,1000,length=10),0.5 .* ones(10),"--",c=cols[2],label="Laughlin: "*L"\gamma = 1/2")
+    legend(fontsize=12)
 
     fs = 16
 
@@ -1286,6 +1276,8 @@ if true
     ticks = [0,0.5,1,1.5,2,10,100,1000]
     labels = ["0","0.5","1","1.5","2",L"10^1",L"10^2",L"10^3"]
     xticks(ticks,labels)
+
+    tight_layout()
 
 end
 
@@ -1726,10 +1718,6 @@ function make_topomarkers_paperplot()
     for (idx,f) in enumerate(all_locs)
         d,m = read_data(f; output_level=0)
 
-        if !(m["onsite_strength"] in [0.0,10.0,300.0])
-            continue
-        end
-
         if haskey(m,"entanglement_spectrum")
             println("Processing file $idx / $(length(all_locs))")
             params = get_params_dict_from_filename(f)
@@ -1739,7 +1727,7 @@ function make_topomarkers_paperplot()
             entspecs = real.(m["entanglement_spectrum"])
 
             for k in 2:layers-1
-                entspec = filter(x -> x != 0.0, entspecs[k,:])
+                entspec = filter(x -> x != 0.0, entspecs[:,k-1])
                 #display(entspec)
 
                 ee = entanglement_entropy(entspec)
@@ -1755,7 +1743,8 @@ function make_topomarkers_paperplot()
     end#
 
     axs[2].errorbar(ulrs,yints,yerr=sigmas,fmt="o",c=cols[3])
-    axs[2].plot(range(0,1000,length=10),0.5 .* ones(10),"--",c=cols[2])
+    axs[2].plot(range(0,1000,length=10),0.5 .* ones(10),"--",c=cols[2],label="Laughlin: "*L"\gamma = 1/2")
+    axs[2].legend(loc="upper left",fontsize=14)
 
     axs[2].set_xscale("symlog"; linthresh=2.0, linscale=1.0)
     ymin,ymax = -0.1,1.1
