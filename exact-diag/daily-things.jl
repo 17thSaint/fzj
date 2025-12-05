@@ -1964,13 +1964,59 @@ if true
     colorbar().set_label(L"log_{10} (\Delta_{01})")
 end=#
 
-#=if false
-    lx,ly,n = 4,4,2
-    intstren = 10
+if true
+    lx,ly,n = 8,4,4
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+
+    intstrens = []
+    psiones = []
+    psitwos = []
+    for f in all_files
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+
+        psi1 = d["state"][1]
+        psi2 = d["state"][2]
+
+        append!(psiones,[psi1])
+        append!(psitwos,[psi2])
+
+        append!(intstrens,m["U"][end])
+
+    end
+
+    sorted_indices = sortperm(intstrens)
+    intstrens_sorted = intstrens[sorted_indices]
+    psiones_sorted = psiones[sorted_indices]
+    psitwos_sorted = psitwos[sorted_indices]
+
+    overlap1s = []
+    overlap2s = []
+    for i in 1:length(intstrens_sorted)
+        psi1_1 = psiones_sorted[1]
+        psi1_2 = psitwos_sorted[1]
+
+        psi2_1 = psiones_sorted[i]
+        psi2_2 = psitwos_sorted[i]
+
+        overlapmat = Matrix{ComplexF64}(undef,2,2)
+        overlapmat[1,1] = abs2(dot(conj(psi1_1),psi2_1))
+        overlapmat[1,2] = abs2(dot(conj(psi1_1),psi2_2))
+        overlapmat[2,1] = abs2(dot(conj(psi1_2),psi2_1))
+        overlapmat[2,2] = abs2(dot(conj(psi1_2),psi2_2))
+
+        eigs = eigvals(overlapmat)
+
+        append!(overlap1s,sum(eigs))
+
+        scatter(intstrens_sorted[i],sum(eigs),c="b")
+    end
+    xscale("log")
+    xlabel("Interaction Strength")
+    ylabel("Overlap with Laughlin")
     
-    params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("if_check_fluxes",false),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
-    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; outputlevel=1)
-end=#
+end
 
 
 

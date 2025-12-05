@@ -1662,6 +1662,9 @@ function make_topomarkers_paperplot()
     axs[2].tick_params(axis="both", which="major", labelsize=16)
     axs[1].tick_params(axis="both", which="major", labelsize=16)
 
+    axs[2].plot(range(0,1000,length=10),0.5 .* ones(10),"--",c=cols[2],label="Laughlin: "*L"\gamma = 1/2")
+    axs[2].legend(loc="upper left",fontsize=14)
+
     fig.tight_layout()
 
     height = 0.085
@@ -1743,8 +1746,6 @@ function make_topomarkers_paperplot()
     end#
 
     axs[2].errorbar(ulrs,yints,yerr=sigmas,fmt="o",c=cols[3])
-    axs[2].plot(range(0,1000,length=10),0.5 .* ones(10),"--",c=cols[2],label="Laughlin: "*L"\gamma = 1/2")
-    axs[2].legend(loc="upper left",fontsize=14)
 
     axs[2].set_xscale("symlog"; linthresh=2.0, linscale=1.0)
     ymin,ymax = -0.1,1.1
