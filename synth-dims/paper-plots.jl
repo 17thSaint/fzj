@@ -1874,8 +1874,85 @@ function plot_realspace_pair_dist_stacked()
 
 end
 
+# particle entanglement spectrum
+if true
+    #using DelimitedFiles
+    cols = ["#C73E1D","#82AC9F","#36213E"]
+    markers = ["^","o"]
 
+    dataloc = get_folder_location("synth-dims/local-paperstuff/N=5_Nx=10_Ny=5_p=1_q=5/ParticleEntanglementSpectrum_NA=3")
+    all_files = reverse(readdir(dataloc))
 
+    fig,axs = subplots(1,2; figsize=(6,5))
+
+    gs_counts = zeros(Int, length(all_files))
+    
+    for (ii,f) in enumerate(all_files)
+        data = readdlm(joinpath(dataloc, f), '\t')
+
+        ulr = split(split(f,"_")[end],"=")[end]
+
+        idx   = data[:, 1]
+        col2  = data[:, 2]
+        col3  = data[:, 3]
+        value = data[:, 4]
+
+        gs_count = length(filter(x -> x < 6, value))
+
+        xs = col3 .+ 5 .* col2
+        ys = value
+
+        gs_counts[ii] = gs_count
+
+        axs[ii].scatter(xs, ys, c=cols[ii], marker=markers[ii], s=20, label=L"U_{\mathrm{i}}"*"= $ulr")
+        ii == 1 && (axs[ii].set_xlabel("Momentum Sector", fontsize=14))
+        ii == 1 && (axs[ii].set_ylabel("PES Eigenvalues", fontsize=14))
+        axs[ii].set_ylim(1.0,15.0)
+        axs[ii].legend(loc="upper right", fontsize=12)
+    end
+
+    # label ulr = 0 ground state count
+    axs[1].annotate(L"\mathcal{N}"*" = $(gs_counts[1])",
+         xy=(4.5, 6.5), xycoords="data",
+         fontsize=14,
+         ha="center", va="center")
+
+    # label ulr = 10 ground state count
+    axs[2].annotate(L"\mathcal{N}"*" = $(gs_counts[2])",
+         xy=(4.5, 4.5), xycoords="data",
+         fontsize=14,
+         ha="center", va="center")
+
+    
+    # ellipses which enclose the ground state manifold for counting
+    patches = pyimport("matplotlib.patches")
+    ellipse_u0 = patches.Ellipse(
+        (4.5, 4.0),    # (x_center, y_center)
+        12.0,           # width (x-extent)
+        3.0;           # height (y-extent)
+        angle = 0,    # rotation in degrees (counterclockwise)
+        fill = false,
+        linewidth = 2,
+        edgecolor = cols[3],
+        zorder = 10
+    )
+    ellipse_u10 = patches.Ellipse(
+        (4.5, 3.0),    # (x_center, y_center)
+        12.0,           # width (x-extent)
+        1.0;           # height (y-extent)
+        angle = 0,    # rotation in degrees (counterclockwise)
+        fill = false,
+        linewidth = 2,
+        edgecolor = cols[3],
+        zorder = 10
+    )
+
+    axs[1].add_patch(ellipse_u0)
+    axs[2].add_patch(ellipse_u10)
+
+    tight_layout()
+
+end
 
 
 
@@ -1892,7 +1969,7 @@ function plot_finitesizescaling_ulr_phasetransition()
     display(all_files)
 
     xis = range(0.0,8.0,length=11)
-    flatnesses = ones(Float64,length(xis))
+    flatnesses = zeros(Float64,length(xis))
     for f in all_files
 
         d,m = read_data(joinpath(dataloc,f); output_level=0)
@@ -1904,10 +1981,10 @@ function plot_finitesizescaling_ulr_phasetransition()
         if haskey(m,"fourpt_momentum")
             fourpt1 = m["fourpt_momentum"]
 
-            fig = figure()
+            #=fig = figure()
             imshow(fourpt1,extent=(1,16,1,16),origin="lower",vmin=0.0)
             colorbar()
-            title("Four-Point Correlator 16x8 N=8 ULR Length = $(xi)")
+            title("Four-Point Correlator 16x8 N=8 ULR Length = $(xi)")=#
 
             subset_fourpt = vcat([diag(fourpt1,i) for i in 3:lx-3]...)
             flatness = minimum(subset_fourpt) / maximum(subset_fourpt)
@@ -1917,11 +1994,20 @@ function plot_finitesizescaling_ulr_phasetransition()
 
     end
 
+    dataloc_laughlin = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict_laughlin16x8 = Dict([("layers",7),("particles",8),("hopping_anisotropy",1.0),("if_periodic_phys",true),("if_periodic_synth",true),("onsite_strength",0.0)])
+    all_files_laughlin16x8 = find_data_file(pdict_laughlin16x8,"ttn",dataloc_laughlin)
+    d,m = read_data(joinpath(dataloc_laughlin,all_files_laughlin16x8[1]); output_level=0)
+    fourpt_laughlin16x8 = m["fourpt_momentum"]
+    subset_fourpt_laughlin16x8 = vcat([diag(fourpt_laughlin16x8,i) for i in 3:lx-3]...)
+    flatness_laughlin16x8 = minimum(subset_fourpt_laughlin16x8) / maximum(subset_fourpt_laughlin16x8)
+    flatnesses[1] = flatness_laughlin16x8
+
     # normalize from laughlin tao-thouless
     flatnesses ./= flatnesses[1]
 
     fig = figure()
-    plot(xis ./ 1,flatnesses,"-o",c="b",label="16x8")
+    plot(xis ./ ly,flatnesses,"-o",c="b",label="16x8")
     xlabel("Interaction Length")
     ylabel("Normalized Fourpt Flatness")
 
@@ -1968,9 +2054,10 @@ function plot_finitesizescaling_ulr_phasetransition()
         flatnesses[i,:] ./= flatnesses[i,1]
     end
 
-    plot(xis ./ 1, flatnesses[1,:],"-o",c="r",label="8x4")
+    plot(xis ./ ly, flatnesses[1,:],"-o",c="r",label="8x4")
     ylim([-0.05,1.1])
 
+    legend()
 end
 
 
