@@ -74,11 +74,18 @@ function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     if haskey(hamilt_params,"if_pinning") && hamilt_params["if_pinning"]
         fdict["if_pinning"] = hamilt_params["if_pinning"]
     end
-    if haskey(hamilt_params,"scaling_type") && hamilt_params["scaling_type"] != "flat"
-        fdict["scaling_type"] = hamilt_params["scaling_type"]
-        fdict["interaction_length"] = hamilt_params["corr_length"]
-        fdict["interaction_strength"] = hamilt_params["U"][1]
-    end
+    if hamilt_params["scaling_type"] != "flat"
+		fdict["scaling"] = hamilt_params["scaling_type"]
+		if hamilt_params["scaling_type"] == "gaussian"
+			fdict["sigma"] = hamilt_params["sigma"]
+		elseif hamilt_params["scaling_type"] == "exp"
+			fdict["corr_length"] = hamilt_params["corr_length"]
+		elseif hamilt_params["scaling_type"] == "rydberg"
+			fdict["blockade_radius"] = hamilt_params["blockade_radius"]
+		else
+			error("ULR Scaling Type Not Recognized: $(hamilt_params["scaling_type"])")
+		end
+	end
     if haskey(hamilt_params,"periodic_potential_strength") && hamilt_params["periodic_potential_strength"] != 0.0
         fdict["periodic_potential_strength"] = hamilt_params["periodic_potential_strength"]
     end
