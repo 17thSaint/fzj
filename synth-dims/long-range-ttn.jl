@@ -1620,6 +1620,10 @@ function get_normal_model_params(params_dict::Dict)
 		longrange_dist = Lx - 1
 	end
 
+	corr_length = get(params_dict,"corr_length",Ly)
+	sigma::Float64 = get(params_dict, "sigma", 1.0)
+	blockade_radius::Float64 = get(params_dict, "blockade_radius", 1.0)
+
 	mu = get(params_dict, "chem_strength", 0.0)
 	mag_off = get(params_dict, "mag_off", true)
 	if_pinning = get(params_dict, "if_pinning", false)
@@ -1721,6 +1725,9 @@ function get_normal_model_params(params_dict::Dict)
 						"scaling"=>sc_type,
 						"lr"=>longrange_dist,
 						"onsite_strength"=>onsite_strength,
+						"corr_length"=>corr_length,
+						"sigma"=>sigma,
+						"blockade_radius"=>blockade_radius,
 						"which_dir"=>which_dir,
 						"cliff"=>if_cliff,
 						"trunc"=>trunc,
@@ -2158,8 +2165,8 @@ if false
 	#dataloc = if_pinning ? get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling") : get_folder_location("cluster-data/synth-dims/torus/new-gauge")
 	#
 
-	lx,ly,n = 14,7,7
-	stren = 300.0
+	#lx,ly,n = 12,8,6
+	#stren = 4.0
 	
 	#alphas = range(0.1,0.30,length=41)
 	#strens = [0.25,0.5,0.75,1.25,1.5,3.0,4.0]#range(0.1,0.5,length=3)

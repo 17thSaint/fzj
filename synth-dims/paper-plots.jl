@@ -17,6 +17,9 @@ include_other_files(["review-practice-codes/plottings.jl","other-funcs/basic-2d-
 include_other_files(["exact-diag/execute-ed.jl","exact-diag/observables.jl","exact-diag/plottings.jl"])
 using JLD2,LaTeXStrings,LsqFit,Dierckx
 
+rc("font", family="serif", serif=["STIXGeneral", "Times New Roman", "Times"])
+rc("mathtext", fontset="stix")
+
 ########### TO-DO ############
 #=
 
@@ -571,25 +574,26 @@ end
 
 # plot finite splitting for ULR=0 and ULR=300 in same figure separate plots
 function plot_paper_finitesplitting_scaling_newplot()
+
     gaps_laughlin,lxs_laughlin = plot_finitesplitting_scaling(0.0; if_plot=false)
     gaps_mblc,lxs_mblc = plot_finitesplitting_scaling(300.0; if_plot=false)
 
     cols = ["#82AC9F","#C73E1D","#36213E"]
 
-    fig, axs = subplots(1,2)
+    fig, axs = subplots(1,2; figsize=(6,4))
     
     axs[1].scatter(lxs_laughlin["0.0"],gaps_laughlin["0.0"],label=L"U_{ir}=0",c=cols[2],marker="^")
     axs[1].scatter(lxs_mblc["0.0"],gaps_mblc["0.0"],label=L"U_{ir}=300",c=cols[1],marker="o")
     axs[1].set_xlabel(L"L_x",fontsize=16)
-    axs[1].set_ylabel("E1 - E0",fontsize=16)
+    axs[1].set_ylabel(L"\Delta_{12}",fontsize=16)
     axs[1].set_yscale("log")
-    axs[1].legend(loc="upper right",fontsize=12)
-    axs[1].set_title("Unpinned",fontsize=16)
+    axs[1].legend(loc="center right",fontsize=12)
+    axs[1].set_title("Without Pinning",fontsize=16)
 
     axs[1].tick_params(axis="both", which="major", labelsize=14)
 
-    ticks = [6,10,14]
-    labels = ["6","10","14"]
+    ticks = [6,7,8,9,10,11,12,13,14]
+    labels = ["6","","8","","10","","12","","14"]
     axs[1].set_xticks(ticks,labels)
 
     for (k,v) in gaps_laughlin
@@ -618,12 +622,29 @@ function plot_paper_finitesplitting_scaling_newplot()
     end
     axs[2].legend(loc="upper right",fontsize=12)
     axs[2].set_xlabel(L"L_x", fontsize=16)
-    axs[2].set_ylabel("E1 - E0",fontsize=16)
+    #axs[2].set_ylabel("GS Splitting",fontsize=16)
     axs[2].set_yscale("log")
-    axs[2].set_title("Pinned",fontsize=16)
+    axs[2].set_title("With Pinning",fontsize=16)
 
     axs[2].tick_params(axis="both", which="major", labelsize=14)
     axs[2].set_xticks(ticks,labels)
+
+    axs[1].tick_params(top=true, right=true)
+    axs[1].tick_params(labeltop=false, labelright=false)
+    axs[2].tick_params(top=true, right=true)
+    axs[2].tick_params(labeltop=false, labelright=false)
+
+    yticks_pin = [ii*10.0^(-jj) for ii in 1:9 for jj in 1:6]
+    ylabels_pin = ["" for ii in 1:9 for jj in 1:6]
+    ylabels_pin[1] = L"10^{-1}"
+    ylabels_pin[2] = L"10^{-2}"
+    ylabels_pin[3] = L"10^{-3}"
+    ylabels_pin[4] = L"10^{-4}"
+    ylabels_pin[5] = L"10^{-5}"
+    axs[2].set_yticks(yticks_pin, ylabels_pin)
+
+    axs[2].set_ylim(5e-6,3e-1)
+
     
     tight_layout()
 end
@@ -1123,13 +1144,22 @@ function plot_four_point_slices_both()
     ys_300 = circshift(fourpt_1_300[7,:],1)[1:end-1] ./ 2
 
 
-    fig = figure()
-    plot(xs,ys_0,"-p",c=cols[2],label=L"U_{ir}=0",marker="^")
-    plot(xs,ys_300,"-p",c=cols[1],label=L"U_{ir}=300")
+    fig = figure(figsize=(6,4))
+    plot(xs,ys_0,c=cols[2],label=L"U_{ir}=0",marker="^")
+    plot(xs,ys_300,c=cols[1],label=L"U_{ir}=300",marker="o")
     legend(loc="upper center",fontsize=14)
-    xlabel("Momentum "*L"k_y", fontsize=18)
-    ylabel(L"\langle \hat{a}_{k_y}^{\dagger} \hat{a}_{k_{y}^{'}}^{\dagger} \hat{a}_{k_{y}^{'}} \hat{a}_{k_{y}} \rangle / \langle \hat{n}_{k_{y}^{'}} \rangle \langle \hat{n}_{k_{y}} \rangle",fontsize=14)
+    xlabel(L"k_y", fontsize=18)
+    #ylabel(L"\langle \hat{a}_{k_y}^{\dagger} \hat{a}_{k_{y}^{'}}^{\dagger} \hat{a}_{k_{y}^{'}} \hat{a}_{k_{y}} \rangle / \langle \hat{n}_{k_{y}^{'}} \rangle \langle \hat{n}_{k_{y}} \rangle",fontsize=14)
+    ylabel(L"C^{(4)} (k_y, k_y'=0)",fontsize=16)
     tick_params(axis="both", which="major", labelsize=14)
+
+    xtickvals = collect(-7:7)
+    xticklabels = ["","-6","","-4","","-2","","0","","2","","4","","6",""]
+    xticks(xtickvals,xticklabels)
+
+    tick_params(top=true, right=true)
+    tick_params(labeltop=false, labelright=false)
+
     fig.tight_layout()
 end
 
@@ -1600,6 +1630,8 @@ function make_topomarkers_paperplot()
     g3s = []
     ulrs_g2 = []
     ulrs_g3 = []
+    g1s = []
+    ulrs_g1 = []
     for f in all_files
         d,m = read_data_jld2(joinpath(dataloc,f); output_level=0)
         all_nrgs = d["nrg"]
@@ -1614,6 +1646,9 @@ function make_topomarkers_paperplot()
         append!(g2s,[all_nrgs[2] - all_nrgs[1]])
         append!(ulrs_g2,[ulr])
 
+        #append!(g1s,[all_nrgs[1]])
+        #append!(ulrs_g1,[ulr])
+
         for i in 3:length(all_nrgs)
             append!(g3s,[all_nrgs[i] - all_nrgs[1]])
             append!(ulrs_g3,[ulr])
@@ -1621,7 +1656,14 @@ function make_topomarkers_paperplot()
     end#
     
 
-    fig, axs = subplots(2,1, figsize=(8,12))
+    fig = figure(figsize=(6, 7), constrained_layout=true)
+    gs  = fig.add_gridspec(2, 1, height_ratios=[2, 1])  # top:bottom = 2:1
+    ax_top = fig.add_subplot(gs[0, 0])
+    ax_bot = fig.add_subplot(gs[1, 0], sharex=ax_top)
+    axs = [ax_bot, ax_top]
+
+    mm = "_"
+    ss = 40
 
 
     cols = ["#82AC9F","#C73E1D","#36213E"]
@@ -1639,31 +1681,43 @@ function make_topomarkers_paperplot()
     axs[1].plot([0.0,x1_0],[0.0,y_0],c="gray",linewidth=1)
     axs[1].plot([0.0,x0_0],[0.0,y_0],c="gray",linewidth=1)
 
-    axs[1].scatter(ulrs_g3,g3s,c=cols[3],label="E2-9")
-    axs[1].scatter(ulrs_g2,g2s,c=cols[2],label="E1")
-    axs[1].scatter(ulrs_g2,zeros(length(ulrs_g2)),c=cols[1],label="E0")
+    axs[1].scatter(ulrs_g3,g3s,c=cols[3],marker=mm,s=ss)
+    axs[1].scatter(ulrs_g2,g2s,c=cols[2],marker=mm,s=ss)
+    axs[1].scatter(ulrs_g2,zeros(length(ulrs_g2)),c=cols[1],marker=mm,s=ss)
 
     axs[1].set_xscale("symlog"; linthresh=2.0, linscale=1.0)
+    axs[2].set_xscale("symlog"; linthresh=2.0, linscale=1.0)
     ymin,ymax = -0.02,0.5
     axs[1].set_ylim([ymin, ymax])
     xmin,xmax = -0.25, 1200.0
     axs[1].set_xlim([xmin,xmax])
     #axs[1].set_xlabel(L"U_{\mathrm{i}} / t", fontsize = fs)
     axs[1].set_ylabel(L"E-E_0", fontsize = fs)
-    axs[1].legend(loc="upper left",fontsize=14)
-
-    ticks = [0,0.5,1,1.5,2,10,100,1000]
-    labels = ["0","0.5","1","1.5","2",L"10^1",L"10^2",L"10^3"]
-    axs[1].set_xticks(ticks,labels)
 
     axs[2].set_xlabel(L"U_{\mathrm{i}} / t", fontsize=fs)
     axs[2].set_ylabel(L"\gamma", fontsize=fs)
 
+    ticks = [0,0.5,1,1.5,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100,200,300,400,500,600,700,800,900,1000]
+    labels = ["0","0.5","1","1.5","2","","","","","","","",L"10^1","","","","","","","","",L"10^2","","","","","","","","",L"10^3"]
+    axs[1].set_xticks(ticks,labels)
+    axs[2].set_xticks(ticks,labels)
+
+    gammaticks = collect(0:8) ./ 8
+    gammalabels = ["0.0","","0.25","","0.5","","0.75","","1.0"]
+    axs[2].set_yticks(gammaticks,gammalabels)
+
     axs[2].tick_params(axis="both", which="major", labelsize=16)
     axs[1].tick_params(axis="both", which="major", labelsize=16)
 
-    axs[2].plot(range(0,1000,length=10),0.5 .* ones(10),"--",c=cols[2],label="Laughlin: "*L"\gamma = 1/2")
-    axs[2].legend(loc="upper left",fontsize=14)
+    # add ticks to top and left
+    axs[1].tick_params(top=true, right=true)
+    axs[1].tick_params(labeltop=false, labelright=false)
+
+    # add ticks to top and left
+    axs[2].tick_params(top=true, right=true)
+    axs[2].tick_params(labeltop=false, labelright=false)
+
+    axs[2].plot(range(0,1000,length=10),0.5 .* ones(10),"--",c=cols[2],label="Laughlin")
 
     fig.tight_layout()
 
@@ -1677,7 +1731,7 @@ function make_topomarkers_paperplot()
     ax_inset1 = axs[1].inset_axes([0.15, 0.25, renorm_height, renorm_height*(8/6)])
     im1 = ax_inset1.imshow(chern_imshow_0 ./ (2*pi), extent=(0,1,0,1), cmap="bwr", aspect="auto", vmin=-1, vmax=1, origin="lower")
     inset1_colorbar = fig.colorbar(im1; ax=ax_inset1, anchor=(3,0.5))
-    ax_inset1.set_title("Winding Defects", fontsize=14)
+    ax_inset1.set_title("Winding Defects", fontsize=12)
     for i in 1:length(spline1[1])
         ax_inset1.plot(spline1[1][i],spline1[2][i],"-k",linewidth=2)
     end
@@ -1685,7 +1739,7 @@ function make_topomarkers_paperplot()
     ax_inset2 = axs[1].inset_axes([0.7, 0.25, renorm_height, renorm_height*(8/6)])
     im2 = ax_inset2.imshow(chern_imshow_1000 ./ (2*pi), extent=(0,1,0,1), cmap="bwr", aspect="auto", vmin=-1, vmax=1, origin="lower")
     inset2_colorbar = fig.colorbar(im2; ax=ax_inset2, anchor=(3,0.5))
-    ax_inset2.set_title("Winding Defects", fontsize=14)
+    ax_inset2.set_title("Winding Defects", fontsize=12)
     for i in 1:length(spline1[1])
         ax_inset2.plot(spline1[1][i],spline1[2][i],"-k",linewidth=2)
     end
@@ -1693,10 +1747,26 @@ function make_topomarkers_paperplot()
     inset1_colorbar.ax.tick_params(labelsize=12)
     inset2_colorbar.ax.tick_params(labelsize=12)
 
+    insetticks = [0,0.5,1.0]
+    insetlabels = ["0","0.5","1"]
+    ax_inset1.set_yticks(insetticks,insetlabels)
+    ax_inset1.set_xticks(insetticks,insetlabels)
+    ax_inset2.set_yticks(insetticks,insetlabels)
+    ax_inset2.set_xticks(insetticks,insetlabels)
 
     ax_inset2.tick_params(axis="both", which="major", labelsize=12)
     ax_inset1.tick_params(axis="both", which="major", labelsize=12)
 
+    ax_inset1.tick_params(top=true, right=true)
+    ax_inset1.tick_params(labeltop=false, labelright=false)
+
+    ax_inset2.tick_params(top=true, right=true)
+    ax_inset2.tick_params(labeltop=false, labelright=false)
+
+    ax_inset2.set_xlabel(L"\theta_x", fontsize=12)
+    ax_inset2.set_ylabel(L"\theta_y", fontsize=12)
+    ax_inset1.set_xlabel(L"\theta_x", fontsize=12)
+    ax_inset1.set_ylabel(L"\theta_y", fontsize=12)
 
 
     ##### Second figure of TEE vs ULR
@@ -1747,15 +1817,12 @@ function make_topomarkers_paperplot()
 
     axs[2].errorbar(ulrs,yints,yerr=sigmas,fmt="o",c=cols[3])
 
-    axs[2].set_xscale("symlog"; linthresh=2.0, linscale=1.0)
-    ymin,ymax = -0.1,1.1
+    ymin,ymax = 0.0,1.0
     axs[2].set_ylim([ymin, ymax])
     xmin,xmax = -0.25, 1200.0
     axs[2].set_xlim([xmin,xmax])
 
-    ticks = [0,0.5,1,1.5,2,10,100,1000]
-    labels = ["0","0.5","1","1.5","2",L"10^1",L"10^2",L"10^3"]
-    axs[2].set_xticks(ticks,labels)
+    axs[2].legend(loc="upper left", fontsize=14)
 end
 
 # energy spectrum under twisting plot
@@ -1875,15 +1942,16 @@ function plot_realspace_pair_dist_stacked()
 end
 
 # particle entanglement spectrum
-if true
-    #using DelimitedFiles
+function plot_particle_entanglement_spectrum_paperplot()
+    #using DelimitedFiles,PyCall
+
     cols = ["#C73E1D","#82AC9F","#36213E"]
-    markers = ["^","o"]
+    markers = "_"
 
     dataloc = get_folder_location("synth-dims/local-paperstuff/N=5_Nx=10_Ny=5_p=1_q=5/ParticleEntanglementSpectrum_NA=3")
     all_files = reverse(readdir(dataloc))
 
-    fig,axs = subplots(1,2; figsize=(6,5))
+    fig,axs = subplots(1,2; figsize=(6,4))
 
     gs_counts = zeros(Int, length(all_files))
     
@@ -1904,12 +1972,26 @@ if true
 
         gs_counts[ii] = gs_count
 
-        axs[ii].scatter(xs, ys, c=cols[ii], marker=markers[ii], s=20, label=L"U_{\mathrm{i}}"*"= $ulr")
-        ii == 1 && (axs[ii].set_xlabel("Momentum Sector", fontsize=14))
-        ii == 1 && (axs[ii].set_ylabel("PES Eigenvalues", fontsize=14))
+        axs[ii].scatter(xs, ys, c=cols[ii], marker=markers, s=60, label=L"U_{\mathrm{i}}"*"= $ulr")
+        axs[ii].set_xlabel(L"K", fontsize=14)
+        ii == 1 && (axs[ii].set_ylabel("PES", fontsize=14))
         axs[ii].set_ylim(1.0,15.0)
-        axs[ii].legend(loc="upper right", fontsize=12)
+        axs[ii].legend(loc="upper right", fontsize=14)
     end
+
+    xtickvals = collect(0:9)
+    xticklabels = ["0","","2","","4","","6","","8",""]
+    axs[1].set_xticks(xtickvals, xticklabels)
+    axs[2].set_xticks(xtickvals, xticklabels)
+
+    axs[1].tick_params(axis="both", which="major", labelsize=14)
+    axs[2].tick_params(axis="both", which="major", labelsize=14)
+
+    axs[1].tick_params(top=true, right=true)
+    axs[1].tick_params(labeltop=false, labelright=false)
+
+    axs[2].tick_params(top=true, right=true)
+    axs[2].tick_params(labeltop=false, labelright=false)
 
     # label ulr = 0 ground state count
     axs[1].annotate(L"\mathcal{N}"*" = $(gs_counts[1])",
@@ -1919,7 +2001,7 @@ if true
 
     # label ulr = 10 ground state count
     axs[2].annotate(L"\mathcal{N}"*" = $(gs_counts[2])",
-         xy=(4.5, 4.5), xycoords="data",
+         xy=(4.5, 4.3), xycoords="data",
          fontsize=14,
          ha="center", va="center")
 
@@ -1961,9 +2043,12 @@ end
 ########## Felix Palm ULR Length Plots ##########
 
 # Felix phase diagram compare 16x8 to 8x4
-function plot_finitesizescaling_ulr_phasetransition()
-    lx,ly,n = 16,8,8
-    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/ulr-length")
+#function plot_finitesizescaling_ulr_phasetransition()
+if true
+    intstren = 4.0
+
+    lx,ly,n = 12,8,6
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/")#ulr-length")
     pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc) 
     display(all_files)
@@ -1981,10 +2066,10 @@ function plot_finitesizescaling_ulr_phasetransition()
         if haskey(m,"fourpt_momentum")
             fourpt1 = m["fourpt_momentum"]
 
-            #=fig = figure()
+            fig = figure()
             imshow(fourpt1,extent=(1,16,1,16),origin="lower",vmin=0.0)
             colorbar()
-            title("Four-Point Correlator 16x8 N=8 ULR Length = $(xi)")=#
+            title("Four-Point Correlator 16x8 N=8 ULR Length = $(xi)")
 
             subset_fourpt = vcat([diag(fourpt1,i) for i in 3:lx-3]...)
             flatness = minimum(subset_fourpt) / maximum(subset_fourpt)
@@ -1994,34 +2079,32 @@ function plot_finitesizescaling_ulr_phasetransition()
 
     end
 
-    dataloc_laughlin = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    #=dataloc_laughlin = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
     pdict_laughlin16x8 = Dict([("layers",7),("particles",8),("hopping_anisotropy",1.0),("if_periodic_phys",true),("if_periodic_synth",true),("onsite_strength",0.0)])
     all_files_laughlin16x8 = find_data_file(pdict_laughlin16x8,"ttn",dataloc_laughlin)
     d,m = read_data(joinpath(dataloc_laughlin,all_files_laughlin16x8[1]); output_level=0)
     fourpt_laughlin16x8 = m["fourpt_momentum"]
     subset_fourpt_laughlin16x8 = vcat([diag(fourpt_laughlin16x8,i) for i in 3:lx-3]...)
     flatness_laughlin16x8 = minimum(subset_fourpt_laughlin16x8) / maximum(subset_fourpt_laughlin16x8)
-    flatnesses[1] = flatness_laughlin16x8
+    flatnesses[1] = flatness_laughlin16x8=#
 
     # normalize from laughlin tao-thouless
-    flatnesses ./= flatnesses[1]
+    #flatnesses ./= flatnesses[1]
 
     fig = figure()
-    plot(xis ./ ly,flatnesses,"-o",c="b",label="16x8")
-    xlabel("Interaction Length")
-    ylabel("Normalized Fourpt Flatness")
+    plot(xis,flatnesses,"-o",c="b",label="$(lx)x$(ly)")
 
 
-    lx,ly,n = 8,4,4
+    #=lx,ly,n = 8,8,4
     dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/ulr-length")
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
     
-    xis = range(0.0,4.0,length=11)
-    intstrens = range(0.0,4.0,length=11)[2:end]
-    flatnesses = ones(Float64,length(intstrens),length(xis))
-    gaps = ones(Float64,length(intstrens),length(xis))
-    splittings = ones(Float64,length(intstrens),length(xis))
+    xis = range(0.0,ly,length=11)
+    #intstrens = range(0.0,4.0,length=11)
+    flatnesses = ones(Float64,length(xis))
+    gaps = ones(Float64,length(xis))
+    splittings = ones(Float64,length(xis))
     for f in all_files
 
         d,m = read_data(joinpath(dataloc,f); output_level=0)
@@ -2029,7 +2112,7 @@ function plot_finitesizescaling_ulr_phasetransition()
         xi = m["corr_length"]
 
         xi_index = findfirst(x -> xis[x] == xi,1:11)
-        intstren_index = findfirst(x -> intstrens[x] == m["U"][1],1:11)
+        #intstren_index = findfirst(x -> intstrens[x] == m["U"][1],1:11)
 
         if !haskey(m,"fourpt_momentum_1")
             continue
@@ -2043,21 +2126,19 @@ function plot_finitesizescaling_ulr_phasetransition()
         subset_fourpt = vcat([diag(fourpt_mixed,i) for i in 3:lx-3]...)
         flatness = minimum(subset_fourpt) / maximum(subset_fourpt)
 
-        
-
-        flatnesses[intstren_index,xi_index] = flatness
+        flatnesses[xi_index] = flatness
 
     end
 
     # normalize from laughlin tao-thouless
-    for i in 1:length(intstrens)
-        flatnesses[i,:] ./= flatnesses[i,1]
-    end
+    flatnesses ./= flatnesses[1]
 
-    plot(xis ./ ly, flatnesses[1,:],"-o",c="r",label="8x4")
-    ylim([-0.05,1.1])
+    plot(xis ./ ly, flatnesses,"-o",c="r",label="$(lx)x$(ly)")
+    ylim([-0.05,1.1])=#
 
     legend()
+    xlabel("Interaction Length")
+    ylabel("Normalized Fourpt Flatness")
 end
 
 

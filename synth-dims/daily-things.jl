@@ -845,6 +845,16 @@ if false
     
 end=#
 
+#= test Nsight profiling
+if false
+    lx,ly,n = 8,8,8
+    intstren = 10.0
+
+    params_dict = Dict([("if_gpu",true),("nrgtol",1e-6),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",1e-5),("particles",n),("mdim",300),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true)])
+    CUDA.@allowscalar all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
+
+end=#
+
 
 
 
