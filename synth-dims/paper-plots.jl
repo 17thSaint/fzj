@@ -342,6 +342,7 @@ function plot_finitesize_gapscaling_pinned(ulr::Float64=300.0)
     return used_files
 end
 
+
 # plot finite splitting scaling pinned and unpinned
 function plot_finitesplitting_scaling(ulr::Float64=0.0; kwargs...)
     if_plot = get(kwargs, :if_plot, true)
@@ -571,12 +572,50 @@ function plot_paper_finitesplitting_scaling_oneplot()
 
 end
 
-
 # plot finite splitting for ULR=0 and ULR=300 in same figure separate plots
 function plot_paper_finitesplitting_scaling_newplot()
 
     gaps_laughlin,lxs_laughlin = plot_finitesplitting_scaling(0.0; if_plot=false)
     gaps_mblc,lxs_mblc = plot_finitesplitting_scaling(300.0; if_plot=false)
+
+    dataloc_ed = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
+    pdict_ed = Dict([("hopping_anisotropy",1.0),("if_pinning",true),("interaction_strength",300.0),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files_ed = find_data_file(pdict_ed,"ed",dataloc_ed; file_type="jld2")
+    cols = ["b","g","r"]
+    pins = [1e-3,1e-4,1e-5]
+    datadict = Dict("0.01"=>[[],[]], "0.001"=>[[],[]], "0.0001"=>[[],[]])
+    for f in all_files_ed
+        d,m = read_data(joinpath(dataloc_ed,f); output_level=0)
+
+        splitting = d["nrg"][2] - d["nrg"][1]
+        Lx = m["Lx"]
+        pinstren = m["pinning_strength"]
+
+        append!(datadict[string(pinstren)][1],[Lx])
+        append!(datadict[string(pinstren)][2],[splitting])
+
+    end
+    gaps_mblc["0.001"] = datadict["0.001"][2]
+    lxs_mblc["0.001"] = datadict["0.001"][1]
+
+    dataloc_ed_laughlin = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
+    pdict_ed_laughlin = Dict([("hopping_anisotropy",1.0),("if_pinning",true),("interaction_strength",0.0),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files_ed_laughlin = find_data_file(pdict_ed_laughlin,"ed",dataloc_ed_laughlin; file_type="jld2")
+    datadict_laughlin = Dict("0.0001"=>[[],[]],"0.001"=>[[],[]],"0.01"=>[[],[]],"0.1"=>[[],[]])
+    for f in all_files_ed_laughlin
+        d,m = read_data(joinpath(dataloc_ed_laughlin,f); output_level=0)
+
+        splitting = d["nrg"][2] - d["nrg"][1]
+        Lx = m["Lx"]
+
+        !haskey(m,"pinning_strength") && continue
+
+        append!(datadict_laughlin[string(m["pinning_strength"])][1],[Lx])
+        append!(datadict_laughlin[string(m["pinning_strength"])][2],[splitting])
+
+    end
+    gaps_laughlin["0.001"] = datadict_laughlin["0.001"][2]
+    lxs_laughlin["0.001"] = datadict_laughlin["0.001"][1]
 
     cols = ["#82AC9F","#C73E1D","#36213E"]
 
@@ -603,7 +642,15 @@ function plot_paper_finitesplitting_scaling_newplot()
             continue
         end
 
-        length(v) > 0 && axs[2].scatter(lxs_laughlin[k],v,label=L"\delta="*"$(local_label)",c=cols[2],marker="^")
+
+        if length(v) > 0
+            if local_label == "0.0001"
+                local_label = "1.0e-4"
+                axs[2].scatter(lxs_laughlin[k],v,label=L"\delta"*"=$(local_label)",marker="^",facecolors="none",edgecolors=cols[2])
+            elseif k == "0.1"
+                axs[2].scatter(lxs_laughlin[k],v,label=L"\delta"*"=$(local_label)",c=cols[2],marker="^")
+            end
+        end
     end
     for (k,v) in gaps_mblc
         local_label = k == "0.0" ? "Unpinned" : "$(parse(Float64,k)/10)"
@@ -616,9 +663,16 @@ function plot_paper_finitesplitting_scaling_newplot()
         if local_label == "1.0e-5"
             v[end] = 1e-5
             display(v)
-        end  
+        end
 
-        length(v) > 0 && axs[2].scatter(lxs_mblc[k],v,label=L"\delta"*"=$(local_label)",c=cols[1],marker="o")
+        if length(v) > 0
+            if local_label == "0.0001"
+                local_label = "1.0e-4"
+                axs[2].scatter(lxs_mblc[k],v,label=L"\delta"*"=$(local_label)",marker="o",facecolors="none",edgecolors=cols[1])
+            elseif k == "0.0001"
+                axs[2].scatter(lxs_mblc[k],v,label=L"\delta"*"=$(local_label)",c=cols[1],marker="o")
+            end
+        end
     end
     axs[2].legend(loc="upper right",fontsize=12)
     axs[2].set_xlabel(L"L_x", fontsize=16)
@@ -2043,8 +2097,8 @@ end
 ########## Felix Palm ULR Length Plots ##########
 
 # Felix phase diagram compare 16x8 to 8x4
-#function plot_finitesizescaling_ulr_phasetransition()
-if true
+#=function plot_finitesizescaling_ulr_phasetransition()
+if false
     intstren = 4.0
 
     lx,ly,n = 12,8,6
@@ -2066,12 +2120,19 @@ if true
         if haskey(m,"fourpt_momentum")
             fourpt1 = m["fourpt_momentum"]
 
-            fig = figure()
-            imshow(fourpt1,extent=(1,16,1,16),origin="lower",vmin=0.0)
+            #=fig = figure()
+            fourpt1_includedsubset = zeros(Float64,lx,lx)
+            for i in 3:lx-3
+                for j in 1:length(diag(fourpt1,i))
+                    fourpt1_includedsubset[j,j+i] = diag(fourpt1,i)[j]
+                    fourpt1_includedsubset[j+i,j] = diag(fourpt1,-i)[j]
+                end 
+            end
+            imshow(fourpt1_includedsubset,extent=(1,lx,1,lx),origin="lower",vmin=0.0)
             colorbar()
-            title("Four-Point Correlator 16x8 N=8 ULR Length = $(xi)")
+            title("Four-Point Correlator $(lx)x$(ly) N=$(n) ULR Length = $(xi)")=#
 
-            subset_fourpt = vcat([diag(fourpt1,i) for i in 3:lx-3]...)
+            subset_fourpt = vcat([diag(fourpt1,-i) for i in 3:lx-3]...,[diag(fourpt1,i) for i in 3:lx-3]...)
             flatness = minimum(subset_fourpt) / maximum(subset_fourpt)
 
             flatnesses[xi_index] = flatness
@@ -2092,7 +2153,7 @@ if true
     #flatnesses ./= flatnesses[1]
 
     fig = figure()
-    plot(xis,flatnesses,"-o",c="b",label="$(lx)x$(ly)")
+    plot(xis,flatnesses ./ flatnesses[1],"-o",c="b",label="$(lx)x$(ly)")
 
 
     #=lx,ly,n = 8,8,4
@@ -2139,7 +2200,7 @@ if true
     legend()
     xlabel("Interaction Length")
     ylabel("Normalized Fourpt Flatness")
-end
+end=#
 
 
 
