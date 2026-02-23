@@ -1619,7 +1619,7 @@ function get_normal_model_params(params_dict::Dict)
 	elseif if_synth_rectangle
 		longrange_dist = Lx - 1
 	end
-
+	
 	corr_length = get(params_dict,"corr_length",Ly)
 	sigma::Float64 = get(params_dict, "sigma", 1.0)
 	blockade_radius::Float64 = get(params_dict, "blockade_radius", 1.0)
@@ -1680,6 +1680,9 @@ function get_normal_model_params(params_dict::Dict)
 	if if_pinning
 		dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
 	end
+	if sc_type != "flat"
+		dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/ulr-length")
+	end
 	loc = get(params_dict, "dataloc", dataloc)
 	
 
@@ -1723,11 +1726,11 @@ function get_normal_model_params(params_dict::Dict)
 						"flux_direction"=>flux_direction,
 						"no_magF"=>mag_off,
 						"scaling"=>sc_type,
-						"lr"=>longrange_dist,
-						"onsite_strength"=>onsite_strength,
 						"corr_length"=>corr_length,
 						"sigma"=>sigma,
 						"blockade_radius"=>blockade_radius,
+						"lr"=>longrange_dist,
+						"onsite_strength"=>onsite_strength,
 						"which_dir"=>which_dir,
 						"cliff"=>if_cliff,
 						"trunc"=>trunc,
@@ -2153,26 +2156,29 @@ if false
 	#anises = range(1.0,5.0,length=10)
 	#strens = [0.0,0.25,0.5,0.75,1.0,1.5,2.0,5.0,10.0,20.0,50.0,100.0,300.0,1000.0]
 	
-	#=
+	#
 	args_dict = make_args_dict(ARGS)
 	stren = args_dict["onsite_strength"]
 	lx = args_dict["Lx"]
 	ly = args_dict["Ly"]
-	n = args_dict["particles"]=#
+	n = args_dict["particles"]
+	#xi = args_dict["corr_length"]
 	#mdim = args_dict["mdim"]
 	#if_pinning = "pinning_strength" in keys(args_dict)
 	#pinstren = if_pinning ? args_dict["pinning_strength"] : 1e-3
 	#dataloc = if_pinning ? get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling") : get_folder_location("cluster-data/synth-dims/torus/new-gauge")
 	#
 
-	#lx,ly,n = 12,8,6
-	#stren = 4.0
+	#lx,ly,n = 14,7,7
+	#stren = 300.0
 	
 	#alphas = range(0.1,0.30,length=41)
 	#strens = [0.25,0.5,0.75,1.25,1.5,3.0,4.0]#range(0.1,0.5,length=3)
 	#for (idx,anis) in enumerate(anises)
 	#for (idx,stren) in enumerate(strens)
 	#for (idx,alpha) in enumerate(alphas)
+	xis = range(0.0,8.0,length=11)[7:end]
+	for (idx,xi) in enumerate(xis)
 	#tws = range(0.0,1.0,length=10)
 	#for tw1 in tws
 	#for tw2 in tws
@@ -2183,7 +2189,8 @@ if false
 		
 		#("if_pinning",if_pinning),("dataloc",dataloc),("pinning_strength",pinstren)
 		
-		params_dict = Dict([("if_gpu",true),("outputlevel",1),("lr","all"),("if_pinning",true),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",2),("expander_fraction",1e-5),("particles",n),("mdim",500),("if_save_data",true),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("if_gpu",true),("outputlevel",1),("nrgtol",5e-5),("scaling","exp"),("corr_length",xi),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",1e-5),("particles",n),("mdim",400),("if_save_data",true),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
+		#params_dict = Dict([("if_gpu",true),("outputlevel",1),("nrgtol",5e-5),("if_pinning",true),("pinning_strength",0.0001),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-5),("particles",n),("mdim",400),("if_save_data",true),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		#open_cores = get(params_dict, "open_cores", 5)
@@ -2296,7 +2303,7 @@ if false
 			fig = figure()
 			scatter(collect(1:mdim),-log.(specs))
 			=#
-	#end
+	end
 #end
 end=#
 

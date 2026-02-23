@@ -146,7 +146,7 @@ function plot_closedgap_8x4_ed()
     filter!(x -> !occursin("twist_angle",x), all_files)
     #display(all_files)
 
-    fs = 16
+    fs = 20
 
     g2s = []
     g3s = []
@@ -178,17 +178,22 @@ function plot_closedgap_8x4_ed()
         #    scatter(ulr,all_nrgs[i] - all_nrgs[1],c=cols[3])
         #end
     end
-    fig = figure()
-    scatter(ulrs_g3[1],g3s[1],c=cols[3],label="E2-9") # do this first to make E2 in legend on top
-    scatter(ulrs_g2,g2s,c=cols[2],label="E1")
-    scatter(ulrs_g3,g3s,c=cols[3]) # put them after so points are on top of E1
-    scatter(ulrs_g2,zeros(length(ulrs_g2)),c=cols[1],label="E0")
-    xlabel(L"U_{ir} / t",fontsize=fs)
-    ylabel("E - E0",fontsize=fs)
-    #title("$(lx)x$(ly) N=$(n), "*L"\rho_{1D}=1")
-    legend()
-    ylim([-0.02,0.65])
 
+    mm = "_"
+    ss = 60
+    #axs[1].scatter(ulrs_g3,g3s,c=cols[3],marker=mm,s=ss)
+
+    fig = figure(figsize=(5,4))
+    scatter(ulrs_g3[1],g3s[1],c=cols[3],label=L"E_{2-9}",marker=mm,s=ss) # do this first to make E2 in legend on top
+    scatter(ulrs_g2,g2s,c=cols[2],label=L"E_1",marker=mm,s=ss)
+    scatter(ulrs_g3,g3s,c=cols[3],marker=mm,s=ss) # put them after so points are on top of E1
+    scatter(ulrs_g2,zeros(length(ulrs_g2)),c=cols[1],label=L"E_0",marker=mm,s=ss)
+    xlabel(L"U_{\mathrm{i}} / t",fontsize=fs)
+    ylabel(L"E - E_0",fontsize=fs)
+    #title("$(lx)x$(ly) N=$(n), "*L"\rho_{1D}=1")
+    legend(fontsize=fs-4)
+    ylim([-0.02,0.65])
+    tight_layout()
 
 end
 
@@ -487,40 +492,126 @@ function plot_paper_finitesplitting_scaling()
     gaps_laughlin,lxs_laughlin = plot_finitesplitting_scaling(0.0; if_plot=false)
     gaps_mblc,lxs_mblc = plot_finitesplitting_scaling(300.0; if_plot=false)
 
+    dataloc_ed = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
+    pdict_ed = Dict([("hopping_anisotropy",1.0),("if_pinning",true),("interaction_strength",300.0),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files_ed = find_data_file(pdict_ed,"ed",dataloc_ed; file_type="jld2")
+    cols = ["b","g","r"]
+    pins = [1e-3,1e-4,1e-5]
+    datadict = Dict("0.01"=>[[],[]], "0.001"=>[[],[]], "0.0001"=>[[],[]])
+    for f in all_files_ed
+        d,m = read_data(joinpath(dataloc_ed,f); output_level=0)
+
+        splitting = d["nrg"][2] - d["nrg"][1]
+        Lx = m["Lx"]
+        pinstren = m["pinning_strength"]
+
+        append!(datadict[string(pinstren)][1],[Lx])
+        append!(datadict[string(pinstren)][2],[splitting])
+
+    end
+    gaps_mblc["0.001"] = datadict["0.001"][2]
+    lxs_mblc["0.001"] = datadict["0.001"][1]
+
+    dataloc_ed_laughlin = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
+    pdict_ed_laughlin = Dict([("hopping_anisotropy",1.0),("if_pinning",true),("interaction_strength",0.0),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files_ed_laughlin = find_data_file(pdict_ed_laughlin,"ed",dataloc_ed_laughlin; file_type="jld2")
+    datadict_laughlin = Dict("0.0001"=>[[],[]],"0.001"=>[[],[]],"0.01"=>[[],[]],"0.1"=>[[],[]])
+    for f in all_files_ed_laughlin
+        d,m = read_data(joinpath(dataloc_ed_laughlin,f); output_level=0)
+
+        splitting = d["nrg"][2] - d["nrg"][1]
+        Lx = m["Lx"]
+
+        !haskey(m,"pinning_strength") && continue
+
+        append!(datadict_laughlin[string(m["pinning_strength"])][1],[Lx])
+        append!(datadict_laughlin[string(m["pinning_strength"])][2],[splitting])
+
+    end
+    gaps_laughlin["0.001"] = datadict_laughlin["0.0001"][2]
+    lxs_laughlin["0.001"] = datadict_laughlin["0.0001"][1]
+
     cols = ["#82AC9F","#C73E1D","#36213E"]
 
-    fig = figure()
-    subplot(1,2,1)
+    fig, axs = subplots(1,2; figsize=(6.75,4.75))
+
+    axs[1].tick_params(axis="both", which="major", labelsize=fs+1)
+
+    ticks = [6,7,8,9,10,11,12,13,14]
+    labels = ["6","","8","","10","","12","","14"]
+    axs[1].set_xticks(ticks,labels)
+
+    fs = 14
+
     for (k,v) in gaps_laughlin
         local_label = k == "0.0" ? "Unpinned" : "$(parse(Float64,k)/10)"
-        col = k == "0.0" ? cols[1] : cols[2]
 
-        length(v) > 0 && scatter(lxs_laughlin[k],v,label=local_label,c=col,marker="^")
+
+        if local_label == "Unpinned"
+            fc = cols[2]
+            mm = "^"
+        elseif local_label == "0.0001"
+            local_label = "1e-4"
+            fc = "none"
+            mm = "*"
+        elseif local_label == "0.01"
+            local_label = "1e-2"
+            fc = "none"
+            mm = "^"
+        elseif local_label == "1.0e-5"
+            local_label = "1e-5"
+            fc = "none"
+            mm = "^"
+        else
+            println("Unknown label $local_label")
+        end
+
+        length(v) > 0 && axs[1].scatter(lxs_laughlin[k],v,label=local_label,marker=mm,facecolors=fc,edgecolors=cols[2])
     end
-    xlabel(L"L_x")
-    ylabel("E1 - E0")
-    yscale("log")
-    legend(loc="upper right")
-    title("ULR=0.0")
+    axs[1].set_xlabel(L"L_x",fontsize=fs+2)
+    axs[1].set_ylabel(L"\Delta_{01}",fontsize=fs+2)
+    axs[1].set_yscale("log")
+    axs[1].legend(loc="upper right",fontsize=fs)
+    axs[1].set_title(L"U_{\mathrm{i}}=0",fontsize=fs+2)
 
-    subplot(1,2,2)
+
     for (k,v) in gaps_mblc
         local_label = k == "0.0" ? "Unpinned" : "$(parse(Float64,k)/10)"
-        col = k == "0.0" ? cols[1] : cols[2]
         
         # temporary data manipulation for ulr = 300.0 Lx = 12
         if local_label == "1.0e-5"
             v[end] = 1e-5
             display(v)
-        end  
+        end
 
-        length(v) > 0 && scatter(lxs_mblc[k],v,label=local_label,c=col,marker="o")
+        if local_label == "Unpinned"
+            fc = cols[1]
+            mm = "o"
+        elseif local_label == "0.0001"
+            local_label = "1e-4"
+            fc = "none"
+            mm = "*"
+        elseif local_label == "1.0e-5"
+            local_label = "1e-5"
+            fc = "none"
+            mm = "o"
+        else
+            println("Unknown label $local_label")
+        end
+
+        length(v) > 0 && axs[2].scatter(lxs_mblc[k],v,label=local_label,marker=mm,facecolors=fc,edgecolors=cols[1])
     end
-    xlabel(L"L_x")
-    ylabel("E1 - E0")
-    yscale("log")
-    legend(loc="upper right")
-    title("ULR=300.0")
+    axs[2].set_xlabel(L"L_x",fontsize=fs+2)
+    #axs[2].set_ylabel(L"\Delta_{01}",fontsize=fs+2)
+    axs[2].set_yscale("log")
+    axs[2].legend(loc="center right",fontsize=fs)
+    axs[2].set_title(L"U_{\mathrm{i}}=300.0",fontsize=fs+2)
+
+    axs[2].tick_params(axis="both", which="major", labelsize=fs+1)
+    axs[2].set_xticks(ticks,labels)
+
+    axs[1].text(-0.1, 1.02, "(a)", transform=axs[1].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
+    axs[2].text(-0.1, 1.02, "(b)", transform=axs[2].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
 
     tight_layout()
 
@@ -614,22 +705,24 @@ function plot_paper_finitesplitting_scaling_newplot()
         append!(datadict_laughlin[string(m["pinning_strength"])][2],[splitting])
 
     end
-    gaps_laughlin["0.001"] = datadict_laughlin["0.001"][2]
-    lxs_laughlin["0.001"] = datadict_laughlin["0.001"][1]
+    gaps_laughlin["0.001"] = datadict_laughlin["0.0001"][2]
+    lxs_laughlin["0.001"] = datadict_laughlin["0.0001"][1]
+
+    fs = 14
 
     cols = ["#82AC9F","#C73E1D","#36213E"]
 
-    fig, axs = subplots(1,2; figsize=(6,4))
+    fig, axs = subplots(1,2; figsize=(6.75,4.75))
     
-    axs[1].scatter(lxs_laughlin["0.0"],gaps_laughlin["0.0"],label=L"U_{ir}=0",c=cols[2],marker="^")
-    axs[1].scatter(lxs_mblc["0.0"],gaps_mblc["0.0"],label=L"U_{ir}=300",c=cols[1],marker="o")
-    axs[1].set_xlabel(L"L_x",fontsize=16)
-    axs[1].set_ylabel(L"\Delta_{12}",fontsize=16)
+    axs[1].scatter(lxs_laughlin["0.0"],gaps_laughlin["0.0"],label=L"U_{\mathrm{i}}=0",c=cols[2],marker="^")
+    axs[1].scatter(lxs_mblc["0.0"],gaps_mblc["0.0"],label=L"U_{\mathrm{i}}=300",c=cols[1],marker="o")
+    axs[1].set_xlabel(L"L_x",fontsize=fs+2)
+    axs[1].set_ylabel(L"\Delta_{01}",fontsize=fs+2)
     axs[1].set_yscale("log")
-    axs[1].legend(loc="center right",fontsize=12)
-    axs[1].set_title("Without Pinning",fontsize=16)
+    axs[1].legend(loc="center right",fontsize=fs)
+    axs[1].set_title("Without Pinning",fontsize=fs+2)
 
-    axs[1].tick_params(axis="both", which="major", labelsize=14)
+    axs[1].tick_params(axis="both", which="major", labelsize=fs+1)
 
     ticks = [6,7,8,9,10,11,12,13,14]
     labels = ["6","","8","","10","","12","","14"]
@@ -645,9 +738,10 @@ function plot_paper_finitesplitting_scaling_newplot()
 
         if length(v) > 0
             if local_label == "0.0001"
-                local_label = "1.0e-4"
+                local_label = "1e-4"
                 axs[2].scatter(lxs_laughlin[k],v,label=L"\delta"*"=$(local_label)",marker="^",facecolors="none",edgecolors=cols[2])
             elseif k == "0.1"
+                local_label = "1e-2"
                 axs[2].scatter(lxs_laughlin[k],v,label=L"\delta"*"=$(local_label)",c=cols[2],marker="^")
             end
         end
@@ -667,19 +761,19 @@ function plot_paper_finitesplitting_scaling_newplot()
 
         if length(v) > 0
             if local_label == "0.0001"
-                local_label = "1.0e-4"
+                local_label = "1e-4"
                 axs[2].scatter(lxs_mblc[k],v,label=L"\delta"*"=$(local_label)",marker="o",facecolors="none",edgecolors=cols[1])
             elseif k == "0.0001"
+                local_label = "1e-5"
                 axs[2].scatter(lxs_mblc[k],v,label=L"\delta"*"=$(local_label)",c=cols[1],marker="o")
             end
         end
     end
-    axs[2].legend(loc="upper right",fontsize=12)
-    axs[2].set_xlabel(L"L_x", fontsize=16)
+    axs[2].legend(loc="upper right",fontsize=fs)
+    axs[2].set_xlabel(L"L_x", fontsize=fs+2)
     #axs[2].set_ylabel("GS Splitting",fontsize=16)
     axs[2].set_yscale("log")
-    axs[2].set_title("With Pinning",fontsize=16)
-
+    axs[2].set_title("With Pinning",fontsize=fs+2)
     axs[2].tick_params(axis="both", which="major", labelsize=14)
     axs[2].set_xticks(ticks,labels)
 
@@ -699,6 +793,8 @@ function plot_paper_finitesplitting_scaling_newplot()
 
     axs[2].set_ylim(5e-6,3e-1)
 
+    axs[1].text(-0.1, 1.02, "(a)", transform=axs[1].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
+    axs[2].text(-0.1, 1.02, "(b)", transform=axs[2].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
     
     tight_layout()
 end
@@ -1247,7 +1343,7 @@ function plot_ULR_adiabatic_spectrum(Lx::Int64)
         append!(allgaps,[[gaps]])
     end
 
-    fs = 15
+    fs = 20
 
 
     clog = [log10.(f_ulrs[i][1]) for i in 1:length(f_ulrs)]
@@ -1263,12 +1359,14 @@ function plot_ULR_adiabatic_spectrum(Lx::Int64)
     for i in 1:length(ulrs)
         xs = ulrs[i] .* ones(length(allgaps[i][1]))
         ys = allgaps[i][1]
-        scatter(xs,ys,c=clog[i],cmap=whitetohex)
+        scatter(xs,ys,c=clog[i],cmap=whitetohex,marker="x",s=60)
     end
-    colorbar().set_label(L"log_{10} (F_{U_{i}})",fontsize=fs)
-    xlabel("Interaction Strength, "*L"U_{i}",fontsize=fs)
-    ylabel("Energy Gap",fontsize=fs)
+    colorbar().set_label(L"\mathrm{log}_{10} [ F_j (U_{\mathrm{i}}) ] ",fontsize=fs)
+    xlabel(L"U_{\mathrm{i}}",fontsize=fs)
+    ylabel(L"\Delta_{j}",fontsize=fs)
     ylim([-0.05,1.05])
+
+    tight_layout()
 
     return ulrs,allgaps,clog
 end
@@ -1409,6 +1507,29 @@ function get_chern_number_plot(intstren::Float64; if_spline::Bool=false, cutoff:
     return chern_imshow,chern_xs,chern_ys,spline1
 end
 
+function get_chern_8x4laughlin(cutoff::Float64=0.07)
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/old-hatsugai-data")
+    all_files = readdir(dataloc)
+    
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    
+    tw1s = m["tws"]
+    tw2s = m["tws2"]
+    omegas = Matrix(transpose(m["omegas"]))
+    lambda1 = Matrix(transpose(m["lambda1s"]))
+    
+    squaresize = length(tw1s)
+    
+    rez = plot_omega(tw1s,tw2s,omegas; if_plot=false)
+
+    plotgamma1 = plot_gamma(tw1s,tw2s,lambda1,1; if_plot=false)
+    spline1 = get_spline_outline(plotgamma1,cutoff,range(0,1,length=11),range(0,1,length=11))
+
+    chern_count,chern_imshow,chern_xs,chern_ys = count_chern_number(collect(tw1s),collect(tw2s),rez; if_plot=false)
+
+    return chern_imshow,chern_xs,chern_ys,spline1
+end
+
 function get_spline_outline(A::AbstractMatrix,
                             cutoff::Real,
                             xcoords::AbstractVector,
@@ -1500,7 +1621,7 @@ function plot_hatsugai_stepbystep()
     new_lambda2[:,6:end] = new_wrongshape_lambda2[:,1:6]
 
     fig, axs = subplots(1,4; figsize=(13,3))
-    cutoffval = 0.27
+    cutoffval = 0.08
 
     xticks = [0,0.25,0.5,0.75,1.0]
     xlabels = ["0.0","0.25","0.5","0.75","1.0"]
@@ -1565,6 +1686,11 @@ function plot_hatsugai_stepbystep()
     end
     axs[4].set_xticks(xticks,xlabels)
     axs[4].set_yticks(yticks,ylabels)
+
+    axs[1].text(-0.3, 0.9, "(a)", transform=axs[1].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
+    axs[2].text(-0.3, 0.9, "(b)", transform=axs[2].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
+    axs[3].text(-0.3, 0.9, "(c)", transform=axs[3].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
+    axs[4].text(-0.3, 0.9, "(d)", transform=axs[4].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
 
     tight_layout()
 
@@ -1668,7 +1794,8 @@ function plot_opengap_spectrum_with_chern()
 end
 
 # combines spectrum with Chern inset with TEE vs ULR
-function make_topomarkers_paperplot()
+#function make_topomarkers_paperplot()
+if true
 
     # top figure of spectrum with Chern insets
 
@@ -1710,11 +1837,13 @@ function make_topomarkers_paperplot()
     end#
     
 
-    fig = figure(figsize=(6, 7), constrained_layout=true)
+    fig = figure(figsize=(6, 7.5))#, constrained_layout=true)
     gs  = fig.add_gridspec(2, 1, height_ratios=[2, 1])  # top:bottom = 2:1
     ax_top = fig.add_subplot(gs[0, 0])
     ax_bot = fig.add_subplot(gs[1, 0], sharex=ax_top)
     axs = [ax_bot, ax_top]
+
+    
 
     mm = "_"
     ss = 40
@@ -1723,14 +1852,16 @@ function make_topomarkers_paperplot()
     cols = ["#82AC9F","#C73E1D","#36213E"]
     fs = 20
 
+    # lines to inset right
     x1_1000 = 340.0
-    y_1000 = 0.108
+    y_1000 = 0.082
     x0_1000 = 75.0
     axs[1].plot([1000.0,x1_1000],[0.0,y_1000],c="gray",linewidth=1)
     axs[1].plot([1000.0,x0_1000],[0.0,y_1000],c="gray",linewidth=1)
 
+    # lines to inset left
     x1_0 = 2.05
-    y_0 = 0.108
+    y_0 = 0.082
     x0_0 = 0.83
     axs[1].plot([0.0,x1_0],[0.0,y_0],c="gray",linewidth=1)
     axs[1].plot([0.0,x0_0],[0.0,y_0],c="gray",linewidth=1)
@@ -1745,7 +1876,7 @@ function make_topomarkers_paperplot()
     axs[1].set_ylim([ymin, ymax])
     xmin,xmax = -0.25, 1200.0
     axs[1].set_xlim([xmin,xmax])
-    #axs[1].set_xlabel(L"U_{\mathrm{i}} / t", fontsize = fs)
+    axs[1].set_xlabel(L"U_{\mathrm{i}} / t", fontsize = fs)
     axs[1].set_ylabel(L"E-E_0", fontsize = fs)
 
     axs[2].set_xlabel(L"U_{\mathrm{i}} / t", fontsize=fs)
@@ -1779,20 +1910,20 @@ function make_topomarkers_paperplot()
     renorm_height = height / (ymax - ymin)
 
     # get chern number calcs
-    chern_imshow_1000,chern_xs_1000,chern_ys_1000,spline1 = get_chern_number_plot(1000.0; if_spline=true,cutoff=0.28)
-    chern_imshow_0 = chern_imshow_1000
+    chern_imshow_1000,chern_xs_1000,chern_ys_1000,spline1 = get_chern_number_plot(1000.0; if_spline=true,cutoff=0.08)
+    chern_imshow_0, chern_xs_0, chern_ys_0, spline2 = get_chern_8x4laughlin()
 
-    ax_inset1 = axs[1].inset_axes([0.15, 0.25, renorm_height, renorm_height*(8/6)])
+    ax_inset1 = axs[1].inset_axes([0.15, 0.2, renorm_height, renorm_height*(8/6)])
     im1 = ax_inset1.imshow(chern_imshow_0 ./ (2*pi), extent=(0,1,0,1), cmap="bwr", aspect="auto", vmin=-1, vmax=1, origin="lower")
-    inset1_colorbar = fig.colorbar(im1; ax=ax_inset1, anchor=(3,0.5))
+    inset1_colorbar = fig.colorbar(im1; ax=ax_inset1, anchor=(3,0.5),shrink=0.8)
     ax_inset1.set_title("Winding Defects", fontsize=12)
-    for i in 1:length(spline1[1])
-        ax_inset1.plot(spline1[1][i],spline1[2][i],"-k",linewidth=2)
+    for i in 1:length(spline2[1])
+        ax_inset1.plot(spline2[1][i],spline2[2][i],"-k",linewidth=2)
     end
 
-    ax_inset2 = axs[1].inset_axes([0.7, 0.25, renorm_height, renorm_height*(8/6)])
+    ax_inset2 = axs[1].inset_axes([0.7, 0.2, renorm_height, renorm_height*(8/6)])
     im2 = ax_inset2.imshow(chern_imshow_1000 ./ (2*pi), extent=(0,1,0,1), cmap="bwr", aspect="auto", vmin=-1, vmax=1, origin="lower")
-    inset2_colorbar = fig.colorbar(im2; ax=ax_inset2, anchor=(3,0.5))
+    inset2_colorbar = fig.colorbar(im2; ax=ax_inset2, anchor=(3,0.5),shrink=0.8)
     ax_inset2.set_title("Winding Defects", fontsize=12)
     for i in 1:length(spline1[1])
         ax_inset2.plot(spline1[1][i],spline1[2][i],"-k",linewidth=2)
@@ -1877,6 +2008,12 @@ function make_topomarkers_paperplot()
     axs[2].set_xlim([xmin,xmax])
 
     axs[2].legend(loc="upper left", fontsize=14)
+
+
+    axs[1].text(-0.1, 1.05, "(a)", transform=axs[1].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
+    axs[2].text(-0.1, 1.07, "(b)", transform=axs[2].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
+
+    tight_layout()
 end
 
 # energy spectrum under twisting plot
@@ -1917,7 +2054,7 @@ end
 
 # nrg spectra under twisting 3D for 8x4 0, 8x4 1000, 4x8 1000
 function plot_spectrum_twisting3D_allthree()
-    fig = figure()
+    fig = figure(figsize=(12,4))
     ax = [fig.add_subplot(1, 3, i, projection="3d") for i in 1:3]
     idx = 1
     for (lx,n,intstren) in [(8,4,0.0),(8,4,1000.0),(4,4,1000.0)]
@@ -1946,16 +2083,23 @@ function plot_spectrum_twisting3D_allthree()
         s2 = ax[idx].plot_surface(xx,yy,nrgs1,color=cols[2])
         s3 = ax[idx].plot_surface(xx,yy,nrgs2,color=cols[3])
 
-        ax[idx].set_title("$(lx)x$(ly), N=$(n), "*L"U_{\mathrm{i}}="*"$(intstren)",fontsize=12)
+        ax[idx].set_title("$(lx)x$(ly), N=$(n), "*L"U_{\mathrm{i}}="*"$(intstren)",fontsize=16)
         
-        if idx == 1
-            ax[idx].set_xlabel(L"\theta_x",fontsize=16)
-            ax[idx].set_ylabel(L"\theta_y",fontsize=16)
+        # Add label (a, b, c)
+        label_text = ["a", "b", "c"][idx]
+        ax[idx].text2D(0.05, 0.95, label_text, transform=ax[idx].transAxes, fontsize=18, fontweight="bold", va="top", ha="left")
+        
+        ax[idx].set_xlabel(L"\theta_x",fontsize=16)
+        ax[idx].set_ylabel(L"\theta_y",fontsize=16)
+        if idx == 3
             ax[idx].set_zlabel("Energy",fontsize=16)
-            #fig.legend(handles=[s1, s2, s3],labels=["E0", "E1", "E2"],loc="upper center")
         end
-        idx += 1
+        global idx += 1
     end
+
+    
+
+    tight_layout()
 end
 
 # pair density distribution vs ULR for 16x8
@@ -1981,16 +2125,20 @@ function plot_realspace_pair_dist_stacked()
             
             thisim = axs[idx].imshow(pairdist, origin="lower",vmin=0.0,vmax=1.6,extent=[1,16,1,8])
             axs[idx].set_title(L"U_{\mathrm{i}}="*"$ulr",fontsize=10)
-            if idx == 3
+            #if idx == 3
                 axs[idx].set_xlabel("Physical",fontsize=10)
                 axs[idx].set_ylabel("Synthetic",fontsize=10)
                 fig.colorbar(thisim, ax=axs[idx])
-            end
+            #end
 
             global idx += 1
         end
 
     end
+
+    axs[1].text(-0.1, 1.05, "(a)", transform=axs[1].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
+    axs[2].text(-0.1, 1.05, "(b)", transform=axs[2].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
+    axs[3].text(-0.1, 1.05, "(c)", transform=axs[3].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
         
 
 end
@@ -2086,6 +2234,9 @@ function plot_particle_entanglement_spectrum_paperplot()
     axs[1].add_patch(ellipse_u0)
     axs[2].add_patch(ellipse_u10)
 
+    axs[1].text(-0.3, 0.9, "(a)", transform=axs[1].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
+    axs[2].text(-0.3, 0.9, "(b)", transform=axs[2].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
+
     tight_layout()
 
 end
@@ -2096,67 +2247,67 @@ end
 
 ########## Felix Palm ULR Length Plots ##########
 
-# Felix phase diagram compare 16x8 to 8x4
-#=function plot_finitesizescaling_ulr_phasetransition()
-if false
+# Felix phase diagram comparing ED/TTN
+function plot_finitesizescaling_ulr_phasetransition()
     intstren = 4.0
 
-    lx,ly,n = 12,8,6
-    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/")#ulr-length")
-    pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
-    all_files = find_data_file(pdict,"ttn",dataloc) 
-    display(all_files)
+    #lx,ly,n = 10,8,5
+    for (lx,ly,n) in [(10,8,5),(12,8,6)]
+        dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/ulr-length")
+        pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+        all_files = find_data_file(pdict,"ttn",dataloc) 
+        display(all_files)
 
-    xis = range(0.0,8.0,length=11)
-    flatnesses = zeros(Float64,length(xis))
-    for f in all_files
+        xis = range(0.0,8.0,length=11)
+        flatnesses = zeros(Float64,length(xis))
+        for f in all_files
 
-        d,m = read_data(joinpath(dataloc,f); output_level=0)
+            d,m = read_data(joinpath(dataloc,f); output_level=0)
 
-        xi = m["corr_length"]
+            xi = m["corr_length"]
 
-        xi_index = findfirst(x -> xis[x] == xi,1:11)
+            xi_index = findfirst(x -> xis[x] == xi,1:11)
 
-        if haskey(m,"fourpt_momentum")
-            fourpt1 = m["fourpt_momentum"]
+            if haskey(m,"fourpt_momentum")
+                fourpt1 = m["fourpt_momentum"]
 
-            #=fig = figure()
-            fourpt1_includedsubset = zeros(Float64,lx,lx)
-            for i in 3:lx-3
-                for j in 1:length(diag(fourpt1,i))
-                    fourpt1_includedsubset[j,j+i] = diag(fourpt1,i)[j]
-                    fourpt1_includedsubset[j+i,j] = diag(fourpt1,-i)[j]
-                end 
+                #=fig = figure()
+                fourpt1_includedsubset = fourpt1#zeros(Float64,lx,lx)
+                for i in 3:lx-3
+                    for j in 1:length(diag(fourpt1,i))
+                        fourpt1_includedsubset[j,j+i] = diag(fourpt1,i)[j]
+                        fourpt1_includedsubset[j+i,j] = diag(fourpt1,-i)[j]
+                    end 
+                end
+                imshow(fourpt1_includedsubset,extent=(1,lx,1,lx),origin="lower",vmin=0.0)
+                colorbar()
+                title("Four-Point Correlator $(lx)x$(ly) N=$(n) ULR Length = $(xi)")=#
+
+                subset_fourpt = vcat([diag(fourpt1,-i)[2:end-1] for i in 3:lx-3]...,[diag(fourpt1,i)[2:end-1] for i in 3:lx-3]...)
+                flatness = minimum(subset_fourpt) / maximum(subset_fourpt)
+
+                flatnesses[xi_index] = flatness
             end
-            imshow(fourpt1_includedsubset,extent=(1,lx,1,lx),origin="lower",vmin=0.0)
-            colorbar()
-            title("Four-Point Correlator $(lx)x$(ly) N=$(n) ULR Length = $(xi)")=#
 
-            subset_fourpt = vcat([diag(fourpt1,-i) for i in 3:lx-3]...,[diag(fourpt1,i) for i in 3:lx-3]...)
-            flatness = minimum(subset_fourpt) / maximum(subset_fourpt)
+        end#
 
-            flatnesses[xi_index] = flatness
-        end
+        #=dataloc_laughlin = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+        pdict_laughlin16x8 = Dict([("layers",7),("particles",8),("hopping_anisotropy",1.0),("if_periodic_phys",true),("if_periodic_synth",true),("onsite_strength",0.0)])
+        all_files_laughlin16x8 = find_data_file(pdict_laughlin16x8,"ttn",dataloc_laughlin)
+        d,m = read_data(joinpath(dataloc_laughlin,all_files_laughlin16x8[1]); output_level=0)
+        fourpt_laughlin16x8 = m["fourpt_momentum"]
+        subset_fourpt_laughlin16x8 = vcat([diag(fourpt_laughlin16x8,i) for i in 3:lx-3]...)
+        flatness_laughlin16x8 = minimum(subset_fourpt_laughlin16x8) / maximum(subset_fourpt_laughlin16x8)
+        flatnesses[1] = flatness_laughlin16x8=#
 
+        # normalize from laughlin tao-thouless
+        flatnesses ./= flatnesses[2]
+
+        plot(xis,flatnesses,"-o",label="$(lx)x$(ly)")
     end
 
-    #=dataloc_laughlin = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
-    pdict_laughlin16x8 = Dict([("layers",7),("particles",8),("hopping_anisotropy",1.0),("if_periodic_phys",true),("if_periodic_synth",true),("onsite_strength",0.0)])
-    all_files_laughlin16x8 = find_data_file(pdict_laughlin16x8,"ttn",dataloc_laughlin)
-    d,m = read_data(joinpath(dataloc_laughlin,all_files_laughlin16x8[1]); output_level=0)
-    fourpt_laughlin16x8 = m["fourpt_momentum"]
-    subset_fourpt_laughlin16x8 = vcat([diag(fourpt_laughlin16x8,i) for i in 3:lx-3]...)
-    flatness_laughlin16x8 = minimum(subset_fourpt_laughlin16x8) / maximum(subset_fourpt_laughlin16x8)
-    flatnesses[1] = flatness_laughlin16x8=#
 
-    # normalize from laughlin tao-thouless
-    #flatnesses ./= flatnesses[1]
-
-    fig = figure()
-    plot(xis,flatnesses ./ flatnesses[1],"-o",c="b",label="$(lx)x$(ly)")
-
-
-    #=lx,ly,n = 8,8,4
+    lx,ly,n = 8,8,4
     dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/ulr-length")
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
@@ -2191,16 +2342,27 @@ if false
 
     end
 
+    # get laughlin tao-thouless flatness
+    dataloc_laughlin = get_folder_location("cluster-data/exact-diag/torus/new-gauge/ulr-length")
+    pdict_laughlin8x8 = Dict([("Lx",8),("Ly",8),("N",4),("interaction_strength",0.0),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files_laughlin8x8 = find_data_file(pdict_laughlin8x8,"ed",dataloc_laughlin; output_level=0,file_type="jld2")
+    d,m = read_data(joinpath(dataloc_laughlin,all_files_laughlin8x8[1]); output_level=0)
+    fourpt_laughlin8x8 = 0.5 .* (m["fourpt_momentum"] .+ m["fourpt_momentum_1"])
+    subset_fourpt_laughlin8x8 = vcat([diag(fourpt_laughlin8x8,i) for i in 3:lx-3]...)
+    flatness_laughlin8x8 = minimum(subset_fourpt_laughlin8x8) / maximum(subset_fourpt_laughlin8x8)
+    flatnesses[1] = flatness_laughlin8x8
+
     # normalize from laughlin tao-thouless
     flatnesses ./= flatnesses[1]
 
-    plot(xis ./ ly, flatnesses,"-o",c="r",label="$(lx)x$(ly)")
-    ylim([-0.05,1.1])=#
+    plot(xis, flatnesses,"-o",c="r",label="$(lx)x$(ly)")
+    ylim([-0.05,1.1])
 
     legend()
     xlabel("Interaction Length")
     ylabel("Normalized Fourpt Flatness")
-end=#
+    title(L"U_{\mathrm{rung}}="*"$(intstren)")
+end
 
 
 

@@ -14,7 +14,7 @@ Depends on:
 
 include("../other-funcs/include-other-files.jl")
 include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","synth-dims/hatsugai-mbcn.jl","other-funcs/basic-2d-observables.jl"])
-include_other_files(["review-practice-codes/plottings.jl","other-funcs/basic-2d-plottings.jl"])
+#include_other_files(["review-practice-codes/plottings.jl","other-funcs/basic-2d-plottings.jl"])
 #include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
 
 function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
@@ -828,7 +828,7 @@ end=#
 #= test Noah's GPU implementation for accuracy comparing to CPU
 if false
     lx,ly,n = 4,4,2
-    intstren = 10.0
+    intstren = 0.0
     #=layers = Int(log(2,lx*ly))
     dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
     pdict = Dict([("layers",layers),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
@@ -839,22 +839,51 @@ if false
     d_wavefunc_gpu,m_wavefunc_gpu = read_data(joinpath(dataloc,"wavefunc"*f); output_level=0)=#
 
 
-    params_dict = Dict([("if_gpu",true),("nrgtol",1e-6),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",1.0),("particles",n),("mdim",100),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true)])
-    CUDA.@allowscalar all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
+    params_dict = Dict([("if_gpu",false),("num_sweeps",5),("nrgtol",1e-6),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",0.5),("particles",n),("mdim",100),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
 
     
 end=#
 
-#= test Nsight profiling
+#= test NSight profiling
+using CUDA
 if false
-    lx,ly,n = 8,8,8
+    lx,ly,n = 8,4,4
     intstren = 10.0
 
-    params_dict = Dict([("if_gpu",true),("nrgtol",1e-6),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",1e-5),("particles",n),("mdim",300),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true)])
+    params_dict = Dict([("if_gpu",true),("nrgtol",5e-5),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",1e-5),("particles",n),("mdim",300),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true)])
     CUDA.@allowscalar all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
 
 end=#
 
+
+#= depreciation calculation for moving out of old apartment
+# depreciation parameters
+factor_per_year = 0.9
+number_of_years = 2 + 7/12  # moved into your old room June 2023, moving out Jan 2026
+
+# initial values of items
+kallax = 60
+clothing_stand = 5 # if by clothing stand you mean the wooden boxes, this is nailed-together scrap wood
+drawers = 2*15     # definitely not 30 each
+desk = 10          # nowhere near new when I received it, definitely cheap to start
+chair = 10         # also not new, had many holes, rips, and stains
+total_value = kallax + clothing_stand + drawers + desk + chair
+println("Total initial value is ",total_value)
+
+# calculated depreciation
+final_value = total_value * factor_per_year^(number_of_years)
+depreciation_amount = total_value - final_value
+println("Depreciation amount after $(number_of_years) years is ",depreciation_amount)
+
+# moving and disposal costs
+van_rental_cost = 60 / 4               # all these items makeup one quarter of a van load, van rental is €60
+moving_items_cost = 15 * 0.25     # cost of physically moving all the items at €15 / hour for 15 minutes
+total_moving_cost = van_rental_cost + moving_items_cost
+println("Total moving cost is ",total_moving_cost)
+
+# final payment due
+println("Final Payment due is ",depreciation_amount - total_moving_cost)=#
 
 
 
