@@ -165,7 +165,7 @@ function time_evolution(starting_wavefunc::Vector{ComplexF64},starting_ham::Spar
     if if_instant_gs
         return tevo_wavefunc,instant_spec
     else
-        return tevo_wavefunc
+        return tevo_wavefunc, nothing
     end
 end
 
@@ -184,6 +184,8 @@ function make_tevo_params(given_parameters::Dict)
             t_evo_params[k] = v[1](t_evo_params["nsteps"],t_evo_params["dt"][1]; v[2]...)
         end
     end
+
+    display(t_evo_params)
 
     return t_evo_params
 end
@@ -275,14 +277,14 @@ end
 
 function run_timeevo(starting_gs::Vector{ComplexF64},time_params::Dict,lattice_dict::Dict,hamilt_dict::Dict; kwargs...)
     
-    max_ramp_time::Float64 = get_maxramptime(time_params)
-    least_ramp_time::Float64 = get_leastramptime(time_params)
-    tmax::Float64 = max(100*max_ramp_time,1e-2)
-    max_nsteps::Int = get(kwargs, :max_nsteps, 1e3)
-    
-    dt::Float64,when_change_dt,other_dt = get_dt(tmax,least_ramp_time; kwargs...)
+    #max_ramp_time::Float64 = get_maxramptime(time_params)
+    #least_ramp_time::Float64 = get_leastramptime(time_params)
+    tmax::Float64 = tmax_global#max(100*max_ramp_time,1e-2)
+    max_nsteps::Int = 1e3#get(kwargs, :max_nsteps, 1e3)
+    dt::Float64 = dt_global
+    when_change_dt::Int = max_nsteps + 1
 
-    tevo_pdict::Dict{String,Any} = Dict([("dt",dt),("tmax",tmax),("nsteps",max_nsteps),("when_change_dt",when_change_dt),("other_dt",other_dt)])
+    tevo_pdict::Dict{String,Any} = Dict([("dt",dt),("tmax",tmax),("nsteps",max_nsteps),("when_change_dt",when_change_dt),("other_dt",dt)])
 
     # structure the control parameter values
     for (k,v) in time_params

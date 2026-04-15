@@ -44,7 +44,7 @@ end
 
 
 include_other_files(["other-funcs/basic-2d-stuff.jl","other-funcs/basic-2d-observables.jl","exact-diag/two-dimensions.jl","exact-diag/observables.jl","exact-diag/hatsugai-mbcn.jl"])
-#include_other_files(["exact-diag/time-evolution.jl"])
+include_other_files(["exact-diag/time-evolution.jl"])
 #include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
 
 function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
@@ -612,88 +612,44 @@ if false
 
 end=#
 
-#= testing time evolution
-if false
+# testing time evolution
+if true
     lx,ly,n = 4,4,2
     anis = 1e-4
     intstren = 300.0
     ppstren = 0.0
     end_tx = 1.0
 
-    params_dict = Dict([("output_level",1),("periodic_potential_strength",ppstren),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",30),("if_find_data",false),("if_save_data",false)])
-    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+    params_dict_i = Dict([("output_level",1),("periodic_potential_strength",ppstren),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+    states_i,nrgs_i,rhos_i,filepath_i,if_found_i,lattice_params_i,hamilt_params_i = run_normal_ed(params_dict; output_level=1)
 
-    gs = states[1]
+    params_dict_f = Dict([("output_level",1),("periodic_potential_strength",ppstren),("tx",end_tx),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+    states_f,nrgs_f,rhos_f,filepath_f,if_found_f,lattice_params_f,hamilt_params_f = run_normal_ed(params_dict; output_level=1)
 
-    speccount = 30
-    time_running_args = (nev=speccount,output_level=1,)
+    starting_gs = states[1]
 
+    speccount = 1
+    time_running_args = (nev=speccount,output_level=1,if_instant_gs=false,)
 
-    #fig = figure()
-    ramptimes = 10 .^ Float64[-8,-7,-6,-5,-4]
-    for (idx,ramptime) in enumerate(ramptimes)
+    tmax_global = 10.0
+    dt_global = 0.0005
+    ramptimes = [i/10 for i in 1:20]
 
-    #ramptime = 1e-6
+    # need to simplify the tevo code, remove changing dt
 
+    for ramptime in ramptimes
+        println("Running time evolution with ramp time $ramptime")
         tevo_params = Dict([ ("tx",(linear_ramp,params_dict["tx"],end_tx,ramptime)) ])
-        tevo_gs,tevo_dict,instspec = run_timeevo(gs,tevo_params,lattice_params,hamilt_params; time_running_args...)
+        tevo_gs,tevo_dict,intspec = run_timeevo(starting_gs,tevo_params,lattice_params,hamilt_params; time_running_args...)
+        
+        final_fidelity = abs2(dot(tevo_gs[:,end],states_f[1]))
 
-        times = make_times(tevo_dict["dt"],tevo_dict["when_dt_ends"])
-
-        ending_inst_occs = get_occupancy(Vector(instspec["1"][:,end]),lattice_params; if_plot=false)
-        stable_ending_occratio = minimum(ending_inst_occs) / maximum(ending_inst_occs)
-
-        length_average_times = Int(ceil(size(tevo_gs,2) * 1.0))
-        max_val = nothing
-        min_val = nothing
-        xs = []
-        ys = []
-        for i in 0:length_average_times-1
-
-            #= CDW flatness oscillation
-            local_occs = get_occupancy(Vector(tevo_gs[:,end-i]),lattice_params; if_plot=false)
-            local_ratio = (minimum(local_occs) / maximum(local_occs)) / stable_ending_occratio            
-            #scatter(tevo_dict["nsteps"]-i,local_ratio,c="b")
-            #xlabel("Time Step")
-            #ylabel("Occupancy Ratio")=#
-
-            local_val = abs2(adjoint(gs) * tevo_gs[:,end-i])
-            #scatter(size(tevo_gs,2)-i,1-local_val,c="b")
-            append!(xs,times[size(tevo_gs,2)-i])
-            append!(ys,1-local_val)
-            #xlabel("Time Step")
-            #ylabel("Instantaneous Infidelity")
-            #yscale("log")
-
-            #=if isnothing(max_val) || local_val > max_val
-                max_val = local_val
-            end
-            if isnothing(min_val) || local_val < min_val
-                min_val = local_val
-            end=#
-
-
-        end
-
-
-        plot(xs,ys,label="$ramptime")
-        xlabel("Time Step")
-        ylabel("Instantaneous Infidelity")
-        yscale("log")
-        legend()
-        xscale("log")
-        xlim([1e-8,1.1])
-
-        #amplitude = max_val - min_val
-        #scatter(ramptime,amplitude,c="b")
-        #scatter(ramptime,1-min_val,c="b")
-        #xlabel("Ramp Time")
-        #ylabel("Amplitude of Occupancy Ratio Oscillation")
-        #ylabel("Deviation from 1 of Overlap Oscillation")
-
+        scatter(ramptime,final_fidelity,c="b")
+        xlabel("Ramp Time")
+        ylabel("Fidelity with Final Ground State")
     end
-    
-end=#
+
+end#
 
 
 
