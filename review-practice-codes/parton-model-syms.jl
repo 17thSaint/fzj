@@ -215,6 +215,24 @@ function wf_mpo(wf, net, op_ins)
     
 end
 
+function initialize_ttn(ttn,maxdim,particle_count; kwargs...)
+	particle_type = get(kwargs, :part_type, "Boson")
+	if particle_type == "Fermion"
+		creation = "Cdag"
+	elseif particle_type == "Boson"
+		creation = "Adag"
+    else
+        error("Unknown particle type: $particle_type. Supported types are 'Fermion' and 'Boson'.")
+	end
+	
+	phys_edge_length,virt_edge_length = get_lattice_dims(ttn)
+	site_count = TTN.number_of_sites(TTN.network(ttn))
+	wf_coefs = create_wavefunction(Float64,size(TTN.physical_lattice(TTN.network(ttn))))
+	for i in 1:particle_count
+		ttn = patron_application!(ttn,wf_coefs,creation;maxdim=maxdim)
+	end
+	return ttn
+end
 
 
 

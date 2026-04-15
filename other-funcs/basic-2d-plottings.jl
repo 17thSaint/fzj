@@ -100,7 +100,7 @@ function plot_fullspectrum(xs::Vector,nrgs::Dict,xstring::AbstractString="x",if_
     return
 end
 
-function plot_gamma(theta_xs::Vector{Float64},theta_ys::Vector{Float64},gammas::Matrix{ComplexF64},which_gamma::Int; kwargs...)
+function plot_gamma(theta_xs::Vector{Float64},theta_ys::Vector{Float64},gammas::Matrix,which_gamma::Int; kwargs...)
     plot_title = get(kwargs,:plot_title,"")
     if_plot::Bool = get(kwargs,:if_plot,true)
 
@@ -116,9 +116,9 @@ function plot_gamma(theta_xs::Vector{Float64},theta_ys::Vector{Float64},gammas::
     end
     return plotting_gamma
 end
-plot_gamma(theta_xs::StepRangeLen,theta_ys::StepRangeLen,gammas::Matrix{ComplexF64},which_gamma::Int; kwargs...) = plot_gamma(collect(theta_xs),collect(theta_ys),gammas,which_gamma; kwargs...)
+plot_gamma(theta_xs::StepRangeLen,theta_ys::StepRangeLen,gammas::Matrix,which_gamma::Int; kwargs...) = plot_gamma(collect(theta_xs),collect(theta_ys),gammas,which_gamma; kwargs...)
 
-function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::Matrix{ComplexF64}; kwargs...)
+function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::Matrix; kwargs...)
     plot_title::String = get(kwargs,:plot_title,"")
     if_mag::Bool = get(kwargs,:if_mag,false)
     if_perfect_grid::Bool = get(kwargs,:if_perfect_grid,true)
@@ -169,7 +169,7 @@ function plot_omega(theta_xs::Vector{Float64},theta_ys::Vector{Float64},omegas::
 
     return plotting_omega
 end
-plot_omega(theta_xs::StepRangeLen,theta_ys::StepRangeLen,omegas::Matrix{ComplexF64}; kwargs...) = plot_omega(collect(theta_xs),collect(theta_ys),omegas; kwargs...)
+plot_omega(theta_xs::StepRangeLen,theta_ys::StepRangeLen,omegas::Matrix; kwargs...) = plot_omega(collect(theta_xs),collect(theta_ys),omegas; kwargs...)
 
 function count_chern_number(theta_xs::Vector{Float64},theta_ys::Vector{Float64},plotting_omega::Matrix{Float64}; kwargs...)
     plot_title::String = get(kwargs,:plot_title,"")

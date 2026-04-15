@@ -1964,7 +1964,8 @@ if true
     colorbar().set_label(L"log_{10} (\Delta_{01})")
 end=#
 
-if true
+#= looking at Laughlin ULR=0 overlap at all ULR values by Erik
+if false
     lx,ly,n = 8,4,4
     dataloc = get_folder_location("cluster-data/exact-diag/torus/")
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
@@ -2016,7 +2017,22 @@ if true
     xlabel("Interaction Strength")
     ylabel("Overlap with Laughlin")
     
-end
+end=#
+
+#= find chern number for laughlin 8x4
+if false
+    lx,ly,n = 8,4,4
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/old-hatsugai-data")
+    all_files = readdir(dataloc)
+    
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    
+    tw1 = m["tws"]
+    tw2 = m["tws2"]
+
+    plot_omega(tw1,tw2,m["omegas"])
+    
+end=#
 
 
 

@@ -707,7 +707,7 @@ function fill_states(particle_count,site_count,max_occupation)
 	return states
 end
 
-function initialize_ttn(ttn,maxdim,particle_count; kwargs...)
+#=function initialize_ttn(ttn,maxdim,particle_count; kwargs...)
 	particle_type = get(kwargs, :part_type, "Boson")
 	if particle_type == "Fermion"
 		creation = "Cdag"
@@ -722,7 +722,7 @@ function initialize_ttn(ttn,maxdim,particle_count; kwargs...)
 		ttn = patron_application!(ttn,wf_coefs,creation;maxdim=maxdim)
 	end
 	return ttn
-end
+end=#
 
 function check_if_frozen(ttn)
 	occs = get_occupancy(ttn; if_plot=false)
@@ -981,8 +981,8 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 	
 	if if_gpu
 		println("Doing GPU TTN")
-		ttn = TTN.gpu(ttn)
-	end
+		#ttn = TTN.gpu(ttn)
+	end#
 	println("Added States")
 	
 
@@ -1064,7 +1064,7 @@ function find_ground_state(num_layers::Int,particle_count::Int; kwargs...)
 	return ttn,ham,"no sweep",end_time-start_time
 end
 
-function find_excited_state(starting_ttn::TTN.TreeTensorNetwork,ttns_ortho::Vector{TTN.TreeTensorNetwork},ham_tpo::TTN.AbstractTensorProductOperator,sweep_type::String,if_densmat::Bool,location::String,actual_filename::String; kwargs...)
+function find_excited_state(starting_ttn::TTN.TreeTensorNetwork,ttns_ortho::Vector{TTN.TreeTensorNetwork},ham_tpo,sweep_type::String,if_densmat::Bool,location::String,actual_filename::String; kwargs...)
 
 	sp = 0.0
 	time_start::Float64 = time()
@@ -1143,14 +1143,14 @@ function find_excited_states(num_layers::Int,num_excited_states::Int,particle_co
 	
 	if if_gpu
 		println("Doing GPU TTN")
-		ttn = TTN.gpu(ttn)
+		#ttn = TTN.gpu(ttn)
 	end
 	println("Added States")
 	
 	if isnothing(ham_operator)
 		ham_operator = metadata["ham"]
 	end
-	ham::TTN.AbstractTensorProductOperator = if_gpu ? TTN.TPO_GPU(ham_operator,lat) : TTN.TPO(ham_operator,lat)
+	ham = TTN.TPO_GPU(ham_operator,lat)
 	println("Built Hamiltonian")
 
 	es_start = length(ortho_states)

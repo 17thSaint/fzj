@@ -13,8 +13,8 @@ Depends on:
 =#
 ######################################################
 
-#using Pkg
-#Pkg.activate(".")
+using Pkg
+Pkg.activate(@__DIR__)
 using JLD2
 
 function find_center()
@@ -45,7 +45,7 @@ end
 
 include_other_files(["other-funcs/basic-2d-stuff.jl","other-funcs/basic-2d-observables.jl","exact-diag/two-dimensions.jl","exact-diag/observables.jl","exact-diag/hatsugai-mbcn.jl"])
 #include_other_files(["exact-diag/time-evolution.jl"])
-include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
+#include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
 
 function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     if hamilt_params["U"][2] == 0.0
@@ -73,6 +73,7 @@ function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     end
     if haskey(hamilt_params,"if_pinning") && hamilt_params["if_pinning"]
         fdict["if_pinning"] = hamilt_params["if_pinning"]
+        fdict["pinning_strength"] = hamilt_params["pinning_strength"]
     end
     if hamilt_params["scaling_type"] != "flat"
 		fdict["scaling"] = hamilt_params["scaling_type"]
@@ -296,7 +297,12 @@ function get_normal_model_params_ed(params_dict::Dict)
     if periodic_potential_strength != 0.0
         dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/periodic-potential")
     end
+    if if_pinning
+        dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
+    end
     dataloc = get(params_dict, "dataloc", dataloc)
+
+
     if occursin("geraghty1",dataloc)
         basis_dataloc::String = "/p/project/netenesyquma/geraghty1/data/data-ed/basis-files"
     else
@@ -410,12 +416,16 @@ if false
     #which_one = args_dict["which_one"]
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
-    lx,ly,n = 12,6,3
-    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    lx,ly,n = 8,4,4
+    intstren = 300.0
+    #xi = 1.0
+    #dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
     #anis = 1e-4
-    intstrens = range(0.0,100.0,length=11)
+    #intstrens = range(0.0,10.0,length=11)
+    #intlens = range(0.0,ly,length=11)
     #cols = ["b","g","r","c","y","orange","purple","pink","brown","gray"]
-    for (idx,intstren) in enumerate(intstrens)
+    #for (idx,intstren) in enumerate(intstrens)
+    #for (idx,xi) in enumerate(intlens)
     #for (idx,anis) in enumerate(anises)
 
     
@@ -444,13 +454,14 @@ if false
         #other_params_dict = make_args_dict(ARGS)
         #intstren = 3.2#other_params_dict["onsite_strength"]
         #xi = 2.0#other_params_dict["corr_length"]
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_pinning",true),("pinning_strength",1e-2),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",true)])
 
         #println("Starting from here")
 
         if true
             states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
         end
+
 
         #=fourpt = four_point(states[1],lattice_params; if_plot=false)
         fourpt_2 = four_point(states[2],lattice_params; if_plot=false)
@@ -517,8 +528,8 @@ if false
             fig = figure()
         end=#
 
-        #plot_spectrum(lls,nrgs,idx,params_dict["nev"],"Interaction Length",true; plot_title="")
-        plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title="")
+        #plot_spectrum(intlens,nrgs,idx,params_dict["nev"],"Interaction Length",true; plot_title="")
+        #plot_spectrum(intstrens,nrgs,idx,params_dict["nev"],"Interaction Strength",true; plot_title="")
         #plot_spectrum(tws,nrgs,idx,params_dict["nev"],"Theta_x / 2pi",false; plot_title=" V=$intstren")
         #plot_spectrum(anises,nrgs,idx,params_dict["nev"],"Physical Hopping",true; plot_title=" with PP $(lx)x$(ly) N=$n ULR=$intstren")
 
@@ -558,7 +569,7 @@ if false
         #gammas1[idx,idx2] = gamma1
         #gammas2[idx,idx2] = gamma2
 
-    end
+    #end
     #end
 
     #=fig = figure()

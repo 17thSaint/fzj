@@ -13,7 +13,7 @@ Depends on:
 ######################################################
 
 include("../other-funcs/include-other-files.jl")
-include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","synth-dims/hatsugai-mbcn.jl","other-funcs/basic-2d-observables.jl"])
+#include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","synth-dims/hatsugai-mbcn.jl","other-funcs/basic-2d-observables.jl"])
 #include_other_files(["review-practice-codes/plottings.jl","other-funcs/basic-2d-plottings.jl"])
 #include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
 
@@ -855,6 +855,107 @@ if false
     CUDA.@allowscalar all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
 
 end=#
+
+function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwargs...) 
+	hopping_anisotropy = get(kwargs, :hopping_anisotropy, 1.0)
+	#t_strength_phys = t_strength * hopping_anisotropy
+	flux_direction = get(kwargs,:flux_direction,"phys")
+	
+
+	t_strength_phys,t_strength_synth = 1.0,1.0#get_hopping_strengths(t_strength,hopping_anisotropy)
+	
+	if get(kwargs, :no_magF, false)
+		phi = 0.0
+	end
+	
+	if s1[1] == s2[1] # Synthetic Dimension Hopping
+
+		stren = -t_strength_synth
+		flux_direction == "synth" ? stren *= exp(im*2*pi*(phi*(s1[1]-1))) : nothing
+		return stren
+	elseif s1[2] == s2[2] # Physical Dimension Hopping
+
+		stren = -t_strength_phys
+		flux_direction == "phys" ? stren *= exp(im*2*pi*(phi*(s1[2]-1))) : nothing
+		return stren
+	else
+		return 0.0
+	end
+
+end
+
+# testing expander for Trento
+if true
+    lx,ly,n = 4,4,8
+    intstren = 0.0
+    num_layers = Int(log(2,lx*ly))
+    
+    params_dict = Dict([("if_gpu",false),("if_check_fluxes",false),("outputlevel",1),("nrgtol",5e-5),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",0.9),("particles",n),("mdim",40),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true)])
+
+    net = TTN.BinaryRectangularNetwork(num_layers, TTN.ITensorNode, "Boson";conserve_qns=true,dim=2)
+    println("Made Network")
+
+
+    restricted_size = (lx,ly)
+    phys_edge_length = lx
+    virt_edge_length = ly
+    which_axis = 1
+    t_strength = 1.0
+    phi = 2 * n / (lx*ly)
+    if_per = [params_dict["if_periodic_phys"],params_dict["if_periodic_synth"]]
+    twist_angle = [0.0,0.0]
+    hopping = TTN.OpSum()
+    for s_phys in 1:restricted_size[1]
+        for s_synth in 1:restricted_size[2]
+            starting_site = [s_phys,s_synth]
+            twist = 0
+            for which_axis in [1,2]
+                    ending_site = starting_site .+ ((which_axis == 1,which_axis == 2))
+
+                    # enforce boundary conditions
+                    if ending_site[which_axis] > restricted_size[which_axis]
+                        if if_per[which_axis]
+                            ending_site[which_axis] = 1
+                            twist = 1
+                        else
+                            continue
+                        end
+                    end
+
+                    if ending_site[which_axis] < 1
+                        if if_per[which_axis]
+                            ending_site[which_axis] = restricted_size[which_axis]
+                            twist = 2
+                        else
+                            continue
+                        end
+                    end
+
+                    coeff = get_inter_coeff(starting_site,ending_site,t_strength,phi,phys_edge_length,virt_edge_length)
+                    twist == 1 ? coeff *= exp(im*twist_angle[which_axis]*2*pi) : nothing
+                    twist == 2 ? coeff *= exp(-im*twist_angle[which_axis]*2*pi) : nothing
+                    global hopping += (coeff,"Adag",Tuple(starting_site),"A",Tuple(ending_site))
+                    global hopping += (conj(coeff),"Adag",Tuple(ending_site),"A",Tuple(starting_site))
+                    twist = 0
+            end
+        end
+    end
+    ham_tpo = TTN.TPO(hopping,physical_lattice(net))
+    println("Made Hamiltonian")
+
+    #states = fill_states(n,lx*ly,1)
+	#old_ttn = TTN.ProductTreeTensorNetwork(net,states)
+    old_ttn = TTN.initialize_ttn(TTN.ProductTreeTensorNetwork(net,fill("0", lx*ly)),20,n; part_type="Boson")
+    println("Made Initial TTN")
+
+    observer = NRGVarObserver(params_dict["nrgtol"])
+    expander = DefaultExpander(params_dict["expander_fraction"])
+    println("Running DMRG")
+    sp = TTN.dmrg(old_ttn,ham_tpo; expander=expander, number_of_sweeps=100, maxdims=100, noise=0.0, outputlevel=1, observer=observer, cutoff=1e-8, eigsolve_krylovdim=15, eigsolve_verbosity=0, use_gpu=false)
+
+
+end
+
 
 
 #= depreciation calculation for moving out of old apartment

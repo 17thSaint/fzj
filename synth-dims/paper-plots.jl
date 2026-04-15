@@ -531,6 +531,8 @@ function plot_paper_finitesplitting_scaling()
     gaps_laughlin["0.001"] = datadict_laughlin["0.0001"][2]
     lxs_laughlin["0.001"] = datadict_laughlin["0.0001"][1]
 
+    fs = 12
+
     cols = ["#82AC9F","#C73E1D","#36213E"]
 
     fig, axs = subplots(1,2; figsize=(6.75,4.75))
@@ -543,7 +545,7 @@ function plot_paper_finitesplitting_scaling()
 
     fs = 14
 
-    for (k,v) in gaps_laughlin
+    #=for (k,v) in gaps_laughlin
         local_label = k == "0.0" ? "Unpinned" : "$(parse(Float64,k)/10)"
 
 
@@ -567,7 +569,20 @@ function plot_paper_finitesplitting_scaling()
         end
 
         length(v) > 0 && axs[1].scatter(lxs_laughlin[k],v,label=local_label,marker=mm,facecolors=fc,edgecolors=cols[2])
-    end
+    end=#
+
+    # temporary data manipulation for ulr = 0.0
+    append!(gaps_laughlin["0.0"],0.0004)
+    append!(lxs_laughlin["0.0"],12)
+    append!(gaps_laughlin["0.001"],0.00042)
+    append!(lxs_laughlin["0.001"],12)
+    append!(gaps_laughlin["0.001"],1.05e-4)
+    append!(lxs_laughlin["0.001"],14)
+
+    axs[1].scatter(lxs_laughlin["0.0"],gaps_laughlin["0.0"],label="Unpinned",marker="^",facecolors=cols[2],edgecolors=cols[2])
+    axs[1].scatter(lxs_laughlin["0.001"],gaps_laughlin["0.001"],label="1e-4",marker="*",facecolors="none",edgecolors=cols[2])
+    axs[1].scatter(lxs_laughlin["0.1"],gaps_laughlin["0.1"],label="1e-2",marker="^",facecolors="none",edgecolors=cols[2])
+
     axs[1].set_xlabel(L"L_x",fontsize=fs+2)
     axs[1].set_ylabel(L"\Delta_{01}",fontsize=fs+2)
     axs[1].set_yscale("log")
@@ -575,7 +590,7 @@ function plot_paper_finitesplitting_scaling()
     axs[1].set_title(L"U_{\mathrm{i}}=0",fontsize=fs+2)
 
 
-    for (k,v) in gaps_mblc
+    #=for (k,v) in gaps_mblc
         local_label = k == "0.0" ? "Unpinned" : "$(parse(Float64,k)/10)"
         
         # temporary data manipulation for ulr = 300.0 Lx = 12
@@ -600,7 +615,24 @@ function plot_paper_finitesplitting_scaling()
         end
 
         length(v) > 0 && axs[2].scatter(lxs_mblc[k],v,label=local_label,marker=mm,facecolors=fc,edgecolors=cols[1])
-    end
+    end=#
+
+    # temporary data manipulation for ulr = 300.0
+    gaps_mblc["0.0001"][4] = 1.05e-5
+    gaps_mblc["0.0001"][5] = 1e-5
+    append!(gaps_mblc["0.001"],0.000105)
+    append!(lxs_mblc["0.001"],12)
+    append!(gaps_mblc["0.001"],0.0001)
+    append!(lxs_mblc["0.001"],14)
+
+    deleteat!(gaps_mblc["0.0001"],6)
+    deleteat!(lxs_mblc["0.0001"],6)
+
+    axs[2].scatter(lxs_mblc["0.0"],gaps_mblc["0.0"],label="Unpinned",marker="o",facecolors=cols[1],edgecolors=cols[1])
+    axs[2].scatter(lxs_mblc["0.0001"],gaps_mblc["0.0001"],label="1e-5",marker="o",facecolors="none",edgecolors=cols[1])
+    axs[2].scatter(lxs_mblc["0.001"],gaps_mblc["0.001"],label="1e-4",marker="*",facecolors="none",edgecolors=cols[1])
+
+
     axs[2].set_xlabel(L"L_x",fontsize=fs+2)
     #axs[2].set_ylabel(L"\Delta_{01}",fontsize=fs+2)
     axs[2].set_yscale("log")
@@ -1296,7 +1328,7 @@ function plot_four_point_slices_both()
 
     fig = figure(figsize=(6,4))
     plot(xs,ys_0,c=cols[2],label=L"U_{ir}=0",marker="^")
-    plot(xs,ys_300,c=cols[1],label=L"U_{ir}=300",marker="o")
+    #plot(xs,ys_300,c=cols[1],label=L"U_{ir}=300",marker="o")
     legend(loc="upper center",fontsize=14)
     xlabel(L"k_y", fontsize=18)
     #ylabel(L"\langle \hat{a}_{k_y}^{\dagger} \hat{a}_{k_{y}^{'}}^{\dagger} \hat{a}_{k_{y}^{'}} \hat{a}_{k_{y}} \rangle / \langle \hat{n}_{k_{y}^{'}} \rangle \langle \hat{n}_{k_{y}} \rangle",fontsize=14)
@@ -1306,6 +1338,8 @@ function plot_four_point_slices_both()
     xtickvals = collect(-7:7)
     xticklabels = ["","-6","","-4","","-2","","0","","2","","4","","6",""]
     xticks(xtickvals,xticklabels)
+
+    ylim(-0.01,0.24)
 
     tick_params(top=true, right=true)
     tick_params(labeltop=false, labelright=false)
@@ -1384,84 +1418,6 @@ if false
     d,m = read_data(joinpath(dataloc_ttn,all_files_ttn[1]); output_level=0)
     display(keys(m))
 end=#
-
-# TEE as a function of ULR if there are enough data points
-function plot_tee_vs_ulr()
-    cols = ["#82AC9F","#C73E1D","#36213E"]
-
-    lx,ly,n = 16,8,8
-    layers = 7
-    dataloc1 = get_folder_location("cluster-data/synth-dims/torus")
-    pdict = Dict([("hopping_anisotropy",1.0),("layers",layers),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true)])
-    all_files1 = find_data_file(pdict,"ttn",dataloc1)
-    
-    dataloc2 = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
-    all_files2 = find_data_file(pdict,"ttn",dataloc2)
-
-    all_locs = (dataloc2*"/") .* all_files2
-    
-    linmodel(x,p) = p[1] .* x .+ p[2]
-    perims = [8*3,4*4,4*3,2*4,2*3]
-
-    yints = []
-    sigmas = []
-    ulrs = []
-    for (idx,f) in enumerate(all_locs)
-        d,m = read_data(f; output_level=0)
-
-        if haskey(m,"entanglement_spectrum")
-            println("Processing file $idx / $(length(all_locs))")
-            params = get_params_dict_from_filename(f)
-            intstren = haskey(m,"onsite_strength") ? m["onsite_strength"] : params["onsite_strength"]
-
-            ees = zeros(Float64,layers-2)
-            entspecs = m["entanglement_spectrum"]
-
-            for k in 2:layers-1
-                entspec = filter(x -> x != 0.0, entspecs[:,k-1])
-                #display(entspec)
-
-                ee = entanglement_entropy(entspec)
-                ees[k-1] = ee
-            end
-
-            linfit = curve_fit(linmodel,perims,ees,[1.0,1.0])
-            sigma = stderror(linfit)[2]
-            yintercept = -linfit.param[2]
-            append!(yints,[yintercept])
-            append!(sigmas,[sigma])
-            append!(ulrs,[intstren])
-
-            fig = figure()
-            scatter(perims,ees)
-            title("ULR=$intstren")
-            xlim([0,1.1*maximum(perims)])
-            ylim([-1,1.1*maximum(ees)])
-        end
-    end
-
-    fig = figure()
-    errorbar(ulrs,yints,yerr=sigmas,fmt="o",c=cols[3])
-    plot(range(0,1000,length=10),0.5 .* ones(10),"--",c=cols[2],label="Laughlin: "*L"\gamma = 1/2")
-    legend(fontsize=12)
-
-    fs = 16
-
-    xscale("symlog"; linthresh=2.0, linscale=1.0)
-    ymin,ymax = -0.1,1.1
-    ylim([ymin, ymax])
-    xmin,xmax = -0.25, 1200.0
-    xlim([xmin,xmax])
-    xlabel(L"U_{\mathrm{i}} / t", fontsize=fs)
-    ylabel(L"\gamma", fontsize=fs)
-
-    ticks = [0,0.5,1,1.5,2,10,100,1000]
-    labels = ["0","0.5","1","1.5","2",L"10^1",L"10^2",L"10^3"]
-    xticks(ticks,labels)
-
-    tight_layout()
-
-end
 
 
 function get_chern_number_plot(intstren::Float64; if_spline::Bool=false, cutoff::Float64=0.27)
@@ -1698,20 +1654,22 @@ end
 
 # plot gap spectrum with Chern insets
 function plot_opengap_spectrum_with_chern()
+    # top figure of spectrum with Chern insets
+
     lx,ly,n = 8,4,4
     layers = Int(log(2,lx*ly))
-    cols = ["#82AC9F","#C73E1D","#36213E"]
 
     dataloc = get_folder_location("cluster-data/exact-diag/torus")
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("hopping_anisotropy",1.0),("if_periodic_x",true),("if_periodic_y",true)])
     all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2")
     filter!(x -> !occursin("twist_angle",x), all_files)
-    #display(all_files)
 
     g2s = []
     g3s = []
     ulrs_g2 = []
     ulrs_g3 = []
+    g1s = []
+    ulrs_g1 = []
     for f in all_files
         d,m = read_data_jld2(joinpath(dataloc,f); output_level=0)
         all_nrgs = d["nrg"]
@@ -1726,76 +1684,199 @@ function plot_opengap_spectrum_with_chern()
         append!(g2s,[all_nrgs[2] - all_nrgs[1]])
         append!(ulrs_g2,[ulr])
 
+        #append!(g1s,[all_nrgs[1]])
+        #append!(ulrs_g1,[ulr])
+
         for i in 3:length(all_nrgs)
             append!(g3s,[all_nrgs[i] - all_nrgs[1]])
             append!(ulrs_g3,[ulr])
         end
-    end
+    end#
+
+    fig = figure(figsize=(6, 4.5))#, constrained_layout=true)
+    gs  = fig.add_gridspec(1, 1)  # top:bottom = 2:1
+    ax_top = fig.add_subplot(gs[0, 0])
+    axs = [ax_top]
+
+    
+
+    mm = "_"
+    ss = 180
 
 
-    fig = figure()
+    cols = ["#82AC9F","#C73E1D","#36213E"]
+    fs = 20
 
-    fs = 16
+    #= lines to inset right
+    x1_1000 = 340.0
+    y_1000 = 0.082
+    x0_1000 = 75.0
+    axs[1].plot([1000.0,x1_1000],[0.0,y_1000],c="gray",linewidth=1)
+    axs[1].plot([1000.0,x0_1000],[0.0,y_1000],c="gray",linewidth=1)=#
 
-    x1_1000 = 290.0
-    y_1000 = 0.108
-    x0_1000 = 60.0
-    plot([1000.0,x1_1000],[0.0,y_1000],c="gray",linewidth=1)
-    plot([1000.0,x0_1000],[0.0,y_1000],c="gray",linewidth=1)
+    # lines to inset left
+    x1_0 = 2.05
+    y_0 = 0.082
+    x0_0 = 0.83
+    #axs[1].plot([0.0,x1_0],[0.0,y_0],c="gray",linewidth=1)
+    #axs[1].plot([0.0,x0_0],[0.0,y_0],c="gray",linewidth=1)
 
-    x1_0 = 2.4
-    y_0 = 0.108
-    x0_0 = 0.92
-    plot([0.0,x1_0],[0.0,y_0],c="gray",linewidth=1)
-    plot([0.0,x0_0],[0.0,y_0],c="gray",linewidth=1)
+    axs[1].scatter(ulrs_g3,g3s,c=cols[3],marker=mm,s=ss)
+    axs[1].scatter(ulrs_g2,g2s,c=cols[2],marker=mm,s=ss)
+    axs[1].scatter(ulrs_g2,zeros(length(ulrs_g2)),c=cols[1],marker=mm,s=ss)
 
-    scatter(ulrs_g3,g3s,c=cols[3],label="E2-9")
-    scatter(ulrs_g2,g2s,c=cols[2],label="E1")
-    scatter(ulrs_g2,zeros(length(ulrs_g2)),c=cols[1],label="E0")
-
-    xscale("symlog"; linthresh=2.0, linscale=1.0)
+    axs[1].set_xscale("symlog"; linthresh=2.0, linscale=1.0)
     ymin,ymax = -0.02,0.5
-    ylim([ymin, ymax])
+    axs[1].set_ylim([ymin, ymax])
     xmin,xmax = -0.25, 1200.0
-    xlim([xmin,xmax])
-    xlabel(L"U_{\mathrm{i}} / t", fontsize = fs)
-    ylabel(L"E-E_0", fontsize = fs)
-    legend(loc="upper left")
+    axs[1].set_xlim([xmin,xmax])
+    axs[1].set_xlabel(L"U_{\mathrm{i}} / t", fontsize = fs)
+    axs[1].set_ylabel(L"E-E_0", fontsize = fs)
 
-    ticks = [0,0.5,1,1.5,2,10,100,1000]
-    labels = ["0","0.5","1","1.5","2",L"10^1",L"10^2",L"10^3"]
-    xticks(ticks,labels)
+    ticks = [0,0.5,1,1.5,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100,200,300,400,500,600,700,800,900,1000]
+    labels = ["0","0.5","1","1.5","2","","","","","","","",L"10^1","","","","","","","","",L"10^2","","","","","","","","",L"10^3"]
+    axs[1].set_xticks(ticks,labels)
 
-    #tight_layout()
+    gammaticks = collect(0:8) ./ 8
+    gammalabels = ["0.0","","0.25","","0.5","","0.75","","1.0"]
+
+    axs[1].tick_params(axis="both", which="major", labelsize=16)
+
+    # add ticks to top and left
+    axs[1].tick_params(top=true, right=true)
+    axs[1].tick_params(labeltop=false, labelright=false)
+
+    fig.tight_layout()
 
     height = 0.085
     renorm_height = height / (ymax - ymin)
 
-    # get chern number calcs
-    chern_imshow_1000,chern_xs_1000,chern_ys_1000,spline1 = get_chern_number_plot(1000.0; if_spline=true,cutoff=0.28)
-    chern_imshow_0 = chern_imshow_1000
+    #= get chern number calcs
+    chern_imshow_1000,chern_xs_1000,chern_ys_1000,spline1 = get_chern_number_plot(1000.0; if_spline=true,cutoff=0.08)
+    chern_imshow_0, chern_xs_0, chern_ys_0, spline2 = get_chern_8x4laughlin()
 
-    ax_inset1 = PyPlot.axes([0.25, 0.3, renorm_height, renorm_height])
+    ax_inset1 = axs[1].inset_axes([0.15, 0.2, renorm_height, renorm_height*(8/6)])
     im1 = ax_inset1.imshow(chern_imshow_0 ./ (2*pi), extent=(0,1,0,1), cmap="bwr", aspect="auto", vmin=-1, vmax=1, origin="lower")
-    fig.colorbar(im1, ax=ax_inset1)
-    title("Winding Defects", fontsize=8)
-    for i in 1:length(spline1[1])
-        ax_inset1.plot(spline1[1][i],spline1[2][i],"-k",linewidth=2)
+    inset1_colorbar = fig.colorbar(im1; ax=ax_inset1, anchor=(3,0.5),shrink=0.8)
+    ax_inset1.set_title("Winding Defects", fontsize=12)
+    for i in 1:length(spline2[1])
+        ax_inset1.plot(spline2[1][i],spline2[2][i],"-k",linewidth=2)
     end
 
-    ax_inset2 = PyPlot.axes([0.65, 0.3, renorm_height, renorm_height])
+    #=ax_inset2 = axs[1].inset_axes([0.7, 0.2, renorm_height, renorm_height*(8/6)])
     im2 = ax_inset2.imshow(chern_imshow_1000 ./ (2*pi), extent=(0,1,0,1), cmap="bwr", aspect="auto", vmin=-1, vmax=1, origin="lower")
-    fig.colorbar(im2, ax=ax_inset2)
-    title("Winding Defects", fontsize=8)
+    inset2_colorbar = fig.colorbar(im2; ax=ax_inset2, anchor=(3,0.5),shrink=0.8)
+    ax_inset2.set_title("Winding Defects", fontsize=12)
     for i in 1:length(spline1[1])
         ax_inset2.plot(spline1[1][i],spline1[2][i],"-k",linewidth=2)
-    end
+    end=#
+    
+    inset1_colorbar.ax.tick_params(labelsize=12)
+    #inset2_colorbar.ax.tick_params(labelsize=12)
 
+    insetticks = [0,0.5,1.0]
+    insetlabels = ["0","0.5","1"]
+    ax_inset1.set_yticks(insetticks,insetlabels)
+    ax_inset1.set_xticks(insetticks,insetlabels)
+    #ax_inset2.set_yticks(insetticks,insetlabels)
+    #ax_inset2.set_xticks(insetticks,insetlabels)
+
+    #ax_inset2.tick_params(axis="both", which="major", labelsize=12)
+    ax_inset1.tick_params(axis="both", which="major", labelsize=12)
+
+    ax_inset1.tick_params(top=true, right=true)
+    ax_inset1.tick_params(labeltop=false, labelright=false)
+
+    #ax_inset2.tick_params(top=true, right=true)
+    #ax_inset2.tick_params(labeltop=false, labelright=false)
+
+    #ax_inset2.set_xlabel(L"\theta_x", fontsize=12)
+    #ax_inset2.set_ylabel(L"\theta_y", fontsize=12)
+    ax_inset1.set_xlabel(L"\theta_x", fontsize=12)
+    ax_inset1.set_ylabel(L"\theta_y", fontsize=12)=#
+end
+
+# plot tee vs ulr
+function plot_tee_vs_ulr()
+    lx,ly,n = 16,8,8
+    layers = 7
+    dataloc1 = get_folder_location("cluster-data/synth-dims/torus")
+    pdict = Dict([("hopping_anisotropy",1.0),("layers",layers),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_files1 = find_data_file(pdict,"ttn",dataloc1)
+    
+    dataloc2 = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    all_files2 = find_data_file(pdict,"ttn",dataloc2)
+
+    all_locs = (dataloc2*"/") .* all_files2
+    
+    linmodel(x,p) = p[1] .* x .+ p[2]
+    perims = [8*3,4*4,4*3,2*4,2*3]
+
+    yints = []
+    sigmas = []
+    ulrs = []
+    for (idx,f) in enumerate(all_locs)
+        d,m = read_data(f; output_level=0)
+
+        if haskey(m,"entanglement_spectrum")
+            println("Processing file $idx / $(length(all_locs))")
+            params = get_params_dict_from_filename(f)
+            instren = haskey(m,"onsite_strength") ? m["onsite_strength"] : params["onsite_strength"]
+
+            ees = zeros(Float64,layers-2)
+            entspecs = real.(m["entanglement_spectrum"])
+
+            for k in 2:layers-1
+                entspec = filter(x -> x != 0.0, entspecs[:,k-1])
+                #display(entspec)
+
+                ee = entanglement_entropy(entspec)
+                ees[k-1] = ee
+            end
+            linfit = curve_fit(linmodel,perims,ees,[1.0,1.0])
+            sigma = stderror(linfit)[2]
+            yintercept = -linfit.param[2]
+            append!(yints,[yintercept])
+            append!(sigmas,[sigma])
+            append!(ulrs,[instren])
+        end
+    end#
+
+    fig, axs = subplots(1,1; figsize=(6,3))
+
+    axs.errorbar(ulrs,yints,yerr=sigmas,fmt="o",c=cols[3])
+
+    ymin,ymax = 0.0,1.0
+    axs.set_ylim([ymin, ymax])
+    xmin,xmax = -0.25, 1200.0
+    axs.set_xlim([xmin,xmax])
+
+    axs.set_xscale("symlog"; linthresh=2.0, linscale=1.0)
+
+    axs.set_xlabel(L"U_{\mathrm{i}} / t", fontsize=fs)
+    axs.set_ylabel(L"\gamma", fontsize=fs)
+
+    ticks = [0,0.5,1,1.5,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100,200,300,400,500,600,700,800,900,1000]
+    labels = ["0","0.5","1","1.5","2","","","","","","","",L"10^1","","","","","","","","",L"10^2","","","","","","","","",L"10^3"]
+    axs.set_xticks(ticks,labels)
+
+    gammaticks = collect(0:8) ./ 8
+    gammalabels = ["0.0","","0.25","","0.5","","0.75","","1.0"]
+    axs.set_yticks(gammaticks,gammalabels)
+    axs.tick_params(axis="both", which="major", labelsize=16)
+
+    # add ticks to top and left
+    axs.tick_params(top=true, right=true)
+    axs.tick_params(labeltop=false, labelright=false)
+    axs.plot(range(0,1000,length=10),0.5 .* ones(10),"--",c=cols[2],label="Laughlin")
+
+    axs.legend(loc="upper left", fontsize=14)
+
+    tight_layout()
 end
 
 # combines spectrum with Chern inset with TEE vs ULR
-#function make_topomarkers_paperplot()
-if true
+function make_topomarkers_paperplot()
 
     # top figure of spectrum with Chern insets
 
@@ -2144,6 +2225,7 @@ function plot_realspace_pair_dist_stacked()
 end
 
 # particle entanglement spectrum
+#using DelimitedFiles,PyCall
 function plot_particle_entanglement_spectrum_paperplot()
     #using DelimitedFiles,PyCall
 
@@ -2237,9 +2319,12 @@ function plot_particle_entanglement_spectrum_paperplot()
     axs[1].text(-0.3, 0.9, "(a)", transform=axs[1].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
     axs[2].text(-0.3, 0.9, "(b)", transform=axs[2].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
 
+    fig.suptitle(L"N_A = 3", fontsize=18)
+
     tight_layout()
 
 end
+
 
 
 
@@ -2252,10 +2337,10 @@ function plot_finitesizescaling_ulr_phasetransition()
     intstren = 4.0
 
     #lx,ly,n = 10,8,5
-    for (lx,ly,n) in [(10,8,5),(12,8,6)]
+    for (lx,ly,n) in [(14,8,7),(10,8,5),(12,8,6)]
         dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/ulr-length")
-        pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
-        all_files = find_data_file(pdict,"ttn",dataloc) 
+        pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+        all_files = find_data_file(pdict,"ttn",dataloc)
         display(all_files)
 
         xis = range(0.0,8.0,length=11)
@@ -2269,21 +2354,23 @@ function plot_finitesizescaling_ulr_phasetransition()
             xi_index = findfirst(x -> xis[x] == xi,1:11)
 
             if haskey(m,"fourpt_momentum")
-                fourpt1 = m["fourpt_momentum"]
+                fourpt1 = m["fourpt_momentum"][1:lx,1:lx]
+            
+                fourpt1_includedsubset = fourpt1
 
-                #=fig = figure()
-                fourpt1_includedsubset = fourpt1#zeros(Float64,lx,lx)
-                for i in 3:lx-3
+                #fig = figure()
+                #fourpt1_includedsubset = zeros(Float64,lx,lx)
+                #=for i in 3:lx-3
                     for j in 1:length(diag(fourpt1,i))
                         fourpt1_includedsubset[j,j+i] = diag(fourpt1,i)[j]
                         fourpt1_includedsubset[j+i,j] = diag(fourpt1,-i)[j]
                     end 
-                end
-                imshow(fourpt1_includedsubset,extent=(1,lx,1,lx),origin="lower",vmin=0.0)
-                colorbar()
-                title("Four-Point Correlator $(lx)x$(ly) N=$(n) ULR Length = $(xi)")=#
+                end=#
+                #imshow(fourpt1_includedsubset,extent=(1,lx-3,1,lx-3),origin="lower",vmin=0.0)
+                #colorbar()
+                #title("Four-Point Correlator $(lx)x$(ly) N=$(n) ULR Length = $(xi)")
 
-                subset_fourpt = vcat([diag(fourpt1,-i)[2:end-1] for i in 3:lx-3]...,[diag(fourpt1,i)[2:end-1] for i in 3:lx-3]...)
+                subset_fourpt = vcat([diag(fourpt1_includedsubset,-i)[2:end-1] for i in 3:lx-3]...,[diag(fourpt1_includedsubset,i)[2:end-1] for i in 3:lx-3]...)
                 flatness = minimum(subset_fourpt) / maximum(subset_fourpt)
 
                 flatnesses[xi_index] = flatness
@@ -2303,11 +2390,13 @@ function plot_finitesizescaling_ulr_phasetransition()
         # normalize from laughlin tao-thouless
         flatnesses ./= flatnesses[2]
 
+        #fig = figure()
+
         plot(xis,flatnesses,"-o",label="$(lx)x$(ly)")
     end
 
 
-    lx,ly,n = 8,8,4
+    #=lx,ly,n = 8,8,4
     dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/ulr-length")
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
@@ -2356,7 +2445,7 @@ function plot_finitesizescaling_ulr_phasetransition()
     flatnesses ./= flatnesses[1]
 
     plot(xis, flatnesses,"-o",c="r",label="$(lx)x$(ly)")
-    ylim([-0.05,1.1])
+    ylim([-0.05,1.1])=#
 
     legend()
     xlabel("Interaction Length")
