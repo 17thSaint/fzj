@@ -13,8 +13,8 @@ Depends on:
 =#
 ######################################################
 
-using Pkg
-Pkg.activate(@__DIR__)
+#using Pkg
+#Pkg.activate(@__DIR__)
 using JLD2
 
 function find_center()
@@ -616,33 +616,33 @@ end=#
 if true
     lx,ly,n = 4,4,2
     anis = 1e-4
-    intstren = 300.0
+    intstren = 0.0
     ppstren = 0.0
     end_tx = 1.0
 
-    params_dict_i = Dict([("output_level",1),("periodic_potential_strength",ppstren),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
-    states_i,nrgs_i,rhos_i,filepath_i,if_found_i,lattice_params_i,hamilt_params_i = run_normal_ed(params_dict; output_level=1)
+    #=params_dict_i = Dict([("output_level",1),("periodic_potential_strength",ppstren),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+    states_i,nrgs_i,rhos_i,filepath_i,if_found_i,lattice_params_i,hamilt_params_i = run_normal_ed(params_dict_i; output_level=1)
 
     params_dict_f = Dict([("output_level",1),("periodic_potential_strength",ppstren),("tx",end_tx),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
-    states_f,nrgs_f,rhos_f,filepath_f,if_found_f,lattice_params_f,hamilt_params_f = run_normal_ed(params_dict; output_level=1)
-
-    starting_gs = states[1]
+    states_f,nrgs_f,rhos_f,filepath_f,if_found_f,lattice_params_f,hamilt_params_f = run_normal_ed(params_dict_f; output_level=1)
+    =#
+    starting_gs = states_i[1]
 
     speccount = 1
     time_running_args = (nev=speccount,output_level=1,if_instant_gs=false,)
 
-    tmax_global = 10.0
-    dt_global = 0.0005
-    ramptimes = [i/10 for i in 1:20]
+    tmax_global = 25.0
+    dt_global = 0.05
+    ramptimes = [i for i in 1:20]
 
     # need to simplify the tevo code, remove changing dt
 
     for ramptime in ramptimes
         println("Running time evolution with ramp time $ramptime")
-        tevo_params = Dict([ ("tx",(linear_ramp,params_dict["tx"],end_tx,ramptime)) ])
-        tevo_gs,tevo_dict,intspec = run_timeevo(starting_gs,tevo_params,lattice_params,hamilt_params; time_running_args...)
+        tevo_params = Dict([ ("tx",(linear_ramp,params_dict_i["tx"],end_tx,ramptime)) ])
+        tevo_gs,tevo_dict,intspec = run_timeevo(starting_gs,tevo_params,lattice_params_i,hamilt_params_i; time_running_args...)
         
-        final_fidelity = abs2(dot(tevo_gs[:,end],states_f[1]))
+        final_fidelity = abs2(dot(tevo_gs[:,end-1],states_f[1]))
 
         scatter(ramptime,final_fidelity,c="b")
         xlabel("Ramp Time")

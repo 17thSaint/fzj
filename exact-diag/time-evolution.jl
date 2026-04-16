@@ -115,7 +115,7 @@ function time_evolution(starting_wavefunc::Vector{ComplexF64},starting_ham::Spar
     ht_prev = starting_ham
 
     nsteps::Int = t_evo_params["nsteps"]
-    tevo_wavefunc = spzeros(ComplexF64,length(wavefunc),Int(1+(nsteps-1)/2))
+    tevo_wavefunc = spzeros(ComplexF64,length(wavefunc),Int(1+(nsteps+1)/2))
 
     if if_instant_gs
         nev = get(kwargs, :nev, 10)
@@ -195,13 +195,13 @@ function linear_ramp(nsteps::Int,dt::Float64; kwargs...)
     starting_value::Float64 = kwargs[:starting_value]
     ending_value::Float64 = kwargs[:ending_value]
 
-    starting_time::Float64 = get(kwargs, :starting_time, 0.0)
+    starting_time::Float64 = 0.0#get(kwargs, :starting_time, 0.0)
     ending_time::Float64 = get(kwargs, :ending_time, nsteps * dt)
 
-    steps_until_start::Int = Int(ceil(starting_time / dt))
+    #steps_until_start::Int = Int(ceil(starting_time / dt))
     steps_until_end::Int = Int(ceil(ending_time / dt))
 
-    return vcat(starting_value .* ones(steps_until_start), range(starting_value, ending_value, length = steps_until_end - steps_until_start + 1), ending_value .* ones(nsteps - steps_until_end + 1))
+    return vcat(range(starting_value, ending_value, length = steps_until_end + 1), ending_value .* ones(nsteps - steps_until_end + 1))
 end
 
 function find_when_change_dt(tmax::Float64,leastramptime::Float64; kwargs...)
@@ -280,8 +280,8 @@ function run_timeevo(starting_gs::Vector{ComplexF64},time_params::Dict,lattice_d
     #max_ramp_time::Float64 = get_maxramptime(time_params)
     #least_ramp_time::Float64 = get_leastramptime(time_params)
     tmax::Float64 = tmax_global#max(100*max_ramp_time,1e-2)
-    max_nsteps::Int = 1e3#get(kwargs, :max_nsteps, 1e3)
     dt::Float64 = dt_global
+    max_nsteps::Int = Int(ceil(tmax / dt))
     when_change_dt::Int = max_nsteps + 1
 
     tevo_pdict::Dict{String,Any} = Dict([("dt",dt),("tmax",tmax),("nsteps",max_nsteps),("when_change_dt",when_change_dt),("other_dt",dt)])
@@ -298,8 +298,6 @@ function run_timeevo(starting_gs::Vector{ComplexF64},time_params::Dict,lattice_d
             end
         end
     end
-
-    display(tevo_pdict)
 
     tevo_dict = make_tevo_params(tevo_pdict)
     
