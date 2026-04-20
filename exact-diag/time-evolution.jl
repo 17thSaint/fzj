@@ -185,8 +185,6 @@ function make_tevo_params(given_parameters::Dict)
         end
     end
 
-    display(t_evo_params)
-
     return t_evo_params
 end
 
@@ -279,6 +277,9 @@ function run_timeevo(starting_gs::Vector{ComplexF64},time_params::Dict,lattice_d
     
     #max_ramp_time::Float64 = get_maxramptime(time_params)
     #least_ramp_time::Float64 = get_leastramptime(time_params)
+    tmax_global = 25.0
+    dt_global = 0.05
+
     tmax::Float64 = tmax_global#max(100*max_ramp_time,1e-2)
     dt::Float64 = dt_global
     max_nsteps::Int = Int(ceil(tmax / dt))
@@ -293,6 +294,8 @@ function run_timeevo(starting_gs::Vector{ComplexF64},time_params::Dict,lattice_d
                 tevo_pdict[k] = (v[1],(starting_value=v[2],ending_value=v[3],starting_time=0.0,ending_time=v[4]))
             elseif length(v) == 5    
                 tevo_pdict[k] = (v[1],(starting_value=v[2],ending_value=v[3],starting_time=v[4],ending_time=v[5]))
+            elseif length(v) == 3
+                tevo_pdict[k] = (v[1],(ending_time=v[2],pulse_ramp=v[3]))
             else
                 error("Invalid length of time evolution parameter $k: $(length(v))")
             end

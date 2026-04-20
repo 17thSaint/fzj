@@ -13,8 +13,8 @@ Depends on:
 =#
 ######################################################
 
-#using Pkg
-#Pkg.activate(@__DIR__)
+using Pkg
+Pkg.activate(@__DIR__)
 using JLD2
 
 function find_center()
@@ -63,6 +63,7 @@ function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     else
         alpha_val = hamilt_params["alpha"]
     end
+
     fdict::Dict{String,Any} = Dict([("Lx",lattice_params["Lx"]),("Ly",lattice_params["Ly"]),("N",lattice_params["N"]),("alpha",alpha_val),("hopping_anisotropy",hamilt_params["tx"]/hamilt_params["ty"]),("interaction_strength",intstren),("if_periodic_x",lattice_params["if_periodic_x"]),("if_periodic_y",lattice_params["if_periodic_y"])])
     if lattice_params["twist_angle"] != [0.0,0.0]
         fdict["twist_angle1"] = lattice_params["twist_angle"][1]
@@ -612,20 +613,20 @@ if false
 
 end=#
 
-# testing time evolution
-if true
+#= testing time evolution
+if false
     lx,ly,n = 4,4,2
     anis = 1e-4
     intstren = 0.0
     ppstren = 0.0
     end_tx = 1.0
 
-    #=params_dict_i = Dict([("output_level",1),("periodic_potential_strength",ppstren),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+    params_dict_i = Dict([("output_level",1),("periodic_potential_strength",ppstren),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
     states_i,nrgs_i,rhos_i,filepath_i,if_found_i,lattice_params_i,hamilt_params_i = run_normal_ed(params_dict_i; output_level=1)
 
     params_dict_f = Dict([("output_level",1),("periodic_potential_strength",ppstren),("tx",end_tx),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
     states_f,nrgs_f,rhos_f,filepath_f,if_found_f,lattice_params_f,hamilt_params_f = run_normal_ed(params_dict_f; output_level=1)
-    =#
+    
     starting_gs = states_i[1]
 
     speccount = 1
@@ -649,7 +650,7 @@ if true
         ylabel("Fidelity with Final Ground State")
     end
 
-end#
+end=#
 
 
 
