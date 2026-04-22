@@ -39,7 +39,7 @@ include_other_files(["exact-diag/execute-ed.jl"])
 
 function pulse_function(nsteps::Int,dt::Float64; kwargs...)
 
-    starting_value::Float64 = 0.01
+    starting_value::Float64 = 0.001
     ending_value::Float64 = 1.0
 
     starting_time::Float64 = 0.0
@@ -57,7 +57,7 @@ function compute_fidelity(pulses,parameters_dictionary)
     parameters_dictionary["output_level"] = 0
     
     # first find starting and final groundstates
-    parameters_dictionary["tx"] = 0.01
+    parameters_dictionary["tx"] = 0.001
     #startingGS_pdict = get_normal_model_params_ed(parameters_dictionary)
     startingGS_states,_,_,startingGS_filepath,startingGS_if_found,startingGS_lattice_params,startingGS_hamilt_params = run_normal_ed(parameters_dictionary; output_level=0)
 
@@ -76,7 +76,6 @@ function compute_fidelity(pulses,parameters_dictionary)
 
     tevo_params = Dict([ ("tx",(pulse_function,ramptime,pulses[1])) ])
     tevo_gs,tevo_dict,intspec = run_timeevo(startingGS_states[1],tevo_params,startingGS_lattice_params,startingGS_hamilt_params; time_running_args...)
-    println("Finished Time Evolution")
     
     return abs2(dot(tevo_gs[:,end-1],finalGS_states[1]))
 end

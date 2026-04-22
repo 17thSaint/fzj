@@ -1576,7 +1576,7 @@ function plot_hatsugai_stepbystep()
     new_lambda2[:,1:5] = new_wrongshape_lambda2[:,7:end]
     new_lambda2[:,6:end] = new_wrongshape_lambda2[:,1:6]
 
-    fig, axs = subplots(1,4; figsize=(13,3))
+    fig, axs = subplots(1,4; figsize=(14,3.5))
     cutoffval = 0.08
 
     xticks = [0,0.25,0.5,0.75,1.0]
@@ -1591,7 +1591,6 @@ function plot_hatsugai_stepbystep()
     im1 = axs[1].imshow(plotgamma2; extent=(minimum(new_tw1s), maximum(new_tw1s), minimum(new_tw2s), maximum(new_tw2s)), vmin=0.0, vmax=1.0, origin="lower")
     axs[1].set_ylabel(L"\theta_y / 2\pi",fontsize=fs)
     axs[1].set_xlabel(L"\theta_x / 2\pi",fontsize=fs)
-    fig.colorbar(im1, ax=axs[1])
     axs[1].set_title(L"\vert \Lambda_{\Phi} \vert",fontsize=fs+2)
     spline2 = get_spline_outline(plotgamma2,cutoffval,new_tw1s,new_tw2s)
     for i in 1:length(spline2[1])
@@ -1604,7 +1603,6 @@ function plot_hatsugai_stepbystep()
     im2 = axs[2].imshow(plotgamma1; extent=(minimum(new_tw1s), maximum(new_tw1s), minimum(new_tw2s), maximum(new_tw2s)), vmin=0.0, vmax=1.0, origin="lower")
     axs[2].set_ylabel(L"\theta_y / 2\pi",fontsize=fs)
     axs[2].set_xlabel(L"\theta_x / 2\pi",fontsize=fs)
-    fig.colorbar(im2, ax=axs[2])
     axs[2].set_title(L"\vert \Lambda_{\Phi'} \vert",fontsize=fs+2)
     spline1 = get_spline_outline(plotgamma1,cutoffval,new_tw1s,new_tw2s)
     for i in 1:length(spline1[1])
@@ -1622,17 +1620,14 @@ function plot_hatsugai_stepbystep()
     axs[3].quiver(xs, ys, us, vs)
     axs[3].set_ylabel(L"\theta_y / 2\pi",fontsize=fs)
     axs[3].set_xlabel(L"\theta_x / 2\pi",fontsize=fs)
-    fig.colorbar(im3, ax=axs[3])
     axs[3].set_title(L"\Omega_{\Phi \rightarrow \Phi'}",fontsize=fs+2)
     axs[3].set_xticks(xticks,xlabels)
     axs[3].set_yticks(yticks,ylabels)
-
 
     aa,plotcherns,bb,cc = count_chern_number(new_tw1s,new_tw2s,plotomega; if_plot=false)
     im4 = axs[4].imshow(plotcherns ./ (2*pi); extent=(minimum(new_tw1s), maximum(new_tw1s), minimum(new_tw2s), maximum(new_tw2s)), vmin=-1, vmax=1, cmap="bwr", origin="lower")
     axs[4].set_ylabel(L"\theta_y / 2\pi",fontsize=fs)
     axs[4].set_xlabel(L"\theta_x / 2\pi",fontsize=fs)
-    fig.colorbar(im4, ax=axs[4])
     axs[4].set_title(L"\frac{1}{2\pi} \sum_{\diamond} \Delta \Omega",fontsize=fs+2)
     for i in 1:length(spline1[1])
         axs[4].plot(spline1[1][i],spline1[2][i],"-k",linewidth=2)
@@ -1643,12 +1638,16 @@ function plot_hatsugai_stepbystep()
     axs[4].set_xticks(xticks,xlabels)
     axs[4].set_yticks(yticks,ylabels)
 
+    # Create a single colorbar spanning all plots
+    cbar_ax = fig.add_axes([0.92, axs[1].get_position().y0, 0.015, axs[1].get_position().height])
+    fig.colorbar(im4, cax=cbar_ax)
+
     axs[1].text(-0.3, 0.9, "(a)", transform=axs[1].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
     axs[2].text(-0.3, 0.9, "(b)", transform=axs[2].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
     axs[3].text(-0.3, 0.9, "(c)", transform=axs[3].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
     axs[4].text(-0.3, 0.9, "(d)", transform=axs[4].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
 
-    tight_layout()
+    subplots_adjust(right=0.90)
 
 end
 
@@ -2193,7 +2192,7 @@ function plot_realspace_pair_dist_stacked()
 
     idx = 1
     
-    fig, axs = subplots(3,1; sharex = true,sharey = true,figsize = (4, 6),constrained_layout = true)
+    fig, axs = subplots(1,3; sharex = true,sharey = true,figsize = (12, 4),constrained_layout = true)
 
     for f in all_files
         d,m = read_data(joinpath(dataloc,f); output_level=0)
@@ -2208,7 +2207,7 @@ function plot_realspace_pair_dist_stacked()
             axs[idx].set_title(L"U_{\mathrm{i}}="*"$ulr",fontsize=10)
             #if idx == 3
                 axs[idx].set_xlabel("Physical",fontsize=10)
-                axs[idx].set_ylabel("Synthetic",fontsize=10)
+                idx == 1 && axs[idx].set_ylabel("Synthetic",fontsize=10)
                 fig.colorbar(thisim, ax=axs[idx])
             #end
 
@@ -2220,7 +2219,7 @@ function plot_realspace_pair_dist_stacked()
     axs[1].text(-0.1, 1.05, "(a)", transform=axs[1].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
     axs[2].text(-0.1, 1.05, "(b)", transform=axs[2].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
     axs[3].text(-0.1, 1.05, "(c)", transform=axs[3].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
-        
+    
 
 end
 

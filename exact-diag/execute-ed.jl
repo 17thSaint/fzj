@@ -13,8 +13,8 @@ Depends on:
 =#
 ######################################################
 
-using Pkg
-Pkg.activate(@__DIR__)
+#using Pkg
+#Pkg.activate(@__DIR__)
 using JLD2
 
 function find_center()

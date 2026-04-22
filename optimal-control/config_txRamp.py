@@ -80,8 +80,8 @@ optimization_dictionary = {"optimization_client_name": "txRamp_dCRAB"}
 optimization_dictionary["algorithm_settings"] = { "algorithm_name": "dCRAB"}
 
 optimization_dictionary["algorithm_settings"]["optimization_direction"] = "maximization"
-optimization_dictionary["algorithm_settings"]["super_iteration_number"] = 3
-optimization_dictionary["algorithm_settings"]["max_eval_total"] = 20
+optimization_dictionary["algorithm_settings"]["super_iteration_number"] = 5
+optimization_dictionary["algorithm_settings"]["max_eval_total"] = 200
 
 # will need expert advice on choices made here
 dsm_settings = {
@@ -121,7 +121,7 @@ pulse_tx = {"pulse_name": "txRamp",
 
 pulse_tx["initial_guess"] = {
     "function_type": "lambda_function",
-    "lambda_function": "lambda t: 0.01 + (1.0 - 0.01) * (t / t[-1])"
+    "lambda_function": "lambda t: 0.001 + (1.0 - 0.001) * (t / t[-1])"
     }
 
 
