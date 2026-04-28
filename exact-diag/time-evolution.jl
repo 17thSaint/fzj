@@ -104,9 +104,19 @@ function runge_kutta_step(wavefunc::Vector{ComplexF64},ht_prev::SparseMatrixCSC,
     return new_wavefunc,ht_next
 end
 
+# possibly introduce saving interval 
+function save_tevo_data(local_wavefunc::Vector{ComplexF64},timestep::Int,t_evo_params::Dict; kwargs...)
+    opl::Int = get(kwargs, :output_level, 1)
+
+
+
+
+end
+
 function time_evolution(starting_wavefunc::Vector{ComplexF64},starting_ham::SparseMatrixCSC,t_evo_params::Dict,lattice_params::Dict,hamilt_params::Dict; kwargs...)
     opl::Int = get(kwargs, :output_level, 1)
     if_instant_gs::Bool = get(kwargs, :if_instant_gs, true)
+    if_save_data::Bool = t_evo_params["if_save_data"]
 
     # initialize the wavefunction
     wavefunc = starting_wavefunc
@@ -180,7 +190,7 @@ function make_tevo_params(given_parameters::Dict)
     t_evo_params["tmax"] = t_evo_params["nsteps"] * t_evo_params["dt"]
 
     for (k,v) in given_parameters
-        if k != "dt" && k != "nsteps" && k != "tmax" && k != "when_change_dt" && k != "other_dt"
+        if k != "dt" && k != "nsteps" && k != "tmax" && k != "when_change_dt" && k != "other_dt" && k != "if_save_data"
             t_evo_params[k] = v[1](t_evo_params["nsteps"],t_evo_params["dt"][1]; v[2]...)
         end
     end
@@ -280,16 +290,21 @@ function run_timeevo(starting_gs::Vector{ComplexF64},time_params::Dict,lattice_d
     tmax_global = 25.0
     dt_global = 0.05
 
-    tmax::Float64 = tmax_global#max(100*max_ramp_time,1e-2)
-    dt::Float64 = dt_global
+    tmax::Float64 = time_params["tmax"]
+    dt::Float64 = time_params["dt"]
     max_nsteps::Int = Int(ceil(tmax / dt))
     when_change_dt::Int = max_nsteps + 1
 
+    if_save_data::Bool = get(kwargs, :if_save_data, false)
+    dataloc::String = get(kwargs, :dataloc, get_folder_location("cluster-data/exact-diag/time-evo"))
+    filename::String = get(kwargs, :filename, get_tevo_filename())
+    saving_args::Tuple = (if_save_data=if_save_data,dataloc=dataloc,filename=filename,)
+    
     tevo_pdict::Dict{String,Any} = Dict([("dt",dt),("tmax",tmax),("nsteps",max_nsteps),("when_change_dt",when_change_dt),("other_dt",dt)])
 
     # structure the control parameter values
     for (k,v) in time_params
-        if k != "dt" && k != "tmax"
+        if k != "dt" && k != "tmax" && k != "if_save_data"
             if length(v) == 4
                 tevo_pdict[k] = (v[1],(starting_value=v[2],ending_value=v[3],starting_time=0.0,ending_time=v[4]))
             elseif length(v) == 5    
@@ -304,7 +319,7 @@ function run_timeevo(starting_gs::Vector{ComplexF64},time_params::Dict,lattice_d
 
     tevo_dict = make_tevo_params(tevo_pdict)
     
-    tevo_groundstate,instantaneous_spectrum = time_evolution(starting_gs,hamilt_dict["H"],tevo_dict,lattice_dict,hamilt_dict; kwargs...) #output_level=1, nev=speccount
+    tevo_groundstate,instantaneous_spectrum = time_evolution(starting_gs,hamilt_dict["H"],tevo_dict,lattice_dict,hamilt_dict; saving_args...,kwargs...) #output_level=1, nev=speccount
 
     return tevo_groundstate,tevo_dict,instantaneous_spectrum
 end

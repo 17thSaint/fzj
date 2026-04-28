@@ -613,8 +613,8 @@ if false
 
 end=#
 
-#= testing time evolution
-if false
+# testing time evolution
+if true
     lx,ly,n = 4,4,2
     anis = 1e-4
     intstren = 0.0
@@ -629,28 +629,21 @@ if false
     
     starting_gs = states_i[1]
 
-    speccount = 1
-    time_running_args = (nev=speccount,output_level=1,if_instant_gs=false,)
+    speccount = 2
+    time_running_args = (nev=speccount,output_level=1,if_instant_gs=false,if_save_data=true,)
 
-    tmax_global = 25.0
+    tmax_global = 10.0
+    ramptime = 2.0
     dt_global = 0.05
-    ramptimes = [i for i in 1:20]
 
-    # need to simplify the tevo code, remove changing dt
 
-    for ramptime in ramptimes
-        println("Running time evolution with ramp time $ramptime")
-        tevo_params = Dict([ ("tx",(linear_ramp,params_dict_i["tx"],end_tx,ramptime)) ])
-        tevo_gs,tevo_dict,intspec = run_timeevo(starting_gs,tevo_params,lattice_params_i,hamilt_params_i; time_running_args...)
-        
-        final_fidelity = abs2(dot(tevo_gs[:,end-1],states_f[1]))
+    tevo_params = Dict([ ("tx",(linear_ramp,params_dict_i["tx"],end_tx,ramptime)),("dt",dt_global),("tmax",tmax_global) ])
+    tevo_gs,tevo_dict,intspec = run_timeevo(starting_gs,tevo_params,lattice_params_i,hamilt_params_i; time_running_args...)
+    
+    final_fidelity = abs2(dot(tevo_gs[:,end-1],states_f[1]))
 
-        scatter(ramptime,final_fidelity,c="b")
-        xlabel("Ramp Time")
-        ylabel("Fidelity with Final Ground State")
-    end
 
-end=#
+end#
 
 
 
