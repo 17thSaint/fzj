@@ -104,19 +104,122 @@ function runge_kutta_step(wavefunc::Vector{ComplexF64},ht_prev::SparseMatrixCSC,
     return new_wavefunc,ht_next
 end
 
-# possibly introduce saving interval 
-function save_tevo_data(local_wavefunc::Vector{ComplexF64},timestep::Int,t_evo_params::Dict; kwargs...)
+function get_tevo_filename(timeevo_dict::Dict,lattice_dict::Dict,hamilt_dict::Dict)
+
+    filename_dict = Dict{String,Any}()
+
+    filename_dict["Lx"] = lattice_dict["Lx"]
+    filename_dict["Ly"] = lattice_dict["Ly"]
+    filename_dict["N"] = lattice_dict["N"]
+    filename_dict["alpha"] = hamilt_dict["alpha"][2]
+    filename_dict["if_periodic_x"] = lattice_dict["if_periodic_x"]
+    filename_dict["if_periodic_y"] = lattice_dict["if_periodic_y"]
+
+    if hamilt_dict["disorder_strength"] != 0.0
+        filename_dict["disorder_strength"] = hamilt_dict["disorder_strength"]
+    end
+    if haskey(hamilt_dict,"if_pinning") && hamilt_dict["if_pinning"]
+        filename_dict["if_pinning"] = hamilt_dict["if_pinning"]
+        filename_dict["pinning_strength"] = hamilt_dict["pinning_strength"]
+    end
+    if haskey(hamilt_dict,"periodic_potential_strength") && hamilt_dict["periodic_potential_strength"] != 0.0
+        filename_dict["periodic_potential_strength"] = hamilt_dict["periodic_potential_strength"]
+    end
+
+    dataloc = get_folder_location("cluster-data/exact-diag/time-evo")
+    if_both = 0
+
+    for (k,v) in timeevo_dict
+        if k != "dt" && k != "nsteps" && k != "tmax" && k != "when_dt_ends" && k != "other_dt" && k != "when_change_dt"
+            filename_dict["rampparam"] = k
+            if string(v[1]) == "linear_ramp"
+                filename_dict["ramptype"] = "linear"
+            elseif string(v[1]) == "pulse_ramp"
+                filename_dict["ramptype"] = "pulse"
+            else
+                error("Unknown ramp type for time evolution parameter $k")
+            end
+        end
+
+        # set data storage location based on the ramp parameter
+        if k == "tx"
+            dataloc = get_folder_location("cluster-data/exact-diag/time-evo/tx-ramp")
+            if_both += 1
+        elseif k == "intstren"
+            dataloc = get_folder_location("cluster-data/exact-diag/time-evo/intstren-ramp")
+            if_both += 1
+        end
+    end
+
+    # if ramping multiple parameters, save in "mixed-ramp" folder
+    if if_both > 1
+        dataloc = get_folder_location("cluster-data/exact-diag/time-evo/mixed-ramp")
+    end
+
+    if !haskey(timeevo_dict,"tx")
+        filename_dict["hopping_anisotropy"] = hamilt_dict["tx"] / hamilt_dict["ty"]
+    end
+
+    # still need to figure out naming of interaction strength ramp
+    if hamilt_dict["U"][2] == 0.0
+        filename_dict["interaction_strength"] = 0.0
+    else
+        filename_dict["interaction_strength"] = hamilt_params["U"][1]
+    end
+    if hamilt_dict["scaling_type"] != "flat"
+		filename_dict["scaling"] = hamilt_dict["scaling_type"]
+		if hamilt_params["scaling_type"] == "gaussian"
+			filename_dict["sigma"] = hamilt_dict["sigma"]
+		elseif hamilt_params["scaling_type"] == "exp"
+			filename_dict["corr_length"] = hamilt_dict["corr_length"]
+		elseif hamilt_params["scaling_type"] == "rydberg"
+			filename_dict["blockade_radius"] = hamilt_dict["blockade_radius"]
+		else
+			error("ULR Scaling Type Not Recognized: $(hamilt_params["scaling_type"])")
+		end
+	end
+    
+    return dataloc,"tevo-" * make_parameters_filename(filename_dict) * ".jld2"
+end
+
+function save_tevo_data(tevo_wavefunc::SparseMatrixCSC,metadata::Dict; kwargs...)
     opl::Int = get(kwargs, :output_level, 1)
+    dataloc::String = metadata["dataloc"]
+    filename::String = metadata["filename"]
 
+    println("Saving time evolution data to $dataloc")
 
+    # save metadata line
+    data = Dict()
+    write_data(filename,data,dataloc,metadata; kwargs...,dataloc=dataloc)
+    
+    # save wavefunction data
+    for i in 1:size(tevo_wavefunc,2)
+        data[string("tevowavefunc_",i)] = tevo_wavefunc[:,i]
+    end
+    return write_data("wavefunc"*filename,data,dataloc,metadata; kwargs...,dataloc=dataloc,output_level=opl-1)
+end
 
+# possibly introduce saving interval 
+function save_tevo_data_local(local_wavefunc::Vector,timestep::Int; kwargs...)
+    opl::Int = get(kwargs, :output_level, 1)
+    dataloc::String = kwargs[:dataloc]
+    filename::String = kwargs[:filename]
+    filepath = joinpath(dataloc,filename)
 
+    # save wavefunction data
+    data = Dict(string("tevowavefunc_",Int((timestep+1)/2)) => local_wavefunc)
+    modify_data(data,filepath; kwargs...,output_level=opl-1)
 end
 
 function time_evolution(starting_wavefunc::Vector{ComplexF64},starting_ham::SparseMatrixCSC,t_evo_params::Dict,lattice_params::Dict,hamilt_params::Dict; kwargs...)
     opl::Int = get(kwargs, :output_level, 1)
     if_instant_gs::Bool = get(kwargs, :if_instant_gs, true)
-    if_save_data::Bool = t_evo_params["if_save_data"]
+    if_save_data::Bool = kwargs[:if_save_data]
+    if_continuous_saving::Bool = kwargs[:if_continuous_saving]
+
+    # make full metadata
+    metadata = merge(lattice_params,hamilt_params,t_evo_params,named_tuple_to_dict(kwargs))
 
     # initialize the wavefunction
     wavefunc = starting_wavefunc
@@ -126,6 +229,9 @@ function time_evolution(starting_wavefunc::Vector{ComplexF64},starting_ham::Spar
 
     nsteps::Int = t_evo_params["nsteps"]
     tevo_wavefunc = spzeros(ComplexF64,length(wavefunc),Int(1+(nsteps+1)/2))
+
+    # if continuous saving, save the initial state
+    if_save_data && if_continuous_saving && (actual_filename = save_tevo_data(tevo_wavefunc,metadata))
 
     if if_instant_gs
         nev = get(kwargs, :nev, 10)
@@ -164,11 +270,15 @@ function time_evolution(starting_wavefunc::Vector{ComplexF64},starting_ham::Spar
         
         tevo_wavefunc[:,Int((timestep+1)/2)] = wavefunc
         ht_prev = ht_new
+
+        # save data if continuous saving is enabled
+        if_save_data && if_continuous_saving && save_tevo_data_local(wavefunc,timestep; kwargs...,filename=actual_filename)
         
-        if opl > 0
-            println("Finished $(round(timestep / nsteps * 100, digits = 2))% of time evolution")
-        end
+        opl > 0 && println("Finished $(round(timestep / nsteps * 100, digits = 2))% of time evolution")
     end
+
+    # save data if not continuous saving
+    if_save_data && !if_continuous_saving && save_tevo_data(tevo_wavefunc,metadata; kwargs...)
 
     opl > 0 && println("Time evolution completed.")
 
@@ -190,7 +300,7 @@ function make_tevo_params(given_parameters::Dict)
     t_evo_params["tmax"] = t_evo_params["nsteps"] * t_evo_params["dt"]
 
     for (k,v) in given_parameters
-        if k != "dt" && k != "nsteps" && k != "tmax" && k != "when_change_dt" && k != "other_dt" && k != "if_save_data"
+        if k != "dt" && k != "nsteps" && k != "tmax" && k != "when_change_dt" && k != "other_dt"
             t_evo_params[k] = v[1](t_evo_params["nsteps"],t_evo_params["dt"][1]; v[2]...)
         end
     end
@@ -284,9 +394,8 @@ function get_leastramptime(time_params::Dict)
 end
 
 function run_timeevo(starting_gs::Vector{ComplexF64},time_params::Dict,lattice_dict::Dict,hamilt_dict::Dict; kwargs...)
+    opl::Int = get(kwargs, :output_level, 1)
     
-    #max_ramp_time::Float64 = get_maxramptime(time_params)
-    #least_ramp_time::Float64 = get_leastramptime(time_params)
     tmax_global = 25.0
     dt_global = 0.05
 
@@ -294,17 +403,12 @@ function run_timeevo(starting_gs::Vector{ComplexF64},time_params::Dict,lattice_d
     dt::Float64 = time_params["dt"]
     max_nsteps::Int = Int(ceil(tmax / dt))
     when_change_dt::Int = max_nsteps + 1
-
-    if_save_data::Bool = get(kwargs, :if_save_data, false)
-    dataloc::String = get(kwargs, :dataloc, get_folder_location("cluster-data/exact-diag/time-evo"))
-    filename::String = get(kwargs, :filename, get_tevo_filename())
-    saving_args::Tuple = (if_save_data=if_save_data,dataloc=dataloc,filename=filename,)
     
     tevo_pdict::Dict{String,Any} = Dict([("dt",dt),("tmax",tmax),("nsteps",max_nsteps),("when_change_dt",when_change_dt),("other_dt",dt)])
 
     # structure the control parameter values
     for (k,v) in time_params
-        if k != "dt" && k != "tmax" && k != "if_save_data"
+        if k != "dt" && k != "tmax"
             if length(v) == 4
                 tevo_pdict[k] = (v[1],(starting_value=v[2],ending_value=v[3],starting_time=0.0,ending_time=v[4]))
             elseif length(v) == 5    
@@ -315,6 +419,19 @@ function run_timeevo(starting_gs::Vector{ComplexF64},time_params::Dict,lattice_d
                 error("Invalid length of time evolution parameter $k: $(length(v))")
             end
         end
+    end
+
+    if_save_data::Bool = get(kwargs, :if_save_data, false)
+    if_continuous_saving::Bool = get(kwargs, :if_continuous_saving, if_save_data)
+    dataloc::String, filename::String = get_tevo_filename(tevo_pdict,lattice_dict,hamilt_dict)
+    saving_args = (if_save_data=if_save_data,if_continuous_saving=if_continuous_saving,dataloc=dataloc,filename=filename,)
+
+    if opl > 0
+        println("Starting time evolution for $(lattice_dict["Lx"])x$(lattice_dict["Ly"]) N=$(lattice_dict["N"])")
+        println("Saving filepath is $(joinpath(saving_args[:dataloc],saving_args[:filename]))")
+        display(lattice_dict)
+        display(hamilt_dict)
+        display(tevo_pdict)
     end
 
     tevo_dict = make_tevo_params(tevo_pdict)

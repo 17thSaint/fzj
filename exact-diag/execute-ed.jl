@@ -613,8 +613,8 @@ if false
 
 end=#
 
-# testing time evolution
-if true
+#= testing time evolution
+if false
     lx,ly,n = 4,4,2
     anis = 1e-4
     intstren = 0.0
@@ -629,7 +629,7 @@ if true
     
     starting_gs = states_i[1]
 
-    speccount = 2
+    speccount = 1
     time_running_args = (nev=speccount,output_level=1,if_instant_gs=false,if_save_data=true,)
 
     tmax_global = 10.0
@@ -643,9 +643,7 @@ if true
     final_fidelity = abs2(dot(tevo_gs[:,end-1],states_f[1]))
 
 
-end#
-
-
+end=#
 
 
 
