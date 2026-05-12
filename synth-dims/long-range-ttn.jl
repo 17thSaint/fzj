@@ -1,10 +1,12 @@
 #using Pkg
 #Pkg.activate("../synth-dims/")
+#Pkg.develop(path="../.julia/packages/TTN_gpu")
+#Pkg.precompile()
 include("../review-practice-codes/ttn.jl")
 include("../other-funcs/basic-2d-stuff.jl")
 include("../review-practice-codes/observables.jl")
 #include("../review-practice-codes/plottings.jl")
-using Profile,MKL,CUDA,TensorOperations
+using Profile,MKL,TensorOperations,CUDA
 
 function spin_matrix_element(m1,m2,spin,direction::String)
 	if direction == "X"
@@ -1773,25 +1775,28 @@ function run_synth_dims_generic(params_dict::Dict)
 
 		#
 	println(model_paras[:name])
-	filename_dict = get_params_dict_from_filename(model_paras[:name])
+	filename_dict = get_minimal_params_dict_from_filename(model_paras[:name])
 	println("Location for data is $(model_paras[:location])")
 	if_exists,found_data = if_find_data ? check_data_exists(filename_dict,"ttn"; location=model_paras[:location],output_level=false) : (false,nothing)
+	println("Data Found: ",if_exists)
 
 	if if_exists
-		if_wavefunc = !isnothing(found_data[1]["ttn"])
+		if_wavefunc = haskey(found_data[1],"ttn") ? !isnothing(found_data[1]["ttn"]) : false
 		if es_count > 0 # when need excited states start by counting how many inside the data file
-			count_found_states = length(findall(x -> occursin("ttn",x),collect(keys(found_data[1]))))
+			d_wavefunc,m_wavefunc = read_data(joinpath(found_data[2]["location"],"wavefunc"*found_data[2]["name"]); output_level=0)
+			count_found_states = length(findall(x -> occursin("ttn",x),collect(keys(d_wavefunc))))
+			#count_found_states -= 1
 
 			if count_found_states < es_count + 1 # found states less than asked for count means run for higher states
 				println("Not Enough States in Data File, Running for $(es_count - count_found_states + 1) more States")
 				ortho_states = Vector{TTN.TreeTensorNetwork}(undef,count_found_states)
-				ortho_states[1] = found_data[1]["ttn"]
+				ortho_states[1] = d_wavefunc["ttn"]
 				for i in 2:count_found_states
-					ortho_states[i] = found_data[1]["ttn_$(i-1)"]
+					ortho_states[i] = d_wavefunc["ttn_$(i-1)"]
 				end
 				model_paras[:ham] = found_data[2]["ham"]
 				metadata_dict["ham"] = model_paras[:ham]
-				all_states, hamilt, all_obs, all_densmats, all_runtimes = find_excited_states(params_dict["layers"],es_count,model_paras[:particles],ortho_states; model_paras...,metadata=metadata_dict)
+				all_states, hamilt, all_obs, all_densmats, all_runtimes = find_excited_states(found_data[2]["layers"],es_count,model_paras[:particles],ortho_states; model_paras...,metadata=metadata_dict)
 
 			else # found states is less than or equal to asked for count means use found states
 				println("Found Data")
@@ -1824,7 +1829,7 @@ function run_synth_dims_generic(params_dict::Dict)
 		end
 	else # if no data found then run from scratch starting from the ground state
 		println("Starting Script using $(model_paras[:particles]) particles on $(model_paras[:lattice_size][1])x$(model_paras[:lattice_size][2]) lattice with Flux = $(round(model_paras[:alpha],digits=4)), Bond Dim = $(model_paras[:mdim]), and Long Range Dist = $(model_paras[:lr])")
-
+		error("Didn't find the existing data")
 		starting = time()
 		net = build_HH_net(model_paras)
 		ham = long_range_HH_ham(net,model_paras[:ts],model_paras[:alpha]; model_paras...)
@@ -2162,7 +2167,8 @@ if false
 	lx = args_dict["Lx"]
 	ly = args_dict["Ly"]
 	n = args_dict["particles"]
-	#xi = args_dict["corr_length"]
+	#pinstren = args_dict["pinning_strength"]
+	xi = args_dict["corr_length"]
 	#mdim = args_dict["mdim"]
 	#if_pinning = "pinning_strength" in keys(args_dict)
 	#pinstren = if_pinning ? args_dict["pinning_strength"] : 1e-3
@@ -2177,8 +2183,8 @@ if false
 	#for (idx,anis) in enumerate(anises)
 	#for (idx,stren) in enumerate(strens)
 	#for (idx,alpha) in enumerate(alphas)
-	xis = range(0.0,8.0,length=11)[7:end]
-	for (idx,xi) in enumerate(xis)
+	#xis = range(0.0,8.0,length=11)
+	#for (idx,xi) in enumerate(xis)
 	#tws = range(0.0,1.0,length=10)
 	#for tw1 in tws
 	#for tw2 in tws
@@ -2189,8 +2195,9 @@ if false
 		
 		#("if_pinning",if_pinning),("dataloc",dataloc),("pinning_strength",pinstren)
 		
-		params_dict = Dict([("if_gpu",true),("outputlevel",1),("nrgtol",5e-5),("scaling","exp"),("corr_length",xi),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",1e-5),("particles",n),("mdim",400),("if_save_data",true),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
-		#params_dict = Dict([("if_gpu",true),("outputlevel",1),("nrgtol",5e-5),("if_pinning",true),("pinning_strength",0.0001),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-5),("particles",n),("mdim",400),("if_save_data",true),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
+		#params_dict = Dict([("if_gpu",true),("outputlevel",1),("scaling","exp"),("corr_length",xi),("nrgtol",5e-6),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-5),("particles",n),("mdim",700),("if_save_data",true),("filling",0.5),("if_find_data",true),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
+		#params_dict = Dict([("if_gpu",false),("outputlevel",1),("nrgtol",5e-6),("if_pinning",true),("pinning_strength",pinstren),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-5),("particles",n),("mdim",500),("if_save_data",true),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("if_gpu",true),("outputlevel",1),("scaling","exp"),("corr_length",xi),("nrgtol",1e-5),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-4),("particles",n),("mdim",400),("if_save_data",true),("filling",0.5),("if_find_data",true),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		#open_cores = get(params_dict, "open_cores", 5)
@@ -2303,7 +2310,7 @@ if false
 			fig = figure()
 			scatter(collect(1:mdim),-log.(specs))
 			=#
-	end
+	#end
 #end
 end=#
 

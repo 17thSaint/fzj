@@ -449,7 +449,7 @@ function spatial_entanglement_spectrum(psi::TTN.TreeTensorNetwork; kwargs...)
     layer_count = TTN.number_of_layers(psi)
     entspec = zeros(Float64,TTN.maxlinkdim(psi),layer_count-2)
     
-    for ld in 2:(layer_count-1)
+    for ld in 2:layer_count-1
         output_level > 0 && println("Calculating Layer $(ld) Entanglement Spectrum")
         
         spec_vals = spatial_entanglement_spectrum(psi,ld; kwargs...)
@@ -1190,7 +1190,7 @@ function four_point_mpo(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     #println("Made Annihilation 2")
     opl > 1 && println("Made Suboperators")
 
-    return apply(apply(creat1, creat2), apply(annih1, annih2))
+    return TTN.ITensors.apply(TTN.ITensors.apply(creat1, creat2), TTN.ITensors.apply(annih1, annih2))
     #bothcreats = TTN.replaceprime(TTN.contract(creat1',creat2; alg="naive", truncate=false), 2 => 1)
     #bothannihs = TTN.replaceprime(TTN.contract(annih1',annih2; alg="naive", truncate=false), 2 => 1)
     #return TTN.replaceprime(TTN.contract(bothcreats',bothannihs; alg="naive", truncate=false), 2 => 1)
@@ -1215,7 +1215,7 @@ function four_point_mpo(wavefunc::TTN.TreeTensorNetwork, restricted_size::Vector
     #println("Made Annihilation 2")
     opl > 1 && println("Made Suboperators")
 
-    return apply(apply(creat1, creat2), apply(annih1, annih2))
+    return TTN.ITensors.apply(TTN.ITensors.apply(creat1, creat2), TTN.ITensors.apply(annih1, annih2))
     #bothcreats = TTN.replaceprime(TTN.contract(creat1',creat2; alg="naive", truncate=false), 2 => 1)
     #bothannihs = TTN.replaceprime(TTN.contract(annih1',annih2; alg="naive", truncate=false), 2 => 1)
     #return TTN.replaceprime(TTN.contract(bothcreats',bothannihs; alg="naive", truncate=false), 2 => 1)
@@ -1312,6 +1312,7 @@ function four_point(wavefunc::TTN.TreeTensorNetwork, restricted_size::Vector{Int
 
     momenta = [n/Ly for n in 0:Lx-1]
     fourpt_vals = zeros(Float64,Lx,Lx)
+    display(fourpt_vals)
     for (idx1,k1) in enumerate(momenta)
         for (idx2,k2) in enumerate(momenta)
             opl > 0 && println("Working on momenta $(k1) and $(k2)")

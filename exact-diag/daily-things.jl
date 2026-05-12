@@ -2034,8 +2034,220 @@ if false
     
 end=#
 
+#= make time evolution dt benchmark plots
+if false
+    lx,ly,n = 8,4,4
+    dataloc = get_folder_location("cluster-data/exact-diag/time-evo/dt-benchmark")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",0.0)])
+    all_files = find_data_file(pdict,"tevo",dataloc; output_level=0,file_type="jld2")
+    
+    for f in all_files
+    #f = all_files[1]
+        m = read_data(joinpath(dataloc,f); output_level=0)
+        if !haskey(m,"final_fidelity")
+            continue
+        end
+        dt = m["dt"][1]
+        ff = m["final_fidelity"]
+
+        scatter(dt,ff,c="b")
+        xlabel("dt")
+        ylabel("Final Fidelity")
+        title("Time Evolution dt Benchmark for $(lx)x$(ly) N=$(n) ULR=0.0")
+    end
+end=#
+
+#= test chern number with pinning, need to use the old git version dont know why
+if false
+    lx,ly,n = 8,4,4
+    intstren = 300.0
+    pinstren = 1e-2
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling/twisting-data")
+    tws = range(0.0,1.0,length=11)
 
 
+    for tw1 in tws
+        for tw2 in tws
+            params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_pinning",true),("pinning_strength",1e-2),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
+            states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+
+            shift = (nrgs[1] + nrgs[2]) / 2
+            scatter(tw2,nrgs[1] - shift,c="b")
+            scatter(tw2,nrgs[2] - shift,c="g")
+            xlabel(L"\theta_y / 2 \pi")
+            ylabel("Energy")
+            title("Energy Spectrum vs Twisting for $(lx)x$(ly) N=$(n) ULR=$(intstren) Pinning=$(pinstren)")
+        end
+    end#
+
+    
+
+    #= plot full data
+    lx,ly,n = 8,4,4
+    pinstren = 1e-2
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling/twisting-data")
+    intstren = 300.0
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("interaction_strength",intstren),("pinning_strength",pinstren)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    display(all_files)
+
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+
+    omegas = m["omegas"]
+    tw1 = m["tws"]
+    tw2 = m["tws2"]
+    gamma1s = m["gamma1s"]
+    gamma2s = m["gamma2s"]
+
+    plot_gamma(tw1,tw2,gamma1s,1)
+    plot_gamma(tw1,tw2,gamma2s,2)
+    plot_omega(tw1,tw2,omegas)=#
+
+end=#
+
+
+#= look at phase transition at finite pinning along ulr by twisted 0,pi gap
+if false
+    lx,ly,n = 8,4,4
+    pinstren = 1e-2
+
+    tw1 = 0.0
+    tw2 = 0.5
+
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling/pinning-ulr-transition")
+
+    fig,ax1 = subplots()
+    ax2 = ax1.twinx()
+
+
+    intstrens = range(0.0,10.0,length=11)
+    for (idx,intstren) in enumerate(intstrens)
+
+        # at (0,pi)
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("dataloc",dataloc),("if_pinning",true),("pinning_strength",pinstren),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",true),("if_save_data",false)])
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+
+        if idx == 1
+            ax1.scatter(intstren,nrgs[2] - nrgs[1],c="b",label=L"(0,\pi)")
+        else
+            ax1.scatter(intstren,nrgs[2] - nrgs[1],c="b")
+        end
+
+        ax1.set_ylabel("Energy Splitting "*L"(0,\pi)", color="tab:blue")
+        ax1.tick_params(axis="y", labelcolor="tab:blue")
+
+
+        # at (pi,0)
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw2),("tw2",tw1),("dataloc",dataloc),("if_pinning",true),("pinning_strength",pinstren),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",true),("if_save_data",false)])
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+
+        if idx == 1
+            ax2.scatter(intstren,nrgs[2] - nrgs[1],c="r",label=L"(\pi,0)")
+        else
+            ax2.scatter(intstren,nrgs[2] - nrgs[1],c="r")
+        end
+
+        ax2.set_ylabel(L"Energy Splitting "*L"(\pi,0)", color="tab:red")
+        ax2.tick_params(axis="y", labelcolor="tab:red")
+
+        ax1.set_xlabel("Interaction Strength")
+        #ylabel("Energy Splitting")
+        ax1.set_title("Energy Splitting for $(lx)x$(ly) N=$(n) Pinning=$(pinstren)")
+    end
+    ax1.legend(loc="center left")
+    ax2.legend(loc="center right")
+end=#
+
+# look at phase transition at finite ulr along pinning by twisted 0,pi gap
+if true
+    lx,ly,n = 8,4,4
+    intstren = 300.0
+
+    tw1 = 0.0
+    tw2 = 0.5
+
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling/pinning-ulr-transition")
+
+    fig,ax1 = subplots()
+    ax2 = ax1.twinx()
+
+    #=pinstrens = 10 .^ collect(range(-0.25,1.0,length=6))
+    for (idx,pinstren) in enumerate(pinstrens)
+
+        # at (0,pi)
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("dataloc",dataloc),("if_pinning",true),("pinning_strength",pinstren),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",true)])
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+
+        if idx == 1
+            ax1.scatter(pinstren,nrgs[2] - nrgs[1],c="b",label=L"(0,\pi)")
+        else
+            ax1.scatter(pinstren,nrgs[2] - nrgs[1],c="b")
+        end
+
+        ax1.set_ylabel("Energy Splitting "*L"(0,\pi)", color="tab:blue")
+        ax1.tick_params(axis="y", labelcolor="tab:blue")
+
+        # at (pi,0)
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw2),("tw2",tw1),("dataloc",dataloc),("if_pinning",true),("pinning_strength",pinstren),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",true)])
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+
+        if idx == 1
+            ax2.scatter(pinstren,nrgs[2] - nrgs[1],c="r",label=L"(\pi,0)")
+        else
+            ax2.scatter(pinstren,nrgs[2] - nrgs[1],c="r")
+        end
+
+        ax2.set_ylabel(L"Energy Splitting "*L"(\pi,0)", color="tab:red")
+        ax2.tick_params(axis="y", labelcolor="tab:red")
+
+        ax1.set_xscale("log")
+        ax2.set_yscale("log")
+
+        ax1.set_xlabel("Pinning Strength")
+        #ylabel("Energy Splitting")
+        ax1.set_title("Energy Splitting for $(lx)x$(ly) N=$(n) ULR=$(intstren)")
+    end=#
+
+    blue_files = filter!(x -> occursin("interaction_strength-300.0",x) && occursin("twist_angle1-0.0",x) && occursin("twist_angle2-0.5",x), readdir(dataloc))
+    red_files = filter!(x -> occursin("interaction_strength-300.0",x) && occursin("twist_angle1-0.5",x) && occursin("twist_angle2-0.0",x), readdir(dataloc))
+
+    blue_ys = []
+    blue_xs = []
+    for f in blue_files
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+        #m["pinning_strength"] > 10^-2.2 && continue
+        append!(blue_xs,m["pinning_strength"])
+        append!(blue_ys,d["nrg"][2] - d["nrg"][1])
+    end
+
+    red_ys = []
+    red_xs = []
+    for f in red_files
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+        #m["pinning_strength"] > 10^-2.2 && continue
+        append!(red_xs,m["pinning_strength"])
+        append!(red_ys,d["nrg"][2] - d["nrg"][1])
+    end
+
+    ax1.scatter(blue_xs,blue_ys,c="b",label=L"(0,\pi)")
+    ax2.scatter(red_xs,red_ys,c="r",label=L"(\pi,0)")
+
+    ax1.set_ylabel("Energy Splitting "*L"(0,\pi)", color="tab:blue")
+    ax1.tick_params(axis="y", labelcolor="tab:blue")
+
+    ax2.set_ylabel("Energy Splitting "*L"(\pi,0)", color="tab:red")
+    ax2.tick_params(axis="y", labelcolor="tab:red")
+
+    ax1.set_xscale("log")
+    ax2.set_yscale("log")
+
+    ax1.set_xlabel("Pinning Strength")
+    ax1.set_title("Energy Splitting for $(lx)x$(ly) N=$(n) ULR=$(intstren)")
+
+    ax1.legend(loc="center left")
+    ax2.legend(loc="center right")
+
+end
 
 
 

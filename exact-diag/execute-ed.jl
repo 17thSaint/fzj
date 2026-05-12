@@ -14,6 +14,7 @@ Depends on:
 ######################################################
 
 #using Pkg
+#Pkg.activate(".")
 #Pkg.activate(@__DIR__)
 using JLD2
 
@@ -44,7 +45,7 @@ end
 
 
 include_other_files(["other-funcs/basic-2d-stuff.jl","other-funcs/basic-2d-observables.jl","exact-diag/two-dimensions.jl","exact-diag/observables.jl","exact-diag/hatsugai-mbcn.jl"])
-include_other_files(["exact-diag/time-evolution.jl"])
+#include_other_files(["exact-diag/time-evolution.jl"])
 #include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
 
 function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
@@ -615,11 +616,17 @@ end=#
 
 #= testing time evolution
 if false
-    lx,ly,n = 4,4,2
+    #lx,ly,n = 4,4,2
     anis = 1e-4
     intstren = 0.0
     ppstren = 0.0
     end_tx = 1.0
+
+    args_dict = make_args_dict(ARGS)
+    dt_global = args_dict["dt"]
+    lx = args_dict["Lx"]
+    ly = args_dict["Ly"]
+    n = args_dict["particles"]
 
     params_dict_i = Dict([("output_level",1),("periodic_potential_strength",ppstren),("tx",anis),("ty",1.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
     states_i,nrgs_i,rhos_i,filepath_i,if_found_i,lattice_params_i,hamilt_params_i = run_normal_ed(params_dict_i; output_level=1)
@@ -630,18 +637,18 @@ if false
     starting_gs = states_i[1]
 
     speccount = 1
-    time_running_args = (nev=speccount,output_level=1,if_instant_gs=false,if_save_data=true,)
+    dataloc = get_folder_location("cluster-data/exact-diag/time-evo/dt-benchmark")
+    time_running_args = (nev=speccount,output_level=1,if_instant_gs=false,if_save_data=true,dataloc=dataloc,)
 
     tmax_global = 10.0
     ramptime = 2.0
-    dt_global = 0.05
-
+    #dt_global = 0.05
 
     tevo_params = Dict([ ("tx",(linear_ramp,params_dict_i["tx"],end_tx,ramptime)),("dt",dt_global),("tmax",tmax_global) ])
-    tevo_gs,tevo_dict,intspec = run_timeevo(starting_gs,tevo_params,lattice_params_i,hamilt_params_i; time_running_args...)
+    tevo_gs,tevo_dict,intspec,saving_args = run_timeevo(starting_gs,tevo_params,lattice_params_i,hamilt_params_i; time_running_args...)
     
     final_fidelity = abs2(dot(tevo_gs[:,end-1],states_f[1]))
-
+    modify_data(Dict([("final_fidelity",final_fidelity)]),joinpath(saving_args[:dataloc],saving_args[:filename]),"metadata"; output_level=2)
 
 end=#
 

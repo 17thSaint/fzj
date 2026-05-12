@@ -104,7 +104,7 @@ function runge_kutta_step(wavefunc::Vector{ComplexF64},ht_prev::SparseMatrixCSC,
     return new_wavefunc,ht_next
 end
 
-function get_tevo_filename(timeevo_dict::Dict,lattice_dict::Dict,hamilt_dict::Dict)
+function get_tevo_filename(timeevo_dict::Dict,lattice_dict::Dict,hamilt_dict::Dict; kwargs...)
 
     filename_dict = Dict{String,Any}()
 
@@ -114,6 +114,8 @@ function get_tevo_filename(timeevo_dict::Dict,lattice_dict::Dict,hamilt_dict::Di
     filename_dict["alpha"] = hamilt_dict["alpha"][2]
     filename_dict["if_periodic_x"] = lattice_dict["if_periodic_x"]
     filename_dict["if_periodic_y"] = lattice_dict["if_periodic_y"]
+
+    filename_dict["dt"] = timeevo_dict["dt"]
 
     if hamilt_dict["disorder_strength"] != 0.0
         filename_dict["disorder_strength"] = hamilt_dict["disorder_strength"]
@@ -150,6 +152,7 @@ function get_tevo_filename(timeevo_dict::Dict,lattice_dict::Dict,hamilt_dict::Di
             if_both += 1
         end
     end
+    dataloc = get(kwargs, :dataloc, dataloc)
 
     # if ramping multiple parameters, save in "mixed-ramp" folder
     if if_both > 1
@@ -422,8 +425,8 @@ function run_timeevo(starting_gs::Vector{ComplexF64},time_params::Dict,lattice_d
     end
 
     if_save_data::Bool = get(kwargs, :if_save_data, false)
-    if_continuous_saving::Bool = get(kwargs, :if_continuous_saving, if_save_data)
-    dataloc::String, filename::String = get_tevo_filename(tevo_pdict,lattice_dict,hamilt_dict)
+    if_continuous_saving::Bool = get(kwargs, :if_continuous_saving, if_save_data && size(hamilt_dict["H"],1) > 10000)
+    dataloc::String, filename::String = get_tevo_filename(tevo_pdict,lattice_dict,hamilt_dict; kwargs...)
     saving_args = (if_save_data=if_save_data,if_continuous_saving=if_continuous_saving,dataloc=dataloc,filename=filename,)
 
     if opl > 0
@@ -438,7 +441,7 @@ function run_timeevo(starting_gs::Vector{ComplexF64},time_params::Dict,lattice_d
     
     tevo_groundstate,instantaneous_spectrum = time_evolution(starting_gs,hamilt_dict["H"],tevo_dict,lattice_dict,hamilt_dict; saving_args...,kwargs...) #output_level=1, nev=speccount
 
-    return tevo_groundstate,tevo_dict,instantaneous_spectrum
+    return tevo_groundstate,tevo_dict,instantaneous_spectrum,saving_args
 end
 
 

@@ -136,10 +136,16 @@ function get_params_dict_from_filename(filename_before)
 	end
 	if split(filename,"-")[1] in ["virt","phys","Y","X"]
 		split_filename = split(filename,"-")[4:end]
-	elseif split(filename,"-")[1] in ["mps","ttn","rfa","laugh","basis","ed","wavefuncmps","wavefuncttn","hopping","interaction"]
+	elseif split(filename,"-")[1] in ["mps","ttn","rfa","laugh","basis","ed","wavefuncmps","wavefuncttn","hopping","interaction","tevo","wavefunctevo"]
 		split_filename = split(filename,"-")[2:end]
 	else
 		split_filename = split(filename,"-")
+	end
+
+	if length(split_filename) % 2 != 0
+		loc = findfirst(x -> split_filename[x] == "pinning_strength",1:length(split_filename))
+		split_filename[loc+1] = split_filename[loc+1] * "-" * split_filename[loc+2]
+		deleteat!(split_filename,loc+2)
 	end
 
 	for i in 1:Int(length(split_filename)/2)
@@ -458,6 +464,7 @@ function add_wavefunc_to_filepath(filepath::String)
 end
 
 function write_data_jld2(file_name::AbstractString,data::Dict,location=pwd(),metadata=nothing; kwargs...)
+	opl::Int = get(kwargs, :output_level, 1)
 	og_location = pwd()
 	try
 		cd(location)
@@ -523,12 +530,14 @@ function read_data_jld2(file_name,location=pwd(); kwargs...)
 	output = []
 	binary_file = jldopen(file_name,"r")
 	
-	data = Dict()
-	alldata = binary_file["all_data"]
-	for datum_key in keys(alldata)
-		data[datum_key] = alldata[datum_key]
+	if haskey(binary_file,"all_data")
+		data = Dict()
+		alldata = binary_file["all_data"]
+		for datum_key in keys(alldata)
+			data[datum_key] = alldata[datum_key]
+		end
+		push!(output,data)
 	end
-	push!(output,data)
 	
 	if !isnothing(findfirst(x -> x == "metadata",keys(binary_file)))
 		metadata = Dict()
@@ -547,7 +556,7 @@ function read_data_jld2(file_name,location=pwd(); kwargs...)
 	end
 	
 	if length(output) < 2
-		return data
+		return output[1]
 	else
 		return output
 	end
@@ -582,10 +591,10 @@ function modify_data_jld2(key_to_modify::String, new_value, file_path, which_gro
 	return split(file_path,"/")[end]
 end
 
-function modify_data_jld2(to_modify_dict::Dict,file_path, which_group="all_data"; kwargs...)
+function modify_data_jld2(to_modify_dict::Dict,file_path,which_group="all_data"; kwargs...)
 	output_level = get(kwargs, :output_level, 0)
 
-	println("Starting with $file_path")
+	output_level > 0 ? println("Starting with $file_path") : nothing
 
 	if length(split(file_path,"/")) < 2
 		output_level > 0 ? println("No directory splits in input: $file_path") : nothing
@@ -808,7 +817,6 @@ function modify_data(key_to_modify::String,new_value,file_path,which_group="all_
 end
 
 function modify_data(to_modify_dict::Dict,file_path,which_group="all_data"; kwargs...)
-	display(file_path)
 	if occursin("jld2",file_path)
 		return modify_data_jld2(to_modify_dict,file_path,which_group; kwargs...)
 	elseif occursin("h5",file_path)

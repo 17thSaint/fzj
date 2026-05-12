@@ -1309,6 +1309,7 @@ end
 
 # four point slices with both 0 and 300 and correct markers/colors
 function plot_four_point_slices_both()
+    
     cols = ["#82AC9F","#C73E1D","#36213E"]
 
     d_300,m_300 = read_data("../cluster-data/synth-dims/torus/new-gauge/ttn-if_periodic_phys-true-onsite_strength-300.0-lr-7-particles-8-alpha-0.125-if_periodic_synth-true-layers-7-hopping_anisotropy-1.0.h5");
@@ -1536,58 +1537,93 @@ function get_spline_outline(A::AbstractMatrix,
 end
 
 # plot Matteo Hatsugai step-by-step End Matter
-function plot_hatsugai_stepbystep()
+function plot_hatsugai_stepbystep(intstren::Float64)
     lx,ly,n = 8,4,4
-    intstren = 1000.0
-    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    
+    #intstren = 0.0
+    dataloc = intstren == 0.0 ? get_folder_location("cluster-data/exact-diag/torus/new-gauge/old-hatsugai-data") : get_folder_location("cluster-data/synth-dims/torus")
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
     display(all_files)
 
     d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
 
-    tw1s = m["tw1s"]
-    tw2s = m["tw2s"]
+    if intstren == 0.0
+        tw1s = collect(m["tws"])
+        tw2s = collect(m["tws"])
+    else
+        tw1s = collect(m["tws"])
+        tw2s = collect(m["tws"])
+    end
     omegas = m["omegas"]
     lambda1 = m["lambda1s"]
     lambda2 = m["lambda2s"]
 
-    which_to_keep = []
-    for (idx,tw1) in enumerate(tw1s)
-        if round(tw1,digits=1) == tw1 && round(tw2s[idx],digits=1) == tw2s[idx]
-            append!(which_to_keep,[idx])
+    if intstren != 0.0
+        which_to_keep = []
+        for (idx,tw1) in enumerate(tw1s)
+            if round(tw1,digits=1) == tw1 && round(tw2s[idx],digits=1) == tw2s[idx]
+                append!(which_to_keep,[idx])
+            end
         end
     end
 
-    squaresize = Int(sqrt(length(which_to_keep)))
-    new_tw1s = unique(tw1s[which_to_keep])
-    new_tw2s = unique(tw2s[which_to_keep]) .- 0.5
-    new_wrongshape_omegas = reshape(omegas[which_to_keep],squaresize,squaresize)
-    new_omegas = zeros(ComplexF64,squaresize,squaresize)
-    new_omegas[:,1:5] = new_wrongshape_omegas[:,7:end]
-    new_omegas[:,6:end] = new_wrongshape_omegas[:,1:6]
+    if intstren == 300.0
+        squaresize = Int(sqrt(length(which_to_keep)))
+        new_tw1s = unique(tw1s[which_to_keep])
+        new_tw2s = unique(tw2s[which_to_keep]) .- 0.5
+        new_wrongshape_omegas = reshape(omegas[which_to_keep],squaresize,squaresize)
+        new_omegas = zeros(ComplexF64,squaresize,squaresize)
+        new_omegas[:,1:5] = new_wrongshape_omegas[:,7:end]
+        new_omegas[:,6:end] = new_wrongshape_omegas[:,1:6]
 
-    new_wrongshape_lambda1 = reshape(lambda1[which_to_keep],squaresize,squaresize)
-    new_lambda1 = zeros(ComplexF64,squaresize,squaresize)
-    new_lambda1[:,1:5] = new_wrongshape_lambda1[:,7:end]
-    new_lambda1[:,6:end] = new_wrongshape_lambda1[:,1:6]
-    new_wrongshape_lambda2 = reshape(lambda2[which_to_keep],squaresize,squaresize)
-    new_lambda2 = zeros(ComplexF64,squaresize,squaresize)
-    new_lambda2[:,1:5] = new_wrongshape_lambda2[:,7:end]
-    new_lambda2[:,6:end] = new_wrongshape_lambda2[:,1:6]
+        new_wrongshape_lambda1 = reshape(lambda1[which_to_keep],squaresize,squaresize)
+        new_lambda1 = zeros(ComplexF64,squaresize,squaresize)
+        new_lambda1[:,1:5] = new_wrongshape_lambda1[:,7:end]
+        new_lambda1[:,6:end] = new_wrongshape_lambda1[:,1:6]
+        new_wrongshape_lambda2 = reshape(lambda2[which_to_keep],squaresize,squaresize)
+        new_lambda2 = zeros(ComplexF64,squaresize,squaresize)
+        new_lambda2[:,1:5] = new_wrongshape_lambda2[:,7:end]
+        new_lambda2[:,6:end] = new_wrongshape_lambda2[:,1:6]
+    else
+        new_tw1s = tw1s .- 0.5
+        new_tw2s = tw2s
+
+        new_omegas = zeros(ComplexF64,length(tw1s),length(tw2s))
+        new_lambda1 = zeros(ComplexF64,length(tw1s),length(tw2s))
+        new_lambda2 = zeros(ComplexF64,length(tw1s),length(tw2s))
+
+        new_omegas[1:5,:] = omegas[7:end,:]
+        new_omegas[6:end,:] = omegas[1:6,:]
+
+        new_lambda1[1:5,:] = lambda1[7:end,:]
+        new_lambda1[6:end,:] = lambda1[1:6,:]
+
+        new_lambda2[1:5,:] = lambda2[7:end,:]
+        new_lambda2[6:end,:] = lambda2[1:6,:]
+    end
 
     fig, axs = subplots(1,4; figsize=(14,3.5))
     cutoffval = 0.08
 
-    xticks = [0,0.25,0.5,0.75,1.0]
-    xlabels = ["0.0","0.25","0.5","0.75","1.0"]
+    if intstren == 300.0
+        xticks = [0,0.25,0.5,0.75,1.0]
+        xlabels = ["0.0","0.25","0.5","0.75","1.0"]
 
-    yticks = [-0.5,-0.25,0,0.25,0.5]
-    ylabels = ["-0.5","-0.25","0.0","0.25","0.5"]
+        yticks = [-0.5,-0.25,0,0.25,0.5]
+        ylabels = ["-0.5","-0.25","0.0","0.25","0.5"]
+    else
+        xticks = [-0.5,-0.25,0,0.25,0.5]
+        xlabels = ["-0.5","-0.25","0.0","0.25","0.5"]
+
+        yticks = [0,0.25,0.5,0.75,1.0]
+        ylabels = ["0.0","0.25","0.5","0.75","1.0"]
+    end
 
     fs = 14
 
     plotgamma2 = plot_gamma(new_tw1s,new_tw2s,new_lambda2,2; plot_title="ULR=$intstren", if_plot=false)
+    plotgamma2 = reverse(plotgamma2,dims=1)
     im1 = axs[1].imshow(plotgamma2; extent=(minimum(new_tw1s), maximum(new_tw1s), minimum(new_tw2s), maximum(new_tw2s)), vmin=0.0, vmax=1.0, origin="lower")
     axs[1].set_ylabel(L"\theta_y / 2\pi",fontsize=fs)
     axs[1].set_xlabel(L"\theta_x / 2\pi",fontsize=fs)
@@ -1600,6 +1636,7 @@ function plot_hatsugai_stepbystep()
     axs[1].set_yticks(yticks,ylabels)
 
     plotgamma1 = plot_gamma(new_tw1s,new_tw2s,new_lambda1,1; plot_title="ULR=$intstren", if_plot=false)
+    plotgamma1 = reverse(plotgamma1,dims=1)
     im2 = axs[2].imshow(plotgamma1; extent=(minimum(new_tw1s), maximum(new_tw1s), minimum(new_tw2s), maximum(new_tw2s)), vmin=0.0, vmax=1.0, origin="lower")
     axs[2].set_ylabel(L"\theta_y / 2\pi",fontsize=fs)
     axs[2].set_xlabel(L"\theta_x / 2\pi",fontsize=fs)
@@ -1610,6 +1647,7 @@ function plot_hatsugai_stepbystep()
     end
     axs[2].set_xticks(xticks,xlabels)
     axs[2].set_yticks(yticks,ylabels)
+    axs[2].set_xlim(minimum(new_tw1s), maximum(new_tw1s))
 
     plotomega = plot_omega(new_tw1s,new_tw2s,new_omegas; plot_title=L"U_{ir}"*"=$intstren", if_plot=false, if_count_chern=false)
     im3 = axs[3].imshow(plotomega; extent=(minimum(new_tw1s), maximum(new_tw1s), minimum(new_tw2s), maximum(new_tw2s)), vmin=0, vmax=2*pi, cmap="hsv", origin="lower")
@@ -1625,6 +1663,7 @@ function plot_hatsugai_stepbystep()
     axs[3].set_yticks(yticks,ylabels)
 
     aa,plotcherns,bb,cc = count_chern_number(new_tw1s,new_tw2s,plotomega; if_plot=false)
+    plotcherns = reverse(plotcherns,dims=1)
     im4 = axs[4].imshow(plotcherns ./ (2*pi); extent=(minimum(new_tw1s), maximum(new_tw1s), minimum(new_tw2s), maximum(new_tw2s)), vmin=-1, vmax=1, cmap="bwr", origin="lower")
     axs[4].set_ylabel(L"\theta_y / 2\pi",fontsize=fs)
     axs[4].set_xlabel(L"\theta_x / 2\pi",fontsize=fs)
@@ -1637,6 +1676,7 @@ function plot_hatsugai_stepbystep()
     end
     axs[4].set_xticks(xticks,xlabels)
     axs[4].set_yticks(yticks,ylabels)
+    axs[4].set_xlim(minimum(new_tw1s), maximum(new_tw1s))
 
     # Create a single colorbar spanning all plots
     cbar_ax = fig.add_axes([0.92, axs[1].get_position().y0, 0.015, axs[1].get_position().height])
@@ -2333,6 +2373,7 @@ end
 
 # Felix phase diagram comparing ED/TTN
 function plot_finitesizescaling_ulr_phasetransition()
+
     intstren = 4.0
 
     #lx,ly,n = 10,8,5
@@ -2355,7 +2396,13 @@ function plot_finitesizescaling_ulr_phasetransition()
             if haskey(m,"fourpt_momentum")
                 fourpt1 = m["fourpt_momentum"][1:lx,1:lx]
             
-                fourpt1_includedsubset = fourpt1
+                if haskey(m,"fourpt_momentum_1")
+                    fourpt2 = m["fourpt_momentum_1"][1:lx,1:lx]
+                    fourpt1_includedsubset = 0.5 .* (fourpt1 .+ fourpt2)
+                else
+                    fourpt1_includedsubset = fourpt1
+                end
+                
 
                 #fig = figure()
                 #fourpt1_includedsubset = zeros(Float64,lx,lx)
