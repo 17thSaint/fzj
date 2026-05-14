@@ -13,8 +13,8 @@ Depends on:
 ######################################################
 
 include("../other-funcs/include-other-files.jl")
-#include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","synth-dims/hatsugai-mbcn.jl","other-funcs/basic-2d-observables.jl"])
-#include_other_files(["review-practice-codes/plottings.jl","other-funcs/basic-2d-plottings.jl"])
+include_other_files(["synth-dims/long-range-ttn.jl","review-practice-codes/observables.jl","synth-dims/hatsugai-mbcn.jl","other-funcs/basic-2d-observables.jl"])
+include_other_files(["review-practice-codes/plottings.jl","other-funcs/basic-2d-plottings.jl"])
 #include_other_files(["synth-dims/oneD-effective-LR.jl","synth-dims/plottings-oneD.jl"])
 
 function datacollection_flatness_1deff(Lx::Int64,Ly::Int64,N::Int64; kwargs...)
@@ -884,8 +884,8 @@ function get_inter_coeff(s1,s2,t_strength,phi,edge_length_x,edge_length_y; kwarg
 
 end
 
-# testing expander for Trento
-if true
+#= testing expander for Trento
+if false
     lx,ly,n = 4,4,8
     intstren = 0.0
     num_layers = Int(log(2,lx*ly))
@@ -954,7 +954,31 @@ if true
     sp = TTN.dmrg(old_ttn,ham_tpo; expander=expander, number_of_sweeps=100, maxdims=100, noise=0.0, outputlevel=1, observer=observer, cutoff=1e-8, eigsolve_krylovdim=15, eigsolve_verbosity=0, use_gpu=false)
 
 
-end
+end=#
+
+#= dimerization analysis, no dimer
+if false
+    lx,ly,n = 16,8,8
+    pdict = Dict([("layers",7),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    all_files = find_data_file(pdict,"ttn",dataloc)
+    display(all_files)
+
+    for f in all_files
+        d,m = read_data(dataloc * "/" * f; output_level=0)
+        intstren = m["onsite_strength"]
+
+        dimer_x = abs(m["dimer_x"])
+        dimer_y = abs(m["dimer_y"])
+
+        scatter(intstren,dimer_x,c="b")
+        scatter(intstren,dimer_y,c="r")
+        xlabel("Interaction Strength")
+        ylabel("Dimerization")
+        title("Dimerization vs Interaction Strength 16x8 N=8")
+    end
+end=#
+
 
 
 

@@ -61,11 +61,16 @@ end
 
 #= set ham in data file to nothing
 if false
-    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
     all_files = readdir(dataloc)
     filter!(x -> occursin("jld2",x),all_files)
     for f in all_files
         d,m = read_data(joinpath(dataloc,f); output_level=0)
+
+        if !isnothing(m["full_basis"])
+            println("Modifying file: $f")
+            modify_data(Dict([("full_basis",nothing)]),joinpath(dataloc,f),"metadata"; output_level=0)
+        end
 
         if !isnothing(m["H"])
             println("Modifying file: $f")
@@ -2158,8 +2163,8 @@ if false
     ax2.legend(loc="center right")
 end=#
 
-# look at phase transition at finite ulr along pinning by twisted 0,pi gap
-if true
+#= look at phase transition at finite ulr along pinning by twisted 0,pi gap
+if false
     lx,ly,n = 8,4,4
     intstren = 300.0
 
@@ -2247,12 +2252,134 @@ if true
     ax1.legend(loc="center left")
     ax2.legend(loc="center right")
 
-end
+end=#
 
+#= gather fixed ULR range pinning more twist data
+if false
+    lx,ly,n = 8,4,4
+    intstren = 300.0
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling/pinning-ulr-transition")
+    tws = range(0.0,1.0,length=11)
 
+    all_files = find_data_file(Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("twist_angle1",0.5),("twist_angle2",0.0),("if_pinning",true)]),"ed",dataloc; output_level=0,file_type="jld2")
+    display(all_files)
 
+    for f in all_filestrens
+        filename_params = get_params_dict_from_filename(f)
+        pinstren = filename_params["pinning_strength"]
 
+        if pinstren > 10^-2.2
+            continue
+        end
 
+        println("Working on pinning strength = $pinstren")
+
+        for tw2 in tws
+            params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",0.5),("tw2",tw2),("dataloc",dataloc),("if_pinning",true),("pinning_strength",pinstren),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",true),("if_save_data",true)])
+            states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+        end
+    end
+
+end=#
+
+# plot cross twist plane change as function of pinning strength at fixed ULR
+if true
+    lx,ly,n = 8,4,4
+    intstren = 300.0
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling/pinning-ulr-transition")
+
+    pdict_1 = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("twist_angle1",0.5),("if_pinning",true)])
+    all_files_1 = find_data_file(pdict_1,"ed",dataloc; output_level=0,file_type="jld2")
+    
+    pdict_2 = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("twist_angle2",0.5),("if_pinning",true)])
+    all_files_2 = find_data_file(pdict_2,"ed",dataloc; output_level=0,file_type="jld2")
+
+    pinstrens_1 = []
+    tw2s_1 = []
+    gaps_1 = []
+    for f in all_files_1
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+        filename_params = get_params_dict_from_filename(f)
+        pinstren = filename_params["pinning_strength"]
+
+        if pinstren > 10^-2.2
+            continue
+        end
+
+        tw2 = m["twist_angle"][2]
+
+        append!(pinstrens_1,pinstren)
+        append!(tw2s_1,tw2)
+        append!(gaps_1,d["nrg"][2] - d["nrg"][1])
+    end
+
+    unique_pinstrens_1 = sort(unique(pinstrens_1))
+    unique_tw2s_1 = sort(unique(tw2s_1))
+    matdata_1 = ones(Float64,length(unique_pinstrens_1),length(unique_tw2s_1))
+
+    for i in 1:length(pinstrens_1)
+        pinstren = pinstrens_1[i]
+        tw2 = tw2s_1[i]
+        gap = gaps_1[i]
+
+        pinstren_index = findfirst(x -> x == pinstren, unique_pinstrens_1)
+        tw2_index = findfirst(x -> x == tw2, unique_tw2s_1)
+
+        matdata_1[pinstren_index,tw2_index] = gap
+    end
+
+    fig = figure()
+    imshow(log10.(matdata_1),extent=(minimum(unique_tw2s_1),maximum(unique_tw2s_1),minimum(unique_pinstrens_1),maximum(unique_pinstrens_1)),origin="lower",aspect="auto")
+    xlabel(L"\theta_y / 2 \pi")
+    ylabel("Pinning Strength")
+    title("Energy Gap for $(lx)x$(ly) N=$(n) ULR=$(intstren)")
+    colorbar().set_label("log Energy Gap")
+    yscale("log")
+    tight_layout()
+
+    pinstrens_2 = []
+    tw1s_2 = []
+    gaps_2 = []
+    for f in all_files_2
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+        pinstren = m["pinning_strength"]
+
+        if pinstren > 10^-2.2
+            continue
+        end
+
+        tw1 = m["twist_angle"][1]
+
+        append!(pinstrens_2,pinstren)
+        append!(tw1s_2,tw1)
+        append!(gaps_2,d["nrg"][2] - d["nrg"][1])
+    end
+
+    unique_pinstrens_2 = sort(unique(pinstrens_2))
+    unique_tw1s_2 = sort(unique(tw1s_2))
+    matdata_2 = ones(Float64,length(unique_pinstrens_2),length(unique_tw1s_2))
+
+    for i in 1:length(pinstrens_2)
+        pinstren = pinstrens_2[i]
+        tw1 = tw1s_2[i]
+        gap = gaps_2[i]
+
+        pinstren_index = findfirst(x -> x == pinstren, unique_pinstrens_2)
+        tw1_index = findfirst(x -> x == tw1, unique_tw1s_2)
+
+        matdata_2[pinstren_index,tw1_index] = gap
+    end
+
+    fig = figure()
+    imshow(log10.(matdata_2),extent=(minimum(unique_tw1s_2),maximum(unique_tw1s_2),minimum(unique_pinstrens_2),maximum(unique_pinstrens_2)),origin="lower",aspect="auto")
+    xlabel(L"\theta_x / 2 \pi")
+    ylabel("Pinning Strength")
+    title("Energy Gap for $(lx)x$(ly) N=$(n) ULR=$(intstren)")
+    colorbar().set_label("log Energy Gap")
+    yscale("log")
+    tight_layout()
+
+end#
 
 
 

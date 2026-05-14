@@ -1494,6 +1494,40 @@ function two_point_real(wavefunc::TTN.TreeTensorNetwork, momentum1::Vector{Float
 end
 
 
+# dimerization order parameter
+function dimerization_orderparameter(wavefunc::TTN.TreeTensorNetwork,which_dir::String; kwargs...)
+    if_periodic::Bool = get(kwargs,:if_periodic,true)
+
+    lat = TTN.physical_lattice(wavefunc.net)
+
+    dir_bool::Bool = which_dir == "x" ? true : false
+
+    L = size(lat,dir_bool+1)
+    L_other = size(lat,!dir_bool+1)
+
+    dimerization::ComplexF64 = 0.0
+    for s1 in 1:(L - 1 + if_periodic)
+        neighbor_site = mod1(s1+1,L)
+
+        pos1::Vector{Int} = Vector{Int}(undef,2)
+        pos2::Vector{Int} = Vector{Int}(undef,2)
+
+        pos1[dir_bool+1] = s1
+        pos2[dir_bool+1] = neighbor_site
+
+        for s2 in 1:L_other
+            pos1[!dir_bool+1] = s2
+            pos2[!dir_bool+1] = s2
+
+            dimerization += (-1)^(s1) * correlation(wavefunc, "Adag", "A", Tuple(pos1), Tuple(pos2))
+            dimerization += (-1)^(s1) * correlation(wavefunc, "Adag", "A", Tuple(pos2), Tuple(pos1))
+        end
+
+    end
+
+    return dimerization / (L * L_other)
+end
+
 
 
 

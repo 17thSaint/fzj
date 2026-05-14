@@ -1540,7 +1540,7 @@ end
 function plot_hatsugai_stepbystep(intstren::Float64)
     lx,ly,n = 8,4,4
     
-    #intstren = 0.0
+    intstren = 0.0
     dataloc = intstren == 0.0 ? get_folder_location("cluster-data/exact-diag/torus/new-gauge/old-hatsugai-data") : get_folder_location("cluster-data/synth-dims/torus")
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
@@ -1678,6 +1678,8 @@ function plot_hatsugai_stepbystep(intstren::Float64)
     axs[4].set_yticks(yticks,ylabels)
     axs[4].set_xlim(minimum(new_tw1s), maximum(new_tw1s))
 
+    tight_layout()
+
     # Create a single colorbar spanning all plots
     cbar_ax = fig.add_axes([0.92, axs[1].get_position().y0, 0.015, axs[1].get_position().height])
     fig.colorbar(im4, cax=cbar_ax)
@@ -1688,6 +1690,7 @@ function plot_hatsugai_stepbystep(intstren::Float64)
     axs[4].text(-0.3, 0.9, "(d)", transform=axs[4].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
 
     subplots_adjust(right=0.90)
+
 
 end
 

@@ -240,8 +240,6 @@ function find_data_file(params_dict,calc_type,location::String="/home/patrick/fz
 	end
 	deleteat!(file_choices,remove_indices)
 
-
-
 	# remove all files that do not have the correct parameters
 	remove_indices = []
 	# this is for finding a single file with all the correct parameters in the filename
