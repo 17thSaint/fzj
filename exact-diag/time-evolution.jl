@@ -167,18 +167,18 @@ function get_tevo_filename(timeevo_dict::Dict,lattice_dict::Dict,hamilt_dict::Di
     if hamilt_dict["U"][2] == 0.0
         filename_dict["interaction_strength"] = 0.0
     else
-        filename_dict["interaction_strength"] = hamilt_params["U"][1]
+        filename_dict["interaction_strength"] = hamilt_dict["U"][1]
     end
     if hamilt_dict["scaling_type"] != "flat"
 		filename_dict["scaling"] = hamilt_dict["scaling_type"]
-		if hamilt_params["scaling_type"] == "gaussian"
+		if hamilt_dict["scaling_type"] == "gaussian"
 			filename_dict["sigma"] = hamilt_dict["sigma"]
-		elseif hamilt_params["scaling_type"] == "exp"
+		elseif hamilt_dict["scaling_type"] == "exp"
 			filename_dict["corr_length"] = hamilt_dict["corr_length"]
-		elseif hamilt_params["scaling_type"] == "rydberg"
+		elseif hamilt_dict["scaling_type"] == "rydberg"
 			filename_dict["blockade_radius"] = hamilt_dict["blockade_radius"]
 		else
-			error("ULR Scaling Type Not Recognized: $(hamilt_params["scaling_type"])")
+			error("ULR Scaling Type Not Recognized: $(hamilt_dict["scaling_type"])")
 		end
 	end
     
@@ -203,6 +203,26 @@ function save_tevo_data(tevo_wavefunc::SparseMatrixCSC,metadata::Dict; kwargs...
     return write_data("wavefunc"*filename,data,dataloc,metadata; kwargs...,dataloc=dataloc,output_level=opl-1)
 end
 
+function save_tevo_data(tevo_wavefunc::Vector,metadata::Dict; kwargs...)
+    opl::Int = get(kwargs, :output_level, 1)
+    dataloc::String = metadata["dataloc"]
+    filename::String = metadata["filename"]
+
+    println("Saving time evolution data to $dataloc")
+
+    # save metadata line
+    data = Dict()
+    write_data(filename,data,dataloc,metadata; kwargs...,dataloc=dataloc)
+    
+    # save wavefunction data
+    for j in 1:length(tevo_wavefunc)
+        for i in 1:size(tevo_wavefunc[1],2)
+            data[string("tevowavefunc_gs$(j)_",i)] = tevo_wavefunc[j][:,i]
+        end
+    end
+    return write_data("wavefunc"*filename,data,dataloc,metadata; kwargs...,dataloc=dataloc,output_level=opl-1)
+end
+
 # possibly introduce saving interval 
 function save_tevo_data_local(local_wavefunc::Vector,timestep::Int; kwargs...)
     opl::Int = get(kwargs, :output_level, 1)
@@ -213,6 +233,21 @@ function save_tevo_data_local(local_wavefunc::Vector,timestep::Int; kwargs...)
     # save wavefunction data
     data = Dict(string("tevowavefunc_",Int((timestep+1)/2)) => local_wavefunc)
     modify_data(data,filepath; kwargs...,output_level=opl-1)
+end
+
+function save_tevo_data_local(local_wavefunc::Vector{Vector},timestep::Int; kwargs...)
+    opl::Int = get(kwargs, :output_level, 1)
+    dataloc::String = kwargs[:dataloc]
+    filename::String = kwargs[:filename]
+    filepath = joinpath(dataloc,filename)
+
+    # save wavefunction data
+    data = Dict()
+    for i in 1:length(local_wavefunc)
+        data[string("tevowavefunc_gs$(i)_",Int((timestep+1)/2))] = local_wavefunc[i]
+    end
+    modify_data(data,filepath; kwargs...,output_level=opl-1)
+
 end
 
 function time_evolution(starting_wavefunc::Vector{ComplexF64},starting_ham::SparseMatrixCSC,t_evo_params::Dict,lattice_params::Dict,hamilt_params::Dict; kwargs...)
@@ -247,10 +282,12 @@ function time_evolution(starting_wavefunc::Vector{ComplexF64},starting_ham::Spar
 
     opl > 0 && println("Starting time evolution")
 
+    display(t_evo_params)
+
     # perform the time evolution
     for timestep in 1:2:nsteps
 
-        wavefunc,ht_new = runge_kutta_step(wavefunc,ht_prev,timestep,t_evo_params,lattice_params,hamilt_params; kwargs...)
+        wavefunc_gs1,ht_new = runge_kutta_step(wavefunc,ht_prev,timestep,t_evo_params,lattice_params,hamilt_params; kwargs...)
         
         normalize!(wavefunc)
 
@@ -273,6 +310,95 @@ function time_evolution(starting_wavefunc::Vector{ComplexF64},starting_ham::Spar
         
         tevo_wavefunc[:,Int((timestep+1)/2)] = wavefunc
         ht_prev = ht_new
+
+        # save data if continuous saving is enabled
+        if_save_data && if_continuous_saving && save_tevo_data_local(wavefunc,timestep; kwargs...,filename=actual_filename)
+        
+        opl > 0 && println("Finished $(round(timestep / nsteps * 100, digits = 2))% of time evolution")
+    end
+
+    # save data if not continuous saving
+    if_save_data && !if_continuous_saving && save_tevo_data(tevo_wavefunc,metadata; kwargs...)
+
+    opl > 0 && println("Time evolution completed.")
+
+    if if_instant_gs
+        return tevo_wavefunc,instant_spec
+    else
+        return tevo_wavefunc, nothing
+    end
+end
+
+# run time evolution for multiple initial states (e.g. ground state and first excited state)
+function time_evolution(starting_wavefunc::Vector{Vector{ComplexF64}},starting_ham::SparseMatrixCSC,t_evo_params::Dict,lattice_params::Dict,hamilt_params::Dict; kwargs...)
+    opl::Int = get(kwargs, :output_level, 1)
+    if_instant_gs::Bool = get(kwargs, :if_instant_gs, true)
+    if_save_data::Bool = kwargs[:if_save_data]
+    if_continuous_saving::Bool = kwargs[:if_continuous_saving]
+
+    # make full metadata
+    metadata = merge(lattice_params,hamilt_params,t_evo_params,named_tuple_to_dict(kwargs))
+
+    # initialize the wavefunction
+    wavefunc::Vector{Vector{ComplexF64}} = Vector{Vector{ComplexF64}}(undef,length(starting_wavefunc))
+    for i in 1:length(starting_wavefunc)
+        wavefunc[i] = starting_wavefunc[i]
+    end
+
+    # initialize ht_prev
+    ht_prev = starting_ham
+
+    nsteps::Int = t_evo_params["nsteps"]
+    tevo_wavefunc = [spzeros(ComplexF64,length(wavefunc[1]),Int(1+(nsteps+1)/2)) for i in 1:length(wavefunc)]
+
+    # if continuous saving, save the initial state
+    if_save_data && if_continuous_saving && (actual_filename = save_tevo_data(tevo_wavefunc,metadata))
+
+    if if_instant_gs
+        nev = get(kwargs, :nev, 10)
+        instant_spec = Dict{String,SparseMatrixCSC}()
+        for i in 1:nev
+            instant_spec[string(i)] = spzeros(ComplexF64,length(wavefunc),Int(1+(nsteps-1)/2))
+        end
+        running_args = get_quick_running_args(nev)
+    end
+
+    opl > 0 && println("Starting time evolution")
+
+    display(t_evo_params)
+
+    # perform the time evolution
+    for timestep in 1:2:nsteps
+
+        for i in 1:length(wavefunc)
+            wavefunc[i],ht_new = runge_kutta_step(wavefunc[i],ht_prev,timestep,t_evo_params,lattice_params,hamilt_params; kwargs...)
+            ht_prev = ht_new
+        end
+        
+        for i in 1:length(wavefunc)
+            normalize!(wavefunc[i])
+        end
+
+        if if_instant_gs
+            
+            fulloverlap = 0.0
+
+            states,nrgs,rhos,hh = find_eigenstates(running_args.nev,lattice_params,hamilt_params; running_args...)
+            for i in 1:nev
+                local_state = states[i]
+                fulloverlap += abs2(dot(wavefunc,local_state))
+                instant_spec[string(i)][:,Int((timestep+1)/2)] = local_state
+            end
+            opl > 1 && println("Found instantaneous eigenstates at step $timestep")
+
+            if fulloverlap < 1e-6
+                error("State is Lost! Overlap with instantaneous eigenstates: $fulloverlap")
+            end
+        end
+        
+        for i in 1:length(wavefunc)
+            tevo_wavefunc[i][:,Int((timestep+1)/2)] = wavefunc[i]
+        end
 
         # save data if continuous saving is enabled
         if_save_data && if_continuous_saving && save_tevo_data_local(wavefunc,timestep; kwargs...,filename=actual_filename)
@@ -396,7 +522,7 @@ function get_leastramptime(time_params::Dict)
     return minimum(all_ramptimes)
 end
 
-function run_timeevo(starting_gs::Vector{ComplexF64},time_params::Dict,lattice_dict::Dict,hamilt_dict::Dict; kwargs...)
+function run_timeevo(starting_gs::Vector,time_params::Dict,lattice_dict::Dict,hamilt_dict::Dict; kwargs...)
     opl::Int = get(kwargs, :output_level, 1)
     
     tmax_global = 25.0
