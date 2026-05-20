@@ -43,9 +43,9 @@ legend()=#
 # define starting state
 if false || if_all
 
-    start_xi = 50.0
+    start_tx = 1e-3
 
-    params_dict_starting = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("scaling_type","exp"),("corr_length",start_xi),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
+    params_dict_starting = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tx",start_tx),("ty",1.0),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",5),("if_find_data",false),("if_save_data",false)])
 
     states_i,nrgs_i,rhos_i,filepath_i,if_found_i,lattice_params_i,hamilt_params_i = run_normal_ed(params_dict_starting; output_level=0)
     println("Found starting state")
@@ -58,9 +58,9 @@ end
 # define ending state
 if false || if_all
 
-    end_xi = 0.1
+    end_tx = 1.0
 
-    params_dict_ending = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("scaling_type","exp"),("corr_length",end_xi),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
+    params_dict_ending = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("ty",1.0),("tx",end_tx),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",5),("if_find_data",false),("if_save_data",false)])
 
     states_f,nrgs_f,rhos_f,filepath_f,if_found_f,lattice_params_f,hamilt_params_f = run_normal_ed(params_dict_ending; output_level=0)
     println("Found ending state")
@@ -75,12 +75,12 @@ if true || if_all
     speccount = 2
     time_running_args = (nev=speccount,output_level=1,if_instant_gs=false,if_save_data=false,dataloc=dataloc,)
 
-    quench_fidelity = groundstate_manifold_fidelity(states_f[1:speccount],states_i[1:speccount])
+    #quench_fidelity = groundstate_manifold_fidelity(states_f[1:speccount],states_i[1:speccount])
 
-    tmax_global = 0.5
-    ramptimes = 10 .^ range(-3,-0.5,length=21)
+    ramptimes = 10 .^ range(-0.9,1.0,length=5)
     for ramptime in ramptimes
-        tevo_params = Dict([ ("corr_length",(linear_ramp,start_xi,end_xi,ramptime)),("dt",dt_global),("tmax",tmax_global) ])
+        tmax_global = ramptime + 0.5
+        tevo_params = Dict([ ("tx",(linear_ramp,start_tx,end_tx,ramptime)),("dt",dt_global),("tmax",tmax_global) ])
         tevo_gs,tevo_dict,intspec,saving_args = run_timeevo([psi0_1,psi0_2],tevo_params,lattice_params_i,hamilt_params_i; time_running_args...)
 
     #end
@@ -90,11 +90,11 @@ if true || if_all
         final_gs_manifold = [tevo_gs[1][:,end-1],tevo_gs[2][:,end-1]]
         final_fidelity = groundstate_manifold_fidelity(states_f[1:speccount],final_gs_manifold)
         println("Final fidelity for ramp time $(ramptime): $(final_fidelity)")
-        scatter(ramptime,abs(quench_fidelity - final_fidelity),c="b")
+        scatter(ramptime,final_fidelity,c="b")
     end
     xlabel("Ramp time")
     ylabel("Fidelity with target manifold")
-    title("Fidelity vs ramp time $(lx)x$(ly) N=$(n) U=$(intstren) ramp ULR xi")
+    title("Fidelity vs ramp time $(lx)x$(ly) N=$(n) U=$(intstren) ramp tx")
     xscale("log")
 
 end#

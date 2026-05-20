@@ -2457,6 +2457,42 @@ if false
 end=#
 
 
+# check twisting on square lattice laughlin
+if true
+    # for 6,3,3 the splitting is beyond numerical precision and can see full brillioun zone
+    lx,ly,n = 4,4,2
+    intstren = 0.0
+    
+    tws = range(0.0,2.0,length=21)
+
+    xs = []
+    ys = []
+    zs1 = []
+    zs2 = []
+    beyondcount = 0
+    for (idx,tw1) in enumerate(tws)
+        for (idx2,tw2) in enumerate(tws)
+            params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tw1",tw1),("tw2",tw2),("if_pinning",true),("pinning_strength",1e-2),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",5),("if_find_data",false),("if_save_data",false)])
+            states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=0)
+            shift = (nrgs[1] + nrgs[2]) / 2
+            push!(xs,tw1)
+            push!(ys,tw2)
+            push!(zs1,nrgs[1] - shift)
+            push!(zs2,nrgs[2] - shift)
+            #(abs(zs1[end]) > 1e-8 || abs(zs2[end]) > 1e-8) && (global beyondcount += 1) #println("At ($tw1, $tw2): Splitting is beyond numerical precision.")
+            #scatter(tw1,plus_nrg - shift,c="b")
+            #scatter(tw1,minus_nrg - shift,c="g")
+        end
+    end
+    fig = figure()
+    scatter3D(xs,ys,zs1,c="b")
+    scatter3D(xs,ys,zs2,c="g")
+    xlabel(L"\theta_x / 2 \pi")
+    ylabel(L"\theta_y / 2 \pi")
+    zlabel("Energy - shift")
+    println("Number of points with splitting beyond numerical precision: $beyondcount out of $(length(xs)) total points.")
+
+end
 
 
 
