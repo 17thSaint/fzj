@@ -289,6 +289,13 @@ function long_range_scaling(x_final::Int64,virt_edge_length::Int64,initial_stren
 		strengths = map(0:virt_edge_length-1) do x
 			initial_strength * (blockade_radius^6) / (blockade_radius^6 + x^6)
 		end
+    elseif scaling_func == "dd"
+        a = get(kwargs, :magnetic_spacing, 1.0)
+        strengths = zeros(virt_edge_length)
+        strengths[1] = initial_strength
+        for x in 1:virt_edge_length-1
+            strengths[x+1] = initial_strength * (1 / (a*x)^3)
+        end
 	end
 	
 	strengths = round.(strengths,digits=trunc)

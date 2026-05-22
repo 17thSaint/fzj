@@ -2457,8 +2457,8 @@ if false
 end=#
 
 
-# check twisting on square lattice laughlin
-if true
+#= check twisting on square lattice laughlin
+if false
     # for 6,3,3 the splitting is beyond numerical precision and can see full brillioun zone
     lx,ly,n = 4,4,2
     intstren = 0.0
@@ -2492,8 +2492,27 @@ if true
     zlabel("Energy - shift")
     println("Number of points with splitting beyond numerical precision: $beyondcount out of $(length(xs)) total points.")
 
-end
+end=#
 
+# transition as function of magnetic spacing of synth-dim with DD interactions
+if true
+    lx,ly,n = 4,4,2
+    intstren = 300.0
+    
+    spacings = range(0.01,1.0,length=11)
+    for magnetic_spacing in spacings
+        #params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("magnetic_spacing",1.0),("scaling_type","dd"),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",5),("if_find_data",false),("if_save_data",false)])
+        #states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=0)
+        us = long_range_scaling(ly-1,ly,intstren; magnetic_spacing=magnetic_spacing, scaling="dd")
+        plot(us[2:end],label="$(round(magnetic_spacing, digits=3))")
+    end
+    xlabel("Distance")
+    ylabel("Interaction Strength")
+    title("Long Range Interaction Scaling for Different Magnetic Spacings")
+    legend()
+    yscale("log")
+
+end
 
 
 

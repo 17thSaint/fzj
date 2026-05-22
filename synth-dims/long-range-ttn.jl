@@ -1517,6 +1517,8 @@ function make_synthdims_filename(model_parameters::Dict)
 			filename_dict["corr_length"] = model_parameters["corr_length"]
 		elseif model_parameters["scaling"] == "rydberg"
 			filename_dict["blockade_radius"] = model_parameters["blockade_radius"]
+		elseif model_parameters["scaling"] == "dd"
+			filename_dict["magnetic_spacing"] = model_parameters["magnetic_spacing"]
 		else
 			error("ULR Scaling Type Not Recognized: $(model_parameters["scaling"])")
 		end
@@ -1625,6 +1627,7 @@ function get_normal_model_params(params_dict::Dict)
 	corr_length = get(params_dict,"corr_length",Ly)
 	sigma::Float64 = get(params_dict, "sigma", 1.0)
 	blockade_radius::Float64 = get(params_dict, "blockade_radius", 1.0)
+	magnetic_spacing::Float64 = get(params_dict, "magnetic_spacing", 1.0)
 
 	mu = get(params_dict, "chem_strength", 0.0)
 	mag_off = get(params_dict, "mag_off", true)
@@ -1731,6 +1734,7 @@ function get_normal_model_params(params_dict::Dict)
 						"corr_length"=>corr_length,
 						"sigma"=>sigma,
 						"blockade_radius"=>blockade_radius,
+						"magnetic_spacing"=>magnetic_spacing,
 						"lr"=>longrange_dist,
 						"onsite_strength"=>onsite_strength,
 						"which_dir"=>which_dir,
