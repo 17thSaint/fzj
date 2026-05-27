@@ -1,5 +1,5 @@
-#using Pkg
-#Pkg.activate("../synth-dims/")
+using Pkg
+Pkg.activate("../synth-dims/")
 #Pkg.develop(path="../.julia/packages/TTN_gpu")
 #Pkg.precompile()
 include("../review-practice-codes/ttn.jl")
@@ -2143,10 +2143,10 @@ if false
 	all_results = run_synth_dims_generic(params_dict)
 end=#
 
-#= synth-dims for loop runnings
-if false
+# synth-dims for loop runnings
+if true
 	#BLAS.set_num_threads(open_cores)
-	cols = ["b","g","r"]
+	#cols = ["b","g","r"]
 	#nnst = 0.0
 	#layers = 6
 	#=layers = 4
@@ -2172,7 +2172,7 @@ if false
 	ly = args_dict["Ly"]
 	n = args_dict["particles"]
 	#pinstren = args_dict["pinning_strength"]
-	xi = args_dict["corr_length"]
+	#xi = args_dict["corr_length"]
 	#mdim = args_dict["mdim"]
 	#if_pinning = "pinning_strength" in keys(args_dict)
 	#pinstren = if_pinning ? args_dict["pinning_strength"] : 1e-3
@@ -2199,9 +2199,9 @@ if false
 		
 		#("if_pinning",if_pinning),("dataloc",dataloc),("pinning_strength",pinstren)
 		
-		#params_dict = Dict([("if_gpu",true),("outputlevel",1),("scaling","exp"),("corr_length",xi),("nrgtol",5e-6),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-5),("particles",n),("mdim",700),("if_save_data",true),("filling",0.5),("if_find_data",true),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("if_gpu",true),("outputlevel",1),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",1e-5),("particles",n),("mdim",300),("if_save_data",true),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		#params_dict = Dict([("if_gpu",false),("outputlevel",1),("nrgtol",5e-6),("if_pinning",true),("pinning_strength",pinstren),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-5),("particles",n),("mdim",500),("if_save_data",true),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
-		params_dict = Dict([("if_gpu",true),("outputlevel",1),("scaling","exp"),("corr_length",xi),("nrgtol",1e-5),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-4),("particles",n),("mdim",400),("if_save_data",true),("filling",0.5),("if_find_data",true),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
+		#params_dict = Dict([("if_gpu",true),("outputlevel",1),("scaling","exp"),("corr_length",xi),("nrgtol",1e-5),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-4),("particles",n),("mdim",400),("if_save_data",true),("filling",0.5),("if_find_data",true),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
 		#params_dict = make_args_dict(ARGS)
 		#open_cores = get(params_dict, "open_cores", 5)
@@ -2316,7 +2316,7 @@ if false
 			=#
 	#end
 #end
-end=#
+end#
 
 #
 #plot(strens,real.(centermoms),"-p")

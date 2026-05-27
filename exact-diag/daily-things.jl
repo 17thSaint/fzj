@@ -2494,8 +2494,8 @@ if false
 
 end=#
 
-# transition as function of magnetic spacing of synth-dim with DD interactions
-if true
+#= transition as function of magnetic spacing of synth-dim with DD interactions
+if false
     lx,ly,n = 4,4,2
     intstren = 300.0
     
@@ -2512,8 +2512,160 @@ if true
     legend()
     yscale("log")
 
-end
+end=#
 
+#= density off-diagonal components in strongly interacting case
+if false
+    lx,ly,n = 8,4,4
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    
+    for f in all_files[1:end-2]
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+
+        lattice_params = get_lattice_params_from_metadata(m)
+
+        dens1 = zeros(Float64,lx,ly)
+        dens2 = zeros(Float64,lx,ly)
+        for i in 1:lx
+            println("Working on x = $i")
+            for j in 1:ly
+                densop = density_operator(lattice_params, (i,j))
+
+                val_mat = zeros(ComplexF64,2,2)
+                
+                val_mat[1,1] = adjoint(d["state"][1]) * densop * d["state"][1]
+                val_mat[1,2] = adjoint(d["state"][1]) * densop * d["state"][2]
+                val_mat[2,1] = adjoint(d["state"][2]) * densop * d["state"][1]
+                val_mat[2,2] = adjoint(d["state"][2]) * densop * d["state"][2]
+
+                rez = eigen(val_mat)
+
+                dens1[i,j] = abs(rez.values[1])
+                dens2[i,j] = abs(rez.values[2])
+            end
+        end
+
+        scatter(m["U"][end],std(dens1),c="b")
+        scatter(m["U"][end],std(dens2),c="r")
+        xlabel("Interaction Strength")
+        ylabel("Std Dev of Density Profile Values")
+        title("Std Dev of Density Eigenvalues vs Interaction Strength for $(lx)x$(ly) N=$(n)")
+    end
+    xscale("log")
+    yscale("log")
+
+
+    #=fig = figure()
+    imshow(dens1,extent=(1,lx,1,ly),origin="lower",aspect="auto")
+    xlabel("x")
+    ylabel("y")
+    title("Density Matrix Eigenvalue 1 for 8x4 N=4 ULR=300.0")
+    colorbar()
+
+    fig = figure()
+    imshow(dens2,extent=(1,lx,1,ly),origin="lower",aspect="auto")
+    xlabel("x")
+    ylabel("y")
+    title("Density Matrix Eigenvalue 2 for 8x4 N=4 ULR=300.0")
+    colorbar()=#
+
+
+
+end=#
+
+# fourpt real-space correlation off-diagonal components in strongly interacting case
+#= ED size of 8x4 is too small to see the order
+if false
+    lx,ly,n = 8,4,4
+    intstren = 300.0
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+
+    d,m = read_data(joinpath(dataloc,all_files[end]); output_level=0)
+
+    lattice_params = get_lattice_params_from_metadata(m)
+
+    x1,y1 = 4,2
+
+    fourpt1 = zeros(Float64,lx)
+    fourpt2 = zeros(Float64,lx)
+    for i in 1:lx
+        println("Working on x = $i")
+        
+        s1 = linear_index((i,y1),lx,ly)
+        s2 = linear_index((x1,y1),lx,ly)
+
+        fourpt_op = four_point_operator(s1,s2,s2,s1,lattice_params)
+
+        val_mat = zeros(ComplexF64,2,2)
+
+        val_mat[1,1] = adjoint(d["state"][1]) * fourpt_op * d["state"][1]
+        val_mat[1,2] = adjoint(d["state"][1]) * fourpt_op * d["state"][2]
+        val_mat[2,1] = adjoint(d["state"][2]) * fourpt_op * d["state"][1]
+        val_mat[2,2] = adjoint(d["state"][2]) * fourpt_op * d["state"][2]
+
+        rez = eigen(val_mat)
+
+        fourpt1[i] = abs(rez.values[1])
+        fourpt2[i] = abs(rez.values[2])
+    end
+
+    fig = figure()
+    plot(1:lx,fourpt1,"-p",c="b")
+    plot(1:lx,fourpt2,"-p",c="r")
+    xlabel("x")
+    ylabel("Four Point Correlation Eigenvalue")
+    title("Four Point Correlation Eigenvalues for $(lx)x$(ly) N=$(n) ULR=$(intstren) with s1=(x,$y1) and s2=($x1,$y1)")
+
+end=#
+
+#= density off-diagonal for strongly interacting case with pinning
+if true
+    lx,ly,n = 8,4,4
+    intstren = 300.0
+    pinstren = 1e-2
+    params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_pinning",true),("pinning_strength",pinstren),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
+    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+
+    dens1 = zeros(Float64,lx,ly)
+    dens2 = zeros(Float64,lx,ly)
+    for i in 1:lx
+        println("Working on x = $i")
+        for j in 1:ly
+            densop = density_operator(lattice_params, (i,j))
+
+            val_mat = zeros(ComplexF64,2,2)
+            
+            val_mat[1,1] = adjoint(states[1]) * densop * states[1]
+            val_mat[1,2] = adjoint(states[1]) * densop * states[2]
+            val_mat[2,1] = adjoint(states[2]) * densop * states[1]
+            val_mat[2,2] = adjoint(states[2]) * densop * states[2]
+            
+            rez = eigen(val_mat)
+
+            dens1[i,j] = abs(rez.values[1])
+            dens2[i,j] = abs(rez.values[2])
+        end
+    end
+
+    fig = figure()
+    imshow(dens1,extent=(1,lx,1,ly),origin="lower",aspect="auto",vmin=0,vmax=1/2)
+    xlabel("x")
+    ylabel("y")
+    title("Density Matrix Eigenvalue 1 for 8x4 N=4 ULR=300.0 Pinning=$(pinstren)")
+    colorbar()
+
+    fig = figure()
+    imshow(dens2,extent=(1,lx,1,ly),origin="lower",aspect="auto",vmin=0,vmax=1)
+    xlabel("x")
+    ylabel("y")
+    title("Density Matrix Eigenvalue 2 for 8x4 N=4 ULR=300.0 Pinning=$(pinstren)")
+    colorbar()
+
+end=#
 
 
 
