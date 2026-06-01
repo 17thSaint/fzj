@@ -31,6 +31,26 @@ function get_cdwsf(angle::Float64,dens_corr_mat::Array{Float64},radius::Int64=1;
     return get_cdwsf(qvec,dens_corr_mat; kwargs...)
 end
 
+function get_cdwsf_occs(qvec::Vector{Float64},occs::Matrix{Float64}; kwargs...)
+    Lphys::Int64,Lsynth::Int64 = size(occs)
+
+    result::Union{Float64,ComplexF64} = 0.0
+    
+    for j in 1:Lphys
+        for s in 1:Lsynth
+            dotprod::Float64 = dot(qvec,[j,s])
+            result += exp(-im*2*pi*dotprod)*occs[j,s]
+        end
+    end
+
+    return result
+end
+
+function get_cdwsf_occs(angle::Float64,occs::Matrix{Float64},radius::Int64=1; kwargs...)
+    qvec::Vector{Float64} = [radius*cos(pi*angle),radius*sin(pi*angle)]
+    return get_cdwsf_occs(qvec,occs; kwargs...)
+end
+
 function save_ft_dd(ft_dd_val::ComplexF64,angle::Float64,filepath::String)
     data_dict = Dict([("ft_dd_$angle",ft_dd_val)])
     modify_data_jld2(data_dict,filepath,"metadata"; output_level=1)

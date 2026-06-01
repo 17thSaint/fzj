@@ -2516,18 +2516,23 @@ end=#
 
 #= density off-diagonal components in strongly interacting case
 if false
+    cols = ["b","g","r","c","m","y","k","tab:orange","tab:purple","tab:brown"]
     lx,ly,n = 8,4,4
     dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
-    
+
+    all_eigs::Dict{Int,Vector{ComplexF64}} = Dict([(1,[1/sqrt(2),1/sqrt(2)]),(2,[1/sqrt(2),-1/sqrt(2)])])
+    all_dens = Dict([(1,zeros(Float64,lx,ly)),(2,zeros(Float64,lx,ly))])
+
     for f in all_files[1:end-2]
         d,m = read_data(joinpath(dataloc,f); output_level=0)
 
         lattice_params = get_lattice_params_from_metadata(m)
 
-        dens1 = zeros(Float64,lx,ly)
-        dens2 = zeros(Float64,lx,ly)
+        for (k,v) in all_dens
+            all_dens[k] .= 0.0
+        end
         for i in 1:lx
             println("Working on x = $i")
             for j in 1:ly
@@ -2542,34 +2547,63 @@ if false
 
                 rez = eigen(val_mat)
 
-                dens1[i,j] = abs(rez.values[1])
-                dens2[i,j] = abs(rez.values[2])
+                eigfound1 = false
+                next_eig = 1
+                while !eigfound1 && next_eig < length(all_eigs)
+                    next_eig += 1
+                    abs2(adjoint(rez.vectors[:,1]) * all_eigs[next_eig]) > 0.9 && (eigfound1 = true)
+                end
+                if eigfound1 == false
+                    next_eig += 1
+                    #println("Adding new eigenvector for first value at index $(next_eig+1)")
+                    all_eigs[next_eig] = rez.vectors[:,1]
+                    all_dens[next_eig] = zeros(Float64,lx,ly)
+                else
+                    #println("Found existing eigenvector for first value at index $next_eig")
+                end
+                all_dens[next_eig][i,j] = real(rez.values[1])
+
+
+                eigfound2 = false
+                next_eig = 1
+                while !eigfound2 && next_eig < length(all_eigs)
+                    next_eig += 1
+                    abs2(adjoint(rez.vectors[:,2]) * all_eigs[next_eig]) > 0.9 && (eigfound2 = true)
+                end
+                if eigfound2 == false
+                    next_eig += 1
+                    #println("Adding new eigenvector for second value at index $(next_eig+1)")
+                    all_eigs[next_eig] = rez.vectors[:,2]
+                    all_dens[next_eig] = zeros(Float64,lx,ly)
+                else
+                    #println("Found existing eigenvector for second value at index $next_eig")
+                end
+                all_dens[next_eig][i,j] = real(rez.values[2])
+                
+                
             end
         end
 
-        scatter(m["U"][end],std(dens1),c="b")
-        scatter(m["U"][end],std(dens2),c="r")
+        #=total_n = 0.0
+        for (k,v) in all_dens
+            if sum(v) < 1e-3
+                continue
+            end
+            println("Eigenvector $k has $(sum(v)) particles")
+            println("Eigenvector $k has relative std dev of $(std(v)/mean(v))")
+            total_n += sum(v)
+        end
+        println("Total number of particles is $total_n")=#
+
+        for (k,v) in all_dens
+            scatter(m["U"][end],std(v)/mean(v),c=cols[k])
+        end
         xlabel("Interaction Strength")
-        ylabel("Std Dev of Density Profile Values")
-        title("Std Dev of Density Eigenvalues vs Interaction Strength for $(lx)x$(ly) N=$(n)")
+        ylabel("Relative Std Dev of Density Profile")
+        title("Rel Std Dev of Density Profile vs Interaction Strength for $(lx)x$(ly) N=$(n)")
     end
     xscale("log")
-    yscale("log")
-
-
-    #=fig = figure()
-    imshow(dens1,extent=(1,lx,1,ly),origin="lower",aspect="auto")
-    xlabel("x")
-    ylabel("y")
-    title("Density Matrix Eigenvalue 1 for 8x4 N=4 ULR=300.0")
-    colorbar()
-
-    fig = figure()
-    imshow(dens2,extent=(1,lx,1,ly),origin="lower",aspect="auto")
-    xlabel("x")
-    ylabel("y")
-    title("Density Matrix Eigenvalue 2 for 8x4 N=4 ULR=300.0")
-    colorbar()=#
+    #yscale("log")
 
 
 
@@ -2630,8 +2664,11 @@ if true
     params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_pinning",true),("pinning_strength",pinstren),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
     states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
 
-    dens1 = zeros(Float64,lx,ly)
-    dens2 = zeros(Float64,lx,ly)
+    all_eigs::Dict{Int,Vector{ComplexF64}} = Dict([(1,[1/sqrt(2),1/sqrt(2)]),(2,[1/sqrt(2),-1/sqrt(2)])])
+    all_dens = Dict([(1,zeros(Float64,lx,ly)),(2,zeros(Float64,lx,ly))])
+
+
+
     for i in 1:lx
         println("Working on x = $i")
         for j in 1:ly
@@ -2643,34 +2680,194 @@ if true
             val_mat[1,2] = adjoint(states[1]) * densop * states[2]
             val_mat[2,1] = adjoint(states[2]) * densop * states[1]
             val_mat[2,2] = adjoint(states[2]) * densop * states[2]
-            
+
             rez = eigen(val_mat)
 
-            dens1[i,j] = abs(rez.values[1])
-            dens2[i,j] = abs(rez.values[2])
+            eigfound1 = false
+            next_eig = 1
+            while !eigfound1 && next_eig < length(all_eigs)
+                next_eig += 1
+                abs2(adjoint(rez.vectors[:,1]) * all_eigs[next_eig]) > 0.9 && (eigfound1 = true)
+            end
+            if eigfound1 == false
+                next_eig += 1
+                #println("Adding new eigenvector for first value at index $(next_eig+1)")
+                all_eigs[next_eig] = rez.vectors[:,1]
+                all_dens[next_eig] = zeros(Float64,lx,ly)
+            else
+                #println("Found existing eigenvector for first value at index $next_eig")
+            end
+            all_dens[next_eig][i,j] = real(rez.values[1])
+
+
+            eigfound2 = false
+            next_eig = 1
+            while !eigfound2 && next_eig < length(all_eigs)
+                next_eig += 1
+                abs2(adjoint(rez.vectors[:,2]) * all_eigs[next_eig]) > 0.9 && (eigfound2 = true)
+            end
+            if eigfound2 == false
+                next_eig += 1
+                #println("Adding new eigenvector for second value at index $(next_eig+1)")
+                all_eigs[next_eig] = rez.vectors[:,2]
+                all_dens[next_eig] = zeros(Float64,lx,ly)
+            else
+                #println("Found existing eigenvector for second value at index $next_eig")
+            end
+            all_dens[next_eig][i,j] = real(rez.values[2])
+            
+            
         end
     end
 
-    fig = figure()
-    imshow(dens1,extent=(1,lx,1,ly),origin="lower",aspect="auto",vmin=0,vmax=1/2)
-    xlabel("x")
-    ylabel("y")
-    title("Density Matrix Eigenvalue 1 for 8x4 N=4 ULR=300.0 Pinning=$(pinstren)")
-    colorbar()
+    for (k,v) in all_dens
+        sum(v) < 1e-3 && continue
 
-    fig = figure()
-    imshow(dens2,extent=(1,lx,1,ly),origin="lower",aspect="auto",vmin=0,vmax=1)
-    xlabel("x")
-    ylabel("y")
-    title("Density Matrix Eigenvalue 2 for 8x4 N=4 ULR=300.0 Pinning=$(pinstren)")
-    colorbar()
+        fig = figure()
+        imshow(v,extent=(1,lx,1,ly),origin="lower",aspect="auto",vmin=0,vmax=1/4)
+        xlabel("x")
+        ylabel("y")
+        title("Density Matrix Eigenvalue $k for $(lx)x$(ly) N=$(n) ULR=$(intstren) Pinning=$(pinstren)")
+        colorbar()
+    end
+    
 
+    
 end=#
 
 
+#= density off-diagonal for strongly interacting case at other fillings
+if true
+    lx,ly,n = 6,4,4
+    intstren = 300.0
+    params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
+    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+
+    all_eigs::Dict{Int,Vector{ComplexF64}} = Dict([(1,[1/sqrt(2),1/sqrt(2)]),(2,[1/sqrt(2),-1/sqrt(2)])])
+    all_dens = Dict([(1,zeros(Float64,lx,ly)),(2,zeros(Float64,lx,ly))])
 
 
+    for i in 1:lx
+        println("Working on x = $i")
+        for j in 1:ly
+            densop = density_operator(lattice_params, (i,j))
 
+            val_mat = zeros(ComplexF64,2,2)
+            
+            val_mat[1,1] = adjoint(states[1]) * densop * states[1]
+            val_mat[1,2] = adjoint(states[1]) * densop * states[2]
+            val_mat[2,1] = adjoint(states[2]) * densop * states[1]
+            val_mat[2,2] = adjoint(states[2]) * densop * states[2]
+
+            rez = eigen(val_mat)
+
+            eigfound1 = false
+            next_eig = 1
+            while !eigfound1 && next_eig < length(all_eigs)
+                next_eig += 1
+                abs2(adjoint(rez.vectors[:,1]) * all_eigs[next_eig]) > 0.9 && (eigfound1 = true)
+            end
+            if eigfound1 == false
+                next_eig += 1
+                #println("Adding new eigenvector for first value at index $(next_eig+1)")
+                all_eigs[next_eig] = rez.vectors[:,1]
+                all_dens[next_eig] = zeros(Float64,lx,ly)
+            else
+                #println("Found existing eigenvector for first value at index $next_eig")
+            end
+            all_dens[next_eig][i,j] = real(rez.values[1])
+
+
+            eigfound2 = false
+            next_eig = 1
+            while !eigfound2 && next_eig < length(all_eigs)
+                next_eig += 1
+                abs2(adjoint(rez.vectors[:,2]) * all_eigs[next_eig]) > 0.9 && (eigfound2 = true)
+            end
+            if eigfound2 == false
+                next_eig += 1
+                #println("Adding new eigenvector for second value at index $(next_eig+1)")
+                all_eigs[next_eig] = rez.vectors[:,2]
+                all_dens[next_eig] = zeros(Float64,lx,ly)
+            else
+                #println("Found existing eigenvector for second value at index $next_eig")
+            end
+            all_dens[next_eig][i,j] = real(rez.values[2])
+            
+            
+        end
+    end
+
+    for (k,v) in all_dens
+        sum(v) < 1e-3 && continue
+
+        fig = figure()
+        imshow(transpose(v),extent=(1,lx,1,ly),origin="lower",aspect="auto",vmin=0,vmax=1/4)
+        xlabel("x")
+        ylabel("y")
+        title("Density Matrix Eigenvalue $k for $(lx)x$(ly) N=$(n) ULR=$(intstren)")
+        colorbar()
+    end
+    
+
+    
+end=#
+
+#= manifold density finite size scaling
+if false
+    ulr = 0.0
+
+    # ED section: pinned
+    dataloc_pin = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
+    pdict_pin = Dict([("hopping_anisotropy",1.0),("if_pinning",true),("interaction_strength",ulr),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files_pin = find_data_file(pdict_pin,"ed",dataloc_pin; file_type="jld2")
+    display(all_files_pin)
+
+    used_files = []
+    lxs = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
+    gaps = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
+    for f in all_files_pin
+        params = get_params_dict_from_filename(f)
+
+        if (params["N"] / params["Lx"] != 0.5) || (params["Lx"] != 2*params["Ly"])
+            continue
+        end
+
+        lx,ly = params["Lx"],params["Ly"]
+
+        append!(used_files,[f])
+
+        d,m = read_data_jld2(joinpath(dataloc_pin,f); output_level=0)
+
+        all_keys = findall(x -> occursin("occs_eig",x), string.(keys(m)))
+        occs1 = m[string.(keys(m))[all_keys[1]]]
+        occs2 = m[string.(keys(m))[all_keys[2]]]
+
+        #=fig = figure()
+        imshow(transpose(occs1),extent=(1,lx,1,ly),origin="lower",aspect="auto",vmin=0,vmax=1)
+        xlabel("x")
+        ylabel("y")
+        title("Density Matrix Eigenvalue 3 for $(lx)x$(ly) N=$(params["N"]) ULR=$(ulr)")
+        colorbar()
+
+        fig = figure()
+        imshow(transpose(occs2),extent=(1,lx,1,ly),origin="lower",aspect="auto",vmin=0,vmax=1)
+        xlabel("x")
+        ylabel("y")
+        title("Density Matrix Eigenvalue 4 for $(lx)x$(ly) N=$(params["N"]) ULR=$(ulr)")
+        colorbar()=#
+
+        relstd1 = std(occs1) / mean(occs1)
+        relstd2 = std(occs2) / mean(occs2)
+
+        scatter(lx,relstd1,c="b")
+        scatter(lx,relstd2,c="r")
+        xlabel("Lattice Size")
+        ylabel("Relative Std Dev of Density Matrix Eigenvalues")
+
+    end
+
+end=#
 
 
 

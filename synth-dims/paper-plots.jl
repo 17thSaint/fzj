@@ -2367,7 +2367,206 @@ function plot_particle_entanglement_spectrum_paperplot()
 
 end
 
+function pull_manifold_density_data(ulr::Float64)
 
+    pinning_strength = ulr == 0.0 ? 0.1 : 0.0001
+
+    # ED section: pinned
+    dataloc_pin = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
+    pdict_pin = Dict([("hopping_anisotropy",1.0),("if_pinning",true),("interaction_strength",ulr),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files_pin = find_data_file(pdict_pin,"ed",dataloc_pin; file_type="jld2")
+    display(all_files_pin)
+
+    used_files = []
+    lxs = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
+    eig1 = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
+    eig2 = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
+    for f in all_files_pin
+        params = get_params_dict_from_filename(f)
+
+        if (params["N"] / params["Lx"] != 0.5) || (params["Lx"] != 2*params["Ly"])
+            continue
+        end
+
+        append!(used_files,[f])
+
+        d,m = read_data_jld2(joinpath(dataloc_pin,f); output_level=0)
+        all_nrgs = d["nrg"]
+
+        if haskey(m,"pinning_strength") && m["pinning_strength"] == pinning_strength
+            eiglocs = findall(x -> occursin("occs_eig", x), string.(keys(m)))
+            if length(eiglocs) < 2
+                continue
+            end
+            occmat1 = m[string.(keys(m))[eiglocs[1]]]
+            occmat2 = m[string.(keys(m))[eiglocs[2]]]
+            append!(eig1[string(pinning_strength)],[std(occmat1)/mean(occmat1)])
+            append!(eig2[string(pinning_strength)],[std(occmat2)/mean(occmat2)])
+            append!(lxs[string(pinning_strength)],[params["Lx"]])
+        end
+    end
+
+    # ED section: unpinned
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    pdict = Dict([("hopping_anisotropy",1.0),("interaction_strength",ulr),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2")
+    display(all_files)
+
+    for f in all_files
+        params = get_params_dict_from_filename(f)
+
+        if (params["N"] / params["Lx"] != 0.5) || (params["Lx"] != 2*params["Ly"])
+            continue
+        end
+
+        append!(used_files,[f])
+
+        d,m = read_data_jld2(joinpath(dataloc,f); output_level=0)
+        all_nrgs = d["nrg"]
+
+        eiglocs = findall(x -> occursin("occs_eig", x), string.(keys(m)))
+        if length(eiglocs) < 2
+            continue
+        end
+        occmat1 = m[string.(keys(m))[eiglocs[1]]]
+        occmat2 = m[string.(keys(m))[eiglocs[2]]]
+        append!(eig1["0.0"],[std(occmat1)/mean(occmat1)])
+        append!(eig2["0.0"],[std(occmat2)/mean(occmat2)])
+        append!(lxs["0.0"],[params["Lx"]])
+    end
+
+    # TTN section: pinned
+    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
+    pdict_ttn = Dict([("hopping_anisotropy",1.0),("onsite_strength",ulr),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
+    display(all_files_ttn)
+
+    for f in all_files_ttn
+        println("Working on file $f")
+        params = get_params_dict_from_filename(f)
+        Lx,Ly = "Lx" in keys(params) ? (params["Lx"],params["Ly"]) : get_lattice_dims_from_layers(params["layers"])
+
+
+        if (params["particles"] / Lx != 0.5) || (Lx != 2*Ly) || Lx <= 10
+            continue
+        end
+
+        d,m = read_data(joinpath(dataloc_ttn,f); output_level=0)
+
+        if haskey(m,"observer") && haskey(m,"observer_1")
+            eiglocs = findall(x -> occursin("occs_eig", x), string.(keys(m)))
+            if length(eiglocs) < 2
+                continue
+            end
+            occmat1 = m[string.(keys(m))[eiglocs[1]]]
+            occmat2 = m[string.(keys(m))[eiglocs[2]]]
+            append!(eig1[string(pinning_strength)], [std(occmat1)/mean(occmat1)])
+            append!(eig2[string(pinning_strength)], [std(occmat2)/mean(occmat2)])
+            append!(used_files,[f])
+            append!(lxs[string(pinning_strength)], [Lx])
+        end
+
+    end
+
+    # TTN section: unpinned
+    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict_ttn = Dict([("hopping_anisotropy",1.0),("onsite_strength",ulr),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
+    display(all_files_ttn)
+
+    for f in all_files_ttn
+        params = get_params_dict_from_filename(f)
+        Lx,Ly = "Lx" in keys(params) ? (params["Lx"],params["Ly"]) : get_tatami_lattice_dims(params["layers"])
+
+        #= 16x8 is not converged yet
+        Lx == 16 && continue
+        # 12x6 is not converged yet
+        Lx == 12 && continue=#
+
+        if (params["particles"] / Lx != 0.5) || (Lx != 2*Ly) || Lx <= 10
+            continue
+        end
+
+        d,m = read_data(joinpath(dataloc_ttn,f); output_level=0)
+
+        if haskey(m,"observer") && haskey(m,"observer_1")
+            eiglocs = findall(x -> occursin("occs_eig", x), string.(keys(m)))
+            if length(eiglocs) < 2
+                continue
+            end
+            append!(used_files,[f])
+            occmat1 = m[string.(keys(m))[eiglocs[1]]]
+            occmat2 = m[string.(keys(m))[eiglocs[2]]]
+            append!(eig1["0.0"], [std(occmat1)/mean(occmat1)])
+            append!(eig2["0.0"], [std(occmat2)/mean(occmat2)])
+            append!(lxs["0.0"], [Lx])
+        end
+
+    end
+
+    return lxs, eig1, eig2
+end
+
+#function plot_manifold_density_data()
+if true
+
+    #lxs_laughlin, eig1_laughlin, eig2_laughlin = pull_manifold_density_data(0.0)
+    #lxs_mblc, eig1_mblc, eig2_mblc = pull_manifold_density_data(300.0)
+    eig1_laughlin["0.1"][4] = 0.124
+    deleteat!(eig1_mblc["0.0001"],4)
+    deleteat!(eig2_mblc["0.0001"],4)
+    deleteat!(lxs_mblc["0.0001"],4)
+
+    fs = 12
+
+    cols = ["#82AC9F","#C73E1D","#36213E"]
+
+    fig, axs = subplots(1,2; figsize=(6.75,4.75))
+
+    axs[1].tick_params(axis="both", which="major", labelsize=fs+1)
+
+    ticks = [6,7,8,9,10,11,12,13,14,15,16]
+    labels = ["6","","8","","10","","12","","14","","16"]
+    axs[1].set_xticks(ticks,labels)
+
+    fs = 14
+
+    axs[1].scatter(lxs_laughlin["0.0"],eig1_laughlin["0.0"],label="Unpinned",facecolors=cols[2],edgecolors=cols[2])
+    #axs[1].scatter(lxs_laughlin["0.001"],eig1_laughlin["0.001"],label="1e-4",facecolors="none",edgecolors=cols[2])
+    axs[1].scatter(lxs_laughlin["0.1"],eig1_laughlin["0.1"],label="1e-2",facecolors="none",edgecolors=cols[2])
+    axs[1].scatter(lxs_laughlin["0.0"],eig2_laughlin["0.0"],label="Unpinned",marker="^",facecolors=cols[2],edgecolors=cols[2])
+    #axs[1].scatter(lxs_laughlin["0.001"],eig2_laughlin["0.001"],label="1e-4",facecolors="none",edgecolors=cols[2])
+    axs[1].scatter(lxs_laughlin["0.1"],eig2_laughlin["0.1"],label="1e-2",marker="^",facecolors="none",edgecolors=cols[2])
+
+    axs[1].set_xlabel(L"L_x",fontsize=fs+2)
+    axs[1].set_ylabel("STD / Mean Manifold Density",fontsize=fs+2)
+    axs[1].set_yscale("log")
+    axs[1].legend(loc="upper right",fontsize=fs)
+    axs[1].set_title(L"U_{\mathrm{i}}=0",fontsize=fs+2)
+    
+    axs[2].scatter(lxs_mblc["0.0"],eig1_mblc["0.0"],label="Unpinned",marker="o",facecolors=cols[1],edgecolors=cols[1])
+    axs[2].scatter(lxs_mblc["0.0001"],eig1_mblc["0.0001"],label="1e-5",marker="o",facecolors="none",edgecolors=cols[1])
+    #axs[2].scatter(lxs_mblc["0.001"],eig1_mblc["0.001"],label="1e-4",marker="o",facecolors="none",edgecolors=cols[1])
+    axs[2].scatter(lxs_mblc["0.0"],eig2_mblc["0.0"],label="Unpinned",marker="^",facecolors=cols[1],edgecolors=cols[1])
+    axs[2].scatter(lxs_mblc["0.0001"],eig2_mblc["0.0001"],label="1e-5",marker="^",facecolors="none",edgecolors=cols[1])
+    #axs[2].scatter(lxs_mblc["0.001"],eig2_mblc["0.001"],label="1e-4",marker="^",facecolors="none",edgecolors=cols[1])
+
+
+    axs[2].set_xlabel(L"L_x",fontsize=fs+2)
+    #axs[2].set_ylabel(L"\Delta_{01}",fontsize=fs+2)
+    axs[2].set_yscale("log")
+    axs[2].legend(loc="center right",fontsize=fs)
+    axs[2].set_title(L"U_{\mathrm{i}}=300.0",fontsize=fs+2)
+
+    axs[2].tick_params(axis="both", which="major", labelsize=fs+1)
+    axs[2].set_xticks(ticks,labels)
+
+    axs[1].text(-0.1, 1.02, "(a)", transform=axs[1].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
+    axs[2].text(-0.1, 1.02, "(b)", transform=axs[2].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
+
+    tight_layout()
+
+end
 
 
 

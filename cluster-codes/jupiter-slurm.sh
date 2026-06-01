@@ -7,7 +7,7 @@
 #SBATCH --output=logs/log_file_test_8x8_laughlin
 #SBATCH --error=logs/log_file_test_8x8_laughlin
 #SBATCH --time=00:00:59
-#SBATCH --partition=all
+#SBATCH --partition=booster
 
 
 module load Julia

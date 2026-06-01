@@ -1,5 +1,5 @@
-using Pkg
-Pkg.activate("../synth-dims/")
+#using Pkg
+#Pkg.activate("../synth-dims/")
 #Pkg.develop(path="../.julia/packages/TTN_gpu")
 #Pkg.precompile()
 include("../review-practice-codes/ttn.jl")
@@ -1779,7 +1779,7 @@ function run_synth_dims_generic(params_dict::Dict)
 
 		#
 	println(model_paras[:name])
-	filename_dict = get_minimal_params_dict_from_filename(model_paras[:name])
+	filename_dict = get_params_dict_from_filename(model_paras[:name])
 	println("Location for data is $(model_paras[:location])")
 	if_exists,found_data = if_find_data ? check_data_exists(filename_dict,"ttn"; location=model_paras[:location],output_level=false) : (false,nothing)
 	println("Data Found: ",if_exists)
@@ -1833,7 +1833,6 @@ function run_synth_dims_generic(params_dict::Dict)
 		end
 	else # if no data found then run from scratch starting from the ground state
 		println("Starting Script using $(model_paras[:particles]) particles on $(model_paras[:lattice_size][1])x$(model_paras[:lattice_size][2]) lattice with Flux = $(round(model_paras[:alpha],digits=4)), Bond Dim = $(model_paras[:mdim]), and Long Range Dist = $(model_paras[:lr])")
-		error("Didn't find the existing data")
 		starting = time()
 		net = build_HH_net(model_paras)
 		ham = long_range_HH_ham(net,model_paras[:ts],model_paras[:alpha]; model_paras...)
@@ -2143,8 +2142,8 @@ if false
 	all_results = run_synth_dims_generic(params_dict)
 end=#
 
-# synth-dims for loop runnings
-if true
+#= synth-dims for loop runnings
+if false
 	#BLAS.set_num_threads(open_cores)
 	#cols = ["b","g","r"]
 	#nnst = 0.0
@@ -2165,12 +2164,12 @@ if true
 	#anises = range(1.0,5.0,length=10)
 	#strens = [0.0,0.25,0.5,0.75,1.0,1.5,2.0,5.0,10.0,20.0,50.0,100.0,300.0,1000.0]
 	
-	#
+	#=
 	args_dict = make_args_dict(ARGS)
 	stren = args_dict["onsite_strength"]
 	lx = args_dict["Lx"]
 	ly = args_dict["Ly"]
-	n = args_dict["particles"]
+	n = args_dict["particles"]=#
 	#pinstren = args_dict["pinning_strength"]
 	#xi = args_dict["corr_length"]
 	#mdim = args_dict["mdim"]
@@ -2179,8 +2178,8 @@ if true
 	#dataloc = if_pinning ? get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling") : get_folder_location("cluster-data/synth-dims/torus/new-gauge")
 	#
 
-	#lx,ly,n = 14,7,7
-	#stren = 300.0
+	lx,ly,n = 4,4,2
+	stren = 0.0
 	
 	#alphas = range(0.1,0.30,length=41)
 	#strens = [0.25,0.5,0.75,1.25,1.5,3.0,4.0]#range(0.1,0.5,length=3)
@@ -2199,7 +2198,7 @@ if true
 		
 		#("if_pinning",if_pinning),("dataloc",dataloc),("pinning_strength",pinstren)
 		
-		params_dict = Dict([("if_gpu",true),("outputlevel",1),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",1e-5),("particles",n),("mdim",300),("if_save_data",true),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("if_gpu",false),("outputlevel",1),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",1e-5),("particles",n),("mdim",300),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		#params_dict = Dict([("if_gpu",false),("outputlevel",1),("nrgtol",5e-6),("if_pinning",true),("pinning_strength",pinstren),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-5),("particles",n),("mdim",500),("if_save_data",true),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		#params_dict = Dict([("if_gpu",true),("outputlevel",1),("scaling","exp"),("corr_length",xi),("nrgtol",1e-5),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-4),("particles",n),("mdim",400),("if_save_data",true),("filling",0.5),("if_find_data",true),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
@@ -2218,7 +2217,7 @@ if true
 		#ham = long_range_HH_ham(net,model_paras[:ts],model_paras[:alpha]; model_paras...)
 
 
-		CUDA.@allowscalar all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
+		all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
 		#nrgs = [all_obs[i].nrg[end] for i in 1:params_dict["es_count"]+1]
 		#plot_spectrum(alphas,nrgs,idx,params_dict["es_count"]+1,"Flux Density",true; plot_title="Pfaffian")
 
@@ -2316,7 +2315,7 @@ if true
 			=#
 	#end
 #end
-end#
+end=#
 
 #
 #plot(strens,real.(centermoms),"-p")

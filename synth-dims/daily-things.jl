@@ -979,7 +979,43 @@ if false
     end
 end=#
 
+#= density off-diagonal components in strongly interacting case
+if false
+    cols = ["b","g","r","c","m","y","k","tab:orange","tab:purple","tab:brown"]
+    lx,ly,n = 16,8,8
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict = Dict([("layers",7),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc; output_level=0)
 
+    for f in all_files
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+        state_count = length(findall(x -> occursin("observer",x),string.(keys(m))))
+        println("For $(m["onsite_strength"]) found $(state_count) states")
+    end
+
+    #=d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+
+    occs1 = m["occs_eig_3"]
+    occs2 = m["occs_eig_4"]
+
+
+    fig = figure()
+    imshow(transpose(occs1),extent=(1,lx,1,ly),origin="lower",aspect="auto")
+    xlabel("x")
+    ylabel("y")
+    title("Density Matrix Eigenvalue 1 for $lx x $ly N=$n ULR=$(m["onsite_strength"])")
+    colorbar()
+
+    fig = figure()
+    imshow(transpose(occs2),extent=(1,lx,1,ly),origin="lower",aspect="auto")
+    xlabel("x")
+    ylabel("y")
+    title("Density Matrix Eigenvalue 2 for $lx x $ly N=$n ULR=$(m["onsite_strength"])")
+    colorbar()=#
+
+
+
+end=#
 
 
 #= depreciation calculation for moving out of old apartment
