@@ -2495,22 +2495,77 @@ if false
 end=#
 
 #= transition as function of magnetic spacing of synth-dim with DD interactions
-if false
-    lx,ly,n = 4,4,2
+if false 
+    lx,ly,n = 8,4,4
     intstren = 300.0
-    
-    spacings = range(0.01,1.0,length=11)
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/dd-ints")
+    #=spacings = range(0.01,10.0,length=11)
+    #starting_manifold = []
+    #final_manifold = []
+    flatnesses = []
     for magnetic_spacing in spacings
-        #params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("magnetic_spacing",1.0),("scaling_type","dd"),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",5),("if_find_data",false),("if_save_data",false)])
-        #states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=0)
-        us = long_range_scaling(ly-1,ly,intstren; magnetic_spacing=magnetic_spacing, scaling="dd")
-        plot(us[2:end],label="$(round(magnetic_spacing, digits=3))")
-    end
-    xlabel("Distance")
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("magnetic_spacing",magnetic_spacing),("scaling_type","dd"),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",10),("dataloc",dataloc),("if_find_data",true),("if_save_data",false)])
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=0)
+        #us = long_range_scaling(ly-1,ly,intstren; magnetic_spacing=magnetic_spacing, scaling="dd")
+        #plot(1:length(us[2:end]),us[2:end],label="$(round(magnetic_spacing, digits=3))")
+        #=for i in 3:10
+            scatter(magnetic_spacing,nrgs[i] - nrgs[1],c="k")
+        end
+        scatter(magnetic_spacing,nrgs[2] - nrgs[1],c="r")
+        scatter(magnetic_spacing,nrgs[1] - nrgs[1],c="b")
+        xlabel("Magnetic Spacing")
+        ylabel("E - E0")
+        title("Energy Spectrum vs Magnetic Spacing for $(lx)x$(ly) N=$(n) ULR=$(intstren)")=#
+
+        fourpt1 = four_point(states[1],lattice_params)
+        fourpt2 = four_point(states[2],lattice_params)
+        datadict = Dict([("fourpt_momentum",fourpt1),("fourpt_momentum_1",fourpt2)])
+        modify_data(datadict,filepath,"metadata"; output_level=0)
+
+        
+    end=#
+    #=xlabel("Distance")
     ylabel("Interaction Strength")
     title("Long Range Interaction Scaling for Different Magnetic Spacings")
     legend()
-    yscale("log")
+    yscale("log")=#
+
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    display(all_files)
+
+    spacings = []
+    flatnesses = []
+    for f in all_files
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+
+        magnetic_spacing = m["magnetic_spacing"]
+        println("Working on spacing = $(magnetic_spacing)")
+
+        if haskey(m,"fourpt_momentum")
+            fourpt1 = m["fourpt_momentum"]
+            fourpt2 = m["fourpt_momentum_1"]
+        else
+            lattice_params = get_lattice_params_from_metadata(m)
+            fourpt1 = four_point(d["state"][1],lattice_params)
+            fourpt2 = four_point(d["state"][1],lattice_params)
+            datadict = Dict([("fourpt_momentum",fourpt1),("fourpt_momentum_1",fourpt2)])
+            modify_data(datadict,joinpath(dataloc,f),"metadata"; output_level=0)
+        end
+
+        total_fourpt = (fourpt1 .+ fourpt2) ./2
+        subset_fourpt = vcat([diag(total_fourpt,-i)[2:end-1] for i in 3:lx-3]...,[diag(total_fourpt,i)[2:end-1] for i in 3:lx-3]...)
+        flatness = minimum(subset_fourpt) / maximum(subset_fourpt)
+        
+        append!(flatnesses,[flatness])
+        append!(spacings,[magnetic_spacing])
+
+    end
+    
+    scatter(spacings,flatnesses,c="b")
+    xlabel("Magnetic Spacing")
+    ylabel("Fourpt Momentum Flatness")
+    title("k-DW Order Parameter vs Magnetic Spacing $(lx)x$(ly) N=$(n)")
 
 end=#
 
@@ -2869,8 +2924,629 @@ if false
 
 end=#
 
+#= check density manifold eigenstate rotation
+if false
+
+    ulr = 0.0
+
+    pinning_strength = ulr == 0.0 ? 0.1 : 0.0001
+
+    # ED section: pinned
+    dataloc_pin = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
+    pdict_pin = Dict([("hopping_anisotropy",1.0),("Lx",8),("if_pinning",true),("interaction_strength",ulr),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files_pin = find_data_file(pdict_pin,"ed",dataloc_pin; file_type="jld2")
+    display(all_files_pin)
+
+    used_files = []
+    lxs = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
+    eig1 = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
+    eig2 = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
+    uans1 = []
+    uans2 = []
+    uans3 = []
+    for f in all_files_pin
+        params = get_params_dict_from_filename(f)
+
+        if (params["N"] / params["Lx"] != 0.5) || (params["Lx"] != 2*params["Ly"])
+            continue
+        end
+
+        if params["Lx"] >= 10
+            continue
+        end
+
+        append!(used_files,[f])
+
+        d,m = read_data_jld2(joinpath(dataloc_pin,f); output_level=0)
+        all_nrgs = d["nrg"]
+
+        lx,ly = params["Lx"],params["Ly"]
+        lattice_params = get_lattice_params_from_metadata(m)
+
+        if haskey(m,"pinning_strength") && m["pinning_strength"] == pinning_strength
+            all_eigs::Dict{Int,Vector{ComplexF64}} = Dict([(1,[1/sqrt(2),1/sqrt(2)]),(2,[1/sqrt(2),-1/sqrt(2)])])
+            all_dens = Dict([(1,zeros(Float64,lx,ly)),(2,zeros(Float64,lx,ly))])
+            all_angles1 = zeros(Float64,lx,ly)
+            all_angles2 = zeros(Float64,lx,ly)
+            all_angles3 = zeros(Float64,lx,ly)
+            for i in 1:lx
+                println("Working on x = $i")
+                for j in 1:ly
+                    densop = density_operator(lattice_params, (i,j))
+
+                    val_mat = zeros(ComplexF64,2,2)
+                    
+                    val_mat[1,1] = adjoint(d["state"][1]) * densop * d["state"][1]
+                    val_mat[1,2] = adjoint(d["state"][1]) * densop * d["state"][2]
+                    val_mat[2,1] = adjoint(d["state"][2]) * densop * d["state"][1]
+                    val_mat[2,2] = adjoint(d["state"][2]) * densop * d["state"][2]
+
+                    rez = eigen(val_mat)
+
+                    unitary = zeros(ComplexF64,2,2)
+
+                    eigfound1 = false
+                    next_eig = 1
+                    while !eigfound1 && next_eig < length(all_eigs)
+                        next_eig += 1
+                        abs2(adjoint(rez.vectors[:,1]) * all_eigs[next_eig]) > 0.9 && (eigfound1 = true)
+                    end
+                    if eigfound1 == false
+                        next_eig += 1
+                        #println("Adding new eigenvector for first value at index $(next_eig+1)")
+                        all_eigs[next_eig] = rez.vectors[:,1]
+                        all_dens[next_eig] = zeros(Float64,lx,ly)
+                    else
+                        #println("Found existing eigenvector for first value at index $next_eig")
+                    end
+                    all_dens[next_eig][i,j] = real(rez.values[1])
+
+                    unitary_theta = atan(abs(all_eigs[next_eig][2]),abs(all_eigs[next_eig][1]))
+                    unitary_phi1 = angle(all_eigs[next_eig][1])
+                    unitary_phi2 = angle(all_eigs[next_eig][2])
+                    all_angles1[i,j] = unitary_theta
+                    all_angles2[i,j] = unitary_phi1
+                    all_angles3[i,j] = unitary_phi2
+
+                    eigfound2 = false
+                    next_eig = 1
+                    while !eigfound2 && next_eig < length(all_eigs)
+                        next_eig += 1
+                        abs2(adjoint(rez.vectors[:,2]) * all_eigs[next_eig]) > 0.9 && (eigfound2 = true)
+                    end
+                    if eigfound2 == false
+                        next_eig += 1
+                        #println("Adding new eigenvector for second value at index $(next_eig+1)")
+                        all_eigs[next_eig] = rez.vectors[:,2]
+                        all_dens[next_eig] = zeros(Float64,lx,ly)
+                    else
+                        #println("Found existing eigenvector for second value at index $next_eig")
+                    end
+                    all_dens[next_eig][i,j] = real(rez.values[2])
+
+                    #unitary_angle = atan(abs(all_eigs[next_eig][2]),abs(all_eigs[next_eig][1]))
+                    #all_angles2[i,j] = unitary_angle
+
+                    
+                end
+            end
+            append!(uans1,[all_angles1])
+            append!(uans2,[all_angles2])
+            append!(uans3,[all_angles3])
+        end
+    end
+
+    #= ED section: unpinned
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    pdict = Dict([("hopping_anisotropy",1.0),("interaction_strength",ulr),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2")
+    display(all_files)
+
+    for f in all_files
+        params = get_params_dict_from_filename(f)
+
+        if (params["N"] / params["Lx"] != 0.5) || (params["Lx"] != 2*params["Ly"])
+            continue
+        end
+
+        if params["Lx"] >= 10
+            continue
+        end
+
+        append!(used_files,[f])
+
+        d,m = read_data_jld2(joinpath(dataloc,f); output_level=0)
+        all_nrgs = d["nrg"]
+
+        lx,ly = params["Lx"],params["Ly"]
+        lattice_params = get_lattice_params_from_metadata(m)
+
+        all_eigs::Dict{Int,Vector{ComplexF64}} = Dict([(1,[1/sqrt(2),1/sqrt(2)]),(2,[1/sqrt(2),-1/sqrt(2)])])
+        all_dens = Dict([(1,zeros(Float64,lx,ly)),(2,zeros(Float64,lx,ly))])
+        all_angles1 = zeros(Float64,lx,ly)
+        all_angles2 = zeros(Float64,lx,ly)
+        all_angles3 = zeros(Float64,lx,ly)
+        for i in 1:lx
+            println("Working on x = $i")
+            for j in 1:ly
+                densop = density_operator(lattice_params, (i,j))
+
+                val_mat = zeros(ComplexF64,2,2)
+                
+                val_mat[1,1] = adjoint(d["state"][1]) * densop * d["state"][1]
+                val_mat[1,2] = adjoint(d["state"][1]) * densop * d["state"][2]
+                val_mat[2,1] = adjoint(d["state"][2]) * densop * d["state"][1]
+                val_mat[2,2] = adjoint(d["state"][2]) * densop * d["state"][2]
+
+                rez = eigen(val_mat)
+
+                unitary = zeros(ComplexF64,2,2)
+
+                eigfound1 = false
+                next_eig = 1
+                while !eigfound1 && next_eig < length(all_eigs)
+                    next_eig += 1
+                    abs2(adjoint(rez.vectors[:,1]) * all_eigs[next_eig]) > 0.9 && (eigfound1 = true)
+                end
+                if eigfound1 == false
+                    next_eig += 1
+                    #println("Adding new eigenvector for first value at index $(next_eig+1)")
+                    all_eigs[next_eig] = rez.vectors[:,1]
+                    all_dens[next_eig] = zeros(Float64,lx,ly)
+                else
+                    #println("Found existing eigenvector for first value at index $next_eig")
+                end
+                all_dens[next_eig][i,j] = real(rez.values[1])
+
+                unitary_theta = atan(abs(all_eigs[next_eig][2]),abs(all_eigs[next_eig][1]))
+                unitary_phi1 = angle(all_eigs[next_eig][1])
+                unitary_phi2 = angle(all_eigs[next_eig][2])
+                all_angles1[i,j] = unitary_theta
+                all_angles2[i,j] = unitary_phi1
+                all_angles3[i,j] = unitary_phi2
+
+                eigfound2 = false
+                next_eig = 1
+                while !eigfound2 && next_eig < length(all_eigs)
+                    next_eig += 1
+                    abs2(adjoint(rez.vectors[:,2]) * all_eigs[next_eig]) > 0.9 && (eigfound2 = true)
+                end
+                if eigfound2 == false
+                    next_eig += 1
+                    #println("Adding new eigenvector for second value at index $(next_eig+1)")
+                    all_eigs[next_eig] = rez.vectors[:,2]
+                    all_dens[next_eig] = zeros(Float64,lx,ly)
+                else
+                    #println("Found existing eigenvector for second value at index $next_eig")
+                end
+                all_dens[next_eig][i,j] = real(rez.values[2])
+
+                #unitary_angle = atan(all_eigs[next_eig][2],all_eigs[next_eig][1])
+                #all_angles2[i,j] = unitary_angle
+
+                
+            end
+        end
+        append!(uans1,[all_angles1])
+        append!(uans2,[all_angles2])
+        append!(uans3,[all_angles3])
+    end=#
+
+end=#
+
+#=function momentum_occupation(wavefunc::Vector{Vector{ComplexF64}},lattice_params::Dict; kwargs...)
+    Lx::Int64 = lattice_params["Lx"]
+    Ly::Int64 = lattice_params["Ly"]
+
+    opl::Int = get(kwargs,:output_level,1)
+
+    which_coeff::Function = get(kwargs,:which_coeff,diocane)
+    coeff_kwargs::NamedTuple = get(kwargs,:coeff_kwargs,(Ly=Ly,))
+
+    #twopt1::ComplexF64 = 0.0
+    #twopt2::ComplexF64 = 0.0
+
+    all_eigs::Dict{Int,Vector{ComplexF64}} = Dict([(1,[1/sqrt(2),1/sqrt(2)]),(2,[1/sqrt(2),-1/sqrt(2)])])
+    all_twopts = Dict([(1,zeros(ComplexF64,Lx)),(2,zeros(ComplexF64,Lx))])
+
+    ks = [n/ly for n in 0:Lx-1]
+
+    for (idx,k) in enumerate(ks)
+
+        println("Working on k = $k")
+
+        momentum1 = [0.0, k]
+        momentum2 = momentum1
+
+        mval = Int(momentum1[2] * Ly)
+        mval2 = Int(momentum2[2] * Ly)
+        if mval > Lx || mval2 > Lx
+            error("Momentum out of bounds: m=$mval mp=$mval2 Lx=$Lx")
+        end
+                
+        for y3 in 1:Ly
+            coord3 = (mval+1,y3)
+            s3_linear = linear_index(coord3,Lx,Ly)
+            coeff3::ComplexF64 = which_coeff(coord3,momentum1,"Adag"; coeff_kwargs...)
+            for y4 in 1:Ly
+                coord4 = (mval2+1,y4)
+                s4_linear = linear_index(coord4,Lx,Ly)
+                opl > 0 && println("Working on y1=$(y3) y2=$(y4)")
+                coeff4::ComplexF64 = which_coeff(coord4,momentum2,"A"; coeff_kwargs...)
+
+                coeff::ComplexF64 = coeff3 * coeff4
+                
+                rezmat = zeros(ComplexF64,2,2)
+                hopping_operator = buildHopping(lattice_params,s3_linear,s4_linear)
+                rezmat[1,1] = adjoint(wavefunc[1]) * hopping_operator * wavefunc[1]
+                rezmat[1,2] = adjoint(wavefunc[1]) * hopping_operator * wavefunc[2]
+                rezmat[2,1] = adjoint(wavefunc[2]) * hopping_operator * wavefunc[1]
+                rezmat[2,2] = adjoint(wavefunc[2]) * hopping_operator * wavefunc[2]
+                rez = eigen(rezmat)
+
+                eigfound1 = false
+                next_eig = 1
+                while !eigfound1 && next_eig < length(all_eigs)
+                    next_eig += 1
+                    abs2(adjoint(rez.vectors[:,1]) * all_eigs[next_eig]) > 0.9 && (eigfound1 = true)
+                end
+                if eigfound1 == false
+                    next_eig += 1
+                    #println("Adding new eigenvector for first value at index $(next_eig+1)")
+                    all_eigs[next_eig] = rez.vectors[:,1]
+                    all_twopts[next_eig] = zeros(ComplexF64,Lx)
+                else
+                    #println("Found existing eigenvector for first value at index $next_eig")
+                end
+                all_twopts[next_eig][idx] += coeff * real(rez.values[1])
 
 
+                eigfound2 = false
+                next_eig = 1
+                while !eigfound2 && next_eig < length(all_eigs)
+                    next_eig += 1
+                    abs2(adjoint(rez.vectors[:,2]) * all_eigs[next_eig]) > 0.9 && (eigfound2 = true)
+                end
+                if eigfound2 == false
+                    next_eig += 1
+                    #println("Adding new eigenvector for second value at index $(next_eig+1)")
+                    all_eigs[next_eig] = rez.vectors[:,2]
+                    all_twopts[next_eig] = zeros(ComplexF64,Lx)
+                else
+                    #println("Found existing eigenvector for second value at index $next_eig")
+                end
+                all_twopts[next_eig][idx] += coeff * real(rez.values[2])
+                
+                #local_twopt = coeff * local_exppart
+                #twopt += local_twopt
+            end
+        end
+    end
+
+    final_eigs = []
+    final_twopts = []
+    for (k,v) in all_eigs
+        if sum(abs.(all_twopts[k])) > 1e-3
+            push!(final_eigs,v)
+            push!(final_twopts,real(all_twopts[k]))
+        end
+    end
+
+    if length(final_eigs) > 2
+        display(final_eigs)
+        display(final_twopts)
+        error("Warning: more than 2 eigenvectors found for momentum occupation, check results")
+    end
+        
+    return final_eigs, final_twopts
+end
+
+momentum occupation 8x4 vs interaction strength
+if false
+    lx,ly,n = 8,4,4
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+
+    for f in all_files
+        d,m = read_data_jld2(joinpath(dataloc,f); output_level=0)
+
+        lattice_params = get_lattice_params_from_metadata(m)
+
+        ks = [n/ly for n in 0:lx-1]
+
+        eigs,twopts = momentum_occupation(d["state"],lattice_params; output_level=0, which_coeff=diocane)
+
+        #=fig = figure()
+        plot(ks,twopts[1],"-p",c="b")
+        plot(ks,twopts[2],"-p",c="r")
+        xlabel("k")
+        ylabel("Momentum Occupation")
+        title("Momentum Occupations vs k for $(lx)x$(ly) N=$(n) ULR=$(m["U"][end])")
+        ylim([-0.1,1.1])=#
+        
+        relstd1 = std(twopts[1]) / mean(twopts[1])
+        relstd2 = std(twopts[2]) / mean(twopts[2])
+
+        scatter(m["U"][end],relstd1,c="b")
+        scatter(m["U"][end],relstd2,c="r")
+        xlabel("Interaction Strength")
+        ylabel("Relative Std Dev of Momentum Occupations")
+        title("Rel Std Dev of Momentum Occupations vs Interaction Strength for $(lx)x$(ly) N=$(n)")
+        xscale("log")
+    end
+end=#
+
+#= fourpt momentum 6x3
+if true
+    lx,ly,n = 6,3,3
+    intstren = 300.0
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    params_dict = Dict([("output_level",1),("dataloc",dataloc),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",10),("dataloc",dataloc),("if_find_data",false),("if_save_data",true)])
+    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=0)
+
+    fourpt1 = four_point(states[1],lattice_params)
+    fourpt2 = four_point(states[2],lattice_params)
+
+    datadict = Dict("fourpt_momentum"=>fourpt1,"fourpt_momentum_1"=>fourpt2)
+
+    modify_data(datadict,filepath,"metadata"; output_level=0)
+
+end=#
+
+#= fourier transform of manifold density
+if false
+    lx,ly,n = 8,4,4
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    #=display(all_files)
+
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    lattice_params = get_lattice_params_from_metadata(m)
+
+    occs = get_occupancy(d["state"][2],lattice_params; if_plot=true)
+
+    ft_angles = range(0,2*pi,length=50)
+    ftmat = zeros(ComplexF64,length(ft_angles),length(ft_angles))
+    for (idx1,angle1) in enumerate(ft_angles)
+        for (idx2,angle2) in enumerate(ft_angles)
+            for i in 1:lx
+                for j in 1:ly
+                    dotpart = dot([angle1,angle2],[i,j])
+                    ftmat[idx1,idx2] += occs[j,i] * exp(-im*dotpart)
+                end
+            end
+        end
+    end
+
+    fig = figure()
+    imshow(abs.(ftmat),extent=(0,2*pi,0,2*pi),origin="lower",aspect="auto")
+    xlabel("Fourier Transform Angle 1")
+    ylabel("Fourier Transform Angle 2")
+    title("Fourier Transform of Density Profile for $(lx)x$(ly) N=$(n) ULR=$(m["U"][end])")
+    colorbar()=#
+                
+
+    all_eigs::Dict{Int,Vector{ComplexF64}} = Dict([(1,[1/sqrt(2),1/sqrt(2)]),(2,[1/sqrt(2),-1/sqrt(2)])])
+    all_dens = Dict([(1,0.0),(2,0.0)])
+
+    which_angle1 = [pi,0.0]
+    which_angle2 = [0.0,pi]
+
+    ftd1s = []
+    ftd2s = []
+    intstres = []
+    for f in all_files
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+
+        lattice_params = get_lattice_params_from_metadata(m)
+
+        println("Working on U=$(m["U"][end])")
+
+        occs,eigs = get_manifold_occupancy([d["state"][1],d["state"][2]],lattice_params; output_level=0)
+        #occs = [transpose(get_occupancy(d["state"][1],lattice_params; if_plot=false)), get_occupancy(d["state"][2],lattice_params; if_plot=false)]
+
+        #=if m["U"][end] == 0.0
+            fig = figure()
+            imshow(occs[1],extent=(1,lx,1,ly),origin="lower",aspect="auto",vmin=0,vmax=1)
+            xlabel("x")
+            ylabel("y")
+            title("Density Matrix Eigenvalue 1 for $(lx)x$(ly) N=$(n) ULR=$(m["U"][end])")
+            colorbar()
+            fig = figure()
+        end=#
+
+        ftd11::ComplexF64 = 0.0
+        ftd21::ComplexF64 = 0.0
+        ftd12::ComplexF64 = 0.0
+        ftd22::ComplexF64 = 0.0
+        for i in 1:lx
+            for j in 1:ly
+                dotpart1 = which_angle1[1]*i + which_angle1[2]*j
+                dotpart2 = which_angle1[1]*i + which_angle1[2]*j
+                ftd11 += occs[1][i,j] * exp(im*dotpart1)
+                ftd21 += occs[2][i,j] * exp(im*dotpart2)
+                #ftd12 += occs[1][i,j] * exp(2*pi*im*dot(which_angle2,[i,j]))
+                #ftd22 += occs[2][i,j] * exp(2*pi*im*dot(which_angle2,[i,j]))
+            end
+        end
+
+        append!(ftd1s,abs(ftd11))
+        append!(ftd2s,abs(ftd21))
+        append!(intstres,m["U"][end])
+    end
+    scatter(intstres,ftd1s,c="b",label="Eig 1")
+    scatter(intstres,ftd2s,c="r",label="Eig 2")
+    xlabel("Interaction Strength")
+    ylabel("Fourier Transform of Density Profile")
+    title("FTD vs Interaction Strength for $(lx)x$(ly) N=$(n)")
+    xscale("log")
+    legend()
+    
+
+
+
+end=#
+
+
+#= look directly at manifold density matrix
+if false    
+    lx,ly,n = 8,4,4
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    display(all_files)
+
+    cols = [:b,:r,:g,:m,:c]
+    for f in all_files[1:end-2]
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+
+        lattice_params = get_lattice_params_from_metadata(m)
+
+        offdiags1 = zeros(ComplexF64,lx,ly)
+        offdiags2 = zeros(ComplexF64,lx,ly)        
+        for i in 1:lx
+            println("Working on x = $i")
+            for j in 1:ly
+                densop = density_operator(lattice_params, (i,j))
+                
+                offdiags1[i,j] = adjoint(d["state"][1]) * densop * d["state"][2]
+                offdiags2[i,j] = adjoint(d["state"][2]) * densop * d["state"][1]
+            end
+        end
+
+        unique_vals1 = unique(round.(offdiags1,digits=8))
+        unique_vals2 = unique(round.(offdiags2,digits=8))
+
+        #=if length(unique_vals1) > length(cols) || length(unique_vals2) > length(cols)
+            display(unique_vals1)
+            display(unique_vals2)
+            error("Too many unique values for plotting, increase number of colors or check results")
+        end=#
+
+        for i in 1:length(unique_vals1)
+            scatter(m["U"][end],abs(unique_vals1[i]),c="b",marker="o")
+            scatter(m["U"][end],abs(unique_vals2[i]),c="r",marker="^")
+        end
+        xlabel("Interaction Strength")
+        ylabel("Off-Diagonal Density Matrix Elements")
+        title("Off-Diagonal Density Matrix Elements vs Interaction Strength for $(lx)x$(ly) N=$(n)")
+        xscale("log")
+    end
+
+
+
+end=#
+
+#= check 6x3 real space CDW order vs theoretical value
+if false
+    lx,ly,n = 6,3,3
+    intstren = 300.0
+    pinstren = 1e-5
+    params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_pinning",iszero(pinstren)),("pinning_strength",pinstren),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
+    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+
+    nrgsplitting = nrgs[2] - nrgs[1]
+
+    occs,eigs = get_manifold_occupancy([states[1],states[2]],lattice_params; output_level=1)
+
+    cdwcontrast = maximum(occs[1]) - minimum(occs[1])
+
+    th_cdwcontrast = nrgsplitting / (pinstren)
+    th_splitting = cdwcontrast * pinstren
+
+    println("Theoretical CDW Contrast: $th_cdwcontrast")
+    println("Actual CDW Contrast: $cdwcontrast")
+
+    println("Theoretical Splitting: $th_splitting")
+    println("Actual Splitting: $nrgsplitting")
+end=#
+
+#= plot the CDW contrast theory vs calculated, shows the theory plateaus
+if false
+    ulr = 300.0
+    pinning_strength = ulr == 0.0 ? 0.1 : 0.0001
+    # ED section: pinned
+    dataloc_pin = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
+    pdict_pin = Dict([("hopping_anisotropy",1.0),("if_pinning",true),("interaction_strength",ulr),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files_pin = find_data_file(pdict_pin,"ed",dataloc_pin; file_type="jld2")
+    display(all_files_pin)
+
+    used_files = []
+    lxs = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
+    eig1 = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
+    eig2 = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
+    splittings = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
+    for f in all_files_pin
+        params = get_params_dict_from_filename(f)
+
+        if (params["N"] / params["Lx"] != 0.5) || (params["Lx"] != 2*params["Ly"])
+            continue
+        end
+
+        append!(used_files,[f])
+
+        d,m = read_data_jld2(joinpath(dataloc_pin,f); output_level=0)
+        all_nrgs = d["nrg"]
+
+        if haskey(m,"pinning_strength") && m["pinning_strength"] == pinning_strength
+            eiglocs = findall(x -> occursin("occs_eig", x) && !occursin("vec", x), string.(keys(m)))
+            if length(eiglocs) < 2
+                continue
+            end
+            occmat1 = m[string.(keys(m))[eiglocs[1]]]
+            occmat2 = m[string.(keys(m))[eiglocs[2]]]
+            append!(eig1[string(pinning_strength)],[maximum(occmat1) - minimum(occmat1)])
+            append!(eig2[string(pinning_strength)],[maximum(occmat2) - minimum(occmat2)])
+            append!(lxs[string(pinning_strength)],[params["Lx"]])
+            append!(splittings[string(pinning_strength)],[all_nrgs[2] - all_nrgs[1]])
+        end
+    end
+
+    # ED section: unpinned
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    pdict = Dict([("hopping_anisotropy",1.0),("interaction_strength",ulr),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2")
+    display(all_files)
+
+    for f in all_files
+        params = get_params_dict_from_filename(f)
+
+        if (params["N"] / params["Lx"] != 0.5) || (params["Lx"] != 2*params["Ly"])
+            continue
+        end
+
+        append!(used_files,[f])
+
+        d,m = read_data_jld2(joinpath(dataloc,f); output_level=0)
+        all_nrgs = d["nrg"]
+
+        eiglocs = findall(x -> occursin("occs_eig", x) && !occursin("vec", x), string.(keys(m)))
+        if length(eiglocs) < 2
+            continue
+        end
+        occmat1 = m[string.(keys(m))[eiglocs[1]]]
+        occmat2 = m[string.(keys(m))[eiglocs[2]]]
+        append!(eig1["0.0"],[maximum(occmat1) - minimum(occmat1)])
+        append!(eig2["0.0"],[maximum(occmat2) - minimum(occmat2)])
+        append!(lxs["0.0"],[params["Lx"]])
+        append!(splittings["0.0"],[all_nrgs[2] - all_nrgs[1]])
+    end
+
+    for (k,v) in lxs
+        scatter(v,eig1[k],c="b")
+        scatter(v,eig2[k],c="r")
+
+        thval = splittings[k] / parse(Float64,k)
+        scatter(v,thval,c="g",marker="x")
+    end
+    xlabel(L"L_x")
+    ylabel("CDW Contrast")
+    title("CDW Contrast vs Lattice Size for ULR=$(ulr) with Pinning Strength = $(pinning_strength)")
+    yscale("log")
+
+end=#
 
 
 

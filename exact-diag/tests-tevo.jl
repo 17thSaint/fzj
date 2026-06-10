@@ -127,17 +127,17 @@ end=#
 #= 4x4 N=2 dt benchmark
 if false
 
-    lx,ly,n = 4,4,2
+    lx,ly,n = 6,3,3
     
     intstren = 0.0
 
-    tmax_global = 10.0
+    #tmax_global = 10.0
     #dt_global = 0.001
     dataloc = get_folder_location("cluster-data/exact-diag/time-evo/dt-benchmark")
 
     start_tx = 1e-8
 
-    params_dict_starting = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tx",start_tx),("ty",1.0),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",5),("if_find_data",false),("if_save_data",false)])
+    params_dict_starting = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("tx",start_tx),("ty",1.0),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",5),("if_find_data",false),("if_save_data",false)])
 
     states_i,nrgs_i,rhos_i,filepath_i,if_found_i,lattice_params_i,hamilt_params_i = run_normal_ed(params_dict_starting; output_level=0)
     println("Found starting state")
@@ -147,7 +147,7 @@ if false
 
     end_tx = 1.0
 
-    params_dict_ending = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tx",end_tx),("ty",1.0),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",5),("if_find_data",false),("if_save_data",false)])
+    params_dict_ending = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("tx",end_tx),("ty",1.0),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",5),("if_find_data",false),("if_save_data",false)])
 
     states_f,nrgs_f,rhos_f,filepath_f,if_found_f,lattice_params_f,hamilt_params_f = run_normal_ed(params_dict_ending; output_level=0)
     println("Found ending state")
@@ -155,6 +155,8 @@ if false
     psif_1 = states_f[1]
     psif_2 = states_f[2]
 
+    inst_fid = groundstate_manifold_fidelity([psif_1,psif_2],[psi0_1,psi0_2])
+    println("Instantaneous fidelity at start: $(inst_fid)")
 
     speccount = 2
     time_running_args = (nev=speccount,output_level=1,if_instant_gs=false,if_save_data=false,dataloc=dataloc,)

@@ -51,6 +51,76 @@ function get_occupancy(rho::Array{ComplexF64,2},lattice_params::Dict{String,Any}
     return occs
 end
 
+function get_manifold_occupancy(states::Vector{Vector{ComplexF64}},lattice_params::Dict{String,Any}; kwargs...)
+    opl::Int = get(kwargs,:output_level,1)
+    Lx,Ly = lattice_params["Lx"],lattice_params["Ly"]
+
+    all_eigs::Dict{Int,Vector{ComplexF64}} = Dict([(1,[1/sqrt(2),1/sqrt(2)]),(2,[1/sqrt(2),-1/sqrt(2)])])
+    all_dens = Dict([(1,zeros(Float64,Lx,Ly)),(2,zeros(Float64,Lx,Ly))])
+
+    for i in 1:Lx
+        opl > 0 && println("Working on x = $i")
+        for j in 1:Ly
+            densop = density_operator(lattice_params, (i,j))
+
+            val_mat = zeros(ComplexF64,2,2)
+            
+            val_mat[1,1] = adjoint(states[1]) * densop * states[1]
+            val_mat[1,2] = adjoint(states[1]) * densop * states[2]
+            val_mat[2,1] = adjoint(states[2]) * densop * states[1]
+            val_mat[2,2] = adjoint(states[2]) * densop * states[2]
+
+            rez = eigen(val_mat)
+
+            eigfound1 = false
+            next_eig = 1
+            while !eigfound1 && next_eig < length(all_eigs)
+                next_eig += 1
+                abs2(adjoint(rez.vectors[:,1]) * all_eigs[next_eig]) > 0.9 && (eigfound1 = true)
+            end
+            if eigfound1 == false
+                next_eig += 1
+                #println("Adding new eigenvector for first value at index $(next_eig+1)")
+                all_eigs[next_eig] = rez.vectors[:,1]
+                all_dens[next_eig] = zeros(Float64,Lx,Ly)
+            else
+                #println("Found existing eigenvector for first value at index $next_eig")
+            end
+            all_dens[next_eig][i,j] = real(rez.values[1])
+
+
+            eigfound2 = false
+            next_eig = 1
+            while !eigfound2 && next_eig < length(all_eigs)
+                next_eig += 1
+                abs2(adjoint(rez.vectors[:,2]) * all_eigs[next_eig]) > 0.9 && (eigfound2 = true)
+            end
+            if eigfound2 == false
+                next_eig += 1
+                #println("Adding new eigenvector for second value at index $(next_eig+1)")
+                all_eigs[next_eig] = rez.vectors[:,2]
+                all_dens[next_eig] = zeros(Float64,Lx,Ly)
+            else
+                #println("Found existing eigenvector for second value at index $next_eig")
+            end
+            all_dens[next_eig][i,j] = real(rez.values[2])
+                  
+        end
+    end
+
+    final_dens = []
+    final_eigs = []
+    for (k,v) in all_dens
+        if sum(v) < 1e-3
+            continue
+        end
+        push!(final_dens,v)
+        push!(final_eigs,all_eigs[k])
+    end
+
+    return final_dens, final_eigs
+end
+
 # functions for two-site correlation along physical or synthetic dimension, made from density matrix
 function physical_correlation(densmat::Array{ComplexF64,2},Lx::Int64,Ly::Int64; kwargs...)
     if_plot = get(kwargs,:if_plot,true)

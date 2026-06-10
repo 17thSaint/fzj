@@ -85,6 +85,8 @@ function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
 			fdict["corr_length"] = hamilt_params["corr_length"]
 		elseif hamilt_params["scaling_type"] == "rydberg"
 			fdict["blockade_radius"] = hamilt_params["blockade_radius"]
+        elseif hamilt_params["scaling_type"] == "dd"
+            fdict["magnetic_spacing"] = hamilt_params["magnetic_spacing"]
 		else
 			error("ULR Scaling Type Not Recognized: $(hamilt_params["scaling_type"])")
 		end
@@ -200,16 +202,16 @@ function get_normal_model_params_ed(params_dict::Dict)
     lr_dist == "all" ? lr_dist = Ly-1 : nothing
     scaling_type::String = get(params_dict,"scaling_type","flat")
     other_params_dict::Dict{String,Any} = Dict([("scaling",scaling_type)])
-    if scaling_type != "flat"
-        corr_length = get(params_dict,"corr_length",Ly)
-        sigma::Float64 = get(params_dict, "sigma", 1.0)
-        blockade_radius::Float64 = get(params_dict, "blockade_radius", 1.0)
-        magnetic_spacing::Float64 = get(params_dict, "magnetic_spacing", 1.0)
-        other_params_dict["corr_length"] = corr_length
-        other_params_dict["sigma"] = sigma
-        other_params_dict["blockade_radius"] = blockade_radius
-        other_params_dict["magnetic_spacing"] = magnetic_spacing
-    end
+    
+    corr_length = get(params_dict,"corr_length",Ly)
+    sigma::Float64 = get(params_dict, "sigma", 1.0)
+    blockade_radius::Float64 = get(params_dict, "blockade_radius", 1.0)
+    magnetic_spacing::Float64 = get(params_dict, "magnetic_spacing", 1.0)
+    other_params_dict["corr_length"] = corr_length
+    other_params_dict["sigma"] = sigma
+    other_params_dict["blockade_radius"] = blockade_radius
+    other_params_dict["magnetic_spacing"] = magnetic_spacing
+    
     us::Vector{Float64} = long_range_scaling(lr_dist,Ly,stren; dict_to_symbols(other_params_dict)...)
     interaction_length = scaling_type == "flat" ? lr_dist : corr_length
 
@@ -279,6 +281,9 @@ function get_normal_model_params_ed(params_dict::Dict)
                         "U"=>us,
                         "scaling_type"=>scaling_type,
                         "corr_length"=>interaction_length,
+                        "sigma"=>sigma,
+                        "blockade_radius"=>blockade_radius,
+                        "magnetic_spacing"=>magnetic_spacing,
                         "which_dir"=>which_dir,
                         "interaction_cutoff"=>int_cutoff)
 

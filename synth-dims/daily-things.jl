@@ -1017,35 +1017,73 @@ if false
 
 end=#
 
+#= finite size scaling 4pt momentum
+if false
+    lx,ly,n = 14,7,7
+    intstren = 300.0
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0),("onsite_strength",intstren)])
+    all_files = find_data_file(pdict,"ttn",dataloc; output_level=0)
+    display(all_files)
 
-#= depreciation calculation for moving out of old apartment
-# depreciation parameters
-factor_per_year = 0.9
-number_of_years = 2 + 7/12  # moved into your old room June 2023, moving out Jan 2026
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    dw,mw = read_data(joinpath(dataloc,"wavefunc"*all_files[1]); output_level=0)
 
-# initial values of items
-kallax = 60
-clothing_stand = 5 # if by clothing stand you mean the wooden boxes, this is nailed-together scrap wood
-drawers = 2*15     # definitely not 30 each
-desk = 10          # nowhere near new when I received it, definitely cheap to start
-chair = 10         # also not new, had many holes, rips, and stains
-total_value = kallax + clothing_stand + drawers + desk + chair
-println("Total initial value is ",total_value)
+    fourpt = four_point(dw["ttn"])
 
-# calculated depreciation
-final_value = total_value * factor_per_year^(number_of_years)
-depreciation_amount = total_value - final_value
-println("Depreciation amount after $(number_of_years) years is ",depreciation_amount)
+    datadict = Dict([("fourpt_momentum",fourpt)])
 
-# moving and disposal costs
-van_rental_cost = 60 / 4               # all these items makeup one quarter of a van load, van rental is €60
-moving_items_cost = 15 * 0.25     # cost of physically moving all the items at €15 / hour for 15 minutes
-total_moving_cost = van_rental_cost + moving_items_cost
-println("Total moving cost is ",total_moving_cost)
+    modify_data(datadict,joinpath(dataloc,all_files[1]),"metadata"; output_level=0)
+end=#
 
-# final payment due
-println("Final Payment due is ",depreciation_amount - total_moving_cost)=#
+# look directly at manifold density matrix
+if true    
+    lx,ly,n = 8,4,4
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    display(all_files)
 
+    cols = [:b,:r,:g,:m,:c]
+    for f in all_files[1:end-2]
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+
+        lattice_params = get_lattice_params_from_metadata(m)
+
+        offdiags1 = zeros(ComplexF64,lx,ly)
+        offdiags2 = zeros(ComplexF64,lx,ly)        
+        for i in 1:lx
+            println("Working on x = $i")
+            for j in 1:ly
+                densop = density_operator(lattice_params, (i,j))
+                
+                offdiags1[i,j] = adjoint(d["state"][1]) * densop * d["state"][2]
+                offdiags2[i,j] = adjoint(d["state"][2]) * densop * d["state"][1]
+            end
+        end
+
+        unique_vals1 = unique(round.(offdiags1,digits=8))
+        unique_vals2 = unique(round.(offdiags2,digits=8))
+
+        #=if length(unique_vals1) > length(cols) || length(unique_vals2) > length(cols)
+            display(unique_vals1)
+            display(unique_vals2)
+            error("Too many unique values for plotting, increase number of colors or check results")
+        end=#
+
+        for i in 1:length(unique_vals1)
+            scatter(m["U"][end],abs(unique_vals1[i]),c="b",marker="o")
+            scatter(m["U"][end],abs(unique_vals2[i]),c="r",marker="^")
+        end
+        xlabel("Interaction Strength")
+        ylabel("Off-Diagonal Density Matrix Elements")
+        title("Off-Diagonal Density Matrix Elements vs Interaction Strength for $(lx)x$(ly) N=$(n)")
+        xscale("log")
+    end
+
+
+
+end
 
 
 

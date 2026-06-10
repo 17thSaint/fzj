@@ -442,9 +442,9 @@ function plot_finitesplitting_scaling(ulr::Float64=0.0; kwargs...)
         Lx,Ly = "Lx" in keys(params) ? (params["Lx"],params["Ly"]) : get_tatami_lattice_dims(params["layers"])
 
         # 16x8 is not converged yet
-        Lx == 16 && continue
+        #Lx == 16 && continue
         # 12x6 is not converged yet
-        Lx == 12 && continue
+        #Lx == 12 && continue
 
         if (params["particles"] / Lx != 0.5) || (Lx != 2*Ly) || Lx <= 10
             continue
@@ -539,8 +539,8 @@ function plot_paper_finitesplitting_scaling()
 
     axs[1].tick_params(axis="both", which="major", labelsize=fs+1)
 
-    ticks = [6,7,8,9,10,11,12,13,14]
-    labels = ["6","","8","","10","","12","","14"]
+    ticks = [6,7,8,9,10,11,12,13,14,15,16]
+    labels = ["6","","8","","10","","12","","14","","16"]
     axs[1].set_xticks(ticks,labels)
 
     fs = 14
@@ -571,17 +571,17 @@ function plot_paper_finitesplitting_scaling()
         length(v) > 0 && axs[1].scatter(lxs_laughlin[k],v,label=local_label,marker=mm,facecolors=fc,edgecolors=cols[2])
     end=#
 
-    # temporary data manipulation for ulr = 0.0
+    #= temporary data manipulation for ulr = 0.0
     append!(gaps_laughlin["0.0"],0.0004)
     append!(lxs_laughlin["0.0"],12)
     append!(gaps_laughlin["0.001"],0.00042)
     append!(lxs_laughlin["0.001"],12)
     append!(gaps_laughlin["0.001"],1.05e-4)
-    append!(lxs_laughlin["0.001"],14)
+    append!(lxs_laughlin["0.001"],14)=#
 
     axs[1].scatter(lxs_laughlin["0.0"],gaps_laughlin["0.0"],label="Unpinned",marker="^",facecolors=cols[2],edgecolors=cols[2])
-    axs[1].scatter(lxs_laughlin["0.001"],gaps_laughlin["0.001"],label="1e-4",marker="*",facecolors="none",edgecolors=cols[2])
-    axs[1].scatter(lxs_laughlin["0.1"],gaps_laughlin["0.1"],label="1e-2",marker="^",facecolors="none",edgecolors=cols[2])
+    axs[1].scatter(lxs_laughlin["0.001"],gaps_laughlin["0.001"],label="1e-3",marker="*",facecolors="none",edgecolors=cols[2])
+    axs[1].scatter(lxs_laughlin["0.1"],gaps_laughlin["0.1"],label="1e-1",marker="^",facecolors="none",edgecolors=cols[2])
 
     axs[1].set_xlabel(L"L_x",fontsize=fs+2)
     axs[1].set_ylabel(L"\Delta_{01}",fontsize=fs+2)
@@ -617,20 +617,20 @@ function plot_paper_finitesplitting_scaling()
         length(v) > 0 && axs[2].scatter(lxs_mblc[k],v,label=local_label,marker=mm,facecolors=fc,edgecolors=cols[1])
     end=#
 
-    # temporary data manipulation for ulr = 300.0
+    #= temporary data manipulation for ulr = 300.0
     gaps_mblc["0.0001"][4] = 1.05e-5
     gaps_mblc["0.0001"][5] = 1e-5
     append!(gaps_mblc["0.001"],0.000105)
     append!(lxs_mblc["0.001"],12)
     append!(gaps_mblc["0.001"],0.0001)
-    append!(lxs_mblc["0.001"],14)
+    append!(lxs_mblc["0.001"],14)=#
 
-    deleteat!(gaps_mblc["0.0001"],6)
-    deleteat!(lxs_mblc["0.0001"],6)
+    #deleteat!(gaps_mblc["0.0001"],6)
+    #deleteat!(lxs_mblc["0.0001"],6)
 
     axs[2].scatter(lxs_mblc["0.0"],gaps_mblc["0.0"],label="Unpinned",marker="o",facecolors=cols[1],edgecolors=cols[1])
-    axs[2].scatter(lxs_mblc["0.0001"],gaps_mblc["0.0001"],label="1e-5",marker="o",facecolors="none",edgecolors=cols[1])
-    axs[2].scatter(lxs_mblc["0.001"],gaps_mblc["0.001"],label="1e-4",marker="*",facecolors="none",edgecolors=cols[1])
+    axs[2].scatter(lxs_mblc["0.0001"],gaps_mblc["0.0001"],label="1e-4",marker="o",facecolors="none",edgecolors=cols[1])
+    axs[2].scatter(lxs_mblc["0.001"],gaps_mblc["0.001"],label="1e-3",marker="*",facecolors="none",edgecolors=cols[1])
 
 
     axs[2].set_xlabel(L"L_x",fontsize=fs+2)
@@ -2507,11 +2507,10 @@ function pull_manifold_density_data(ulr::Float64)
     return lxs, eig1, eig2
 end
 
-#function plot_manifold_density_data()
-if true
+function plot_manifold_density_data()
 
-    #lxs_laughlin, eig1_laughlin, eig2_laughlin = pull_manifold_density_data(0.0)
-    #lxs_mblc, eig1_mblc, eig2_mblc = pull_manifold_density_data(300.0)
+    lxs_laughlin, eig1_laughlin, eig2_laughlin = pull_manifold_density_data(0.0)
+    lxs_mblc, eig1_mblc, eig2_mblc = pull_manifold_density_data(300.0)
     eig1_laughlin["0.1"][4] = 0.124
     deleteat!(eig1_mblc["0.0001"],4)
     deleteat!(eig2_mblc["0.0001"],4)
@@ -2564,11 +2563,711 @@ if true
     axs[1].text(-0.1, 1.02, "(a)", transform=axs[1].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
     axs[2].text(-0.1, 1.02, "(b)", transform=axs[2].transAxes,va="bottom", ha="left", fontsize=14, fontweight="bold")
 
+    axs[1].set_ylim(1e-2,1e0)
+    axs[2].set_ylim(1e-2,1e0)
+
     tight_layout()
 
 end
 
+# finite size scaling k-DW
+function plot_kdw_finite_size_scaling()
+    fourpt_dict = Dict()
 
+    lx,ly,n = 6,3,3
+    intstren = 300.0
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("hopping_anisotropy",1.0),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2")
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    fourpt_full = 0.5 .* (m["fourpt_momentum"] .+ m["fourpt_momentum_1"])
+    fourpt_dict["$(lx)x$(ly)"] = fourpt_full[2,4:end]
+
+    lx,ly,n = 8,4,4
+    intstren = 300.0
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("hopping_anisotropy",1.0),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2")
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    fourpt_full = m["fourpt_momentum"]
+    fourpt_dict["$(lx)x$(ly)"] = fourpt_full[2,4:end]
+
+    lx,ly,n = 12,6,6
+    intstren = 300.0
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
+    pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0),("onsite_strength",intstren)])
+    all_files = find_data_file(pdict,"ttn",dataloc; output_level=0)
+    d,m = read_data(joinpath(dataloc,all_files[2]); output_level=0)
+    fourpt_full = m["fourpt_momentum"]
+    fourpt_dict["$(lx)x$(ly)"] = fourpt_full[2,4:end]
+
+
+    #= rerunning groundstate
+    lx,ly,n = 14,7,7
+    intstren = 300.0
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
+    pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0),("onsite_strength",intstren)])
+    all_files = find_data_file(pdict,"ttn",dataloc; output_level=0)
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    fourpt_full = m["fourpt_momentum"]
+    fourpt_dict["$(lx)x$(ly)"] = fourpt_full=#
+
+    lx,ly,n = 16,8,8
+    intstren = 300.0
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict = Dict([("layers",7),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc)    
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    fourpt_full = m["fourpt_momentum"]
+    fourpt_dict["$(lx)x$(ly)"] = vcat(fourpt_full[3,5:end],fourpt_full[3,1])
+
+    lxs = []
+    relstds = []
+    for (k,v) in fourpt_dict
+        maxval,minval = maximum(v), minimum(v)
+        relstd = std([maxval,minval]) / mean([maxval,minval])
+        split(k,"x") |> x -> push!(lxs, parse(Int,x[1]))
+        push!(relstds, relstd)
+    end
+    scatter(lxs,relstds)
+    xlabel(L"L_x",fontsize=14)
+    ylabel("STD / Mean k-DW",fontsize=14)
+    yscale("log")
+    title("Finite Size Scaling of k-DW",fontsize=16)
+    ylim(1e-2,1e1)
+end
+
+# finite size scaling momentum occupation
+function momentum_occupation(wavefunc::Vector{Vector{ComplexF64}},lattice_params::Dict; kwargs...)
+    Lx::Int64 = lattice_params["Lx"]
+    Ly::Int64 = lattice_params["Ly"]
+
+    opl::Int = get(kwargs,:output_level,1)
+
+    which_coeff::Function = get(kwargs,:which_coeff,diocane)
+    coeff_kwargs::NamedTuple = get(kwargs,:coeff_kwargs,(Ly=Ly,))
+
+    #twopt1::ComplexF64 = 0.0
+    #twopt2::ComplexF64 = 0.0
+
+    all_eigs::Dict{Int,Vector{ComplexF64}} = Dict([(1,[1/sqrt(2),1/sqrt(2)]),(2,[1/sqrt(2),-1/sqrt(2)])])
+    all_twopts = Dict([(1,zeros(ComplexF64,Lx)),(2,zeros(ComplexF64,Lx))])
+
+    ks = [n/Ly for n in 0:Lx-1]
+
+    for (idx,k) in enumerate(ks)
+
+        opl > 0 && println("Working on k = $k")
+
+        momentum1 = [0.0, k]
+        momentum2 = momentum1
+
+        mval = Int(momentum1[2] * Ly)
+        mval2 = Int(momentum2[2] * Ly)
+        if mval > Lx || mval2 > Lx
+            error("Momentum out of bounds: m=$mval mp=$mval2 Lx=$Lx")
+        end
+                
+        for y3 in 1:Ly
+            coord3 = (mval+1,y3)
+            s3_linear = linear_index(coord3,Lx,Ly)
+            coeff3::ComplexF64 = which_coeff(coord3,momentum1,"Adag"; coeff_kwargs...)
+            for y4 in 1:Ly
+                coord4 = (mval2+1,y4)
+                s4_linear = linear_index(coord4,Lx,Ly)
+                opl > 0 && println("Working on y1=$(y3) y2=$(y4)")
+                coeff4::ComplexF64 = which_coeff(coord4,momentum2,"A"; coeff_kwargs...)
+
+                coeff::ComplexF64 = coeff3 * coeff4
+                
+                rezmat = zeros(ComplexF64,2,2)
+                hopping_operator = buildHopping(lattice_params,s3_linear,s4_linear)
+                rezmat[1,1] = adjoint(wavefunc[1]) * hopping_operator * wavefunc[1]
+                rezmat[1,2] = adjoint(wavefunc[1]) * hopping_operator * wavefunc[2]
+                rezmat[2,1] = adjoint(wavefunc[2]) * hopping_operator * wavefunc[1]
+                rezmat[2,2] = adjoint(wavefunc[2]) * hopping_operator * wavefunc[2]
+                rez = eigen(rezmat)
+
+                eigfound1 = false
+                next_eig = 1
+                while !eigfound1 && next_eig < length(all_eigs)
+                    next_eig += 1
+                    abs2(adjoint(rez.vectors[:,1]) * all_eigs[next_eig]) > 0.9 && (eigfound1 = true)
+                end
+                if eigfound1 == false
+                    next_eig += 1
+                    #println("Adding new eigenvector for first value at index $(next_eig+1)")
+                    all_eigs[next_eig] = rez.vectors[:,1]
+                    all_twopts[next_eig] = zeros(ComplexF64,Lx)
+                else
+                    #println("Found existing eigenvector for first value at index $next_eig")
+                end
+                all_twopts[next_eig][idx] += coeff * real(rez.values[1])
+
+
+                eigfound2 = false
+                next_eig = 1
+                while !eigfound2 && next_eig < length(all_eigs)
+                    next_eig += 1
+                    abs2(adjoint(rez.vectors[:,2]) * all_eigs[next_eig]) > 0.9 && (eigfound2 = true)
+                end
+                if eigfound2 == false
+                    next_eig += 1
+                    #println("Adding new eigenvector for second value at index $(next_eig+1)")
+                    all_eigs[next_eig] = rez.vectors[:,2]
+                    all_twopts[next_eig] = zeros(ComplexF64,Lx)
+                else
+                    #println("Found existing eigenvector for second value at index $next_eig")
+                end
+                all_twopts[next_eig][idx] += coeff * real(rez.values[2])
+                
+                #local_twopt = coeff * local_exppart
+                #twopt += local_twopt
+            end
+        end
+    end
+
+    final_eigs = []
+    final_twopts = []
+    for (k,v) in all_eigs
+        if sum(abs.(all_twopts[k])) > 1e-3
+            push!(final_eigs,v)
+            push!(final_twopts,real(all_twopts[k]))
+        end
+    end
+
+    if length(final_eigs) > 2
+        display(final_eigs)
+        display(final_twopts)
+        error("Warning: more than 2 eigenvectors found for momentum occupation, check results")
+    end
+        
+    return final_eigs, final_twopts
+end
+
+function momentum_occupation(wavefuncs::Vector{TreeTensorNetwork}; kwargs...)
+    Lx,Ly = size(physical_lattice(network(wavefuncs[1])))
+
+    opl::Int = get(kwargs,:output_level,1)
+
+    which_coeff::Function = get(kwargs,:which_coeff,diocane)
+    coeff_kwargs::NamedTuple = get(kwargs,:coeff_kwargs,(Ly=Ly,))
+
+    all_eigs::Dict{Int,Vector{ComplexF64}} = Dict([(1,[1/sqrt(2),1/sqrt(2)]),(2,[1/sqrt(2),-1/sqrt(2)])])
+    all_twopts = Dict([(1,zeros(ComplexF64,Lx)),(2,zeros(ComplexF64,Lx))])
+
+    ks = [n/ly for n in 0:Lx-1]
+
+    for (idx,k) in enumerate(ks)
+
+        opl > 0 && println("Working on k = $k")
+
+        momentum1 = [0.0, k]
+        momentum2 = momentum1
+
+        mval = Int(momentum1[2] * Ly)
+        mval2 = Int(momentum2[2] * Ly)
+        if mval > Lx || mval2 > Lx
+            error("Momentum out of bounds: m=$mval mp=$mval2 Lx=$Lx")
+        end
+                
+        for y3 in 1:Ly
+            coord3 = (mval+1,y3)
+            s3_linear = linear_index(coord3,Lx,Ly)
+            coeff3::ComplexF64 = which_coeff(coord3,momentum1,"Adag"; coeff_kwargs...)
+            for y4 in 1:Ly
+                coord4 = (mval2+1,y4)
+                s4_linear = linear_index(coord4,Lx,Ly)
+                opl > 0 && println("Working on y1=$(y3) y2=$(y4)")
+                coeff4::ComplexF64 = which_coeff(coord4,momentum2,"A"; coeff_kwargs...)
+
+                coeff::ComplexF64 = coeff3 * coeff4
+                
+                rez = correlation(wavefuncs, "Adag", "A", s3_linear, s4_linear)
+
+                eigfound1 = false
+                next_eig = 1
+                while !eigfound1 && next_eig < length(all_eigs)
+                    next_eig += 1
+                    abs2(adjoint(rez.vectors[:,1]) * all_eigs[next_eig]) > 0.9 && (eigfound1 = true)
+                end
+                if eigfound1 == false
+                    next_eig += 1
+                    #println("Adding new eigenvector for first value at index $(next_eig+1)")
+                    all_eigs[next_eig] = rez.vectors[:,1]
+                    all_twopts[next_eig] = zeros(ComplexF64,Lx)
+                else
+                    #println("Found existing eigenvector for first value at index $next_eig")
+                end
+                all_twopts[next_eig][idx] += coeff * real(rez.values[1])
+
+
+                eigfound2 = false
+                next_eig = 1
+                while !eigfound2 && next_eig < length(all_eigs)
+                    next_eig += 1
+                    abs2(adjoint(rez.vectors[:,2]) * all_eigs[next_eig]) > 0.9 && (eigfound2 = true)
+                end
+                if eigfound2 == false
+                    next_eig += 1
+                    #println("Adding new eigenvector for second value at index $(next_eig+1)")
+                    all_eigs[next_eig] = rez.vectors[:,2]
+                    all_twopts[next_eig] = zeros(ComplexF64,Lx)
+                else
+                    #println("Found existing eigenvector for second value at index $next_eig")
+                end
+                all_twopts[next_eig][idx] += coeff * real(rez.values[2])
+                
+                #local_twopt = coeff * local_exppart
+                #twopt += local_twopt
+            end
+        end
+    end
+
+    final_eigs = []
+    final_twopts = []
+    for (k,v) in all_eigs
+        if sum(abs.(all_twopts[k])) > 1e-3
+            push!(final_eigs,v)
+            push!(final_twopts,real(all_twopts[k]))
+        end
+    end
+
+    if length(final_eigs) > 2
+        display(final_eigs)
+        display(final_twopts)
+        error("Warning: more than 2 eigenvectors found for momentum occupation, check results")
+    end
+        
+    return final_eigs, final_twopts
+end
+
+# finite size scaling momentum occupation Laughlin
+function plot_finite_size_scaling_momentum_occupation_laughlin()
+    intstren = 0.0
+
+    lx,ly,n = 6,3,3
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    lattice_params = get_lattice_params_from_metadata(m)
+    eigs,twopts = momentum_occupation(d["state"][1:2],lattice_params; output_level=0, which_coeff=diocane)
+    relstd1 = std(twopts[1]) / mean(twopts[1])
+    relstd2 = std(twopts[2]) / mean(twopts[2])
+    #scatter(lx,relstd1,c="r")
+    #scatter(lx,relstd2,c="b")
+    scatter(lx,0.5*(relstd1+relstd2),c="b")
+
+    lx,ly,n = 8,4,4
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    lattice_params = get_lattice_params_from_metadata(m)
+    eigs,twopts = momentum_occupation(d["state"][1:2],lattice_params; output_level=0, which_coeff=diocane)
+    relstd1 = std(twopts[1]) / mean(twopts[1])
+    relstd2 = std(twopts[2]) / mean(twopts[2])
+    #scatter(lx,relstd1,c="r")
+    #scatter(lx,relstd2,c="b")
+    scatter(lx,0.5*(relstd1+relstd2),c="b")
+
+    lx,ly,n = 10,5,5
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    eigs = [m["momentum_occs"],m["momentum_occs_1"]]
+    relstd1 = std(eigs[1]) / mean(eigs[1])
+    relstd2 = std(eigs[2]) / mean(eigs[2])
+    #scatter(lx,relstd1,c="r")
+    #scatter(lx,relstd2,c="b")
+    scatter(lx,0.5*(relstd1+relstd2),c="b")
+
+    lx,ly,n = 12,6,6
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
+    pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc; output_level=0)
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    eigs = [m["momentum_occs"],m["momentum_occs_1"]]
+    relstd1 = std(eigs[1]) / mean(eigs[1])
+    relstd2 = std(eigs[2]) / mean(eigs[2])
+    #scatter(lx,relstd1,c="r")
+    #scatter(lx,relstd2,c="b")
+    scatter(lx,0.5*(relstd1+relstd2),c="b")
+
+    #= this one looks very wrong
+    lx,ly,n = 14,7,7
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc; output_level=0)
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    eigs = [m["momentum_occs"],m["momentum_occs_1"]]
+    relstd1 = std(eigs[1]) / mean(eigs[1])
+    relstd2 = std(eigs[2]) / mean(eigs[2])
+    scatter(lx,relstd1,c="r")
+    scatter(lx,relstd2,c="b")=#
+
+    lx,ly,n = 16,8,8
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict = Dict([("layers",7),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc; output_level=0)
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    eigs = [m["momentum_occs"],m["momentum_occs_1"]]
+    relstd1 = std(eigs[1]) / mean(eigs[1])
+    relstd2 = std(eigs[2]) / mean(eigs[2])
+    #scatter(lx,relstd1,c="r")
+    #scatter(lx,relstd2,c="b")
+    scatter(lx,0.5*(relstd1+relstd2),c="b",label="U=$intstren")
+
+    yscale("log")
+    xlabel(L"L_x")
+    ylabel("STD / Mean Momentum Occupation")
+    title("Finite Size Scaling of Momentum Occupation U = 0.0")
+
+
+end
+
+#= finite size scaling momentum occupation ULR
+# ED data shows plateau, need better TTN data
+if false
+    intstren = 300.0
+
+    lx,ly,n = 6,3,3
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    lattice_params = get_lattice_params_from_metadata(m)
+    eigs,twopts = momentum_occupation(d["state"][1:2],lattice_params; output_level=0, which_coeff=diocane)
+    relstd1 = std(twopts[1]) / mean(twopts[1])
+    relstd2 = std(twopts[2]) / mean(twopts[2])
+    #scatter(lx,relstd1,c="r")
+    #scatter(lx,relstd2,c="b")
+    scatter(lx,0.5*(relstd1+relstd2),c="r")
+
+    lx,ly,n = 8,4,4
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    lattice_params = get_lattice_params_from_metadata(m)
+    eigs,twopts = momentum_occupation(d["state"][1:2],lattice_params; output_level=0, which_coeff=diocane)
+    relstd1 = std(twopts[1]) / mean(twopts[1])
+    relstd2 = std(twopts[2]) / mean(twopts[2])
+    #scatter(lx,relstd1,c="r")
+    #scatter(lx,relstd2,c="b")
+    scatter(lx,0.5*(relstd1+relstd2),c="r")
+
+    lx,ly,n = 10,5,5
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    if haskey(m,"momentum_occs") && haskey(m,"momentum_occs_1")
+        eigs = [m["momentum_occs"],m["momentum_occs_1"]]
+        relstd1 = std(eigs[1]) / mean(eigs[1])
+        relstd2 = std(eigs[2]) / mean(eigs[2])
+        #scatter(lx,relstd1,c="r")
+        #scatter(lx,relstd2,c="b")
+        scatter(lx,0.5*(relstd1+relstd2),c="r",label="U=$intstren")
+    end
+
+    #xlabel(L"L_x")
+    #ylabel("STD / Mean Momentum Occupation")
+    #title("Finite Size Scaling of Momentum Occupation U = $intstren")
+    #yscale("log")
+    #ylim(1e-2,1e1)
+    legend()
+
+end=#
+
+#=if false
+    intstren = 300.0
+
+    markers = ["o","^","*"]
+    splittings = [0.01,0.001,0.0001]
+    for (lx,ly,n) in [(10,5,5),(8,4,4),(6,3,3)]
+        #intstren = 300.0
+        dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
+        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+        all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+        
+        for f in all_files
+            d,m = read_data(joinpath(dataloc,f); output_level=0)
+            pinstren = m["pinning_strength"]
+            
+            eiglocs = findall(x -> occursin("occs_eig", x), string.(keys(m)))
+            if length(eiglocs) < 2
+                continue
+            end
+            occmat1 = m[string.(keys(m))[eiglocs[1]]]
+            occmat2 = m[string.(keys(m))[eiglocs[2]]]
+            
+            contrast = maximum(occmat2) - minimum(occmat2)
+            nrg_splitting = d["nrg"][2] - d["nrg"][1]
+
+            theoretical_splitting = contrast * pinstren
+
+            println("For $(lx)x$(ly) N=$(n) with pinning strength $pinstren, contrast is $contrast, energy splitting is $nrg_splitting, theoretical splitting is $theoretical_splitting")
+
+            which_marker = markers[findfirst(x -> x == pinstren, splittings)]
+
+            scatter(lx, nrg_splitting, c="b", marker=which_marker)
+            scatter(lx, theoretical_splitting, c="r", marker=which_marker)
+        end
+    end
+
+    lx,ly,n = 12,6,6
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
+    pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc; output_level=0)
+    for f in all_files
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+        pinstren = m["pinning_strength"]
+        eiglocs = findall(x -> occursin("occs_eig", x), string.(keys(m)))
+        if length(eiglocs) < 2
+            continue
+        end
+        occmat1 = m[string.(keys(m))[eiglocs[1]]]
+        occmat2 = m[string.(keys(m))[eiglocs[2]]]
+        
+        contrast = maximum(occmat2) - minimum(occmat2)
+        nrg_splitting = m["observer_1"].nrg[end] - m["observer"].nrg[end]
+
+        theoretical_splitting = contrast * pinstren
+
+        println("For $(lx)x$(ly) N=$(n) with pinning strength $pinstren, contrast is $contrast, energy splitting is $nrg_splitting, theoretical splitting is $theoretical_splitting")
+
+        which_marker = markers[findfirst(x -> x == pinstren, splittings)]
+
+        scatter(lx, nrg_splitting, c="b", marker=which_marker)
+        scatter(lx, theoretical_splitting, c="r", marker=which_marker)
+    end
+
+    xlabel(L"L_x")
+    ylabel("Energy Splitting")
+    title("Energy Splitting vs Theoretical Prediction for Pinned ULR")
+    yscale("log")
+end=#
+
+# check pinning strength vs splitting for ULR CDW theory
+if true
+    ulr = 300.0
+    pinning_strength = ulr == 0.0 ? 0.1 : 0.0001
+
+    # ED section: pinned
+    dataloc_pin = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
+    pdict_pin = Dict([("hopping_anisotropy",1.0),("if_pinning",true),("interaction_strength",ulr),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files_pin = find_data_file(pdict_pin,"ed",dataloc_pin; file_type="jld2")
+    display(all_files_pin)
+
+    used_files = []
+    lxs = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
+    eig1 = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
+    eig2 = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
+    real_splittings = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
+    for f in all_files_pin
+        params = get_params_dict_from_filename(f)
+
+        if (params["N"] / params["Lx"] != 0.5) || (params["Lx"] != 2*params["Ly"])
+            continue
+        end
+
+        append!(used_files,[f])
+
+        d,m = read_data_jld2(joinpath(dataloc_pin,f); output_level=0)
+        all_nrgs = d["nrg"]
+
+        if haskey(m,"pinning_strength") && m["pinning_strength"] == pinning_strength
+            eiglocs = findall(x -> occursin("occs_eig", x), string.(keys(m)))
+            if length(eiglocs) < 2
+                continue
+            end
+            occmat1 = m[string.(keys(m))[eiglocs[1]]]
+            occmat2 = m[string.(keys(m))[eiglocs[2]]]
+            append!(eig1[string(pinning_strength)],[maximum(occmat1) - minimum(occmat1)])
+            append!(eig2[string(pinning_strength)],[maximum(occmat2) - minimum(occmat2)])
+            append!(real_splittings[string(pinning_strength)],[all_nrgs[2] - all_nrgs[1]])
+            append!(lxs[string(pinning_strength)],[params["Lx"]])
+        end
+    end
+
+    # ED section: unpinned
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    pdict = Dict([("hopping_anisotropy",1.0),("interaction_strength",ulr),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2")
+    display(all_files)
+
+    for f in all_files
+        params = get_params_dict_from_filename(f)
+
+        if (params["N"] / params["Lx"] != 0.5) || (params["Lx"] != 2*params["Ly"])
+            continue
+        end
+
+        append!(used_files,[f])
+
+        d,m = read_data_jld2(joinpath(dataloc,f); output_level=0)
+        all_nrgs = d["nrg"]
+
+        eiglocs = findall(x -> occursin("occs_eig", x), string.(keys(m)))
+        if length(eiglocs) < 2
+            continue
+        end
+        occmat1 = abs.(m[string.(keys(m))[eiglocs[1]]])
+        occmat2 = abs.(m[string.(keys(m))[eiglocs[2]]])
+        append!(eig1["0.0"],[maximum(occmat1) - minimum(occmat1)])
+        append!(eig2["0.0"],[maximum(occmat2) - minimum(occmat2)])
+        append!(real_splittings["0.0"],[all_nrgs[2] - all_nrgs[1]])
+        append!(lxs["0.0"],[params["Lx"]])
+    end
+
+    # TTN section: pinned
+    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
+    pdict_ttn = Dict([("hopping_anisotropy",1.0),("onsite_strength",ulr),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
+    display(all_files_ttn)
+
+    for f in all_files_ttn
+        println("Working on file $f")
+        params = get_params_dict_from_filename(f)
+        Lx,Ly = "Lx" in keys(params) ? (params["Lx"],params["Ly"]) : get_lattice_dims_from_layers(params["layers"])
+
+
+        if (params["particles"] / Lx != 0.5) || (Lx != 2*Ly) || Lx <= 10
+            continue
+        end
+
+        d,m = read_data(joinpath(dataloc_ttn,f); output_level=0)
+
+        if haskey(m,"observer") && haskey(m,"observer_1")
+            eiglocs = findall(x -> occursin("occs_eig", x), string.(keys(m)))
+            if length(eiglocs) < 2
+                continue
+            end
+            occmat1 = abs.(m[string.(keys(m))[eiglocs[1]]])
+            occmat2 = abs.(m[string.(keys(m))[eiglocs[2]]])
+            append!(eig1[string(pinning_strength)], [maximum(occmat1) - minimum(occmat1)])
+            append!(eig2[string(pinning_strength)], [maximum(occmat2) - minimum(occmat2)])
+            append!(real_splittings[string(pinning_strength)], [m["observer_1"].nrg[end] - m["observer"].nrg[end]])
+            append!(used_files,[f])
+            append!(lxs[string(pinning_strength)], [Lx])
+        end
+
+    end
+
+    # TTN section: unpinned
+    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict_ttn = Dict([("hopping_anisotropy",1.0),("onsite_strength",ulr),("if_periodic_phys",true),("if_periodic_synth",true)])
+    all_files_ttn = find_data_file(pdict_ttn,"ttn",dataloc_ttn)
+    display(all_files_ttn)
+
+    for f in all_files_ttn
+        params = get_params_dict_from_filename(f)
+        Lx,Ly = "Lx" in keys(params) ? (params["Lx"],params["Ly"]) : get_tatami_lattice_dims(params["layers"])
+
+        #= 16x8 is not converged yet
+        Lx == 16 && continue
+        # 12x6 is not converged yet
+        Lx == 12 && continue=#
+
+        if (params["particles"] / Lx != 0.5) || (Lx != 2*Ly) || Lx <= 10
+            continue
+        end
+
+        d,m = read_data(joinpath(dataloc_ttn,f); output_level=0)
+
+        if haskey(m,"observer") && haskey(m,"observer_1")
+            eiglocs = findall(x -> occursin("occs_eig", x), string.(keys(m)))
+            if length(eiglocs) < 2
+                continue
+            end
+            append!(used_files,[f])
+            occmat1 = abs.(m[string.(keys(m))[eiglocs[1]]])
+            occmat2 = abs.(m[string.(keys(m))[eiglocs[2]]])
+            append!(eig1["0.0"], [maximum(occmat1) - minimum(occmat1)])
+            append!(eig2["0.0"], [maximum(occmat2) - minimum(occmat2)])
+            append!(real_splittings["0.0"], [m["observer_1"].nrg[end] - m["observer"].nrg[end]])
+            append!(lxs["0.0"], [Lx])
+        end
+
+    end
+
+    markers = Dict("0.1"=>"o", "0.0001"=>"^", "0.001"=>"*", "0.0"=>"s")
+
+    avgval12_1 = (eig1["0.0001"][end-1] + eig1["0.0001"][end]) / 2
+    avgval12_2 = (eig2["0.0001"][end-1] + eig2["0.0001"][end]) / 2
+    deleteat!(eig1["0.0001"], 5)
+    deleteat!(eig2["0.0001"], 5)
+    deleteat!(lxs["0.0001"], 5)
+    deleteat!(real_splittings["0.0001"], 5)
+    eig1["0.0001"][end] = avgval12_1
+    eig2["0.0001"][end] = avgval12_2
+
+    contrast1 = eig1
+    contrast2 = eig2
+    fig = figure()
+    for (k,v) in real_splittings
+        #cval = v ./ parse(Float64, k)
+        #display(cval)
+        #scatter(lxs[k],cval,c="b",marker=markers[k])
+        #scatter(lxs[k],v,c="r",marker=markers[k])
+        #scatter(lxs[k],theoretical_splittings,c="b",marker=markers[k])
+        scatter(lxs[k],contrast2[k],c="b",marker=markers[k])
+        scatter(lxs[k],contrast1[k],c="g",marker=markers[k])
+        theoretical_contrast = v ./ parse(Float64, k)
+        scatter(lxs[k],theoretical_contrast,c="r",marker=markers[k])
+    end
+    xlabel(L"L_x")
+    #ylabel("Eigvec Contrast")
+    #title("Contrast of Eigenvector Components for Pinned vs Unpinned ULR = $ulr")
+    title("Theoretical Contrast vs Energy Splitting for Pinned ULR = $ulr")
+    yscale("log")
+end#
+
+#=if false
+    intstren = 300.0
+
+    for (lx,ly,n) in [(10,5,5),(8,4,4),(6,3,3)]
+        dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
+        all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+        d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+        if haskey(m,"occs_eig_1") || haskey(m,"occs_eig_2") || haskey(m,"occs_eig_3") || haskey(m,"occs_eig_4")
+            eiglocs = findall(x -> occursin("occs_eig", x), string.(keys(m)))
+            if length(eiglocs) < 2
+                error("Less than 2 eigenvectors found for file $(all_files[1]), check data")
+            end
+            occs = [m[string.(keys(m))[eiglocs[1]]], m[string.(keys(m))[eiglocs[2]]]]
+        else
+            lattice_params = get_lattice_params_from_metadata(m)
+            occs,eigs = get_manifold_occupancy(d["state"][1:2], lattice_params)
+        end
+
+        qxs = range(0.0,lx-1,length=20)
+        qys = range(0.0,ly-1,length=20)
+        sfmat = zeros(ComplexF64,length(qxs),length(qys))
+        for (ix,qx) in enumerate(qxs)
+            for (jy,qy) in enumerate(qys)
+                for i in 1:lx
+                    for j in 1:ly
+                        sfmat[ix,jy] += occs[1][i,j] * exp(2*pi*im*(qx*i/lx + qy*j/ly))
+                    end
+                end
+            end
+        end
+        fig = figure()
+        imshow(abs.(sfmat),extent=(0,lx,0,ly),origin="lower")
+        colorbar()
+        title("Structure Factor for $(lx)x$(ly) N=$(n) ULR = $intstren")
+    end
+
+
+end=#
+
+
+    
 
 
 ########## Felix Palm ULR Length Plots ##########
@@ -2579,7 +3278,7 @@ function plot_finitesizescaling_ulr_phasetransition()
     intstren = 4.0
 
     #lx,ly,n = 10,8,5
-    for (lx,ly,n) in [(14,8,7),(10,8,5),(12,8,6)]
+    for (lx,ly,n) in [(14,8,7),(12,8,6),(10,8,5)]
         dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/ulr-length")
         pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
         all_files = find_data_file(pdict,"ttn",dataloc)
@@ -2603,6 +3302,7 @@ function plot_finitesizescaling_ulr_phasetransition()
                     fourpt1_includedsubset = 0.5 .* (fourpt1 .+ fourpt2)
                 else
                     fourpt1_includedsubset = fourpt1
+                    println("Warning: only one four-point correlator found for file $f, using it without averaging")
                 end
                 
 
@@ -2640,7 +3340,9 @@ function plot_finitesizescaling_ulr_phasetransition()
 
         #fig = figure()
 
-        plot(xis,flatnesses,"-o",label="$(lx)x$(ly)")
+        maglen = 1 / sqrt(2*pi*(2*n/(lx*ly)))
+
+        plot(xis ./ maglen,flatnesses,"-o",label="$(lx)x$(ly)")
     end
 
 
@@ -2696,7 +3398,7 @@ function plot_finitesizescaling_ulr_phasetransition()
     ylim([-0.05,1.1])=#
 
     legend()
-    xlabel("Interaction Length")
+    xlabel("Interaction Length / "*L"l_B")
     ylabel("Normalized Fourpt Flatness")
     title(L"U_{\mathrm{rung}}="*"$(intstren)")
 end
