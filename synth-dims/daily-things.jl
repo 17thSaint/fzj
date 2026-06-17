@@ -1036,8 +1036,8 @@ if false
     modify_data(datadict,joinpath(dataloc,all_files[1]),"metadata"; output_level=0)
 end=#
 
-# look directly at manifold density matrix
-if true    
+#= look directly at manifold density matrix
+if false    
     lx,ly,n = 8,4,4
     dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
@@ -1083,10 +1083,259 @@ if true
 
 
 
+end=#
+
+function wf_mpo_mine(wf, net, op_ins)
+    ampo = TTN.OpSum()
+    lat = TTN.physical_lattice(net)
+    mapping = TTN.ttn_2d_mapping(size(lat))
+    for pci in keys(wf)
+        pt = to_indices(wf, (pci,))
+
+        plin = TTN.linear_ind(lat, pt)
+
+        # find where plin appers in mapping
+        plin_mapped = findfirst(x -> x == plin, mapping)
+
+        ampo += (wf[pci], op_ins, plin_mapped)
+    end
+    
+    
+    # build MPO out of OpSum
+    idx_lat = map(mapping) do pos
+        TTN.hilbertspace(lat[pos])
+    end
+    mpo = TTN.MPO(ampo,idx_lat)
+    
+    rez_data = TTN.construct_first_layer(mpo,mapping,net)
+    
+    remapped_mpo::Vector{TTN.ITensor} = []
+    for i in 1:size(rez_data,1)
+        for j in 1:size(rez_data[i],1)
+            append!(remapped_mpo,[rez_data[i][j]])
+        end
+    end
+    return remapped_mpo
+    
+end
+
+function parton_application_mine!(ttn::TTN.TreeTensorNetwork, wf_coefs::Array, op_ins::String; maxdim::Int = maxlinkdim(ttn), normalize::Bool = true)
+    net = TTN.network(ttn)
+    lat = TTN.physical_lattice(net)
+
+    all(size(lat) .== size(wf_coefs)) || error("Trying to apply a parton wavefunction of dimensionality $(size(wf_coefs)) to a TTN defined on a lattice $(size(lat))")
+
+
+    parton_mpo = wf_mpo_mine(wf_coefs, net, op_ins)
+    
+    for p in eachindex(TTN.lattice(net, 1))
+        ttn = TTN.move_ortho!(ttn, (1,p))
+        pc = TTN.child_nodes(net, (1, p))
+        Tpat = map(j -> parton_mpo[j], last.(pc))
+        
+        pr = TTN.parent_node(net, (1,p))
+        #println("Site $p has parent ",pr)
+        #println("Child nodes with lattice coords are $(pc[1][2]) at $(TTN.coordinate(lat,pc[1][2])) and $(pc[2][2]) at $(TTN.coordinate(lat,pc[2][2]))")
+        Tt  = ttn[(1, p)]
+
+        rind = TTN.commonind(Tt, ttn[pr])
+        linds = TTN.uniqueinds(Tt, rind)
+        Tn = TTN.noprime(TTN.contract(Tt, Tpat...))
+
+        #println("Multiplication worked")
+        #if p == 2
+        #    return Tn,linds,rind
+        #end
+        A, R = TTN.factorize(Tn, linds, maxdim = maxdim, tags = TTN.tags(rind))
+        
+        #=
+        println("Physical Site $p")
+        println("Sizes: ",", Tn",length(TTN.inds(Tn)),", R",length(TTN.inds(R)),", Pr",length(TTN.inds(ttn[pr])),", A",length(TTN.inds(A)))
+        println(", Tn",TTN.tags.(TTN.inds(Tn)),", R",TTN.tags.(TTN.inds(R)),", Pr",TTN.tags.(TTN.inds(ttn[pr])),", A",TTN.tags.(TTN.inds(A)))
+        =#
+        ttn[(1,p)] = A
+        ttn[pr] = ttn[pr] * R    
+        
+        # moving the orhto center
+        ttn.ortho_center[1] = pr[1]
+        ttn.ortho_center[2] = pr[2]
+        # this has to be deleted in the future... dont need this anymore
+        ttn.ortho_direction[1][p] = TTN.number_of_child_nodes(net, (1,p)) + 1
+        ttn.ortho_direction[pr[1]][pr[2]] = -1
+    end
+    # now move to the higher layers layer by layer, excluding the top node
+    #TTN.ITensorMPS.set_warn_order(20)
+    for ll in 2:TTN.number_of_layers(net)-1
+        for p in 1:TTN.number_of_tensors(net, ll)
+            pp = (ll, p)
+            ttnc = TTN.move_ortho!(ttn, pp)
+            
+            Tt = ttn[pp]
+
+            pr = TTN.parent_node(net, pp)
+
+            pc = TTN.child_nodes(net, pp)
+            
+            linds = map(p -> TTN.commonind(Tt, ttn[p]), pc)
+            ptags = "Link,nl=$(ll),np=$(p)"#tags(commonind(Tt, ttn[pr]))
+        
+            A, R = factorize(Tt, linds; maxdim = maxdim, tags = ptags)
+            #=
+            println(ll,", ",p)
+            println("With Parent $pr")
+            println("Sizes: ",", R",length(TTN.inds(R)),", Tt",length(TTN.inds(Tt)),", A",length(TTN.inds(A)))
+            println(", R",TTN.tags.(TTN.inds(R)),", Tt",TTN.tags.(TTN.inds(Tt)),", A",TTN.tags.(TTN.inds(A)))
+            =#
+            ttn[pp] = A
+            ttn[pr] = ttn[pr] * R
+        
+            # moving the orhto center
+            ttn.ortho_center[1] = pr[1]
+            ttn.ortho_center[2] = pr[2]
+            # this has to be deleted in the future... dont need this anymore
+            ttn.ortho_direction[ll][p] = TTN.number_of_child_nodes(net, (ll,p)) + 1
+            ttn.ortho_direction[pr[1]][pr[2]] = -1
+        end
+    end
+
+    if normalize
+        tpnd = (TTN.number_of_layers(net), 1) 
+        T = ttn[tpnd]
+        ttn[tpnd] = T/norm(T)
+    end
+
+    return ttn
+end
+
+function initialize_ttn_wavefunction(ttn,maxdim,particle_count,one_particle_eigenstates_dict; kwargs...)  # function modified from TTN.initialize_ttn, that uses a random wavefunction
+	particle_type = get(kwargs, :part_type, "Boson")
+	if particle_type == "Fermion"
+		creation = "Cdag"
+	elseif particle_type == "Boson"
+		creation = "Adag"
+    else
+        error("Unknown particle type: $particle_type. Supported types are 'Fermion' and 'Boson'.")
+	end
+
+    # check that one_particle_eigenstates_dict has N entry, and that every entry has correct size
+
+    correct_size = size(TTN.physical_lattice(TTN.network(ttn)))
+    if length(one_particle_eigenstates_dict) != particle_count
+        error("The number of one-particle eigenstates provided in one_particle_eigenstates_dict ($(length(one_particle_eigenstates_dict))) does not match the particle count ($particle_count).")
+    end
+    for n in 1:particle_count
+        if !haskey(one_particle_eigenstates_dict, n)
+            error("one_particle_eigenstates_dict is missing entry for n = $n.")
+        end
+        wavefunction = one_particle_eigenstates_dict[n]
+        if size(wavefunction) != correct_size
+            error("Wavefunction size $(size(wavefunction)) does not match the size of the physical lattice $(correct_size) of the TTN.")
+        end
+        
+        # normalize wavefunction
+        wavefunction = wavefunction ./ sqrt(sum(abs2, wavefunction))
+        one_particle_eigenstates_dict[n] = wavefunction
+    end
+
+	for i in 1:particle_count
+        wavefunction = one_particle_eigenstates_dict[i]
+		ttn = parton_application_mine!(ttn,wavefunction,creation;maxdim=maxdim)
+	end
+	return ttn
 end
 
 
+# alberto test correlations function
+if true
+    #params_dict = Dict([("if_gpu",false),("if_check_fluxes",false),("outputlevel",1),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",1e-5),("particles",n),("mdim",100),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",0.0),("if_periodic_phys",true),("if_periodic_synth",true)])
+    #all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
+    #lat = TTN.physical_lattice(TTN.network(all_states))
 
+    Mx = 8
+    My = 8
+    dims = (Mx, My)
+    d_loc = 2
+    conserve_qns = true
+    periodic = false
+    N = 2
+    maxdim_init = 100
+    net = TTN.BinaryRectangularNetwork(dims, "Boson", dim=d_loc; conserve_qns = conserve_qns) # Creates a binary tree network based on a two dimensional rectangle with dimensions given by dims. The physical Hilbert-space is given by type, see PRB 112, 134310 (2025)
+    lat = TTN.physical_lattice(net) # Returns the physical layer of the network defining the local Hilbert-space on every site for the given problem.
+    states = ["0" for i in 1:length(lat)]
+    ttn = TTN.ProductTreeTensorNetwork(net, states; elT=ComplexF64) # ComplexF64 since Hamiltonian is not real due to the magnetic field
+    # use gaussian wavepacket as initial state
+    psi = zeros(ComplexF64, Mx*My)
+    x0 = (Mx + 1) / 2
+    y0 = (My + 1) / 2
+    sigma = 1.0
+    kx = 0.1
+    for x in 1:Mx
+        for y in 1:My
+            index = (y - 1) * Mx + x
+            x_centered = x - x0
+            y_centered = y - y0
+            psi[index] = exp(- (x_centered^2 + y_centered^2) / (2 * sigma^2) + 1im * kx * x_centered)
+        end
+    end
+    # normalize the wavefunction
+    psi /= norm(psi)
+    # save first N eigenstates in a dictionary
+    one_particle_eigenstates_dict = Dict()
+    for n in 1:N
+        one_particle_eigenstates_dict[n] = reshape(psi, Mx, My)
+    end
+
+    ttn = initialize_ttn_wavefunction(ttn, maxdim_init, N, one_particle_eigenstates_dict; part_type="Boson")  # initialize ttn in the ground state of the one-particle Hamiltonian, with N particles, but with limitation on maxdim
+
+    corr_mine = zeros(ComplexF64,Mx-1,My)
+    corr_alb = zeros(ComplexF64,Mx-1,My)
+    for x1 in 1:Mx-1
+        for y1 in 1:My
+            println("Calculating correlations for site ($(x1),$(y1))")
+
+            s1 = (x1+1,y1)
+            s2 = (x1,y1)
+            op1 = "Adag"
+            op2 = "A"
+
+            corr_mine[x1,y1] = TTN.correlation(ttn, op1, op2, s1, s2)
+
+            lin1 = TTN.linear_ind(lat, s1)
+            lin2 = TTN.linear_ind(lat, s2)
+
+            if lin1 > lin2
+                println("Doing Conj Version for site ($(x1),$(y1))")
+            else
+                println("Normal")
+            end            
+            
+            ampo = OpSum()
+            ampo += 1.0, op1, Tuple(s1), op2, Tuple(s2)
+            # fill the rest of the lattice with identity operators, otherwise TTN.full_contraction crashes
+            count = 0
+            for x2 in 1:Mx, y2 in 1:My
+                if (x2,y2) != s1 && (x2,y2) != s2
+                    ampo += 1.0, "Id", (x2,y2)
+                    count += 1
+                end
+            end
+
+            #opbond = TTN.TPO_GPU(ampo,lat)
+            #rez = do_sweep(all_states,opbond,"dmrg"; nrgtol=1e-10,mdim=100,num_sweeps=1,outputlevel=0)
+            #rez = TTN.dmrg(ttn,opbond; number_of_sweeps=1, maxdims=100)
+            #corr_alb[x1,y1] = rez.current_energy - count
+            #corr_alb[x1,y1] = rez[4].nrg[end] - count
+
+            opbond = TTN.TPO(ampo,lat)
+            corr_alb[x1,y1] = TTN.full_contraction(ttn, opbond) - count
+
+        end
+    end
+
+    #display(round.(corr_mine .- corr_alb,digits=6))
+    display(corr_mine)
+    display(corr_alb)
+end
 
 
 
