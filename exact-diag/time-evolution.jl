@@ -177,6 +177,8 @@ function get_tevo_filename(timeevo_dict::Dict,lattice_dict::Dict,hamilt_dict::Di
 			filename_dict["corr_length"] = hamilt_dict["corr_length"]
 		elseif hamilt_dict["scaling_type"] == "rydberg"
 			filename_dict["blockade_radius"] = hamilt_dict["blockade_radius"]
+		elseif hamilt_dict["scaling_type"] == "dd"
+			filename_dict["magnetic_spacing"] = hamilt_dict["magnetic_spacing"]
 		else
 			error("ULR Scaling Type Not Recognized: $(hamilt_dict["scaling_type"])")
 		end
@@ -528,8 +530,11 @@ function run_timeevo(starting_gs::Vector,time_params::Dict,lattice_dict::Dict,ha
     tmax_global = 25.0
     dt_global = 0.05
 
+    dt_crit = 2.0/(lattice_dict["N"]*(lattice_dict["N"]-1)/2 * maximum(hamilt_dict["U"]))
+    dt_crit > 0.01*tmax && (dt_crit = 2.0/(lattice_dict["N"]*(lattice_dict["N"]-1)/2 * 300.0))
+
     tmax::Float64 = time_params["tmax"]
-    dt::Float64 = time_params["dt"]
+    dt::Float64 = dt_crit #time_params["dt"]
     max_nsteps::Int = Int(ceil(tmax / dt))
     when_change_dt::Int = max_nsteps + 1
     

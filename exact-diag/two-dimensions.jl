@@ -1287,6 +1287,18 @@ function make_latticehamilt_params_from_metadata(metadata::Dict)
     return lattice_params,hamilt_params
 end
 
+function position_state(positions::Vector{Tuple{Int64,Int64}}, lattice_params::Dict)
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+    full_basis = lattice_params["full_basis"]
+
+    linear_indices = sort([linear_index(pos, Lx, Ly) for pos in positions], rev=true)
+    basis_idx = find_basis_index(linear_indices)
+
+    psi = zeros(ComplexF64, size(full_basis, 2))
+    psi[basis_idx] = 1.0
+    return psi
+end
 
 
 

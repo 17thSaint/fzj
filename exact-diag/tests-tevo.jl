@@ -180,18 +180,45 @@ if false
 
 end=#
 
+#= test position_state function
+if false
+    println("=== Testing position_state ===")
 
+    function make_test_lattice(Lx, Ly, N)
+        fb = n_particle_basis(N, Lx, Ly; if_save_data=false, if_find_existing=false, output_level=0)
+        return Dict{String,Any}("Lx"=>Lx,"Ly"=>Ly,"N"=>N,"full_basis"=>fb,
+                                "if_periodic_x"=>false,"if_periodic_y"=>false,"twist_angle"=>(0.0,0.0))
+    end
 
+    test_configs = [
+        (4, 3, 2, [(1, 1), (4, 3)]),
+        (4, 3, 2, [(2, 1), (3, 2)]),
+        (4, 3, 3, [(1, 1), (2, 2), (4, 3)]),
+        (5, 4, 2, [(1, 4), (5, 1)]),
+        (5, 4, 4, [(1, 1), (5, 4), (3, 2), (2, 3)]),
+        (6, 3, 3, [(1, 1), (3, 2), (6, 3)]),
+    ]
 
+    local all_passed = true
+    for (Lx, Ly, N, positions) in test_configs
+        lp = make_test_lattice(Lx, Ly, N)
+        psi = position_state(positions, lp)
+        occs = get_occupancy(psi, lp; if_plot=false)
 
+        norm_ok   = abs(norm(psi) - 1.0) < 1e-12
+        total_ok  = abs(sum(occs) - N) < 1e-10
+        pos_ok    = all(abs(occs[y, x] - 1.0) < 1e-10 for (x, y) in positions)
+        zeros_ok  = all(abs(occs[y, x]) < 1e-10
+                        for x in 1:Lx, y in 1:Ly if (x, y) ∉ positions)
 
+        passed = norm_ok && total_ok && pos_ok && zeros_ok
+        all_passed = all_passed && passed
+        println("$(Lx)x$(Ly) N=$N positions=$positions: $(passed ? "PASSED" : "FAILED")",
+                passed ? "" : " (norm=$norm_ok total=$total_ok pos=$pos_ok zeros=$zeros_ok)")
+    end
 
-
-
-
-
-
-
+    println(all_passed ? "\nAll position_state tests PASSED" : "\nSome position_state tests FAILED")
+end=#
 
 
 

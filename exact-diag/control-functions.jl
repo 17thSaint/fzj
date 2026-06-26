@@ -80,7 +80,7 @@ function compute_fidelity(pulses,parameters_dictionary)
     return abs2(dot(tevo_gs[:,end-1],finalGS_states[1]))
 end
 
-function groundstate_manifold_fidelity(comparison_states::Vector,target_states::Vector)
+function groundstate_manifold_fidelity(comparison_states::Vector{Vector{ComplexF64}},target_states::Vector{Vector{ComplexF64}})
     fidelity_matrix = zeros(ComplexF64,length(comparison_states),length(target_states))
     for i in 1:length(comparison_states)
         for j in 1:length(target_states)

@@ -3439,28 +3439,40 @@ if false
 
 end=#
 
-#= check 6x3 real space CDW order vs theoretical value
+#= check 6x3 real space CDW order vs theoretical value and gauge dependece
 if false
-    lx,ly,n = 6,3,3
+    lx,ly,n = 8,4,4
     intstren = 300.0
-    pinstren = 1e-5
-    params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_pinning",iszero(pinstren)),("pinning_strength",pinstren),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
-    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
+    
+    pinstrens = [1e-5,5e-5,1e-4,5e-4,1e-3,5e-3,1e-2,5e-2,0.1]
 
-    nrgsplitting = nrgs[2] - nrgs[1]
+    for (idx,pinstren) in enumerate(pinstrens)
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_pinning",true),("pinning_strength",pinstren),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
 
-    occs,eigs = get_manifold_occupancy([states[1],states[2]],lattice_params; output_level=1)
+        nrgsplitting = nrgs[2] - nrgs[1]
 
-    cdwcontrast = maximum(occs[1]) - minimum(occs[1])
+        occs,eigs = get_manifold_occupancy([states[1],states[2]],lattice_params; output_level=1)
 
-    th_cdwcontrast = nrgsplitting / (pinstren)
-    th_splitting = cdwcontrast * pinstren
+        cdwcontrast = maximum(occs[1]) - minimum(occs[1])
 
-    println("Theoretical CDW Contrast: $th_cdwcontrast")
-    println("Actual CDW Contrast: $cdwcontrast")
+        th_cdwcontrast = nrgsplitting / (pinstren)
+        #th_splitting = cdwcontrast * pinstren
 
-    println("Theoretical Splitting: $th_splitting")
-    println("Actual Splitting: $nrgsplitting")
+        scatter(pinstren,cdwcontrast,c="b")
+        scatter(pinstren,th_cdwcontrast,c="r")
+        xlabel("Pinning Strength")
+        ylabel("CDW Contrast")
+        title("CDW Contrast vs Pinning Strength for $(lx)x$(ly) N=$(n) ULR=$(intstren)")
+        xscale("log")
+        yscale("log")
+
+        #println("Theoretical CDW Contrast: $th_cdwcontrast")
+        #println("Actual CDW Contrast: $cdwcontrast")
+
+        #println("Theoretical Splitting: $th_splitting")
+        #println("Actual Splitting: $nrgsplitting")
+    end
 end=#
 
 #= plot the CDW contrast theory vs calculated, shows the theory plateaus
@@ -3548,8 +3560,33 @@ if false
 
 end=#
 
+# look at energy spectrum vs magnetic spacing for dipole dipole interaction
+if true
+    lx,ly,n = 6,3,3
+    intstren = 300.0
+    spacings = range(0.5,10.0,length=21)
+    for (idx,spacing) in enumerate(spacings)
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false),("magnetic_spacing",spacing),("scaling_type","dd")])
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=0)
 
+        scatter(spacing,nrgs[1]-nrgs[1],c="b")
+        scatter(spacing,nrgs[2]-nrgs[1],c="r")
+        for i in 3:params_dict["nev"]
+            scatter(spacing,nrgs[i]-nrgs[1],c="k")
+        end
+        xlabel("Magnetic Spacing")
+        ylabel("Energy Spectrum")
+        title("Energy Spectrum vs Magnetic Spacing for $(lx)x$(ly) N=$(n) ULR=$(intstren)")
+    end
 
+    laughlin_pdict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+    laughlin_states,laughlin_nrgs,laughlin_rhos,laughlin_filepath,if_found,laughlin_lattice_params,laughlin_hamilt_params = run_normal_ed(laughlin_pdict; output_level=0)
+    scatter(1000.0,laughlin_nrgs[1]-laughlin_nrgs[1],c="b")
+    scatter(1000.0,laughlin_nrgs[2]-laughlin_nrgs[1],c="r")
+    for i in 3:laughlin_pdict["nev"]
+        scatter(1000.0,laughlin_nrgs[i]-laughlin_nrgs[1],c="k")
+    end
+end
 
 
 
