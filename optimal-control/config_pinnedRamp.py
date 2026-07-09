@@ -1,0 +1,238 @@
+
+import math
+import matplotlib.pyplot as plt
+import os
+from quocslib.utils.AbstractFoM import AbstractFoM
+import functools
+
+# Set up the Julia environment from the exact-diag project
+# Julia version is limited to 1.11
+juliaup_bin = "/home/patrick/.juliaup/bin"
+os.environ["PATH"] = f"{juliaup_bin}:{os.environ.get('PATH', '')}"
+os.environ["JULIAUP_CHANNEL"] = "1.11"
+# juliacall does not read JULIA_PROJECT -- it needs PYTHON_JULIACALL_PROJECT (paired
+# with PYTHON_JULIACALL_EXE) or it silently falls back to its own private juliapkg-managed
+# environment, which doesn't have exact-diag's dependencies (JLD2, ITensors, ...)
+os.environ["PYTHON_JULIACALL_PROJECT"] = os.path.abspath("../exact-diag")
+os.environ["PYTHON_JULIACALL_EXE"] = os.path.join(juliaup_bin, "julia")
+# CONFIG['opt_handle_signals'] is None triggers a juliacall init-time NameError
+# (references an undefined 'Base') on this Julia/juliacall version combination -- set
+# explicitly to skip that code path (see https://juliapy.github.io/PythonCall.jl/stable/faq)
+os.environ["PYTHON_JULIACALL_HANDLE_SIGNALS"] = "yes"
+
+from juliacall import Main as jl
+
+jl.include("../exact-diag/control-functions.jl")
+jl.include("../exact-diag/time-evolution.jl")
+jl.include("../exact-diag/pinned-ramp-control-functions.jl")
+
+
+def python_dict_to_julia_dict(data: dict):
+    pairs = [jl.Pair(str(k), v) for k, v in data.items()]
+    return jl.Dict(pairs)
+
+
+class pinnedRamp(AbstractFoM):
+
+    def __init__(self, args_dict: dict = None):
+        if args_dict is None:
+            args_dict = {}
+
+        # hamiltonian / lattice parameters
+        self.Lx = args_dict.setdefault("Lx", 4)
+        self.Ly = args_dict.setdefault("Ly", 4)
+        self.N = args_dict.setdefault("N", 2)
+        self.interaction_strength = args_dict.setdefault("interaction_strength", 0.0)
+        self.lr = args_dict.setdefault("lr", "all")
+        self.if_periodic_x = args_dict.setdefault("if_periodic_x", True)
+        self.if_periodic_y = args_dict.setdefault("if_periodic_y", True)
+
+        # pinned starting configuration: flat (col,row) pairs, one per particle
+        self.starting_config = args_dict.setdefault("starting_config", [1, 1, 1, 2])
+
+        # ramp targets. Ramp durations are fixed (only pulse shape is optimized) and
+        # must match the ramptime_* values used below to build the pulse dictionaries
+        self.end_tx = args_dict.setdefault("end_tx", 1.0)
+        self.end_ty = args_dict.setdefault("end_ty", 1.0)
+        self.ramptime_firstramp = args_dict.setdefault("ramptime_firstramp", 0.5)
+        self.ramptime_secondramp = args_dict.setdefault("ramptime_secondramp", 0.5)
+
+        # figure of merit / time evolution settings
+        self.speccount = args_dict.setdefault("speccount", 2)
+        self.dt = args_dict.setdefault("dt", 0.005)
+
+    def to_julia_dict(self):
+        payload = {
+            k: v
+            for k, v in vars(self).items()
+            if not k.startswith("_") and not callable(v)
+        }
+        return python_dict_to_julia_dict(payload)
+
+    def get_FoM(self, pulses: list = [], parameters: list = [], timegrids: list = []) -> dict:
+
+        fidelity = jl.compute_fidelity_pinned_ramp(pulses, self.to_julia_dict())
+
+        return {"FoM": fidelity}
+
+
+optimization_dictionary = {"optimization_client_name": "pinnedRamp_dCRAB"}
+
+optimization_dictionary["algorithm_settings"] = {"algorithm_name": "dCRAB"}
+
+optimization_dictionary["algorithm_settings"]["optimization_direction"] = "maximization"
+optimization_dictionary["algorithm_settings"]["super_iteration_number"] = 5
+optimization_dictionary["algorithm_settings"]["max_eval_total"] = 200
+
+# will need expert advice on choices made here
+dsm_settings = {
+        "general_settings": {
+            "dsm_algorithm_name": "NelderMead",
+            "is_adaptive": False
+        },
+        "stopping_criteria": {
+            "xatol": 1e-4,
+            "fatol": 1e-6,
+            "change_based_stop": {
+                "cbs_funct_evals": 200,
+                "cbs_change": 0.01
+            }
+        }
+    }
+
+optimization_dictionary["algorithm_settings"]["dsm_settings"] = dsm_settings
+
+# these three must match pinnedRamp's ramptime_firstramp / ramptime_secondramp / dt defaults above
+ramptime_firstramp = 0.5
+ramptime_secondramp = 0.5
+dt = 0.005
+
+# pulse_ramp (exact-diag/time-evolution.jl) samples the pulse on the RK4
+# half-step grid (spacing dt/2) up to ending_time, so the pulse array QuOCS optimizes
+# must have exactly ceil(2 * ramptime / dt) + 1 bins
+bins_ty = math.ceil(2 * ramptime_firstramp / dt) + 1
+bins_tx = math.ceil(2 * ramptime_secondramp / dt) + 1
+
+pulse_ty = {"pulse_name": "tyRamp",
+           "upper_limit": 1.2,
+           "lower_limit": 0.0,
+           "bins_number": bins_ty,
+           "amplitude_variation": 0.3,
+           "time_name": "time_tyRamp",
+           "shaping_options": [
+               "add_base_pulse",
+               "add_new_update_pulse",
+               "scale_pulse",
+               "add_initial_guess",
+               "limit_pulse"
+           ]
+           }
+
+pulse_ty["initial_guess"] = {
+    "function_type": "lambda_function",
+    "lambda_function": "lambda t: 0.0 + (1.0 - 0.0) * (t / t[-1])"
+    }
+
+pulse_ty["scaling_function"] = {
+    "function_type": "lambda_function",
+    "lambda_function": "lambda t: (t / t[-1]) * (1.0 - t / t[-1])"
+    }
+
+pulse_ty["basis"] = {
+                "basis_name": "Fourier",
+                "basis_vector_number": 5,
+                "random_super_parameter_distribution": {
+                    "distribution_name": "Uniform",
+                    "lower_limit": 0.01,
+                    "upper_limit": 10.0
+                }
+            }
+
+
+pulse_tx = {"pulse_name": "txRamp",
+           "upper_limit": 1.2,
+           "lower_limit": 0.0,
+           "bins_number": bins_tx,
+           "amplitude_variation": 0.3,
+           "time_name": "time_txRamp",
+           "shaping_options": [
+               "add_base_pulse",
+               "add_new_update_pulse",
+               "scale_pulse",
+               "add_initial_guess",
+               "limit_pulse"
+           ]
+           }
+
+pulse_tx["initial_guess"] = {
+    "function_type": "lambda_function",
+    "lambda_function": "lambda t: 0.0 + (1.0 - 0.0) * (t / t[-1])"
+    }
+
+pulse_tx["scaling_function"] = {
+    "function_type": "lambda_function",
+    "lambda_function": "lambda t: (t / t[-1]) * (1.0 - t / t[-1])"
+    }
+
+pulse_tx["basis"] = {
+                "basis_name": "Fourier",
+                "basis_vector_number": 5,
+                "random_super_parameter_distribution": {
+                    "distribution_name": "Uniform",
+                    "lower_limit": 0.01,
+                    "upper_limit": 10.0
+                }
+            }
+
+
+time_tyRamp = {"time_name": "time_tyRamp",
+                "initial_value": ramptime_firstramp}
+
+time_txRamp = {"time_name": "time_txRamp",
+                "initial_value": ramptime_secondramp}
+
+
+optimization_dictionary["pulses"] = [pulse_ty, pulse_tx]
+optimization_dictionary["parameters"] = []
+optimization_dictionary["times"] = [time_tyRamp, time_txRamp]
+
+
+from quocslib.Optimizer import Optimizer
+import time
+
+optimization_obj = Optimizer(optimization_dictionary, pinnedRamp({
+    "is_maximization": True,
+    "ramptime_firstramp": ramptime_firstramp,
+    "ramptime_secondramp": ramptime_secondramp,
+    "dt": dt,
+}))
+
+
+time1 = time.time()
+optimization_obj.execute()
+time2 = time.time()
+print("The optimization took {seconds} seconds".format(seconds=time2 - time1))
+
+
+opt_alg_obj = optimization_obj.opt_alg_obj
+controls = opt_alg_obj.get_best_controls()
+
+pulse_ty_opt, timegrid_ty_opt = controls["pulses"][0], controls["timegrids"][0]
+pulse_tx_opt, timegrid_tx_opt = controls["pulses"][1], controls["timegrids"][1]
+
+fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+axes[0].plot(timegrid_ty_opt, pulse_ty_opt)
+axes[0].set_xlabel("Time")
+axes[0].set_ylabel("ty")
+axes[0].grid()
+axes[1].plot(timegrid_tx_opt, pulse_tx_opt)
+axes[1].set_xlabel("Time")
+axes[1].set_ylabel("tx")
+axes[1].grid()
+fig.suptitle("Optimized Pinned-Ramp Fidelity: {fidelity:.4f}".format(fidelity=opt_alg_obj.best_FoM))
+plt.savefig("local-figs/pinnedRamp_optimized.png")
+
+
+
+
+"fin"

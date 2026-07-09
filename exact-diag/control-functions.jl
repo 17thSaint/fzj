@@ -37,47 +37,28 @@ end
 
 include_other_files(["exact-diag/execute-ed.jl"])
 
-function pulse_function(nsteps::Int,dt::Float64; kwargs...)
-
-    starting_value::Float64 = 0.001
-    ending_value::Float64 = 1.0
-
-    starting_time::Float64 = 0.0
-    ending_time::Float64 = kwargs[:ending_time]
-
-    steps_until_end::Int = Int(ceil(ending_time / dt))
-
-    pulse_ramp = kwargs[:pulse_ramp][:]
-
-    return vcat(pulse_ramp, ending_value .* ones(nsteps - steps_until_end + 1))
-end
-
+# bins_number in config_txRamp.py must equal ceil(2*ramptime/dt) + 1 to match
+# pulse_ramp's (time-evolution.jl) half-step sampling grid
 function compute_fidelity(pulses,parameters_dictionary)
 
     parameters_dictionary["output_level"] = 0
-    
+
     # first find starting and final groundstates
     parameters_dictionary["tx"] = 0.001
-    #startingGS_pdict = get_normal_model_params_ed(parameters_dictionary)
-    startingGS_states,_,_,startingGS_filepath,startingGS_if_found,startingGS_lattice_params,startingGS_hamilt_params = run_normal_ed(parameters_dictionary; output_level=0)
+    startingGS_states,_,_,_,_,startingGS_lattice_params,startingGS_hamilt_params = run_normal_ed(parameters_dictionary; output_level=0)
 
     parameters_dictionary["tx"] = 1.0
-    #finalGS_pdict = get_normal_model_params_ed(parameters_dictionary)
-    finalGS_states,_,_,finalGS_filepath,finalGS_if_found,finalGS_lattice_params,finalGS_hamilt_params = run_normal_ed(parameters_dictionary; output_level=0)
+    finalGS_states,_,_,_,_,_,_ = run_normal_ed(parameters_dictionary; output_level=0)
 
     # then find the time-evolved state
-    time_running_args = (nev=1,output_level=0,if_instant_gs=false,)
-    tmax_global = 25.0
-    dt_global = 0.05
+    dt = 0.05
     ramptime = 2.0
-    rampsteps = Int(2*ceil(ramptime / dt_global)-1)
+    time_running_args = (nev=1,output_level=0,if_instant_gs=false,if_save_data=false)
 
-    @assert length(pulses[1]) == rampsteps "The length of the pulse must match the number of ramp steps"
+    starting_states = [Vector{ComplexF64}(startingGS_states[1])]
+    final_states = run_ramp_stages(starting_states,[("tx",collect(pulses[1]),ramptime)],startingGS_lattice_params,startingGS_hamilt_params,dt; time_running_args...)
 
-    tevo_params = Dict([ ("tx",(pulse_function,ramptime,pulses[1])) ])
-    tevo_gs,tevo_dict,intspec = run_timeevo(startingGS_states[1],tevo_params,startingGS_lattice_params,startingGS_hamilt_params; time_running_args...)
-    
-    return abs2(dot(tevo_gs[:,end-1],finalGS_states[1]))
+    return abs2(dot(final_states[1],finalGS_states[1]))
 end
 
 function groundstate_manifold_fidelity(comparison_states::Vector{Vector{ComplexF64}},target_states::Vector{Vector{ComplexF64}})

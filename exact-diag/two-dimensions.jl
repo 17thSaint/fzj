@@ -1123,7 +1123,9 @@ function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwa
 
         if if_exact
             everything = eigen(Matrix(H))
-            rez = (everything.values,everything.vectors)
+            # rez[2] must be indexable like eigsolve's Vector-of-eigenvector output below
+            # (eigen returns eigenvectors as columns of a Matrix, not a Vector of vectors)
+            rez = (everything.values,[everything.vectors[:,j] for j in 1:size(everything.vectors,2)])
         else
             x0 = rand(Float64,size(lattice_params["full_basis"])[2])
             rez = eigsolve(H,x0,nev,:SR,Lanczos())
@@ -1138,7 +1140,9 @@ function find_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict; kwa
 
         if if_exact
             everything = eigen(Matrix(H))
-            rez = (everything.values,everything.vectors)
+            # rez[2] must be indexable like eigsolve's Vector-of-eigenvector output below
+            # (eigen returns eigenvectors as columns of a Matrix, not a Vector of vectors)
+            rez = (everything.values,[everything.vectors[:,j] for j in 1:size(everything.vectors,2)])
         else
             x0 = rand(Float64,size(lattice_params["full_basis"])[2])
             #rez = eigsolve(H,x0,nev,:SR,Lanczos())
@@ -1212,7 +1216,9 @@ function rerun_eigenstates(nev::Int,lattice_params::Dict,hamilt_params::Dict,met
         output_level > 0 ? println("Sparsity = ",nnz(H)/size(H)[1]^2) : nothing
         if if_exact
             everything = eigen(Matrix(H))
-            rez = (everything.values,everything.vectors)
+            # rez[2] must be indexable like eigsolve's Vector-of-eigenvector output below
+            # (eigen returns eigenvectors as columns of a Matrix, not a Vector of vectors)
+            rez = (everything.values,[everything.vectors[:,j] for j in 1:size(everything.vectors,2)])
         else
             x0 = rand(Float64,size(lattice_params["full_basis"])[2])
             #rez = eigsolve(H,x0,nev,:SR,Lanczos())

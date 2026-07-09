@@ -334,7 +334,7 @@ end
 # ramp ty from 0 to 1; tx stays at its default from hamilt_params_starting
 if false || if_all
     speccount_firstramp = 3
-    ramptime_firstramp = 10
+    ramptime_firstramp = 0.5
     tmax_global_firstramp = ramptime_firstramp + 0.0  # extra hold time after ramp end to check convergence
     time_running_args_firstramp = (nev=speccount_firstramp, output_level=1, if_instant_gs=true, if_save_data=false, dataloc="tevo-daily-things-data/")
 
@@ -359,7 +359,7 @@ if false || if_all
 end
 
 # displaying and plotting stuff
-if true || if_all
+if false || if_all
     #=final_states = [Vector{ComplexF64}(tevo_gs_secondramp[1][:,end-1]),Vector{ComplexF64}(tevo_gs_secondramp[2][:,end-1]),Vector{ComplexF64}(tevo_gs_secondramp[3][:,end-1])]
     final_nrgs = [real(adjoint(wavefunc) * hamilt_params_ending["H"] * wavefunc) for wavefunc in final_states]
     display(final_nrgs)
@@ -383,8 +383,9 @@ if true || if_all
         scatter(times_secondramp .+ tmax_global_firstramp,tevo_data_secondramp[2][i][1:end-1],c="k",marker="x")
     end
     legend()
-    xlabel("Time step")
-    ylabel("Instantaneous eigenenergies")
+    xlabel("Time")
+    ylabel("Energy")
+    title("Energy vs time for two ramps $(lx)x$(ly) N=$(n) ramptime $(ramptime_firstramp) ty and tx")
 
     #=final_fidelity = groundstate_manifold_fidelity(final_states[1:2],states_ending[1:2])
 

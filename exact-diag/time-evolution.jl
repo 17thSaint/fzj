@@ -334,7 +334,8 @@ end
 # run time evolution for multiple initial states (e.g. ground state and first excited state)
 function time_evolution(starting_wavefunc::Vector{Vector{ComplexF64}},starting_ham::SparseMatrixCSC,t_evo_params::Dict,lattice_params::Dict,hamilt_params::Dict; kwargs...)
     opl::Int = get(kwargs, :output_level, 1)
-    if_instant_gs::Bool = get(kwargs, :if_instant_gs, true)
+    if_instant_gs::Bool = get(kwargs, :if_instant_gs, false)
+    if_instant_exact::Bool = get(kwargs, :if_instant_exact, if_instant_gs)
     if_save_data::Bool = kwargs[:if_save_data]
     if_continuous_saving::Bool = kwargs[:if_continuous_saving]
 
@@ -365,7 +366,12 @@ function time_evolution(starting_wavefunc::Vector{Vector{ComplexF64}},starting_h
             instant_spec[string(i)] = spzeros(ComplexF64,length(wavefunc[1]),Int(1+(nsteps-1)/2))
             instant_nrgs[string(i)] = zeros(Float64,Int(1+(nsteps-1)/2))
         end
-        running_args = get_quick_running_args(nev)
+        # exact (dense) diagonalization correctly resolves degenerate eigenvalues that a
+        # single-vector Lanczos run structurally cannot (a Krylov chain from one starting
+        # vector only ever yields one Ritz pair per degenerate eigenvalue, however large
+        # krylovdim is) -- only worth it for small Hilbert spaces since it rebuilds and
+        # fully diagonalizes the dense Hamiltonian every RK4 step
+        running_args = get_quick_running_args(nev; if_exact=if_instant_exact)
     end
 
     opl > 0 && println("Starting time evolution")
@@ -444,17 +450,39 @@ function make_tevo_params(given_parameters::Dict)
 end
 
 function linear_ramp(nsteps::Int,dt::Float64; kwargs...)
-    
+
     starting_value::Float64 = kwargs[:starting_value]
     ending_value::Float64 = kwargs[:ending_value]
 
     starting_time::Float64 = 0.0#get(kwargs, :starting_time, 0.0)
-    ending_time::Float64 = get(kwargs, :ending_time, nsteps * dt)
 
-    #steps_until_start::Int = Int(ceil(starting_time / dt))
-    steps_until_end::Int = Int(ceil(ending_time / dt))
+    # nsteps counts raw RK4 half-steps (timeham is indexed directly by this array),
+    # each spaced dt/2 apart in real time, so ending_time must be converted using
+    # the half-step spacing rather than the full step dt
+    raw_dt::Float64 = dt / 2
+    ending_time::Float64 = get(kwargs, :ending_time, nsteps * raw_dt)
+
+    #steps_until_start::Int = Int(ceil(starting_time / raw_dt))
+    steps_until_end::Int = Int(ceil(ending_time / raw_dt))
 
     return vcat(range(starting_value, ending_value, length = steps_until_end + 1), ending_value .* ones(nsteps - steps_until_end + 1))
+end
+
+# Applies an externally supplied pulse (e.g. from a QuOCS optimization) as the shape
+# of a ramp control, on the same half-step grid as linear_ramp. Must be named
+# pulse_ramp: get_tevo_filename below whitelists ramp functions by literal name.
+# pulse_ramp's required length is ceil(ending_time / (dt/2)) + 1.
+function pulse_ramp(nsteps::Int,dt::Float64; kwargs...)
+
+    ending_time::Float64 = kwargs[:ending_time]
+    pulse_values = kwargs[:pulse_ramp][:]
+
+    raw_dt::Float64 = dt / 2
+    steps_until_end::Int = Int(ceil(ending_time / raw_dt))
+
+    @assert length(pulse_values) == steps_until_end + 1 "Pulse length $(length(pulse_values)) does not match the expected number of ramp half-steps $(steps_until_end + 1) for ending_time=$(ending_time), dt=$(dt)"
+
+    return vcat(pulse_values, pulse_values[end] .* ones(nsteps - steps_until_end + 1))
 end
 
 function find_when_change_dt(tmax::Float64,leastramptime::Float64; kwargs...)
@@ -584,6 +612,22 @@ function run_timeevo(starting_gs::Vector,time_params::Dict,lattice_dict::Dict,ha
     tevo_data,instant_data = time_evolution(starting_gs,starting_ham,tevo_dict,lattice_dict,hamilt_dict; saving_args...,kwargs...) #output_level=1, nev=speccount
 
     return tevo_data,tevo_dict,instant_data,saving_args
+end
+
+# Runs a chain of sequential ramp stages, feeding each stage's final states in as the
+# next stage's starting states. Each stage is (control_key,pulse_values,duration): the
+# Hamiltonian parameter named control_key is ramped via pulse_ramp over [0,duration]
+# while every other parameter stays fixed at whatever hamilt_params currently holds.
+# Used by control-functions.jl's figure-of-merit functions to turn one or more
+# QuOCS-optimized pulses into a final state for fidelity comparison.
+function run_ramp_stages(states::Vector{Vector{ComplexF64}},stages,lattice_params::Dict,hamilt_params::Dict,dt::Float64; kwargs...)
+    for (control_key,pulse_values,duration) in stages
+        tevo_params = Dict([(control_key,(pulse_ramp,duration,pulse_values)),("tmax",duration),("dt",dt)])
+        tevo_data,_,_,_ = run_timeevo(states,tevo_params,lattice_params,hamilt_params; kwargs...)
+        # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
+        states = [Vector{ComplexF64}(tevo_data[1][i][:,end-1]) for i in 1:length(states)]
+    end
+    return states
 end
 
 

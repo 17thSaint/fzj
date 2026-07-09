@@ -143,10 +143,10 @@ function get_normal_params_from_lattham(lattice_params::Dict,hamilt_params::Dict
     return new_params
 end
 
-function get_quick_running_args(nev::Int)
-    # set running operation parameters    
+function get_quick_running_args(nev::Int; if_exact::Bool=false)
+    # set running operation parameters
     running_args::NamedTuple = (nev=nev,
-                    if_exact=false,
+                    if_exact=if_exact,
                     if_function=false,
                     if_reading=false,
                     if_densmat=false,

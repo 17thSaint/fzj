@@ -6,11 +6,19 @@ from quocslib.timeevolution.piecewise_integrator import pw_evolution
 import functools
 
 # Set up the Julia environment from the exact-diag project
-# Julia version is limited to 1.11 
+# Julia version is limited to 1.11
 juliaup_bin = "/home/patrick/.juliaup/bin"
 os.environ["PATH"] = f"{juliaup_bin}:{os.environ.get('PATH', '')}"
 os.environ["JULIAUP_CHANNEL"] = "1.11"
-os.environ["JULIA_PROJECT"] = os.path.abspath("../exact-diag")
+# juliacall does not read JULIA_PROJECT -- it needs PYTHON_JULIACALL_PROJECT (paired
+# with PYTHON_JULIACALL_EXE) or it silently falls back to its own private juliapkg-managed
+# environment, which doesn't have exact-diag's dependencies (JLD2, ITensors, ...)
+os.environ["PYTHON_JULIACALL_PROJECT"] = os.path.abspath("../exact-diag")
+os.environ["PYTHON_JULIACALL_EXE"] = os.path.join(juliaup_bin, "julia")
+# CONFIG['opt_handle_signals'] is None triggers a juliacall init-time NameError
+# (references an undefined 'Base') on this Julia/juliacall version combination -- set
+# explicitly to skip that code path (see https://juliapy.github.io/PythonCall.jl/stable/faq)
+os.environ["PYTHON_JULIACALL_HANDLE_SIGNALS"] = "yes"
 
 from juliacall import Main as jl
 
@@ -102,10 +110,13 @@ dsm_settings = {
 
 optimization_dictionary["algorithm_settings"]["dsm_settings"] = dsm_settings
 
+# pulse_ramp (exact-diag/time-evolution.jl) samples the pulse on the RK4 half-step
+# grid (spacing dt/2) up to ending_time, so bins_number must be ceil(2*ramptime/dt) + 1
+# -- with compute_fidelity's ramptime=2.0, dt=0.05 that's ceil(80.0) + 1 = 81
 pulse_tx = {"pulse_name": "txRamp",
            "upper_limit": 2.0,
            "lower_limit": 0.0,
-           "bins_number": 79,
+           "bins_number": 81,
            "amplitude_variation": 0.3,
            "time_name": "time_txRamp",
            "shaping_options": [
