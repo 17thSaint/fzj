@@ -287,23 +287,58 @@ end=#
 
 
 ### Initialize single column full and then ramp tx into FCI state
+# Strategy: start particles pinned to real-space sites (ty=0, no hopping),
+# then adiabatically ramp ty → 1 to connect to the FCI ground state manifold.
 
 if_all::Bool = true
 
 # model parameters
 if false || if_all
     lx,ly,n = 4,4,2
-    
-    intstren = 0.0
+
+    intstren = 0.0  # non-interacting: topology alone drives the FCI
+
+    # pre-compute full Fock basis and cache to avoid rebuilding it in each sub-block
+    lattice_params::Dict{String,Any} = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true)])
+    full_basis = n_particle_basis(lattice_params; output_level=0,dataloc=get_folder_location("cluster-data/exact-diag"))
+    lattice_params["full_basis"] = full_basis
 end
 
-# define starting state
+# define starting state: particles pinned to specific real-space sites, no hopping
 if false || if_all
+    # each tuple is a (column, row) site index for one of the n particles
     starting_config = [(1,1),(1,2)]
 
-    psi_starting = position_state
+    pdict_starting = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
 
-        
+    states_starting, nrgs_starting, lattice_params_starting, hamilt_params_starting = position_state(starting_config, pdict_starting; output_level=0)
+
+    #occs_starting = get_occupancy(states_starting[1], lattice_params_starting; plot_title="Starting state occupancy")
+end
+
+# define ending state: isotropic hopping target used for fidelity comparison
+if false || if_all
+    end_tx = 1.0
+    end_ty = 1.0
+
+    pdict_ending = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tx",end_tx),("ty",end_ty),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
+
+    states_ending, nrgs_ending, lattice_params_ending, hamilt_params_ending = run_normal_ed(pdict_ending; output_level=0)
+end
+
+# ramp ty from 0 to 1; tx stays at its default from hamilt_params_starting
+if false || if_all
+    speccount = 2
+    ramptime = 0.5
+    tmax_global = ramptime + 0.5  # extra hold time after ramp end to check convergence
+    time_running_args = (nev=speccount, output_level=1, if_instant_gs=false, if_save_data=false, dataloc="tevo-daily-things-data/")
+
+    tevo_params = Dict([ ("ty",(linear_ramp,0.0,end_ty,ramptime)),("tmax",tmax_global) ])
+    tevo_gs, tevo_dict, intspec, saving_args = run_timeevo([states_starting[1],states_starting[2]],tevo_params,lattice_params_starting,hamilt_params_starting; time_running_args...)
+
+    # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
+    occs_midpoint = get_occupancy(tevo_gs[1][:,end-1], lattice_params_starting; plot_title="Midpoint state occupancy")
+end
 
 
 

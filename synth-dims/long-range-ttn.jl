@@ -2178,8 +2178,8 @@ if false
 	#dataloc = if_pinning ? get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling") : get_folder_location("cluster-data/synth-dims/torus/new-gauge")
 	#
 
-	lx,ly,n = 4,4,2
-	stren = 0.0
+	lx,ly,n = 4,4,12
+	stren = 300.0
 	
 	#alphas = range(0.1,0.30,length=41)
 	#strens = [0.25,0.5,0.75,1.25,1.5,3.0,4.0]#range(0.1,0.5,length=3)
@@ -2198,7 +2198,7 @@ if false
 		
 		#("if_pinning",if_pinning),("dataloc",dataloc),("pinning_strength",pinstren)
 		
-		params_dict = Dict([("if_gpu",false),("outputlevel",1),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",1e-5),("particles",n),("mdim",300),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("if_gpu",false),("if_check_fluxes",false),("cutoff",1e-12),("outputlevel",1),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",1e-5),("particles",n),("mdim",400),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		#params_dict = Dict([("if_gpu",false),("outputlevel",1),("nrgtol",5e-6),("if_pinning",true),("pinning_strength",pinstren),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-5),("particles",n),("mdim",500),("if_save_data",true),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		#params_dict = Dict([("if_gpu",true),("outputlevel",1),("scaling","exp"),("corr_length",xi),("nrgtol",1e-5),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-4),("particles",n),("mdim",400),("if_save_data",true),("filling",0.5),("if_find_data",true),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist

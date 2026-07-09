@@ -3278,11 +3278,11 @@ if false
 end=#
 
 #= fourpt momentum 6x3
-if true
+if false
     lx,ly,n = 6,3,3
-    intstren = 300.0
+    intstren = 0.0
     dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
-    params_dict = Dict([("output_level",1),("dataloc",dataloc),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",10),("dataloc",dataloc),("if_find_data",false),("if_save_data",true)])
+    params_dict = Dict([("output_level",1),("dataloc",dataloc),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",10),("dataloc",dataloc),("if_find_data",true),("if_save_data",true)])
     states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=0)
 
     fourpt1 = four_point(states[1],lattice_params)
@@ -3293,6 +3293,28 @@ if true
     modify_data(datadict,filepath,"metadata"; output_level=0)
 
 end=#
+
+# make data for 4pt momentum laughlin
+if true
+    lx,ly,n = 8,4,4
+    intstren = 0.0
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    params_dict = Dict([("Lx",lx),("Ly",ly),("N",n),("hopping_anisotropy",1.0),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files = find_data_file(params_dict,"ed",dataloc; output_level=0,file_type="jld2")
+
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+
+    latparas = get_lattice_params_from_metadata(m)
+
+    fourpt1 = four_point(d["state"][1],latparas)
+    fourpt2 = four_point(d["state"][2],latparas)
+
+    datadict = Dict("fourpt_momentum"=>fourpt1,"fourpt_momentum_1"=>fourpt2)
+
+    modify_data(datadict,joinpath(dataloc,all_files[1]),"metadata"; output_level=0)
+
+end
+
 
 #= fourier transform of manifold density
 if false
@@ -3560,8 +3582,8 @@ if false
 
 end=#
 
-# look at energy spectrum vs magnetic spacing for dipole dipole interaction
-if true
+#= look at energy spectrum vs magnetic spacing for dipole dipole interaction
+if false
     lx,ly,n = 6,3,3
     intstren = 300.0
     spacings = range(0.5,10.0,length=21)
@@ -3586,7 +3608,31 @@ if true
     for i in 3:laughlin_pdict["nev"]
         scatter(1000.0,laughlin_nrgs[i]-laughlin_nrgs[1],c="k")
     end
-end
+end=#
+
+#= play with pfaffian
+if false
+    lx,ly,n = 5,5,3
+    intstren = 0.0
+    fluxes = range(0.1,0.4,length=11)
+    for flux in fluxes
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_check_fluxes",false),("lr","all"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("alpha",flux),("nev",20),("if_find_data",false),("if_save_data",false)])
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=0)
+
+        scatter(flux,nrgs[1]-nrgs[1],c="b")
+        scatter(flux,nrgs[2]-nrgs[1],c="r")
+        for i in 3:params_dict["nev"]
+            scatter(flux,nrgs[i]-nrgs[1],c="k")
+        end
+        xlabel("Flux")
+        ylabel("Energy Spectrum")
+        title("Energy Spectrum vs Flux for $(lx)x$(ly) N=$(n)")
+    end
+
+end=#
+
+
+
 
 
 

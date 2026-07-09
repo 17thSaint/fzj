@@ -51,6 +51,28 @@ function get_occupancy(rho::Array{ComplexF64,2},lattice_params::Dict{String,Any}
     return occs
 end
 
+function get_occupancy(x::SparseVector{ComplexF64,Int64},lattice_params::Dict{String,Any}; kwargs...)
+    if_plot = get(kwargs,:if_plot,true)
+
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+    full_basis = lattice_params["full_basis"]
+
+    occs = zeros(Float64,Ly,Lx)
+
+    for (i,val) in enumerate(x.nzind)
+        basis_state = full_basis[:,val]
+        for n in 1:length(basis_state)
+            site = coordinate(basis_state[n],Lx,Ly)
+            occs[site[2],site[1]] += abs(x[val])^2
+        end
+    end
+
+    if_plot ? plot_occupancy(occs; kwargs...) : nothing
+
+    return occs
+end
+
 function get_manifold_occupancy(states::Vector{Vector{ComplexF64}},lattice_params::Dict{String,Any}; kwargs...)
     opl::Int = get(kwargs,:output_level,1)
     Lx,Ly = lattice_params["Lx"],lattice_params["Ly"]

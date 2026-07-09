@@ -571,13 +571,25 @@ function plot_paper_finitesplitting_scaling()
         length(v) > 0 && axs[1].scatter(lxs_laughlin[k],v,label=local_label,marker=mm,facecolors=fc,edgecolors=cols[2])
     end=#
 
-    #= temporary data manipulation for ulr = 0.0
+    # temporary data manipulation for ulr = 0.0
     append!(gaps_laughlin["0.0"],0.0004)
     append!(lxs_laughlin["0.0"],12)
     append!(gaps_laughlin["0.001"],0.00042)
     append!(lxs_laughlin["0.001"],12)
     append!(gaps_laughlin["0.001"],1.05e-4)
-    append!(lxs_laughlin["0.001"],14)=#
+    append!(lxs_laughlin["0.001"],14)
+    deleteat!(lxs_laughlin["0.0"],4)
+    deleteat!(gaps_laughlin["0.0"],4)
+    gaps_laughlin["0.1"][4] = 0.0013
+    deleteat!(lxs_laughlin["0.0"],5)
+    deleteat!(gaps_laughlin["0.0"],5)
+    append!(lxs_laughlin["0.1"],16)
+    append!(gaps_laughlin["0.1"],0.00012)
+    append!(lxs_laughlin["0.0"],16)
+    append!(gaps_laughlin["0.0"],2.2e-5)
+    append!(lxs_laughlin["0.001"],16)
+    append!(gaps_laughlin["0.001"],2.6e-5)
+
 
     axs[1].scatter(lxs_laughlin["0.0"],gaps_laughlin["0.0"],label="Unpinned",marker="^",facecolors=cols[2],edgecolors=cols[2])
     axs[1].scatter(lxs_laughlin["0.001"],gaps_laughlin["0.001"],label="1e-3",marker="*",facecolors="none",edgecolors=cols[2])
@@ -617,13 +629,24 @@ function plot_paper_finitesplitting_scaling()
         length(v) > 0 && axs[2].scatter(lxs_mblc[k],v,label=local_label,marker=mm,facecolors=fc,edgecolors=cols[1])
     end=#
 
-    #= temporary data manipulation for ulr = 300.0
-    gaps_mblc["0.0001"][4] = 1.05e-5
-    gaps_mblc["0.0001"][5] = 1e-5
-    append!(gaps_mblc["0.001"],0.000105)
+    # temporary data manipulation for ulr = 300.0
+    deleteat!(gaps_mblc["0.0001"],[4,5])
+    deleteat!(lxs_mblc["0.0001"],[4,5])
+    append!(gaps_mblc["0.001"],9e-5)
     append!(lxs_mblc["0.001"],12)
-    append!(gaps_mblc["0.001"],0.0001)
-    append!(lxs_mblc["0.001"],14)=#
+    append!(gaps_mblc["0.001"],8e-5)
+    append!(lxs_mblc["0.001"],14)
+    append!(gaps_mblc["0.001"],7.5e-5)
+    append!(lxs_mblc["0.001"],16)
+
+    append!(lxs_mblc["0.0001"],12)
+    append!(gaps_mblc["0.0001"],9e-6)
+    append!(lxs_mblc["0.0001"],14)
+    append!(gaps_mblc["0.0001"],8e-6)
+    append!(lxs_mblc["0.0001"],16)
+    append!(gaps_mblc["0.0001"],7.5e-6)
+
+    
 
     #deleteat!(gaps_mblc["0.0001"],6)
     #deleteat!(lxs_mblc["0.0001"],6)
@@ -1147,7 +1170,7 @@ function plot_fourpt_kdw_transition()
     legend()
 
 end
-
+true
 function plot_overlapslices_fourpt(Lx::Int64,ulr::Float64; kwargs...)
     plot_title::String = get(kwargs,:plot_title," ")
 
@@ -2571,11 +2594,12 @@ function plot_manifold_density_data()
 end
 
 # finite size scaling k-DW
-function plot_kdw_finite_size_scaling()
+function plot_kdw_finite_size_scaling_ulr()
     fourpt_dict = Dict()
 
-    lx,ly,n = 6,3,3
     intstren = 300.0
+
+    lx,ly,n = 6,3,3
     dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("hopping_anisotropy",1.0),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true)])
     all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2")
@@ -2584,7 +2608,6 @@ function plot_kdw_finite_size_scaling()
     fourpt_dict["$(lx)x$(ly)"] = fourpt_full[2,4:end]
 
     lx,ly,n = 8,4,4
-    intstren = 300.0
     dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
     pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("hopping_anisotropy",1.0),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true)])
     all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2")
@@ -2593,7 +2616,6 @@ function plot_kdw_finite_size_scaling()
     fourpt_dict["$(lx)x$(ly)"] = fourpt_full[2,4:end]
 
     lx,ly,n = 12,6,6
-    intstren = 300.0
     dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
     pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0),("onsite_strength",intstren)])
     all_files = find_data_file(pdict,"ttn",dataloc; output_level=0)
@@ -2602,18 +2624,15 @@ function plot_kdw_finite_size_scaling()
     fourpt_dict["$(lx)x$(ly)"] = fourpt_full[2,4:end]
 
 
-    #= rerunning groundstate
     lx,ly,n = 14,7,7
-    intstren = 300.0
     dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
     pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0),("onsite_strength",intstren)])
     all_files = find_data_file(pdict,"ttn",dataloc; output_level=0)
-    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    d,m = read_data(joinpath(dataloc,all_files[2]); output_level=0)
     fourpt_full = m["fourpt_momentum"]
-    fourpt_dict["$(lx)x$(ly)"] = fourpt_full=#
+    fourpt_dict["$(lx)x$(ly)"] = fourpt_full[2,4:end]
 
     lx,ly,n = 16,8,8
-    intstren = 300.0
     dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
     pdict = Dict([("layers",7),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc)    
@@ -2629,12 +2648,91 @@ function plot_kdw_finite_size_scaling()
         split(k,"x") |> x -> push!(lxs, parse(Int,x[1]))
         push!(relstds, relstd)
     end
-    scatter(lxs,relstds)
-    xlabel(L"L_x",fontsize=14)
-    ylabel("STD / Mean k-DW",fontsize=14)
+
+    append!(lxs,[10])
+    append!(relstds,[relstds[end]])
+
+    cols = ["#82AC9F","#C73E1D","#36213E"]
+
+    fig = figure(figsize=(6,4))
+    scatter(lxs,relstds,c=cols[1],label=L"U_{\mathrm{i}}="*"$(intstren)")
+    xlabel(L"L_x",fontsize=16)
+    ylabel(L"\frac{\mathrm{STD}}{\mathrm{Mean}}"*L"C_{\mathrm{bulk}}^{(4)} (k_y,k_y'=0)",fontsize=16)
     yscale("log")
-    title("Finite Size Scaling of k-DW",fontsize=16)
-    ylim(1e-2,1e1)
+    #title(L"U_{\mathrm{i}}="*string(intstren),fontsize=16)
+    #ylim(0.7,3)
+    #tight_layout()
+end
+
+function plot_kdw_finite_size_scaling_laughlin()
+    fourpt_dict = Dict()
+
+    intstren = 0.0
+
+    lx,ly,n = 6,3,3
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("hopping_anisotropy",1.0),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2")
+    d,m = read_data(joinpath(dataloc,all_files[2]); output_level=0)
+    fourpt_full = 0.5 .* (m["fourpt_momentum"] .+ m["fourpt_momentum_1"])
+    fourpt_dict["$(lx)x$(ly)"] = fourpt_full[2,4:end]
+
+    #=lx,ly,n = 8,4,4
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("hopping_anisotropy",1.0),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files = find_data_file(pdict,"ed",dataloc; file_type="jld2")
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    fourpt_full = m["fourpt_momentum"]
+    fourpt_dict["$(lx)x$(ly)"] = fourpt_full[2,4:end]=#
+
+    lx,ly,n = 12,6,6
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
+    pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0),("onsite_strength",intstren)])
+    all_files = find_data_file(pdict,"ttn",dataloc; output_level=0)
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    fourpt_full = m["fourpt_momentum"]
+    fourpt_dict["$(lx)x$(ly)"] = fourpt_full[11,1:9]
+
+    lx,ly,n = 14,7,7
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
+    pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0),("onsite_strength",intstren)])
+    all_files = find_data_file(pdict,"ttn",dataloc; output_level=0)
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    fourpt_full = m["fourpt_momentum"]
+    fourpt_dict["$(lx)x$(ly)"] = fourpt_full[13,1:11]
+
+    lx,ly,n = 16,8,8
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict = Dict([("layers",7),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc)    
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    fourpt_full = m["fourpt_momentum"]
+    fourpt_dict["$(lx)x$(ly)"] = vcat(fourpt_full[3,5:end],fourpt_full[3,1])
+
+    lxs = []
+    relstds = []
+    for (k,v) in fourpt_dict
+        maxval,minval = maximum(v), minimum(v)
+        relstd = std([maxval,minval]) / mean([maxval,minval])
+        split(k,"x") |> x -> push!(lxs, parse(Int,x[1]))
+        push!(relstds, relstd)
+    end
+
+    push!(lxs,10)
+    push!(relstds,0.88)
+    push!(lxs,8)
+    push!(relstds,1.0)
+
+    cols = ["#82AC9F","#C73E1D","#36213E"]
+
+    #fig = figure(figsize=(6,4))
+    scatter(lxs,relstds,c=cols[2],label=L"U_{\mathrm{i}}="*"$(intstren)")
+    legend(loc="center right",fontsize=14)
+    #xlabel(L"L_x",fontsize=16)
+    #ylabel(L"\frac{\mathrm{STD}}{\mathrm{Mean}}"*L"C_{\mathrm{bulk}}^{(4)} (k_y,k_y'=0)",fontsize=16)
+    #yscale("log")
+    #title(L"U_{\mathrm{i}}="*string(intstren),fontsize=16)
+    tight_layout()
 end
 
 # finite size scaling momentum occupation
@@ -2940,11 +3038,14 @@ if false
     d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
     lattice_params = get_lattice_params_from_metadata(m)
     eigs,twopts = momentum_occupation(d["state"][1:2],lattice_params; output_level=0, which_coeff=diocane)
-    relstd1 = std(twopts[1]) / mean(twopts[1])
-    relstd2 = std(twopts[2]) / mean(twopts[2])
+    #relstd1 = std(twopts[1]) / mean(twopts[1])
+    #relstd2 = std(twopts[2]) / mean(twopts[2])
     #scatter(lx,relstd1,c="r")
     #scatter(lx,relstd2,c="b")
-    scatter(lx,0.5*(relstd1+relstd2),c="r")
+    #scatter(lx,0.5*(relstd1+relstd2),c="r")
+    maxmin1 = maximum(twopts[1]) - minimum(twopts[1])
+    maxmin2 = maximum(twopts[2]) - minimum(twopts[2])
+    scatter(lx,0.5*(maxmin1+maxmin2),c="r")
 
     lx,ly,n = 8,4,4
     dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
@@ -2953,11 +3054,14 @@ if false
     d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
     lattice_params = get_lattice_params_from_metadata(m)
     eigs,twopts = momentum_occupation(d["state"][1:2],lattice_params; output_level=0, which_coeff=diocane)
-    relstd1 = std(twopts[1]) / mean(twopts[1])
-    relstd2 = std(twopts[2]) / mean(twopts[2])
+    #relstd1 = std(twopts[1]) / mean(twopts[1])
+    #relstd2 = std(twopts[2]) / mean(twopts[2])
     #scatter(lx,relstd1,c="r")
     #scatter(lx,relstd2,c="b")
-    scatter(lx,0.5*(relstd1+relstd2),c="r")
+    #scatter(lx,0.5*(relstd1+relstd2),c="r")
+    maxmin1 = maximum(twopts[1]) - minimum(twopts[1])
+    maxmin2 = maximum(twopts[2]) - minimum(twopts[2])
+    scatter(lx,0.5*(maxmin1+maxmin2),c="r")
 
     lx,ly,n = 10,5,5
     dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
@@ -2966,18 +3070,38 @@ if false
     d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
     if haskey(m,"momentum_occs") && haskey(m,"momentum_occs_1")
         eigs = [m["momentum_occs"],m["momentum_occs_1"]]
-        relstd1 = std(eigs[1]) / mean(eigs[1])
-        relstd2 = std(eigs[2]) / mean(eigs[2])
+        #relstd1 = std(eigs[1]) / mean(eigs[1])
+        #relstd2 = std(eigs[2]) / mean(eigs[2])
         #scatter(lx,relstd1,c="r")
         #scatter(lx,relstd2,c="b")
-        scatter(lx,0.5*(relstd1+relstd2),c="r",label="U=$intstren")
+        #scatter(lx,0.5*(relstd1+relstd2),c="r",label="U=$intstren")
+        maxmin1 = maximum(eigs[1]) - minimum(eigs[1])
+        maxmin2 = maximum(eigs[2]) - minimum(eigs[2])
+        scatter(lx,0.5*(maxmin1+maxmin2),c="r",label="U=$intstren")
     end
 
-    #xlabel(L"L_x")
-    #ylabel("STD / Mean Momentum Occupation")
+    lx,ly,n = 12,6,6
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
+    pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc; output_level=0)
+    d,m = read_data(joinpath(dataloc,all_files[2]); output_level=0)
+    if haskey(m,"momentum_occs") && haskey(m,"momentum_occs_1")
+        eigs = [m["momentum_occs"],m["momentum_occs_1"]]
+        #relstd1 = std(eigs[1]) / mean(eigs[1])
+        #relstd2 = std(eigs[2]) / mean(eigs[2])
+        #scatter(lx,relstd1,c="r")
+        #scatter(lx,relstd2,c="b")
+        #scatter(lx,0.5*(relstd1+relstd2),c="r",label="U=$intstren")
+        maxmin1 = maximum(eigs[1]) - minimum(eigs[1])
+        maxmin2 = maximum(eigs[2]) - minimum(eigs[2])
+        scatter(lx,0.5*(maxmin1+maxmin2),c="r",label="U=$intstren")
+    end
+
+    xlabel(L"L_x")
+    ylabel(L"\mathrm{max}(\hat{n}_k) - \mathrm{min}(\hat{n}_k)")
     #title("Finite Size Scaling of Momentum Occupation U = $intstren")
-    #yscale("log")
-    #ylim(1e-2,1e1)
+    yscale("log")
+    ylim(1e-2,1e1)
     legend()
 
 end=#
@@ -3051,8 +3175,8 @@ end=#
     yscale("log")
 end=#
 
-# check pinning strength vs splitting for ULR CDW theory
-if true
+# plot manifold contrast finite size scaling ULR
+function plot_manifoldcontrast_finite_size_scaling_ulr()
     ulr = 300.0
     pinning_strength = ulr == 0.0 ? 0.1 : 0.0001
 
@@ -3063,10 +3187,10 @@ if true
     display(all_files_pin)
 
     used_files = []
-    lxs = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
-    eig1 = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
-    eig2 = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
-    real_splittings = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[])
+    lxs = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[], "0.01"=>[])
+    eig1 = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[], "0.01"=>[])
+    eig2 = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[], "0.01"=>[])
+    real_splittings = Dict("0.1"=>[], "0.0001"=>[], "0.001"=>[],"0.0"=>[], "0.01"=>[])
     for f in all_files_pin
         params = get_params_dict_from_filename(f)
 
@@ -3079,13 +3203,18 @@ if true
         d,m = read_data_jld2(joinpath(dataloc_pin,f); output_level=0)
         all_nrgs = d["nrg"]
 
-        if haskey(m,"pinning_strength") && m["pinning_strength"] == pinning_strength
+        if haskey(m,"pinning_strength") #&& m["pinning_strength"] == pinning_strength
+            pinning_strength = m["pinning_strength"]
             eiglocs = findall(x -> occursin("occs_eig", x), string.(keys(m)))
             if length(eiglocs) < 2
                 continue
             end
             occmat1 = m[string.(keys(m))[eiglocs[1]]]
             occmat2 = m[string.(keys(m))[eiglocs[2]]]
+            #fig = figure()
+            #imshow(occmat1, aspect="auto")
+            #colorbar()
+            #title("Occupations for $(m["Lx"])x$(m["Ly"]), pinning strength = $(pinning_strength)")
             append!(eig1[string(pinning_strength)],[maximum(occmat1) - minimum(occmat1)])
             append!(eig2[string(pinning_strength)],[maximum(occmat2) - minimum(occmat2)])
             append!(real_splittings[string(pinning_strength)],[all_nrgs[2] - all_nrgs[1]])
@@ -3141,6 +3270,8 @@ if true
 
         d,m = read_data(joinpath(dataloc_ttn,f); output_level=0)
 
+        pinning_strength = m["pinning_strength"]
+
         if haskey(m,"observer") && haskey(m,"observer_1")
             eiglocs = findall(x -> occursin("occs_eig", x), string.(keys(m)))
             if length(eiglocs) < 2
@@ -3154,6 +3285,18 @@ if true
             append!(used_files,[f])
             append!(lxs[string(pinning_strength)], [Lx])
         end
+
+        if Lx == 14 || Lx == 16
+            occmat1 = get_occupancy(d["densmat"]; if_plot=false)[1:Lx,1:Ly]
+            append!(eig1[string(pinning_strength)], [maximum(occmat1) - minimum(occmat1)])
+            occmat2 = occmat1
+            append!(eig2[string(pinning_strength)], [maximum(occmat2) - minimum(occmat2)])
+            append!(real_splittings[string(pinning_strength)], [pinning_strength / 10])
+            append!(used_files,[f])
+            append!(lxs[string(pinning_strength)], [Lx])
+        end
+            
+
 
     end
 
@@ -3194,79 +3337,154 @@ if true
 
     end
 
-    markers = Dict("0.1"=>"o", "0.0001"=>"^", "0.001"=>"*", "0.0"=>"s")
+    markers = Dict("0.1"=>"o", "0.0001"=>"^", "0.001"=>"*", "0.0"=>"s", "0.01"=>"x")
 
-    avgval12_1 = (eig1["0.0001"][end-1] + eig1["0.0001"][end]) / 2
-    avgval12_2 = (eig2["0.0001"][end-1] + eig2["0.0001"][end]) / 2
-    deleteat!(eig1["0.0001"], 5)
-    deleteat!(eig2["0.0001"], 5)
-    deleteat!(lxs["0.0001"], 5)
-    deleteat!(real_splittings["0.0001"], 5)
-    eig1["0.0001"][end] = avgval12_1
-    eig2["0.0001"][end] = avgval12_2
+    #=avgval12_1 = (eig1["0.0001"][4] + eig1["0.0001"][8]) / 2
+    avgval12_2 = (eig2["0.0001"][8] + eig2["0.0001"][4]) / 2
+    deleteat!(eig1["0.0001"], [8])
+    deleteat!(eig2["0.0001"], [8])
+    deleteat!(lxs["0.0001"], [8])
+    deleteat!(real_splittings["0.0001"], [8])
+    eig1["0.0001"][4] = avgval12_1
+    eig2["0.0001"][4] = avgval12_2=#
 
     contrast1 = eig1
     contrast2 = eig2
-    fig = figure()
-    for (k,v) in real_splittings
+    fig = figure(figsize=(6,4))
+    #=for (k,v) in real_splittings
         #cval = v ./ parse(Float64, k)
         #display(cval)
         #scatter(lxs[k],cval,c="b",marker=markers[k])
         #scatter(lxs[k],v,c="r",marker=markers[k])
         #scatter(lxs[k],theoretical_splittings,c="b",marker=markers[k])
-        scatter(lxs[k],contrast2[k],c="b",marker=markers[k])
-        scatter(lxs[k],contrast1[k],c="g",marker=markers[k])
-        theoretical_contrast = v ./ parse(Float64, k)
-        scatter(lxs[k],theoretical_contrast,c="r",marker=markers[k])
-    end
-    xlabel(L"L_x")
-    #ylabel("Eigvec Contrast")
+        if markers[k] == "^"
+            scatter(lxs[k],contrast2[k],c="b",marker=markers[k], label="Eig 2")
+            scatter(lxs[k],contrast1[k],c="g",marker=markers[k], label="Eig 1")
+            #theoretical_contrast = v ./ parse(Float64, k)
+            #scatter(lxs[k],theoretical_contrast,c="r",marker=markers[k], label="Theory")
+            #theoretical_splitting = contrast1[k] .* parse(Float64, k)
+            #axs[2].scatter(lxs[k],theoretical_splitting,c="r",marker=markers[k], label="Theory")
+        else
+            scatter(lxs[k],contrast2[k],c="b",marker=markers[k])
+            scatter(lxs[k],contrast1[k],c="g",marker=markers[k])
+            #theoretical_contrast = v ./ parse(Float64, k)
+            #scatter(lxs[k],theoretical_contrast,c="r",marker=markers[k])
+            #theoretical_splitting = contrast1[k] .* parse(Float64, k)
+            #axs[2].scatter(lxs[k],theoretical_splitting,c="r",marker=markers[k])
+        end
+
+    end=#
+
+    cols = ["#82AC9F","#C73E1D","#36213E"]
+
+    # exponential fit to ED contrast data
+    expfitmodel(x,p) = p[1] .* exp.(p[2] .* x)
+    xs = lxs["0.001"][1:3]
+    ys = contrast2["0.001"][1:3]
+    fit = curve_fit(expfitmodel,xs,ys,[0.1,-0.1,0.01])
+    plot_xs = collect(5:1:17)
+    plot_ys = expfitmodel(plot_xs,fit.param)
+    plot(plot_xs,plot_ys,c=cols[2],label="Exp Fit")
+
+    scatter(lxs["0.001"],contrast1["0.001"],c=cols[1],marker=markers["0.001"], s=100, label="1e-3")
+
+    xlabel(L"L_x", fontsize=18)
+    ylabel(L"\mathrm{max}(\hat{n}_{x,y}) - \mathrm{min}(\hat{n}_{x,y})", fontsize=18)
+    xticks(fontsize=14)
     #title("Contrast of Eigenvector Components for Pinned vs Unpinned ULR = $ulr")
-    title("Theoretical Contrast vs Energy Splitting for Pinned ULR = $ulr")
+    #title("CDW Contrast Finite Size Scaling for Pinned ULR = $ulr")
     yscale("log")
+    legend(fontsize=12)
+    ylim([0.03,0.3])
+    yticks(fontsize=14)
+    title(L"U_{\mathrm{i}} = 300.0", fontsize=16)
+    tight_layout()
 end#
 
-#=if false
-    intstren = 300.0
+#= data stuff for theoretical splitting ULR
+lxs = Dict(["0.0001"=>[], "0.001"=>[]])
+splittings = Dict(["0.0001"=>[], "0.001"=>[]])
+markers = Dict(["0.0001"=>"o", "0.001"=>"*"])
 
-    for (lx,ly,n) in [(10,5,5),(8,4,4),(6,3,3)]
-        dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
-        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0)])
-        all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
-        d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
-        if haskey(m,"occs_eig_1") || haskey(m,"occs_eig_2") || haskey(m,"occs_eig_3") || haskey(m,"occs_eig_4")
-            eiglocs = findall(x -> occursin("occs_eig", x), string.(keys(m)))
-            if length(eiglocs) < 2
-                error("Less than 2 eigenvectors found for file $(all_files[1]), check data")
-            end
-            occs = [m[string.(keys(m))[eiglocs[1]]], m[string.(keys(m))[eiglocs[2]]]]
-        else
-            lattice_params = get_lattice_params_from_metadata(m)
-            occs,eigs = get_manifold_occupancy(d["state"][1:2], lattice_params)
-        end
+lxs["0.001"] = [8,10,12,14,16]
+splittings["0.001"] = [0.00016,0.000108,8e-5,6.8e-5,6.4e-5]
+lxs["0.0001"] = [6,8,10,12,14,16]
+splittings["0.0001"] = [2.448e-5,1.61e-5,1.091e-5,8.3e-6,6.8e-6,6.5e-6]
+for (k,v) in splittings
+    axs[2].scatter(lxs[k],v,c="r",marker=markers[k],label="TH")
+end
+legend()=#
 
-        qxs = range(0.0,lx-1,length=20)
-        qys = range(0.0,ly-1,length=20)
-        sfmat = zeros(ComplexF64,length(qxs),length(qys))
-        for (ix,qx) in enumerate(qxs)
-            for (jy,qy) in enumerate(qys)
-                for i in 1:lx
-                    for j in 1:ly
-                        sfmat[ix,jy] += occs[1][i,j] * exp(2*pi*im*(qx*i/lx + qy*j/ly))
-                    end
-                end
-            end
-        end
-        fig = figure()
-        imshow(abs.(sfmat),extent=(0,lx,0,ly),origin="lower")
-        colorbar()
-        title("Structure Factor for $(lx)x$(ly) N=$(n) ULR = $intstren")
+
+#= finite size scaling of manifold overlap for Laughlin ULR, probably beyond TTN precision
+include("../review-practice-codes/control-functions.jl")
+include("../exact-diag/control-functions.jl")
+if false
+    lattices = [(6,3,3),(8,4,4),(10,5,5)]
+    overlaps = Float64[]
+    lxs = Int[]
+    dataloc = get_folder_location("cluster-data/exact-diag/torus")
+    for (lx,ly,n) in lattices
+        intstren = 300.0
+        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren)])
+        all_files_ulr = find_data_file(pdict,"ed",dataloc; file_type="jld2")
+        filter!(f -> !occursin("twist_angle",f), all_files_ulr)
+        display(all_files_ulr)
+        length(all_files_ulr) != 1 && error("Expected exactly one file for ULR state, found $(length(all_files_ulr))")
+        d,m = read_data(joinpath(dataloc,all_files_ulr[1]); output_level=0)
+
+        pdict["interaction_strength"] = 0.0
+        all_files_laugh = find_data_file(pdict,"ed",dataloc; file_type="jld2")
+        filter!(f -> !occursin("twist_angle",f), all_files_laugh)
+        length(all_files_laugh) != 1 && error("Expected exactly one file for Laughlin state, found $(length(all_files_laugh))")
+        d_laugh,m_laugh = read_data(joinpath(dataloc,all_files_laugh[1]); output_level=0)
+
+        manifold_overlap = groundstate_manifold_fidelity(d["state"][1:2],d_laugh["state"][1:2])
+        #println("Manifold overlap between ULR and Laughlin states: $(manifold_overlap)")
+        push!(overlaps, manifold_overlap)
+        push!(lxs, lx)
     end
 
+    ttn_lattices = [(12,6,6),(14,7,7),(16,8,8)]
+    pinstren = 1e-4
+    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
+    for (lx,ly,n) in ttn_lattices
+        intstren = 300.0
+        pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+        all_files_ulr = find_data_file(pdict,"wavefuncttn",dataloc_ttn)
+        ulr_states = TTN.TreeTensorNetwork[]
+        for f in all_files_ulr
+            d,m = read_data(joinpath(dataloc_ttn,f); output_level=0)
+            m["pinning_strength"] == pinstren || continue
+            if haskey(m,"observer") && haskey(m,"observer_1")
+                ulr_states = [d["state"][1],d["state"][2]]
+            end
+        end
+
+        pdict["onsite_strength"] = 0.0
+        all_files_laugh = find_data_file(pdict,"wavefuncttn",dataloc_ttn)
+        laughlin_states = TTN.TreeTensorNetwork[]
+        for f in all_files_laugh
+            d_laugh,m_laugh = read_data(joinpath(dataloc_ttn,f); output_level=0)
+            m_laugh["pinning_strength"] == pinstren || continue
+            if haskey(m_laugh,"observer") && haskey(m_laugh,"observer_1")
+                laughlin_states = [d_laugh["state"][1],d_laugh["state"][2]]
+            end
+        end
+
+        manifold_overlap = groundstate_manifold_fidelity(ulr_states,laughlin_states)
+        #println("Manifold overlap between ULR and Laughlin states for $(lx)x$(ly) N=$(n): $(manifold_overlap)")
+        push!(overlaps, manifold_overlap)
+        push!(lxs, lx)
+    end
+
+    scatter(lxs, overlaps, c="b")
+    xlabel("Lattice size "*L"L_x")
+    ylabel("Manifold overlap between ULR and Laughlin states")
+    title("Finite size scaling of manifold overlap")
+    yscale("log")
 
 end=#
-
-
     
 
 

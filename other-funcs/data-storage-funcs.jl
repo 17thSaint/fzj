@@ -699,7 +699,7 @@ function read_data_hdf5(file_name; kwargs...)
 		end
 		g_metadata = open_group(f,"metadata")
 		for metadatum_key in keys(f["metadata"])
-			if occursin("ttn",metadatum_key) && !occursin("size",metadatum_key)
+			if occursin("ttn",metadatum_key) && !occursin("size",metadatum_key) && !occursin("seed",metadatum_key)
 				metadata[metadatum_key] = read(g_metadata, metadatum_key, TTN.TreeTensorNetwork)
 			elseif occursin("observer",metadatum_key)
 				metadata[metadatum_key] = read(g_metadata, metadatum_key, TTN.ITensorMPS.AbstractObserver)

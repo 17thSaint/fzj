@@ -530,11 +530,13 @@ function run_timeevo(starting_gs::Vector,time_params::Dict,lattice_dict::Dict,ha
     tmax_global = 25.0
     dt_global = 0.05
 
+    tmax = time_params["tmax"]    
+
     dt_crit = 2.0/(lattice_dict["N"]*(lattice_dict["N"]-1)/2 * maximum(hamilt_dict["U"]))
     dt_crit > 0.01*tmax && (dt_crit = 2.0/(lattice_dict["N"]*(lattice_dict["N"]-1)/2 * 300.0))
 
-    tmax::Float64 = time_params["tmax"]
-    dt::Float64 = dt_crit #time_params["dt"]
+    # use caller-supplied dt if provided, otherwise fall back to interaction-derived critical step
+    dt::Float64 = haskey(time_params, "dt") ? time_params["dt"] : dt_crit
     max_nsteps::Int = Int(ceil(tmax / dt))
     when_change_dt::Int = max_nsteps + 1
     

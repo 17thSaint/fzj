@@ -15,7 +15,7 @@ include("control-functions.jl")
 include("../other-funcs/basic-2d-plottings.jl")
 include("plottings.jl")
 
-
+using Test
 
 
 #= testing the proper overlap with the manifold as a fidelity measure
@@ -180,45 +180,147 @@ if false
 
 end=#
 
-#= test position_state function
+# Sums the occupancy on all sites not in allowed_coords.
+# get_occupancy returns an Ly×Lx matrix where entry [y,x] is the expected
+# particle count at coordinate (x,y), so occ[y,x] for each (x,y) in allowed.
+function occ_outside_allowed(state, lp, allowed_coords)
+    occ = get_occupancy(state, lp; if_plot=false)
+    inside = sum(occ[y, x] for (x, y) in allowed_coords)
+    return sum(occ) - inside
+end
+
+# Shared parameter template for all position_state tests.
+# PBC in both directions is required so the magnetic flux alpha = N/(0.5*Lx*Ly)
+# stays below the hard limit of 0.4 checked by check_fluxes. Lattice sizes are
+# chosen so that 2N is divisible by Lx or Ly (flux quantization condition on the torus).
+# No interactions and no saving to disk; output silenced.
+base_pdict(lx, ly, n, nev) = Dict(
+    "Lx"=>lx, "Ly"=>ly, "N"=>n, "nev"=>nev,
+    "if_periodic_x"=>true, "if_periodic_y"=>true,
+    "interaction_strength"=>0.0, "filling"=>0.5,
+    "if_save_data"=>false, "if_find_data"=>false, "output_level"=>0
+)
+
+# --- two particles restricted to 2x2 corner of 4x4 lattice ---
+# The 4 allowed sites {(1,1),(2,1),(1,2),(2,2)} span a 2x2 block.
+# With barrier_strength=1e6 on all other sites, the N low-energy eigenstates
+# should live almost entirely in the restricted binomial(4,2)=6 dimensional subspace.
+# We request nev=4 states (all well below the barrier) and check that each has
+# negligible occupancy (<1e-3) outside the allowed block.
 if false
-    println("=== Testing position_state ===")
+    @testset "position_state: N=2 confined to 2x2 corner on 4x4" begin
+        pdict = base_pdict(4, 4, 2, 4)
+        allowed = [(1,1), (2,1), (1,2), (2,2)]
+        states, nrgs, lp, _ = position_state(allowed, pdict; output_level=0)
 
-    function make_test_lattice(Lx, Ly, N)
-        fb = n_particle_basis(N, Lx, Ly; if_save_data=false, if_find_existing=false, output_level=0)
-        return Dict{String,Any}("Lx"=>Lx,"Ly"=>Ly,"N"=>N,"full_basis"=>fb,
-                                "if_periodic_x"=>false,"if_periodic_y"=>false,"twist_angle"=>(0.0,0.0))
+        for state in states
+            @test occ_outside_allowed(state, lp, allowed) < 1e-3
+        end
+        # all 4 nev energies should be far below the 1e6 barrier; the true
+        # sub-barrier spectrum has binomial(4,2)=6 states so nev=4 is safe
+        @test all(nrgs .< 1e4)
     end
+end
 
-    test_configs = [
-        (4, 3, 2, [(1, 1), (4, 3)]),
-        (4, 3, 2, [(2, 1), (3, 2)]),
-        (4, 3, 3, [(1, 1), (2, 2), (4, 3)]),
-        (5, 4, 2, [(1, 4), (5, 1)]),
-        (5, 4, 4, [(1, 1), (5, 4), (3, 2), (2, 3)]),
-        (6, 3, 3, [(1, 1), (3, 2), (6, 3)]),
-    ]
+# --- tuple and linear-index dispatch must produce identical eigenstates ---
+# position_state accepts either Vector{Int} (linear indices) or
+# Vector{Tuple{Int,Int}} (coordinates). Both should build the same Hamiltonian
+# and therefore return the same eigenvalues and eigenvectors (up to global phase).
+# Linear index convention on a 4x4 lattice: index = (x-1)*Ly + y, so
+# (1,1)→1, (2,1)→2, (1,2)→5.
+if false
+    @testset "position_state: tuple vs linear-index dispatch agree on 4x4 N=2" begin
+        pdict = base_pdict(4, 4, 2, 3)
+        allowed_lin = [1, 2, 5]
+        allowed_tup = [(1, 1), (2, 1), (1, 2)]
 
-    local all_passed = true
-    for (Lx, Ly, N, positions) in test_configs
-        lp = make_test_lattice(Lx, Ly, N)
-        psi = position_state(positions, lp)
-        occs = get_occupancy(psi, lp; if_plot=false)
+        states_lin, nrgs_lin, _, _ = position_state(allowed_lin, pdict; output_level=0)
+        states_tup, nrgs_tup, _, _ = position_state(allowed_tup, pdict; output_level=0)
 
-        norm_ok   = abs(norm(psi) - 1.0) < 1e-12
-        total_ok  = abs(sum(occs) - N) < 1e-10
-        pos_ok    = all(abs(occs[y, x] - 1.0) < 1e-10 for (x, y) in positions)
-        zeros_ok  = all(abs(occs[y, x]) < 1e-10
-                        for x in 1:Lx, y in 1:Ly if (x, y) ∉ positions)
-
-        passed = norm_ok && total_ok && pos_ok && zeros_ok
-        all_passed = all_passed && passed
-        println("$(Lx)x$(Ly) N=$N positions=$positions: $(passed ? "PASSED" : "FAILED")",
-                passed ? "" : " (norm=$norm_ok total=$total_ok pos=$pos_ok zeros=$zeros_ok)")
+        # eigenvalues must match exactly (same H constructed both ways)
+        @test isapprox(nrgs_lin, nrgs_tup, atol=1e-8)
+        # |⟨ψ_lin|ψ_tup⟩| = 1 confirms same ground state up to global phase
+        @test isapprox(abs(dot(states_lin[1], states_tup[1])), 1.0, atol=1e-6)
     end
+end
 
-    println(all_passed ? "\nAll position_state tests PASSED" : "\nSome position_state tests FAILED")
-end=#
+# --- two particles confined to bottom row of a 6x2 lattice ---
+# All 6 sites in y=1 are allowed; the y=2 row is barriered.
+# binomial(6,2)=15 restricted states, so nev=6 is comfortably in the sub-barrier sector.
+# We directly sum the occupancy over the top row rather than using occ_outside_allowed
+# to demonstrate the row-indexed check explicitly.
+# Lattice choice: Lx=6, Ly=2 gives alpha=1/3 and 2N=4 divisible by Ly=2 ✓
+if false
+    @testset "position_state: N=2 confined to bottom strip on 6x2" begin
+        pdict = base_pdict(6, 2, 2, 6)
+        allowed = [(x, 1) for x in 1:6]
+        states, nrgs, lp, _ = position_state(allowed, pdict; output_level=0)
+
+        for state in states
+            occ = get_occupancy(state, lp; if_plot=false)
+            # occ[2,:] is the top row (y=2); all weight should be in y=1
+            @test sum(occ[2, :]) < 1e-3
+        end
+        @test all(nrgs .< 1e4)
+    end
+end
+
+# --- three particles restricted to a 3x2 block on 4x6 lattice ---
+# 6 allowed sites → binomial(6,3)=20 restricted states; nev=6 requested.
+# Lattice choice: Lx=4, Ly=6 gives alpha=0.25 and 2N=6 divisible by Ly=6 ✓
+if false
+    @testset "position_state: N=3 confined to 3x2 block on 4x6" begin
+        pdict = base_pdict(4, 6, 3, 6)
+        allowed = [(x, y) for x in 1:3, y in 1:2] |> vec
+        states, nrgs, lp, _ = position_state(allowed, pdict; output_level=0)
+
+        for state in states
+            @test occ_outside_allowed(state, lp, allowed) < 1e-3
+        end
+        @test all(nrgs .< 1e4)
+    end
+end
+
+# --- four particles restricted to left half of 6x4 lattice ---
+# x in 1:3, y in 1:4 gives 12 allowed sites → binomial(12,4)=495 restricted states.
+# Lattice choice: Lx=6, Ly=4 gives alpha=1/3 and 2N=8 divisible by Ly=4 ✓
+if false
+    @testset "position_state: N=4 confined to left half on 6x4" begin
+        pdict = base_pdict(6, 4, 4, 8)
+        allowed = [(x, y) for x in 1:3, y in 1:4] |> vec
+        states, nrgs, lp, _ = position_state(allowed, pdict; output_level=0)
+
+        for state in states
+            @test occ_outside_allowed(state, lp, allowed) < 1e-3
+        end
+        @test all(nrgs .< 1e4)
+    end
+end
+
+# --- three particles in bottom strip of 6x3 lattice ---
+# Only y=1 is allowed; rows y=2 and y=3 are barriered.
+# binomial(6,3)=20 restricted states, nev=8 requested.
+# Lattice choice: Lx=6, Ly=3 gives alpha=1/3 and 2N=6 divisible by both Lx=6 and Ly=3 ✓
+if false
+    @testset "position_state: N=3 confined to bottom strip on 6x3" begin
+        pdict = base_pdict(6, 3, 3, 8)
+        allowed = [(x, 1) for x in 1:6]
+        states, nrgs, lp, _ = position_state(allowed, pdict; output_level=0)
+
+        for state in states
+            occ = get_occupancy(state, lp; if_plot=false)
+            # occ[2:3,:] covers both non-allowed rows; sum should be near zero
+            @test sum(occ[2:3, :]) < 1e-3
+        end
+        @test all(nrgs .< 1e4)
+    end
+end
+
+
+
+
+
+
 
 
 

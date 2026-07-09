@@ -418,10 +418,53 @@ function run_normal_ed(params_dict::Dict; kwargs...)
 
 end
 
+function position_state(allowed_sites::Vector{Int64}, params_dict::Dict; barrier_strength::Float64=1e6, kwargs...)
+    output_level::Int64 = get(kwargs, :output_level, get(params_dict, "output_level", 1))
+
+    lattice_params, hamilt_params, running_args = get_normal_model_params_ed(params_dict)
+    basis_dataloc = running_args.basis_dataloc
+
+    full_basis = n_particle_basis(lattice_params; output_level=running_args.output_level, dataloc=basis_dataloc)
+    lattice_params["full_basis"] = full_basis
+
+    output_level > 0 && println("Building Hamiltonian...")
+    H = buildHam(lattice_params, hamilt_params; output_level=output_level - 1)
+    hamilt_params["H"] = H
+
+    # add large potential on all basis states that have any particle outside allowed_sites
+    allowed_set = Set(allowed_sites)
+    for j in 1:size(full_basis, 2)
+        if any(s -> s ∉ allowed_set, full_basis[:, j])
+            H[j, j] += barrier_strength
+        end
+    end
+
+    nev = running_args.nev
+    kd = nev > 20 ? nev + 10 : 30
+    x0 = rand(Float64, size(full_basis, 2))
+    output_level > 0 && println("Solving eigenproblem (nev=$nev)...")
+    start_time = time()
+    rez = eigsolve(H, x0, nev, :SR; krylovdim=kd)
+    output_level > 0 && println("Elapsed: ", round(time() - start_time, digits=2), "s")
+
+    sorted_indices = sortperm(real.(rez[1]))
+    states = rez[2][sorted_indices][1:nev]
+    nrgs = real.(rez[1][sorted_indices][1:nev])
+
+    return states, nrgs, lattice_params, hamilt_params
+end
+
+function position_state(allowed_sites::Vector{Tuple{Int64,Int64}}, params_dict::Dict; kwargs...)
+    Lx::Int64 = get(params_dict, "Lx", 4)
+    Ly::Int64 = get(params_dict, "Ly", Lx)
+    linear_sites = [linear_index(s, Lx, Ly) for s in allowed_sites]
+    return position_state(linear_sites, params_dict; kwargs...)
+end
+
 #= run data collection with for loops
 if false
-    
-    
+
+
     #which_one = args_dict["which_one"]
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
