@@ -352,6 +352,7 @@ function time_evolution(starting_wavefunc::Vector{Vector{ComplexF64}},starting_h
 
     nsteps::Int = t_evo_params["nsteps"]
     tevo_wavefunc = [spzeros(ComplexF64,length(wavefunc[1]),Int(1+(nsteps+1)/2)) for i in 1:length(wavefunc)]
+    tevo_nrg = [zeros(Float64,Int(1+(nsteps+1)/2)) for i in 1:length(wavefunc)]
 
     # if continuous saving, save the initial state
     if_save_data && if_continuous_saving && (actual_filename = save_tevo_data(tevo_wavefunc,metadata))
@@ -359,8 +360,10 @@ function time_evolution(starting_wavefunc::Vector{Vector{ComplexF64}},starting_h
     if if_instant_gs
         nev = get(kwargs, :nev, 10)
         instant_spec = Dict{String,SparseMatrixCSC}()
+        instant_nrgs = Dict{String,Vector{Float64}}()
         for i in 1:nev
-            instant_spec[string(i)] = spzeros(ComplexF64,length(wavefunc),Int(1+(nsteps-1)/2))
+            instant_spec[string(i)] = spzeros(ComplexF64,length(wavefunc[1]),Int(1+(nsteps-1)/2))
+            instant_nrgs[string(i)] = zeros(Float64,Int(1+(nsteps-1)/2))
         end
         running_args = get_quick_running_args(nev)
     end
@@ -372,8 +375,9 @@ function time_evolution(starting_wavefunc::Vector{Vector{ComplexF64}},starting_h
     # perform the time evolution
     for timestep in 1:2:nsteps
 
+        ht_start = ht_prev
         for i in 1:length(wavefunc)
-            wavefunc[i],ht_new = runge_kutta_step(wavefunc[i],ht_prev,timestep,t_evo_params,lattice_params,hamilt_params; kwargs...)
+            wavefunc[i],ht_new = runge_kutta_step(wavefunc[i],ht_start,timestep,t_evo_params,lattice_params,hamilt_params; kwargs...)
             ht_prev = ht_new
         end
         
@@ -383,23 +387,23 @@ function time_evolution(starting_wavefunc::Vector{Vector{ComplexF64}},starting_h
 
         if if_instant_gs
             
-            fulloverlap = 0.0
+            #fulloverlap = 0.0
 
             states,nrgs,rhos,hh = find_eigenstates(running_args.nev,lattice_params,hamilt_params; running_args...)
             for i in 1:nev
                 local_state = states[i]
-                fulloverlap += abs2(dot(wavefunc,local_state))
+                #fulloverlap += abs2(adjoint(wavefunc[1]) * local_state)
                 instant_spec[string(i)][:,Int((timestep+1)/2)] = local_state
+                instant_nrgs[string(i)][Int((timestep+1)/2)] = nrgs[i]
             end
             opl > 1 && println("Found instantaneous eigenstates at step $timestep")
 
-            if fulloverlap < 1e-6
-                error("State is Lost! Overlap with instantaneous eigenstates: $fulloverlap")
-            end
+            #fulloverlap < 1e-6 && error("State is Lost! Overlap with instantaneous eigenstates: $fulloverlap")
         end
         
         for i in 1:length(wavefunc)
             tevo_wavefunc[i][:,Int((timestep+1)/2)] = wavefunc[i]
+            tevo_nrg[i][Int((timestep+1)/2)] = real(adjoint(wavefunc[i]) * (ht_prev * wavefunc[i]))
         end
 
         # save data if continuous saving is enabled
@@ -414,9 +418,9 @@ function time_evolution(starting_wavefunc::Vector{Vector{ComplexF64}},starting_h
     opl > 0 && println("Time evolution completed.")
 
     if if_instant_gs
-        return tevo_wavefunc,instant_spec
+        return [tevo_wavefunc,tevo_nrg],[instant_spec,instant_nrgs]
     else
-        return tevo_wavefunc, nothing
+        return [tevo_wavefunc,tevo_nrg], [nothing, nothing]
     end
 end
 
@@ -571,10 +575,15 @@ function run_timeevo(starting_gs::Vector,time_params::Dict,lattice_dict::Dict,ha
     end
 
     tevo_dict = make_tevo_params(tevo_pdict)
-    
-    tevo_groundstate,instantaneous_spectrum = time_evolution(starting_gs,hamilt_dict["H"],tevo_dict,lattice_dict,hamilt_dict; saving_args...,kwargs...) #output_level=1, nev=speccount
 
-    return tevo_groundstate,tevo_dict,instantaneous_spectrum,saving_args
+    # build the t=0 Hamiltonian from the ramp's actual starting values rather than reusing
+    # hamilt_dict["H"], which may still carry a one-off pinning/barrier term baked in by whatever
+    # produced the starting state (e.g. position_state's corner-confinement potential)
+    starting_ham = timeham(1,tevo_dict,lattice_dict,hamilt_dict; kwargs...)
+
+    tevo_data,instant_data = time_evolution(starting_gs,starting_ham,tevo_dict,lattice_dict,hamilt_dict; saving_args...,kwargs...) #output_level=1, nev=speccount
+
+    return tevo_data,tevo_dict,instant_data,saving_args
 end
 
 

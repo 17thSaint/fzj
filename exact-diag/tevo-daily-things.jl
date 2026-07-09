@@ -312,6 +312,7 @@ if false || if_all
     pdict_starting = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
 
     states_starting, nrgs_starting, lattice_params_starting, hamilt_params_starting = position_state(starting_config, pdict_starting; output_level=0)
+    hamilt_params_starting["tx"] = 0.0
 
     #occs_starting = get_occupancy(states_starting[1], lattice_params_starting; plot_title="Starting state occupancy")
 end
@@ -323,24 +324,82 @@ if false || if_all
 
     pdict_ending = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tx",end_tx),("ty",end_ty),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
 
-    states_ending, nrgs_ending, lattice_params_ending, hamilt_params_ending = run_normal_ed(pdict_ending; output_level=0)
+    states_ending, nrgs_ending, _, _, _, lattice_params_ending, hamilt_params_ending = run_normal_ed(pdict_ending; output_level=0)
 end
+
+#firstramp_times = range(2.0, 5.0, length=11)
+#final_fidelities = zeros(length(firstramp_times))
+#for (idx,ramptime_firstramp) in enumerate(firstramp_times)
 
 # ramp ty from 0 to 1; tx stays at its default from hamilt_params_starting
 if false || if_all
-    speccount = 2
-    ramptime = 0.5
-    tmax_global = ramptime + 0.5  # extra hold time after ramp end to check convergence
-    time_running_args = (nev=speccount, output_level=1, if_instant_gs=false, if_save_data=false, dataloc="tevo-daily-things-data/")
+    speccount_firstramp = 3
+    ramptime_firstramp = 10
+    tmax_global_firstramp = ramptime_firstramp + 0.0  # extra hold time after ramp end to check convergence
+    time_running_args_firstramp = (nev=speccount_firstramp, output_level=1, if_instant_gs=true, if_save_data=false, dataloc="tevo-daily-things-data/")
 
-    tevo_params = Dict([ ("ty",(linear_ramp,0.0,end_ty,ramptime)),("tmax",tmax_global) ])
-    tevo_gs, tevo_dict, intspec, saving_args = run_timeevo([states_starting[1],states_starting[2]],tevo_params,lattice_params_starting,hamilt_params_starting; time_running_args...)
+    tevo_params_firstramp = Dict([ ("ty",(linear_ramp,0.0,end_ty,ramptime_firstramp)),("tmax",tmax_global_firstramp) ])
+    tevo_data_firstramp, tevo_dict_firstramp, instdata_firstramp, saving_args_firstramp = run_timeevo([states_starting[1],states_starting[2],states_starting[3]],tevo_params_firstramp,lattice_params_starting,hamilt_params_starting; time_running_args_firstramp...)
 
     # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
-    occs_midpoint = get_occupancy(tevo_gs[1][:,end-1], lattice_params_starting; plot_title="Midpoint state occupancy")
+    #occs_midpoint = get_occupancy(tevo_gs_firstramp[1][:,end-1], lattice_params_starting; plot_title="Midpoint state occupancy")
 end
 
+# ramp tx from 0 to 1; ty stays at its default from hamilt_params_starting
+if false || if_all
+    speccount_secondramp = 3
+    ramptime_secondramp = 0.5
+    tmax_global_secondramp = ramptime_secondramp + 0.0  # extra hold time after ramp
+    time_running_args_secondramp = (nev=speccount_secondramp, output_level=1, if_instant_gs=true, if_save_data=false, dataloc="tevo-daily-things-data/")
 
+    initial_states = [Vector{ComplexF64}(tevo_data_firstramp[1][1][:,end-1]),Vector{ComplexF64}(tevo_data_firstramp[1][2][:,end-1]),Vector{ComplexF64}(tevo_data_firstramp[1][3][:,end-1])]
+    tevo_params_secondramp = Dict([ ("tx",(linear_ramp,0.0,end_tx,ramptime_secondramp)),("tmax",tmax_global_secondramp) ])
+    tevo_data_secondramp, tevo_dict_secondramp, instdata_secondramp, saving_args_secondramp = run_timeevo(initial_states,tevo_params_secondramp,lattice_params_starting,hamilt_params_starting; time_running_args_secondramp...)
+
+end
+
+# displaying and plotting stuff
+if true || if_all
+    #=final_states = [Vector{ComplexF64}(tevo_gs_secondramp[1][:,end-1]),Vector{ComplexF64}(tevo_gs_secondramp[2][:,end-1]),Vector{ComplexF64}(tevo_gs_secondramp[3][:,end-1])]
+    final_nrgs = [real(adjoint(wavefunc) * hamilt_params_ending["H"] * wavefunc) for wavefunc in final_states]
+    display(final_nrgs)
+
+    overlap_matrix = zeros(Float64, speccount_secondramp, 2)
+    for i in 1:speccount_secondramp
+        for j in 1:2
+            overlap_matrix[i,j] = abs2(adjoint(final_states[i]) * states_ending[j])
+        end
+    end
+    display(overlap_matrix)=#
+
+    times_firstramp = range(0.0, tmax_global_firstramp, length=length(instdata_firstramp[2]["1"]))
+    times_secondramp = range(0.0, tmax_global_secondramp, length=length(instdata_secondramp[2]["1"]))
+
+    cols = ["b","g","r"]
+    for i in 1:3
+        scatter(times_firstramp,instdata_firstramp[2][string(i)],c=cols[i],label="E$(i)")
+        scatter(times_firstramp,tevo_data_firstramp[2][i][1:end-1],c="k",label="E$(i)",marker="x")
+        scatter(times_secondramp .+ tmax_global_firstramp,instdata_secondramp[2][string(i)],c=cols[i])
+        scatter(times_secondramp .+ tmax_global_firstramp,tevo_data_secondramp[2][i][1:end-1],c="k",marker="x")
+    end
+    legend()
+    xlabel("Time step")
+    ylabel("Instantaneous eigenenergies")
+
+    #=final_fidelity = groundstate_manifold_fidelity(final_states[1:2],states_ending[1:2])
+
+    final_fidelities[idx] = final_fidelity
+    println("Final fidelity for ramp time $(ramptime_firstramp): $(final_fidelity)")
+    scatter(ramptime_firstramp,final_fidelity,c="b")
+    xlabel("Ramp time")
+    ylabel("Fidelity with target manifold")
+    title("Fidelity vs ramp time $(lx)x$(ly) N=$(n) U=$(intstren) ramp tx and ty")
+    xscale("log")=#
+
+
+    # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
+    #occs_final = get_occupancy(tevo_gs_secondramp[1][:,end-1], lattice_params_starting; plot_title="Final Fidelity = $(round(final_fidelity,digits=6))")
+end
 
 
 
