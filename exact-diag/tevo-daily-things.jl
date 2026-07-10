@@ -15,6 +15,8 @@ include("control-functions.jl")
 include("../other-funcs/basic-2d-plottings.jl")
 include("plottings.jl")
 
+using NPZ  # for reading QuOCS best_controls.npz files
+
 ## ramp from strongly interacting state to FCI
 
 #=if_all::Bool = true
@@ -288,9 +290,9 @@ end=#
 
 ### Initialize single column full and then ramp tx into FCI state
 # Strategy: start particles pinned to real-space sites (ty=0, no hopping),
-# then adiabatically ramp ty → 1 to connect to the FCI ground state manifold.
+#= then adiabatically ramp ty → 1 to connect to the FCI ground state manifold.
 
-if_all::Bool = true
+if_all::Bool = false
 
 # model parameters
 if false || if_all
@@ -400,6 +402,97 @@ if false || if_all
 
     # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
     #occs_final = get_occupancy(tevo_gs_secondramp[1][:,end-1], lattice_params_starting; plot_title="Final Fidelity = $(round(final_fidelity,digits=6))")
+end=#
+
+
+
+### Time evolution with the QuOCS-optimized pulses from optimal-control/config_pinnedRamp.py
+# All parameters must match the ones the optimization ran with (see config_pinnedRamp.py):
+# 4x4 N=2 U=0 pbc, particles pinned at [(1,1),(1,2)], ty then tx ramped 0 -> 1 over 0.5 each
+
+if_all::Bool = false
+
+# model parameters and starting/ending states
+if false || if_all
+    lx,ly,n = 4,4,2
+    intstren = 0.0
+    end_tx, end_ty = 1.0, 1.0
+    speccount_quocs = 2  # optimization used the 2-state groundstate manifold
+    speccount_energy = 3  # low-lying states tracked in the energy-vs-time section below
+
+    starting_config = [(1,1),(1,2)]
+    pdict_quocs = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",speccount_energy),("if_find_data",false),("if_save_data",false)])
+
+    states_starting, nrgs_starting, lattice_params_starting, hamilt_params_starting = position_state(starting_config, copy(pdict_quocs); output_level=0)
+    hamilt_params_starting["tx"] = 0.0
+
+    pdict_ending = merge(pdict_quocs, Dict("tx"=>end_tx,"ty"=>end_ty))
+    states_ending,_,_,_,_,_,_ = run_normal_ed(pdict_ending; output_level=0)
+end
+
+# load the optimized pulses and run the two-stage time evolution
+if false || if_all
+    quocs_folder = "../optimal-control/QuOCS_Results/20260709_162520_pinnedRamp_dCRAB"
+    controls_file = filter(f -> endswith(f,"best_controls.npz"), readdir(quocs_folder))[1]
+    # only read the numeric arrays: NPZ.jl cannot parse the numpy unicode-string arrays
+    # (pulse_names etc.) that QuOCS also stores in the file
+    best_controls = npzread(joinpath(quocs_folder,controls_file),["tyRamp","txRamp","time_grid_for_tyRamp","time_grid_for_txRamp"])
+
+    # pulses are sampled on the RK4 half-step grid (spacing dt/2), so dt must match the
+    # value used in config_pinnedRamp.py: pulse length = ceil(2*ramptime/dt) + 1
+    dt_quocs = 0.005
+    ramptime_ty = best_controls["time_grid_for_tyRamp"][end]
+    ramptime_tx = best_controls["time_grid_for_txRamp"][end]
+
+    starting_states_quocs = [Vector{ComplexF64}(states_starting[i]) for i in 1:speccount_quocs]
+    stages_quocs = [
+        ("ty",best_controls["tyRamp"],ramptime_ty),
+        ("tx",best_controls["txRamp"],ramptime_tx),
+    ]
+    time_running_args_quocs = (nev=speccount_quocs,output_level=0,if_instant_gs=false,if_save_data=false)
+    final_states_quocs = run_ramp_stages(starting_states_quocs,stages_quocs,lattice_params_starting,hamilt_params_starting,dt_quocs; time_running_args_quocs...)
+
+    fidelity_quocs = real(groundstate_manifold_fidelity(final_states_quocs,[Vector{ComplexF64}(s) for s in states_ending[1:speccount_quocs]]))
+    println("Fidelity with target manifold using QuOCS pulses: $(fidelity_quocs)")
+end
+
+# instantaneous groundstate energies vs time-evolved energies for a few low-lying states
+# along the QuOCS pulses, plotted like the linear-ramp version in the commented block above
+if false || if_all
+    # work on a copy: run_timeevo's timeham writes each ramp's current value back into the
+    # dict, which would leave tx=1.0 in hamilt_params_starting for any later section
+    hamilt_params_energy = copy(hamilt_params_starting)
+    hamilt_params_energy["tx"] = 0.0
+
+    time_running_args_energy = (nev=speccount_energy, output_level=1, if_instant_gs=true, if_save_data=false, dataloc="tevo-daily-things-data/")
+
+    starting_states_energy = [Vector{ComplexF64}(states_starting[i]) for i in 1:speccount_energy]
+    tevo_params_tyramp = Dict([ ("ty",(pulse_ramp,ramptime_ty,best_controls["tyRamp"])),("tmax",ramptime_ty),("dt",dt_quocs) ])
+    tevo_data_tyramp, tevo_dict_tyramp, instdata_tyramp, saving_args_tyramp = run_timeevo(starting_states_energy,tevo_params_tyramp,lattice_params_starting,hamilt_params_energy; time_running_args_energy...)
+
+    # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
+    midpoint_states_energy = [Vector{ComplexF64}(tevo_data_tyramp[1][i][:,end-1]) for i in 1:speccount_energy]
+    tevo_params_txramp = Dict([ ("tx",(pulse_ramp,ramptime_tx,best_controls["txRamp"])),("tmax",ramptime_tx),("dt",dt_quocs) ])
+    tevo_data_txramp, tevo_dict_txramp, instdata_txramp, saving_args_txramp = run_timeevo(midpoint_states_energy,tevo_params_txramp,lattice_params_starting,hamilt_params_energy; time_running_args_energy...)
+
+end
+
+if true || if_all
+    times_tyramp = range(0.0, ramptime_ty, length=length(instdata_tyramp[2]["1"]))
+    times_txramp = range(0.0, ramptime_tx, length=length(instdata_txramp[2]["1"]))
+
+    figure()
+    cols = ["b","g","r"]
+    for i in 1:speccount_energy
+        plot(times_tyramp,instdata_tyramp[2][string(i)],c=cols[i],"-p",label="E$(i)")
+        plot(times_tyramp,tevo_data_tyramp[2][i][1:end-1],c="k",marker="x")
+        plot(times_txramp .+ ramptime_ty,instdata_txramp[2][string(i)],"-p",c=cols[i])
+        plot(times_txramp .+ ramptime_ty,tevo_data_txramp[2][i][1:end-1],c="k",marker="x")
+    end
+    legend()
+    xlabel("Time")
+    ylabel("Energy")
+    title("Energy vs time for QuOCS pulses $(lx)x$(ly) N=$(n) ramptimes $(ramptime_ty) ty and $(ramptime_tx) tx")
 end
 
 

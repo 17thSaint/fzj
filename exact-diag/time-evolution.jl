@@ -621,6 +621,10 @@ end
 # Used by control-functions.jl's figure-of-merit functions to turn one or more
 # QuOCS-optimized pulses into a final state for fidelity comparison.
 function run_ramp_stages(states::Vector{Vector{ComplexF64}},stages,lattice_params::Dict,hamilt_params::Dict,dt::Float64; kwargs...)
+    # timeham writes each ramped parameter's current value back into hamilt_params as a
+    # side effect; work on a copy so stages still chain correctly (each stage starts from
+    # the previous stage's final control values) without corrupting the caller's dict
+    hamilt_params = copy(hamilt_params)
     for (control_key,pulse_values,duration) in stages
         tevo_params = Dict([(control_key,(pulse_ramp,duration,pulse_values)),("tmax",duration),("dt",dt)])
         tevo_data,_,_,_ = run_timeevo(states,tevo_params,lattice_params,hamilt_params; kwargs...)
