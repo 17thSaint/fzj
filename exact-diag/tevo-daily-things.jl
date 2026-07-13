@@ -291,210 +291,215 @@ end=#
 ### Initialize single column full and then ramp tx into FCI state
 # Strategy: start particles pinned to real-space sites (ty=0, no hopping),
 #= then adiabatically ramp ty → 1 to connect to the FCI ground state manifold.
+if false
 
-if_all::Bool = false
+    if_all::Bool = false
 
-# model parameters
-if false || if_all
-    lx,ly,n = 4,4,2
+    # model parameters
+    if false || if_all
+        lx,ly,n = 4,4,2
 
-    intstren = 0.0  # non-interacting: topology alone drives the FCI
+        intstren = 0.0  # non-interacting: topology alone drives the FCI
 
-    # pre-compute full Fock basis and cache to avoid rebuilding it in each sub-block
-    lattice_params::Dict{String,Any} = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true)])
-    full_basis = n_particle_basis(lattice_params; output_level=0,dataloc=get_folder_location("cluster-data/exact-diag"))
-    lattice_params["full_basis"] = full_basis
-end
+        # pre-compute full Fock basis and cache to avoid rebuilding it in each sub-block
+        lattice_params::Dict{String,Any} = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",true),("if_periodic_y",true)])
+        full_basis = n_particle_basis(lattice_params; output_level=0,dataloc=get_folder_location("cluster-data/exact-diag"))
+        lattice_params["full_basis"] = full_basis
+    end
 
-# define starting state: particles pinned to specific real-space sites, no hopping
-if false || if_all
-    # each tuple is a (column, row) site index for one of the n particles
-    starting_config = [(1,1),(1,2)]
+    # define starting state: particles pinned to specific real-space sites, no hopping
+    if false || if_all
+        # each tuple is a (column, row) site index for one of the n particles
+        starting_config = [(1,1),(1,2)]
 
-    pdict_starting = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
+        pdict_starting = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
 
-    states_starting, nrgs_starting, lattice_params_starting, hamilt_params_starting = position_state(starting_config, pdict_starting; output_level=0)
-    hamilt_params_starting["tx"] = 0.0
+        states_starting, nrgs_starting, lattice_params_starting, hamilt_params_starting = position_state(starting_config, pdict_starting; output_level=0)
+        hamilt_params_starting["tx"] = 0.0
 
-    #occs_starting = get_occupancy(states_starting[1], lattice_params_starting; plot_title="Starting state occupancy")
-end
+        #occs_starting = get_occupancy(states_starting[1], lattice_params_starting; plot_title="Starting state occupancy")
+    end
 
-# define ending state: isotropic hopping target used for fidelity comparison
-if false || if_all
-    end_tx = 1.0
-    end_ty = 1.0
+    # define ending state: isotropic hopping target used for fidelity comparison
+    if false || if_all
+        end_tx = 1.0
+        end_ty = 1.0
 
-    pdict_ending = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tx",end_tx),("ty",end_ty),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
+        pdict_ending = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("tx",end_tx),("ty",end_ty),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
 
-    states_ending, nrgs_ending, _, _, _, lattice_params_ending, hamilt_params_ending = run_normal_ed(pdict_ending; output_level=0)
-end
+        states_ending, nrgs_ending, _, _, _, lattice_params_ending, hamilt_params_ending = run_normal_ed(pdict_ending; output_level=0)
+    end
 
-#firstramp_times = range(2.0, 5.0, length=11)
-#final_fidelities = zeros(length(firstramp_times))
-#for (idx,ramptime_firstramp) in enumerate(firstramp_times)
+    firstramp_times = range(0.01, 0.1, length=11)
+    final_fidelities = zeros(length(firstramp_times))
+    for (idx,ramptime_firstramp) in enumerate(firstramp_times)
 
-# ramp ty from 0 to 1; tx stays at its default from hamilt_params_starting
-if false || if_all
-    speccount_firstramp = 3
-    ramptime_firstramp = 0.5
-    tmax_global_firstramp = ramptime_firstramp + 0.0  # extra hold time after ramp end to check convergence
-    time_running_args_firstramp = (nev=speccount_firstramp, output_level=1, if_instant_gs=true, if_save_data=false, dataloc="tevo-daily-things-data/")
+        # ramp ty from 0 to 1; tx stays at its default from hamilt_params_starting
+        if true || if_all
+            speccount_firstramp = 3
+            #ramptime_firstramp = 0.5
+            tmax_global_firstramp = ramptime_firstramp + 0.0  # extra hold time after ramp end to check convergence
+            time_running_args_firstramp = (nev=speccount_firstramp, output_level=1, if_instant_gs=true, if_save_data=false, dataloc="tevo-daily-things-data/")
 
-    tevo_params_firstramp = Dict([ ("ty",(linear_ramp,0.0,end_ty,ramptime_firstramp)),("tmax",tmax_global_firstramp) ])
-    tevo_data_firstramp, tevo_dict_firstramp, instdata_firstramp, saving_args_firstramp = run_timeevo([states_starting[1],states_starting[2],states_starting[3]],tevo_params_firstramp,lattice_params_starting,hamilt_params_starting; time_running_args_firstramp...)
+            tevo_params_firstramp = Dict([ ("ty",(linear_ramp,0.0,end_ty,ramptime_firstramp)),("tmax",tmax_global_firstramp) ])
+            tevo_data_firstramp, tevo_dict_firstramp, instdata_firstramp, saving_args_firstramp = run_timeevo([states_starting[1],states_starting[2],states_starting[3]],tevo_params_firstramp,lattice_params_starting,hamilt_params_starting; time_running_args_firstramp...)
 
-    # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
-    #occs_midpoint = get_occupancy(tevo_gs_firstramp[1][:,end-1], lattice_params_starting; plot_title="Midpoint state occupancy")
-end
-
-# ramp tx from 0 to 1; ty stays at its default from hamilt_params_starting
-if false || if_all
-    speccount_secondramp = 3
-    ramptime_secondramp = 0.5
-    tmax_global_secondramp = ramptime_secondramp + 0.0  # extra hold time after ramp
-    time_running_args_secondramp = (nev=speccount_secondramp, output_level=1, if_instant_gs=true, if_save_data=false, dataloc="tevo-daily-things-data/")
-
-    initial_states = [Vector{ComplexF64}(tevo_data_firstramp[1][1][:,end-1]),Vector{ComplexF64}(tevo_data_firstramp[1][2][:,end-1]),Vector{ComplexF64}(tevo_data_firstramp[1][3][:,end-1])]
-    tevo_params_secondramp = Dict([ ("tx",(linear_ramp,0.0,end_tx,ramptime_secondramp)),("tmax",tmax_global_secondramp) ])
-    tevo_data_secondramp, tevo_dict_secondramp, instdata_secondramp, saving_args_secondramp = run_timeevo(initial_states,tevo_params_secondramp,lattice_params_starting,hamilt_params_starting; time_running_args_secondramp...)
-
-end
-
-# displaying and plotting stuff
-if false || if_all
-    #=final_states = [Vector{ComplexF64}(tevo_gs_secondramp[1][:,end-1]),Vector{ComplexF64}(tevo_gs_secondramp[2][:,end-1]),Vector{ComplexF64}(tevo_gs_secondramp[3][:,end-1])]
-    final_nrgs = [real(adjoint(wavefunc) * hamilt_params_ending["H"] * wavefunc) for wavefunc in final_states]
-    display(final_nrgs)
-
-    overlap_matrix = zeros(Float64, speccount_secondramp, 2)
-    for i in 1:speccount_secondramp
-        for j in 1:2
-            overlap_matrix[i,j] = abs2(adjoint(final_states[i]) * states_ending[j])
+            # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
+            #occs_midpoint = get_occupancy(tevo_gs_firstramp[1][:,end-1], lattice_params_starting; plot_title="Midpoint state occupancy")
         end
+
+        # ramp tx from 0 to 1; ty stays at its default from hamilt_params_starting
+        if true || if_all
+            speccount_secondramp = 3
+            ramptime_secondramp = ramptime_firstramp
+            tmax_global_secondramp = ramptime_secondramp + 0.0  # extra hold time after ramp
+            time_running_args_secondramp = (nev=speccount_secondramp, output_level=1, if_instant_gs=true, if_save_data=false, dataloc="tevo-daily-things-data/")
+
+            initial_states = [Vector{ComplexF64}(tevo_data_firstramp[1][1][:,end-1]),Vector{ComplexF64}(tevo_data_firstramp[1][2][:,end-1]),Vector{ComplexF64}(tevo_data_firstramp[1][3][:,end-1])]
+            tevo_params_secondramp = Dict([ ("tx",(linear_ramp,0.0,end_tx,ramptime_secondramp)),("tmax",tmax_global_secondramp) ])
+            tevo_data_secondramp, tevo_dict_secondramp, instdata_secondramp, saving_args_secondramp = run_timeevo(initial_states,tevo_params_secondramp,lattice_params_starting,hamilt_params_starting; time_running_args_secondramp...)
+
+        end
+
+        # displaying and plotting stuff
+        if true || if_all
+            final_states = [Vector{ComplexF64}(tevo_data_secondramp[1][1][:,end-1]),Vector{ComplexF64}(tevo_data_secondramp[1][2][:,end-1]),Vector{ComplexF64}(tevo_data_secondramp[1][3][:,end-1])]
+            #=final_nrgs = [real(adjoint(wavefunc) * hamilt_params_ending["H"] * wavefunc) for wavefunc in final_states]
+            display(final_nrgs)
+
+            overlap_matrix = zeros(Float64, speccount_secondramp, 2)
+            for i in 1:speccount_secondramp
+                for j in 1:2
+                    overlap_matrix[i,j] = abs2(adjoint(final_states[i]) * states_ending[j])
+                end
+            end
+            display(overlap_matrix)=#
+
+            #=times_firstramp = range(0.0, tmax_global_firstramp, length=length(instdata_firstramp[2]["1"]))
+            times_secondramp = range(0.0, tmax_global_secondramp, length=length(instdata_secondramp[2]["1"]))
+
+            cols = ["b","g","r"]
+            for i in 1:3
+                scatter(times_firstramp,instdata_firstramp[2][string(i)],c=cols[i],label="E$(i)")
+                scatter(times_firstramp,tevo_data_firstramp[2][i][1:end-1],c="k",label="E$(i)",marker="x")
+                scatter(times_secondramp .+ tmax_global_firstramp,instdata_secondramp[2][string(i)],c=cols[i])
+                scatter(times_secondramp .+ tmax_global_firstramp,tevo_data_secondramp[2][i][1:end-1],c="k",marker="x")
+            end
+            legend()
+            xlabel("Time")
+            ylabel("Energy")
+            title("Energy vs time for two ramps $(lx)x$(ly) N=$(n) ramptime $(ramptime_firstramp) ty and tx")=#
+
+            final_fidelity = groundstate_manifold_fidelity(final_states[1:2],states_ending[1:2])
+
+            final_fidelities[idx] = final_fidelity
+            println("Final fidelity for ramp time $(ramptime_firstramp): $(final_fidelity)")
+            scatter(ramptime_firstramp,final_fidelity,c="b")
+            xlabel("Ramp time")
+            ylabel("Fidelity with target manifold")
+            title("Fidelity vs ramp time $(lx)x$(ly) N=$(n) U=$(intstren) ramp tx and ty")
+            xscale("log")
+
+
+            # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
+            #occs_final = get_occupancy(tevo_gs_secondramp[1][:,end-1], lattice_params_starting; plot_title="Final Fidelity = $(round(final_fidelity,digits=6))")
+        end
+
     end
-    display(overlap_matrix)=#
-
-    times_firstramp = range(0.0, tmax_global_firstramp, length=length(instdata_firstramp[2]["1"]))
-    times_secondramp = range(0.0, tmax_global_secondramp, length=length(instdata_secondramp[2]["1"]))
-
-    cols = ["b","g","r"]
-    for i in 1:3
-        scatter(times_firstramp,instdata_firstramp[2][string(i)],c=cols[i],label="E$(i)")
-        scatter(times_firstramp,tevo_data_firstramp[2][i][1:end-1],c="k",label="E$(i)",marker="x")
-        scatter(times_secondramp .+ tmax_global_firstramp,instdata_secondramp[2][string(i)],c=cols[i])
-        scatter(times_secondramp .+ tmax_global_firstramp,tevo_data_secondramp[2][i][1:end-1],c="k",marker="x")
-    end
-    legend()
-    xlabel("Time")
-    ylabel("Energy")
-    title("Energy vs time for two ramps $(lx)x$(ly) N=$(n) ramptime $(ramptime_firstramp) ty and tx")
-
-    #=final_fidelity = groundstate_manifold_fidelity(final_states[1:2],states_ending[1:2])
-
-    final_fidelities[idx] = final_fidelity
-    println("Final fidelity for ramp time $(ramptime_firstramp): $(final_fidelity)")
-    scatter(ramptime_firstramp,final_fidelity,c="b")
-    xlabel("Ramp time")
-    ylabel("Fidelity with target manifold")
-    title("Fidelity vs ramp time $(lx)x$(ly) N=$(n) U=$(intstren) ramp tx and ty")
-    xscale("log")=#
-
-
-    # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
-    #occs_final = get_occupancy(tevo_gs_secondramp[1][:,end-1], lattice_params_starting; plot_title="Final Fidelity = $(round(final_fidelity,digits=6))")
 end=#
-
 
 
 ### Time evolution with the QuOCS-optimized pulses from optimal-control/config_pinnedRamp.py
 # All parameters must match the ones the optimization ran with (see config_pinnedRamp.py):
-# 4x4 N=2 U=0 pbc, particles pinned at [(1,1),(1,2)], ty then tx ramped 0 -> 1 over 0.5 each
+#= 4x4 N=2 U=0 pbc, particles pinned at [(1,1),(1,2)], ty then tx ramped 0 -> 1 over 0.5 each
+if false
 
-if_all::Bool = false
+    if_all::Bool = false
 
-# model parameters and starting/ending states
-if false || if_all
-    lx,ly,n = 4,4,2
-    intstren = 0.0
-    end_tx, end_ty = 1.0, 1.0
-    speccount_quocs = 2  # optimization used the 2-state groundstate manifold
-    speccount_energy = 3  # low-lying states tracked in the energy-vs-time section below
+    # model parameters and starting/ending states
+    if false || if_all
+        lx,ly,n = 4,4,2
+        intstren = 0.0
+        end_tx, end_ty = 1.0, 1.0
+        speccount_quocs = 2  # optimization used the 2-state groundstate manifold
+        speccount_energy = 3  # low-lying states tracked in the energy-vs-time section below
 
-    starting_config = [(1,1),(1,2)]
-    pdict_quocs = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",speccount_energy),("if_find_data",false),("if_save_data",false)])
+        starting_config = [(1,1),(1,2)]
+        pdict_quocs = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",speccount_energy),("if_find_data",false),("if_save_data",false)])
 
-    states_starting, nrgs_starting, lattice_params_starting, hamilt_params_starting = position_state(starting_config, copy(pdict_quocs); output_level=0)
-    hamilt_params_starting["tx"] = 0.0
+        states_starting, nrgs_starting, lattice_params_starting, hamilt_params_starting = position_state(starting_config, copy(pdict_quocs); output_level=0)
+        hamilt_params_starting["tx"] = 0.0
 
-    pdict_ending = merge(pdict_quocs, Dict("tx"=>end_tx,"ty"=>end_ty))
-    states_ending,_,_,_,_,_,_ = run_normal_ed(pdict_ending; output_level=0)
-end
-
-# load the optimized pulses and run the two-stage time evolution
-if false || if_all
-    quocs_folder = "../optimal-control/QuOCS_Results/20260709_162520_pinnedRamp_dCRAB"
-    controls_file = filter(f -> endswith(f,"best_controls.npz"), readdir(quocs_folder))[1]
-    # only read the numeric arrays: NPZ.jl cannot parse the numpy unicode-string arrays
-    # (pulse_names etc.) that QuOCS also stores in the file
-    best_controls = npzread(joinpath(quocs_folder,controls_file),["tyRamp","txRamp","time_grid_for_tyRamp","time_grid_for_txRamp"])
-
-    # pulses are sampled on the RK4 half-step grid (spacing dt/2), so dt must match the
-    # value used in config_pinnedRamp.py: pulse length = ceil(2*ramptime/dt) + 1
-    dt_quocs = 0.005
-    ramptime_ty = best_controls["time_grid_for_tyRamp"][end]
-    ramptime_tx = best_controls["time_grid_for_txRamp"][end]
-
-    starting_states_quocs = [Vector{ComplexF64}(states_starting[i]) for i in 1:speccount_quocs]
-    stages_quocs = [
-        ("ty",best_controls["tyRamp"],ramptime_ty),
-        ("tx",best_controls["txRamp"],ramptime_tx),
-    ]
-    time_running_args_quocs = (nev=speccount_quocs,output_level=0,if_instant_gs=false,if_save_data=false)
-    final_states_quocs = run_ramp_stages(starting_states_quocs,stages_quocs,lattice_params_starting,hamilt_params_starting,dt_quocs; time_running_args_quocs...)
-
-    fidelity_quocs = real(groundstate_manifold_fidelity(final_states_quocs,[Vector{ComplexF64}(s) for s in states_ending[1:speccount_quocs]]))
-    println("Fidelity with target manifold using QuOCS pulses: $(fidelity_quocs)")
-end
-
-# instantaneous groundstate energies vs time-evolved energies for a few low-lying states
-# along the QuOCS pulses, plotted like the linear-ramp version in the commented block above
-if false || if_all
-    # work on a copy: run_timeevo's timeham writes each ramp's current value back into the
-    # dict, which would leave tx=1.0 in hamilt_params_starting for any later section
-    hamilt_params_energy = copy(hamilt_params_starting)
-    hamilt_params_energy["tx"] = 0.0
-
-    time_running_args_energy = (nev=speccount_energy, output_level=1, if_instant_gs=true, if_save_data=false, dataloc="tevo-daily-things-data/")
-
-    starting_states_energy = [Vector{ComplexF64}(states_starting[i]) for i in 1:speccount_energy]
-    tevo_params_tyramp = Dict([ ("ty",(pulse_ramp,ramptime_ty,best_controls["tyRamp"])),("tmax",ramptime_ty),("dt",dt_quocs) ])
-    tevo_data_tyramp, tevo_dict_tyramp, instdata_tyramp, saving_args_tyramp = run_timeevo(starting_states_energy,tevo_params_tyramp,lattice_params_starting,hamilt_params_energy; time_running_args_energy...)
-
-    # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
-    midpoint_states_energy = [Vector{ComplexF64}(tevo_data_tyramp[1][i][:,end-1]) for i in 1:speccount_energy]
-    tevo_params_txramp = Dict([ ("tx",(pulse_ramp,ramptime_tx,best_controls["txRamp"])),("tmax",ramptime_tx),("dt",dt_quocs) ])
-    tevo_data_txramp, tevo_dict_txramp, instdata_txramp, saving_args_txramp = run_timeevo(midpoint_states_energy,tevo_params_txramp,lattice_params_starting,hamilt_params_energy; time_running_args_energy...)
-
-end
-
-if true || if_all
-    times_tyramp = range(0.0, ramptime_ty, length=length(instdata_tyramp[2]["1"]))
-    times_txramp = range(0.0, ramptime_tx, length=length(instdata_txramp[2]["1"]))
-
-    figure()
-    cols = ["b","g","r"]
-    for i in 1:speccount_energy
-        plot(times_tyramp,instdata_tyramp[2][string(i)],c=cols[i],"-p",label="E$(i)")
-        plot(times_tyramp,tevo_data_tyramp[2][i][1:end-1],c="k",marker="x")
-        plot(times_txramp .+ ramptime_ty,instdata_txramp[2][string(i)],"-p",c=cols[i])
-        plot(times_txramp .+ ramptime_ty,tevo_data_txramp[2][i][1:end-1],c="k",marker="x")
+        pdict_ending = merge(pdict_quocs, Dict("tx"=>end_tx,"ty"=>end_ty))
+        states_ending,_,_,_,_,_,_ = run_normal_ed(pdict_ending; output_level=0)
     end
-    legend()
-    xlabel("Time")
-    ylabel("Energy")
-    title("Energy vs time for QuOCS pulses $(lx)x$(ly) N=$(n) ramptimes $(ramptime_ty) ty and $(ramptime_tx) tx")
-end
 
+    # load the optimized pulses and run the two-stage time evolution
+    if false || if_all
+        quocs_folder = "../optimal-control/QuOCS_Results/20260709_162520_pinnedRamp_dCRAB"
+        controls_file = filter(f -> endswith(f,"best_controls.npz"), readdir(quocs_folder))[1]
+        # only read the numeric arrays: NPZ.jl cannot parse the numpy unicode-string arrays
+        # (pulse_names etc.) that QuOCS also stores in the file
+        best_controls = npzread(joinpath(quocs_folder,controls_file),["tyRamp","txRamp","time_grid_for_tyRamp","time_grid_for_txRamp"])
+
+        # pulses are sampled on the RK4 half-step grid (spacing dt/2), so dt must match the
+        # value used in config_pinnedRamp.py: pulse length = ceil(2*ramptime/dt) + 1
+        dt_quocs = 0.005
+        ramptime_ty = best_controls["time_grid_for_tyRamp"][end]
+        ramptime_tx = best_controls["time_grid_for_txRamp"][end]
+
+        starting_states_quocs = [Vector{ComplexF64}(states_starting[i]) for i in 1:speccount_quocs]
+        stages_quocs = [
+            ("ty",best_controls["tyRamp"],ramptime_ty),
+            ("tx",best_controls["txRamp"],ramptime_tx),
+        ]
+        time_running_args_quocs = (nev=speccount_quocs,output_level=0,if_instant_gs=false,if_save_data=false)
+        final_states_quocs = run_ramp_stages(starting_states_quocs,stages_quocs,lattice_params_starting,hamilt_params_starting,dt_quocs; time_running_args_quocs...)
+
+        fidelity_quocs = real(groundstate_manifold_fidelity(final_states_quocs,[Vector{ComplexF64}(s) for s in states_ending[1:speccount_quocs]]))
+        println("Fidelity with target manifold using QuOCS pulses: $(fidelity_quocs)")
+    end
+
+    # instantaneous groundstate energies vs time-evolved energies for a few low-lying states
+    # along the QuOCS pulses, plotted like the linear-ramp version in the commented block above
+    if false || if_all
+        # work on a copy: run_timeevo's timeham writes each ramp's current value back into the
+        # dict, which would leave tx=1.0 in hamilt_params_starting for any later section
+        hamilt_params_energy = copy(hamilt_params_starting)
+        hamilt_params_energy["tx"] = 0.0
+
+        time_running_args_energy = (nev=speccount_energy, output_level=1, if_instant_gs=true, if_save_data=false, dataloc="tevo-daily-things-data/")
+
+        starting_states_energy = [Vector{ComplexF64}(states_starting[i]) for i in 1:speccount_energy]
+        tevo_params_tyramp = Dict([ ("ty",(pulse_ramp,ramptime_ty,best_controls["tyRamp"])),("tmax",ramptime_ty),("dt",dt_quocs) ])
+        tevo_data_tyramp, tevo_dict_tyramp, instdata_tyramp, saving_args_tyramp = run_timeevo(starting_states_energy,tevo_params_tyramp,lattice_params_starting,hamilt_params_energy; time_running_args_energy...)
+
+        # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
+        midpoint_states_energy = [Vector{ComplexF64}(tevo_data_tyramp[1][i][:,end-1]) for i in 1:speccount_energy]
+        tevo_params_txramp = Dict([ ("tx",(pulse_ramp,ramptime_tx,best_controls["txRamp"])),("tmax",ramptime_tx),("dt",dt_quocs) ])
+        tevo_data_txramp, tevo_dict_txramp, instdata_txramp, saving_args_txramp = run_timeevo(midpoint_states_energy,tevo_params_txramp,lattice_params_starting,hamilt_params_energy; time_running_args_energy...)
+
+    end
+
+    if true || if_all
+        times_tyramp = range(0.0, ramptime_ty, length=length(instdata_tyramp[2]["1"]))
+        times_txramp = range(0.0, ramptime_tx, length=length(instdata_txramp[2]["1"]))
+
+        figure()
+        cols = ["b","g","r"]
+        for i in 1:speccount_energy
+            plot(times_tyramp,instdata_tyramp[2][string(i)],c=cols[i],"-p",label="E$(i)")
+            plot(times_tyramp,tevo_data_tyramp[2][i][1:end-1],c="k",marker="x")
+            plot(times_txramp .+ ramptime_ty,instdata_txramp[2][string(i)],"-p",c=cols[i])
+            plot(times_txramp .+ ramptime_ty,tevo_data_txramp[2][i][1:end-1],c="k",marker="x")
+        end
+        legend()
+        xlabel("Time")
+        ylabel("Energy")
+        title("Energy vs time for QuOCS pulses $(lx)x$(ly) N=$(n) ramptimes $(ramptime_ty) ty and $(ramptime_tx) tx")
+    end
+    
+end=#
 
 
 

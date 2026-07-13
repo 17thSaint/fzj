@@ -3294,8 +3294,8 @@ if false
 
 end=#
 
-# make data for 4pt momentum laughlin
-if true
+#= make data for 4pt momentum laughlin
+if false
     lx,ly,n = 8,4,4
     intstren = 0.0
     dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
@@ -3313,8 +3313,7 @@ if true
 
     modify_data(datadict,joinpath(dataloc,all_files[1]),"metadata"; output_level=0)
 
-end
-
+end=#
 
 #= fourier transform of manifold density
 if false
@@ -3410,7 +3409,6 @@ if false
 
 
 end=#
-
 
 #= look directly at manifold density matrix
 if false    
@@ -3631,7 +3629,22 @@ if false
 
 end=#
 
-
+# check fidelity-susceptibility along uir
+if true
+    lx,ly,n = 4,4,2
+    intstrens = range(0.1,4.0,length=31)
+    cols = ["b","r","g"]
+    for (ii,sv) in enumerate([0.001,0.0001,0.00001])
+        fidseps = zeros(Float64,length(intstrens))
+        for (i,intstren) in enumerate(intstrens)
+            params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+            
+            params_dict["shift_value"] = sv
+            fidseps[i] = fidelity_susceptibility(params_dict; output_level=0)
+        end
+        scatter(intstrens,fidseps,c=cols[ii])
+    end
+end
 
 
 

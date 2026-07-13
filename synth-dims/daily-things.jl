@@ -1173,20 +1173,36 @@ if true
     conserve_qns = false
     stren = 0.0
     params_dict = Dict([("output_level",1),("lr",0),("num_sweeps",10),("syms",conserve_qns),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",1e-5),("particles",n),("mdim",40),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
-    all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
+    #all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
 
-    #net = TTN.BinaryRectangularNetwork(Int(log2(lx*ly)), TTN.ITensorNode, "Boson";conserve_qns=conserve_qns,dim=2)
+    net = TTN.BinaryRectangularNetwork(Int(log2(lx*ly)), TTN.ITensorNode, "Boson";conserve_qns=conserve_qns,dim=2)
     #states = fill_states(n,lx*ly,1)
     #old_ttn = TTN.ProductTreeTensorNetwork(net,states)
-    #old_ttn = TTN.RandomTreeTensorNetwork(net; maxdim=20)
-    #ttn = TTN.increase_dim_tree_tensor_network_zeros(all_states, maxdim = 100)
-    ttn = TTN.increase_dim_tree_tensor_network_randn(all_states, maxdim = 50)
+    old_ttn = TTN.RandomTreeTensorNetwork(net; maxdim=20)
+    ttn = TTN.increase_dim_tree_tensor_network_zeros(old_ttn, maxdim = 100)
+    #ttn = TTN.increase_dim_tree_tensor_network_randn(old_ttn, maxdim = 50)
 
-end
+end#
 
+#= checking ulr xi 4pt momentum behavior
+if false
+    lx,ly,n = 10,8,5
+    intstren = 4.0
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/ulr-length")
+    pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc)
+    
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    fourpt1 = m["fourpt_momentum"]
+    fourpt2 = m["fourpt_momentum_1"]
 
-
-
+    fig = figure()
+    imshow(0.5 .* (fourpt1 .+ fourpt2),extent=(0,lx,0,lx),origin="lower",aspect="auto")
+    xlabel("kx")
+    ylabel("ky")
+    title("Four-Point Correlator in Momentum Space for $(lx)x$(ly) N=$(n) ULR=$(m["onsite_strength"])")
+    colorbar()
+end=#
 
 
 

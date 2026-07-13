@@ -1515,8 +1515,27 @@ function periodic_potential_adiabatic_condition(groundstate::Vector{ComplexF64},
 end
 
 
+function fidelity_susceptibility(parameters_dictionary::Dict{String,Any}; output_level::Int=1)
+    
+    states_center,nrgs_center,rhos_center,filepath_center,if_found_center,lattice_params_center,hamilt_params_center = run_normal_ed(parameters_dictionary; output_level=output_level)
+    
+    shift_value = parameters_dictionary["shift_value"]
+    parameters_dictionary["interaction_strength"] += shift_value
+    states_shifted,nrgs_shifted,rhos_shifted,filepath_shifted,if_found_shifted,lattice_params_shifted,hamilt_params_shifted = run_normal_ed(parameters_dictionary; output_level=output_level)
 
+    fid_mat = zeros(ComplexF64,2,2)
+    fid_mat[1,1] = adjoint(states_center[1]) * states_shifted[1]
+    fid_mat[1,2] = adjoint(states_center[1]) * states_shifted[2]
+    fid_mat[2,1] = adjoint(states_center[2]) * states_shifted[1]
+    fid_mat[2,2] = adjoint(states_center[2]) * states_shifted[2]
 
+    H = Hermitian(fid_mat * adjoint(fid_mat))
+    fidelity = 0.5 * sum(sqrt.(max.(eigvals(H), 0)))
+
+    fid_sep = -2 * log(fidelity) / (shift_value^2)
+
+    return fid_sep
+end
 
 
 
