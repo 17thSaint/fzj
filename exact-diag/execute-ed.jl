@@ -279,6 +279,8 @@ function get_normal_model_params_ed(params_dict::Dict)
                         "periodic_potential_strength"=>periodic_potential_strength,
                         "pinning_strength"=>pinning_strength,
                         "U"=>us,
+                        "interaction_strength"=>stren,
+                        "lr_dist"=>lr_dist,
                         "scaling_type"=>scaling_type,
                         "corr_length"=>interaction_length,
                         "sigma"=>sigma,

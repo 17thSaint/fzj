@@ -502,7 +502,160 @@ if false
 end=#
 
 
+### Ramp from strongly interacting state to FCI with linear ramp of interaction strength
+#= Strategy: start with strongly interacting state (ULR) and ramp interaction strength to 0.0 to connect to the FCI ground state manifold.
+if false
+    if_all::Bool = false
 
+    # define starting state: strongly interacting ULR state
+    if false || if_all
+        lx,ly,n = 4,4,2
+        intstren_start = 10.0
+
+        pdict_starting = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren_start),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+
+        states_starting, nrgs_starting,_,_,_, lattice_params_starting, hamilt_params_starting = run_normal_ed(pdict_starting; output_level=0)
+    end
+
+    # define ending state: FCI
+    if false || if_all
+        intstren_end = 0.0
+
+        pdict_ending = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren_end),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+
+        states_ending, nrgs_ending,_,_,_, lattice_params_ending, hamilt_params_ending = run_normal_ed(pdict_ending; output_level=0)
+    end
+
+    # define reference fidelity
+    if false || if_all
+        speccount = 2
+        reference_fidelity = groundstate_manifold_fidelity(states_ending[1:speccount],states_starting[1:speccount])
+        println("Reference fidelity between ULR and FCI states: $(reference_fidelity)")
+    end
+
+    # time evolution with linear ramp of interaction strength for various ramp times
+    if false || if_all
+        speccount = 2
+        dataloc = get_folder_location("cluster-data/exact-diag/time-evo")
+        time_running_args = (nev=speccount,output_level=1,if_instant_gs=false,if_save_data=false,dataloc=dataloc,)
+
+        ramptimes = 10 .^ range(1.0,1.8,length=11)
+        for ramptime in ramptimes
+            tmax_global = ramptime + 0.5
+            tevo_params = Dict([ ("interaction_strength",(linear_ramp,intstren_start,intstren_end,ramptime)),("tmax",tmax_global) ])
+            tevo_data,tevo_dict,_,saving_args = run_timeevo([states_starting[1],states_starting[2]],tevo_params,lattice_params_starting,hamilt_params_starting; time_running_args...)
+
+            # calculate final fidelity with target state
+            final_gs_manifold = [tevo_data[1][1][:,end-1],tevo_data[1][2][:,end-1]]
+            final_fidelity = groundstate_manifold_fidelity(final_gs_manifold,states_ending[1:speccount])
+            println("Final fidelity for ramp time $(ramptime): $(final_fidelity)")
+            scatter(ramptime,final_fidelity,c="b")
+        end
+        plot([0.0,10.0],[reference_fidelity,reference_fidelity],"--",c="r")
+        xlabel("Ramp time")
+        ylabel("Fidelity with target manifold")
+        title("Fidelity vs ramp time $(lx)x$(ly) N=$(n) U=$(intstren_start)→$(intstren_end) ramp interaction strength")
+        xscale("log")
+
+    end
+
+    # time evolution with linear ramp looking at instantaneous energies
+    if false || if_all
+        speccount = 3
+        dataloc = get_folder_location("cluster-data/exact-diag/time-evo")
+        time_running_args = (nev=speccount,output_level=1,if_instant_gs=true,if_save_data=false,dataloc=dataloc,)
+
+        ramptime = 10.0
+        tmax_global = ramptime
+        tevo_params = Dict([ ("interaction_strength",(linear_ramp,intstren_start,intstren_end,ramptime)),("tmax",tmax_global) ])
+        tevo_data,tevo_dict,instdata,saving_args = run_timeevo([states_starting[1],states_starting[2],states_starting[3]],tevo_params,lattice_params_starting,hamilt_params_starting; time_running_args...)
+
+        times = range(0.0,tmax_global,length=length(instdata[2]["1"]))
+        cols = ["b","g","r"]
+        for i in 1:speccount
+            plot(times,instdata[2][string(i)],c=cols[i],"-p",label="E$(i)")
+            plot(times,tevo_data[2][i][1:end-1],c="k",marker="x")
+        end
+        legend()
+        xlabel("Time")
+        ylabel("Energy")
+        title("Energy vs time for interaction strength ramp $(lx)x$(ly) N=$(n) ramptime $(ramptime) U $(intstren_start)→$(intstren_end)")
+    end
+end=#true
+
+
+### Time evolution with the QuOCS-optimized interaction strength ramp from optimal-control/config_intstrenRamp.py
+# All parameters must match the ones the optimization ran with (see config_intstrenRamp.py):
+# 4x4 N=2 pbc, U ramped 10.0 -> 0.0 over ramptime 1.0, dt 0.005
+# Reference: linear ramp fidelity 0.8891, QuOCS-optimized fidelity 0.9101 (run 20260714_114412) but Claude seems to think more superiterations of DCRAB would improve it further
+if true
+
+    if_all::Bool = true
+
+    # model parameters and starting/ending states
+    if false || if_all
+        lx,ly,n = 4,4,2
+        intstren_start, intstren_end = 10.0, 0.0
+        speccount_intquocs = 2
+
+        pdict_intquocs = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren_start),("filling",0.5),("nev",3),("if_find_data",false),("if_save_data",false)])
+        states_starting_intquocs,_,_,_,_,lattice_params_intquocs,hamilt_params_intquocs = run_normal_ed(pdict_intquocs; output_level=0)
+
+        pdict_ending_intquocs = merge(pdict_intquocs,Dict("interaction_strength"=>intstren_end))
+        states_ending_intquocs,_,_,_,_,_,_ = run_normal_ed(pdict_ending_intquocs; output_level=0)
+    end
+
+    # load the optimized pulse and run the time evolution with instantaneous energies
+    if false || if_all
+        quocs_folder = "../optimal-control/QuOCS_Results/20260714_114412_intstrenRamp_dCRAB"
+        controls_file = filter(f -> endswith(f,"best_controls.npz"), readdir(quocs_folder))[1]
+        # only read the numeric arrays: NPZ.jl cannot parse the numpy unicode-string arrays
+        # (pulse_names etc.) that QuOCS also stores in the file
+        best_controls = npzread(joinpath(quocs_folder,controls_file),["intstrenRamp","time_grid_for_intstrenRamp"])
+
+        # pulse is sampled on the RK4 half-step grid (spacing dt/2), so dt must match the
+        # value used in config_intstrenRamp.py: pulse length = ceil(2*ramptime/dt) + 1
+        dt_intquocs = 0.005
+        ramptime_intquocs = best_controls["time_grid_for_intstrenRamp"][end]
+
+        # work on a copy: run_timeevo's timeham writes the ramp's current value back into
+        # the dict, which would leave interaction_strength=0.0 for any later section
+        hamilt_params_energy_intquocs = copy(hamilt_params_intquocs)
+
+        time_running_args_intquocs = (nev=speccount_intquocs,output_level=1,if_instant_gs=true,if_save_data=false,dataloc="tevo-daily-things-data/")
+        starting_states_intquocs = [Vector{ComplexF64}(states_starting_intquocs[i]) for i in 1:speccount_intquocs]
+        tevo_params_intquocs = Dict([ ("interaction_strength",(pulse_ramp,ramptime_intquocs,best_controls["intstrenRamp"])),("tmax",ramptime_intquocs),("dt",dt_intquocs) ])
+        tevo_data_intquocs,tevo_dict_intquocs,instdata_intquocs,saving_args_intquocs = run_timeevo(starting_states_intquocs,tevo_params_intquocs,lattice_params_intquocs,hamilt_params_energy_intquocs; time_running_args_intquocs...)
+
+        # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
+        final_manifold_intquocs = [Vector{ComplexF64}(tevo_data_intquocs[1][i][:,end-1]) for i in 1:speccount_intquocs]
+        fidelity_intquocs = real(groundstate_manifold_fidelity(final_manifold_intquocs,[Vector{ComplexF64}(s) for s in states_ending_intquocs[1:speccount_intquocs]]))
+        println("Fidelity with target manifold using QuOCS pulse: $(fidelity_intquocs)")
+    end
+
+    # plot the optimized pulse and the instantaneous vs time-evolved energies along it
+    if true || if_all
+        times_intquocs = range(0.0,ramptime_intquocs,length=length(instdata_intquocs[2]["1"]))
+
+        figure()
+        cols = ["b","g","r"]
+        for i in 1:speccount_intquocs
+            plot(times_intquocs,instdata_intquocs[2][string(i)],"-p",c=cols[i],label="E$(i)")
+            plot(times_intquocs,tevo_data_intquocs[2][i][1:end-1],c="k",marker="x")
+        end
+        legend()
+        xlabel("Time")
+        ylabel("Energy")
+        title("Energy vs time for QuOCS interaction strength ramp $(lx)x$(ly) N=$(n) ramptime $(ramptime_intquocs) U $(intstren_start)→$(intstren_end)")
+
+        figure()
+        plot(best_controls["time_grid_for_intstrenRamp"],best_controls["intstrenRamp"])
+        xlabel("Time")
+        ylabel("Interaction strength")
+        title("QuOCS optimized pulse, fidelity = $(round(fidelity_intquocs,digits=6))")
+    end
+
+end
 
 
 

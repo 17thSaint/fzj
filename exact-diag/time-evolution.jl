@@ -16,10 +16,31 @@ function timeham(timestep::Int,t_evo_params::Dict,lattice_params::Dict,hamilt_pa
     localtime_hamilt_params::Dict = hamilt_params
 
     # reset hamilt_params given the timestep from the t_evo_params
+    if_rebuild_ulr = false
     for (k,v) in t_evo_params
         if k != "dt" && k != "nsteps" && k != "tmax" && k != "when_dt_ends" && k != "current_dt"
+            # these parameters only enter the Hamiltonian through the coupling vector U,
+            # which must be rebuilt whenever one of them takes a new value (skipping the
+            # rebuild while the value sits constant, e.g. the hold after a ramp ends)
+            if k in ("interaction_strength","corr_length","sigma","blockade_radius","magnetic_spacing") && get(hamilt_params,k,nothing) !== v[timestep]
+                if_rebuild_ulr = true
+            end
             hamilt_params[k] = v[timestep]
         end
+    end
+
+    if if_rebuild_ulr
+        # applyHam reads the interaction from hamilt_params["U"] only, so the ramped value
+        # has to be propagated into U or the interaction stays frozen at its starting value;
+        # the fallbacks cover hamilt_params dicts built before "lr_dist" and
+        # "interaction_strength" were stored at setup (U[1] equals the overall strength
+        # for every scaling type in long_range_scaling)
+        lr_dist::Int = get(hamilt_params,"lr_dist",length(hamilt_params["U"])-1)
+        stren::Float64 = get(hamilt_params,"interaction_strength",hamilt_params["U"][1])
+        hamilt_params["U"] = long_range_scaling(lr_dist,lattice_params["Ly"],stren;
+            scaling=hamilt_params["scaling_type"],corr_length=hamilt_params["corr_length"],
+            sigma=hamilt_params["sigma"],blockade_radius=hamilt_params["blockade_radius"],
+            magnetic_spacing=hamilt_params["magnetic_spacing"])
     end
 
     # build the Hamiltonian

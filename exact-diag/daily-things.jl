@@ -3629,8 +3629,8 @@ if false
 
 end=#
 
-# check fidelity-susceptibility along uir
-if true
+#= check fidelity-susceptibility along uir
+if false
     lx,ly,n = 4,4,2
     intstrens = range(0.1,4.0,length=31)
     cols = ["b","r","g"]
@@ -3644,7 +3644,23 @@ if true
         end
         scatter(intstrens,fidseps,c=cols[ii])
     end
-end
+end=#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
