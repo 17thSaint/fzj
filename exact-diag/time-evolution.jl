@@ -43,8 +43,12 @@ function timeham(timestep::Int,t_evo_params::Dict,lattice_params::Dict,hamilt_pa
             magnetic_spacing=hamilt_params["magnetic_spacing"])
     end
 
-    # build the Hamiltonian
-    ht = buildHam(lattice_params,localtime_hamilt_params; kwargs...,output_level=0)
+    # build the Hamiltonian, from the saved undressed matrices when if_reading is set
+    if get(kwargs,:if_reading,false)
+        ht = getHamiltonian(lattice_params,localtime_hamilt_params; kwargs...,output_level=0)
+    else
+        ht = buildHam(lattice_params,localtime_hamilt_params; kwargs...,output_level=0)
+    end
 
     return ht
 end

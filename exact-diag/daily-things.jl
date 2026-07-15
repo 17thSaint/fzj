@@ -3646,6 +3646,36 @@ if false
     end
 end=#
 
+#= timing test between reading hamilt and building
+if false
+    lx,ly,n = 8,4,4
+    intstren = 300.0
+
+    pdict_reading = Dict([("output_level",1),("if_reading",true),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+    time_start_reading = time()
+    states_reading,nrgs_reading,rhos_reading,filepath_reading,if_found_reading,lattice_params_reading,hamilt_params_reading = run_normal_ed(pdict_reading; output_level=1)
+    time_end_reading = time()
+
+    pdict_building = Dict([("output_level",1),("if_reading",false),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+    time_start_building = time()
+    states_building,nrgs_building,rhos_building,filepath_building,if_found_building,lattice_params_building,hamilt_params_building = run_normal_ed(pdict_building; output_level=1)
+    time_end_building = time()
+
+    overlaps = abs2.(adjoint(states_reading[1]) * states_building[1])
+    println("Overlap between reading and building: $overlaps")
+    println("Time for reading: $(time_end_reading - time_start_reading)")
+    println("Time for building: $(time_end_building - time_start_building)")
+end=#
+
+
+
+
+
+
+
+
+
+
 
 
 

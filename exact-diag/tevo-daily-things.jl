@@ -503,9 +503,9 @@ end=#
 
 
 ### Ramp from strongly interacting state to FCI with linear ramp of interaction strength
-#= Strategy: start with strongly interacting state (ULR) and ramp interaction strength to 0.0 to connect to the FCI ground state manifold.
-if false
-    if_all::Bool = false
+# Strategy: start with strongly interacting state (ULR) and ramp interaction strength to 0.0 to connect to the FCI ground state manifold.
+if true
+    if_all::Bool = true
 
     # define starting state: strongly interacting ULR state
     if false || if_all
@@ -539,9 +539,9 @@ if false
         dataloc = get_folder_location("cluster-data/exact-diag/time-evo")
         time_running_args = (nev=speccount,output_level=1,if_instant_gs=false,if_save_data=false,dataloc=dataloc,)
 
-        ramptimes = 10 .^ range(1.0,1.8,length=11)
+        ramptimes = 10 .^ range(-2.0,1.5,length=21)
         for ramptime in ramptimes
-            tmax_global = ramptime + 0.5
+            tmax_global = ramptime
             tevo_params = Dict([ ("interaction_strength",(linear_ramp,intstren_start,intstren_end,ramptime)),("tmax",tmax_global) ])
             tevo_data,tevo_dict,_,saving_args = run_timeevo([states_starting[1],states_starting[2]],tevo_params,lattice_params_starting,hamilt_params_starting; time_running_args...)
 
@@ -559,7 +559,7 @@ if false
 
     end
 
-    # time evolution with linear ramp looking at instantaneous energies
+    #= time evolution with linear ramp looking at instantaneous energies
     if false || if_all
         speccount = 3
         dataloc = get_folder_location("cluster-data/exact-diag/time-evo")
@@ -580,15 +580,15 @@ if false
         xlabel("Time")
         ylabel("Energy")
         title("Energy vs time for interaction strength ramp $(lx)x$(ly) N=$(n) ramptime $(ramptime) U $(intstren_start)→$(intstren_end)")
-    end
-end=#true
+    end=#
+end#
 
 
 ### Time evolution with the QuOCS-optimized interaction strength ramp from optimal-control/config_intstrenRamp.py
 # All parameters must match the ones the optimization ran with (see config_intstrenRamp.py):
 # 4x4 N=2 pbc, U ramped 10.0 -> 0.0 over ramptime 1.0, dt 0.005
-# Reference: linear ramp fidelity 0.8891, QuOCS-optimized fidelity 0.9101 (run 20260714_114412) but Claude seems to think more superiterations of DCRAB would improve it further
-if true
+#= Reference: linear ramp fidelity 0.8891, QuOCS-optimized fidelity 0.9101 (run 20260714_114412) but Claude seems to think more superiterations of DCRAB would improve it further
+if false
 
     if_all::Bool = true
 
@@ -655,7 +655,7 @@ if true
         title("QuOCS optimized pulse, fidelity = $(round(fidelity_intquocs,digits=6))")
     end
 
-end
+end=#
 
 
 

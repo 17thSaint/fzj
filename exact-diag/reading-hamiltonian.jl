@@ -51,7 +51,7 @@ function buildHopping(lattice_params::Dict; kwargs...)
         end
     end
 
-    if_save && saveHopping(hopping,get_folder_location("cluster-data/exact-diag"),lattice_params; kwargs...)
+    if_save && saveHopping(hopping,get(kwargs,:dataloc,get_folder_location("cluster-data/exact-diag")),lattice_params; kwargs...)
 
     return hopping
 end
@@ -72,7 +72,7 @@ function dressHopping(hamilt_params::Dict,lattice_params::Dict,hopping::SparseMa
 
     for idx in 1:length(rows)
 
-        (output_level > 0) && (round(100*idx/length(rows),digits=0) % 10 == 0) && println(round(100*idx/length(rows),digits=4),"% complete")
+        output_level > 0 && idx % 1000 == 0 && println("$((idx/length(rows))*100)% complete")
 
         # find the starting and ending basis
         starting_basis::Vector{Int64} = lattice_params["full_basis"][:,rows[idx]]
@@ -93,11 +93,12 @@ function dressHopping(hamilt_params::Dict,lattice_params::Dict,hopping::SparseMa
         # hopping amplitude from tx/ty
         coeff = abs(dir[1]) == 0 ? -ty : -tx
 
-        # flux attachment
-        coeff *= exp(im*dot(alpha,dir)*dot(starting_site,abs.(reverse(dir)))*2*pi)
+        # flux attachment (0-indexed coordinates to match applyHam) and boundary condition twisting
+        phase(d) = exp(im*dot(alpha,d)*dot(starting_site .- 1,abs.(reverse(d)))*2*pi) * exp(im*2*pi*dot(twist_angle ./ (lattice_params["Lx"],lattice_params["Ly"]),d))
 
-        # boundary condition twisting
-        coeff *= exp(im*2*pi*dot(twist_angle ./ (lattice_params["Lx"],lattice_params["Ly"]),dir))
+        # a periodic direction of length 2 merges the +dir and -dir bonds into one entry, so average their phases
+        if_double_bond = abs(dir[1]) == 1 ? (lattice_params["Lx"] == 2 && lattice_params["if_periodic_x"]) : (lattice_params["Ly"] == 2 && lattice_params["if_periodic_y"])
+        coeff *= if_double_bond ? (phase(dir) + phase(dir .* -1))/2 : phase(dir)
 
         # add the hopping term to the Hamiltonian
         hopping[rows[idx],cols[idx]] *= coeff
@@ -112,8 +113,12 @@ function saveHopping(hopping::SparseMatrixCSC{ComplexF64},dataloc::String,lattic
     Lx = lattice_params["Lx"]
     Ly = lattice_params["Ly"]
     N = lattice_params["N"]
-    metadata_dict = Dict([("Lx",Lx),("Ly",Ly),("N",N)])
-    filename = "hopping-N-"*string(N)*"-Lx-"*string(Lx)*"-Ly-"*string(Ly)*".jld2"
+
+    # the undressed hopping structure depends on the boundary conditions so they belong in the cache key
+    if_periodic_x = lattice_params["if_periodic_x"]
+    if_periodic_y = lattice_params["if_periodic_y"]
+    metadata_dict = Dict([("Lx",Lx),("Ly",Ly),("N",N),("if_periodic_x",if_periodic_x),("if_periodic_y",if_periodic_y)])
+    filename = "hopping-N-"*string(N)*"-Lx-"*string(Lx)*"-Ly-"*string(Ly)*"-if_periodic_x-"*string(if_periodic_x)*"-if_periodic_y-"*string(if_periodic_y)*".jld2"
     full_loc = join([dataloc,filename],"/")
     write_data_jld2(full_loc,data_dict,metadata_dict; kwargs...)
 end
@@ -125,8 +130,8 @@ function findHopping(lattice_params::Dict; kwargs...)
     Lx = lattice_params["Lx"]
     Ly = lattice_params["Ly"]
     N = lattice_params["N"]
-    metadata_dict = Dict([("Lx",Lx),("Ly",Ly),("N",N)])
-    return check_data_exists(metadata_dict,"hopping"; location=dataloc,output_level=output_level)
+    metadata_dict = Dict([("Lx",Lx),("Ly",Ly),("N",N),("if_periodic_x",lattice_params["if_periodic_x"]),("if_periodic_y",lattice_params["if_periodic_y"])])
+    return check_data_exists(metadata_dict,"hopping"; location=dataloc,output_level=output_level,file_type="jld2")
 end
 
 function getHopping(lattice_params::Dict,hamilt_params::Dict; kwargs...)
@@ -150,10 +155,11 @@ function buildInteraction(lattice_params::Dict; kwargs...)
     Lx = lattice_params["Lx"]
     Ly = lattice_params["Ly"]
 
-    # initialize the interaction Matrix
-    interaction = spzeros(ComplexF64,size(lattice_params["full_basis"])[2],size(lattice_params["full_basis"])[2])
+    # count interacting pairs per basis state (plain vector so the threaded loop is race-free)
+    dimHilb = size(lattice_params["full_basis"])[2]
+    pair_counts = zeros(Float64,dimHilb)
 
-    Threads.@threads for idx in 1:size(interaction,1)
+    Threads.@threads for idx in 1:dimHilb
         basis = lattice_params["full_basis"][:,idx]
         for s1 in basis
             for s2 in basis
@@ -167,13 +173,16 @@ function buildInteraction(lattice_params::Dict; kwargs...)
                 dist[1] != 0 && continue
 
                 # add the interaction term to the Hamiltonian
-                interaction[idx,idx] += 0.5
+                pair_counts[idx] += 0.5
 
             end
         end
     end
-    
-    if_save && saveInteraction(interaction,get_folder_location("cluster-data/exact-diag"),lattice_params; kwargs...)
+
+    # build the diagonal interaction Matrix, keeping only states with interacting pairs
+    interaction = dropzeros!(spdiagm(0 => ComplexF64.(pair_counts)))
+
+    if_save && saveInteraction(interaction,get(kwargs,:dataloc,get_folder_location("cluster-data/exact-diag")),lattice_params; kwargs...)
 
     return interaction
 end
@@ -197,26 +206,31 @@ function dressInteraction(hamilt_params::Dict,lattice_params::Dict,interaction::
         return interaction
     end
 
+    interaction_cutoff::Float64 = get(hamilt_params,"interaction_cutoff",1e-5)
+    lr_dist = sum(abs.(U) .> interaction_cutoff) - 1
+
     rows,cols,vals = findnz(interaction)
 
     for idx in 1:length(rows)
         basis = lattice_params["full_basis"][:,rows[idx]]
-        for s1 in basis
-            for s2 in basis
-                # skip if the same particle
-                s1 == s2 && continue
+
+        # the undressed entry only counts pairs, so rebuild the value as a sum over pairs like applyHam
+        dressed_value = 0.0
+        for i in 1:length(basis)
+            for j in i+1:length(basis)
 
                 # find the distance between the two particles
-                dist = coordinate(s2,Lx,Ly) .- coordinate(s1,Lx,Ly)
+                dist = coordinate(basis[j],Lx,Ly) .- coordinate(basis[i],Lx,Ly)
 
                 # skip if the particles aren't on the same physical index
                 dist[1] != 0 && continue
 
-                # add the interaction term to the Hamiltonian
-                interaction[idx,idx] *= U[abs(dist[2])]
+                # add the interaction term for this pair
+                abs(dist[2]) <= lr_dist && abs(U[abs(dist[2])+1]) > interaction_cutoff && (dressed_value += U[abs(dist[2])+1])
 
             end
         end
+        interaction[rows[idx],cols[idx]] = dressed_value
     end
 
     # onsite pinning potential
@@ -249,7 +263,7 @@ function findInteraction(lattice_params::Dict; kwargs...)
     Ly = lattice_params["Ly"]
     N = lattice_params["N"]
     metadata_dict = Dict([("Lx",Lx),("Ly",Ly),("N",N)])
-    return check_data_exists(metadata_dict,"interaction"; location=dataloc,output_level=output_level)
+    return check_data_exists(metadata_dict,"interaction"; location=dataloc,output_level=output_level,file_type="jld2")
 end
 
 function getInteraction(lattice_params::Dict,hamilt_params::Dict; kwargs...)
@@ -263,6 +277,127 @@ function getInteraction(lattice_params::Dict,hamilt_params::Dict; kwargs...)
     return interaction
 end
 
+function buildPeriodicPotential(lattice_params::Dict; kwargs...)
+    output_level = get(kwargs,:output_level,1)
+    if_save::Bool = get(kwargs,:if_save,true)
+    if output_level > 1
+        println("Building periodic potential shape")
+    end
+
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+    full_basis = lattice_params["full_basis"]
+    dimHilb = size(full_basis)[2]
+
+    # staggered shape along the physical direction, one term per particle (strength-independent)
+    shape_values = zeros(Float64,dimHilb)
+    Threads.@threads for idx in 1:dimHilb
+        for s in full_basis[:,idx]
+            shape_values[idx] += (-1)^(coordinate(s,Lx,Ly)[1])
+        end
+    end
+    potential = dropzeros!(spdiagm(0 => ComplexF64.(shape_values)))
+
+    if_save && savePeriodicPotential(potential,get(kwargs,:dataloc,get_folder_location("cluster-data/exact-diag")),lattice_params; kwargs...)
+
+    return potential
+end
+
+function dressPeriodicPotential(hamilt_params::Dict,lattice_params::Dict,potential::SparseMatrixCSC{ComplexF64}; kwargs...)
+    potential .*= hamilt_params["periodic_potential_strength"]
+    return potential
+end
+
+function savePeriodicPotential(potential::SparseMatrixCSC{ComplexF64},dataloc::String,lattice_params::Dict; kwargs...)
+    data_dict = Dict([("periodicpotential_matrix",potential)])
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+    N = lattice_params["N"]
+    metadata_dict = Dict([("Lx",Lx),("Ly",Ly),("N",N)])
+    filename = "periodicpotential-N-"*string(N)*"-Lx-"*string(Lx)*"-Ly-"*string(Ly)*".jld2"
+    full_loc = join([dataloc,filename],"/")
+    write_data_jld2(full_loc,data_dict,metadata_dict; kwargs...)
+end
+
+function findPeriodicPotential(lattice_params::Dict; kwargs...)
+    dataloc = get(kwargs,:dataloc,get_folder_location("cluster-data/exact-diag"))
+    output_level = get(kwargs,:output_level,1)
+
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+    N = lattice_params["N"]
+    metadata_dict = Dict([("Lx",Lx),("Ly",Ly),("N",N)])
+    return check_data_exists(metadata_dict,"periodicpotential"; location=dataloc,output_level=output_level,file_type="jld2")
+end
+
+function getPeriodicPotential(lattice_params::Dict,hamilt_params::Dict; kwargs...)
+    if_found,potential_data = findPeriodicPotential(lattice_params; kwargs...)
+
+    !if_found && (potential = buildPeriodicPotential(lattice_params; kwargs...))
+    if_found && (potential = potential_data[1]["periodicpotential_matrix"])
+
+    potential = dressPeriodicPotential(hamilt_params,lattice_params,potential; kwargs...)
+
+    return potential
+end
+
+function buildDisorder(lattice_params::Dict; kwargs...)
+    output_level = get(kwargs,:output_level,1)
+    if_save::Bool = get(kwargs,:if_save,true)
+    if output_level > 1
+        println("Building disorder shape")
+    end
+
+    dimHilb = size(lattice_params["full_basis"])[2]
+
+    # one random onsite energy per basis state in [-1,1]; saving the shape makes the
+    # disorder realization quenched (reused for every dressing), unlike applyHam
+    # which draws a fresh realization on every build
+    disorder = spdiagm(0 => ComplexF64.(rand(dimHilb) .* 2 .- 1))
+
+    if_save && saveDisorder(disorder,get(kwargs,:dataloc,get_folder_location("cluster-data/exact-diag")),lattice_params; kwargs...)
+
+    return disorder
+end
+
+function dressDisorder(hamilt_params::Dict,lattice_params::Dict,disorder::SparseMatrixCSC{ComplexF64}; kwargs...)
+    disorder .*= hamilt_params["disorder_strength"]
+    return disorder
+end
+
+function saveDisorder(disorder::SparseMatrixCSC{ComplexF64},dataloc::String,lattice_params::Dict; kwargs...)
+    data_dict = Dict([("disorder_matrix",disorder)])
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+    N = lattice_params["N"]
+    metadata_dict = Dict([("Lx",Lx),("Ly",Ly),("N",N)])
+    filename = "disorder-N-"*string(N)*"-Lx-"*string(Lx)*"-Ly-"*string(Ly)*".jld2"
+    full_loc = join([dataloc,filename],"/")
+    write_data_jld2(full_loc,data_dict,metadata_dict; kwargs...)
+end
+
+function findDisorder(lattice_params::Dict; kwargs...)
+    dataloc = get(kwargs,:dataloc,get_folder_location("cluster-data/exact-diag"))
+    output_level = get(kwargs,:output_level,1)
+
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+    N = lattice_params["N"]
+    metadata_dict = Dict([("Lx",Lx),("Ly",Ly),("N",N)])
+    return check_data_exists(metadata_dict,"disorder"; location=dataloc,output_level=output_level,file_type="jld2")
+end
+
+function getDisorder(lattice_params::Dict,hamilt_params::Dict; kwargs...)
+    if_found,disorder_data = findDisorder(lattice_params; kwargs...)
+
+    !if_found && (disorder = buildDisorder(lattice_params; kwargs...))
+    if_found && (disorder = disorder_data[1]["disorder_matrix"])
+
+    disorder = dressDisorder(hamilt_params,lattice_params,disorder; kwargs...)
+
+    return disorder
+end
+
 function getHamiltonian(lattice_params::Dict,hamilt_params::Dict; kwargs...)
     output_level = get(kwargs,:output_level,1)
     if output_level > 1
@@ -273,10 +408,20 @@ function getHamiltonian(lattice_params::Dict,hamilt_params::Dict; kwargs...)
         error("Twistings not yet implemented")
     end
 
+    if get(hamilt_params,"which_dir","virt") != "virt"
+        error("Interactions only implemented for which_dir = virt")
+    end
+
     hopping::SparseMatrixCSC{ComplexF64} = getHopping(lattice_params,hamilt_params; kwargs...)
     interaction::SparseMatrixCSC{ComplexF64} = getInteraction(lattice_params,hamilt_params; kwargs...)
 
-    return hopping + interaction
+    ham = hopping + interaction
+
+    # diagonal potential shapes read from file and dressed by their strengths
+    (get(hamilt_params,"disorder_strength",0.0) != 0.0) && (ham += getDisorder(lattice_params,hamilt_params; kwargs...))
+    (get(hamilt_params,"periodic_potential_strength",0.0) != 0.0) && (ham += getPeriodicPotential(lattice_params,hamilt_params; kwargs...))
+
+    return ham
 end
 
 
