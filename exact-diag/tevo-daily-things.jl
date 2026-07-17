@@ -503,8 +503,8 @@ end=#
 
 
 ### Ramp from strongly interacting state to FCI with linear ramp of interaction strength
-# Strategy: start with strongly interacting state (ULR) and ramp interaction strength to 0.0 to connect to the FCI ground state manifold.
-if true
+#= Strategy: start with strongly interacting state (ULR) and ramp interaction strength to 0.0 to connect to the FCI ground state manifold.
+if false
     if_all::Bool = true
 
     # define starting state: strongly interacting ULR state
@@ -581,7 +581,7 @@ if true
         ylabel("Energy")
         title("Energy vs time for interaction strength ramp $(lx)x$(ly) N=$(n) ramptime $(ramptime) U $(intstren_start)→$(intstren_end)")
     end=#
-end#
+end=#
 
 
 ### Time evolution with the QuOCS-optimized interaction strength ramp from optimal-control/config_intstrenRamp.py
@@ -658,9 +658,113 @@ if false
 end=#
 
 
+### Ramp from strongly interacting state to FCI with linear ramp of interaction strength for 8x4 lattice
+#= Strategy: start with strongly interacting state (ULR) and ramp interaction strength to 0.0 to connect to the FCI ground state manifold.
+if false
+    if_all::Bool = true
 
+    # define starting state: strongly interacting ULR state
+    if false || if_all
+        lx,ly,n = 8,4,4
+        intstren_start = 10.0
 
+        pdict_starting = Dict([("output_level",1),("if_reading",true),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren_start),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
 
+        states_starting, nrgs_starting,_,_,_, lattice_params_starting, hamilt_params_starting = run_normal_ed(pdict_starting; output_level=0)
+    end
+
+    # define ending state: FCI
+    if false || if_all
+        intstren_end = 0.0
+
+        pdict_ending = Dict([("output_level",1),("if_reading",true),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren_end),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+
+        states_ending, nrgs_ending,_,_,_, lattice_params_ending, hamilt_params_ending = run_normal_ed(pdict_ending; output_level=0)
+    end
+
+    # define reference fidelity
+    if false || if_all
+        speccount = 2
+        reference_fidelity = groundstate_manifold_fidelity(states_ending[1:speccount],states_starting[1:speccount])
+        println("Reference fidelity between ULR and FCI states: $(reference_fidelity)")
+    end
+
+    # time evolution with linear ramp of interaction strength for various ramp times
+    if true || if_all
+        speccount = 2
+        dataloc = get_folder_location("cluster-data/exact-diag/time-evo/ulr-flat")
+        time_running_args = (nev=speccount,output_level=1,if_instant_gs=false,if_reading=true,if_save_data=true,dataloc=dataloc,)
+
+        tevo_hamilt_params = copy(hamilt_params_starting)
+
+        #ramptimes = 10 .^ range(-2.0,1.5,length=21)
+        #for ramptime in ramptimes
+        ramptime = 0.1
+        tmax_global = ramptime
+        tevo_params = Dict([ ("interaction_strength",(linear_ramp,intstren_start,intstren_end,ramptime)),("tmax",tmax_global) ])
+        tevo_data,tevo_dict,_,saving_args = run_timeevo([states_starting[1],states_starting[2]],tevo_params,lattice_params_starting,tevo_hamilt_params; time_running_args...)
+
+        # calculate final fidelity with target state
+        final_gs_manifold = [tevo_data[1][1][:,end-1],tevo_data[1][2][:,end-1]]
+        final_fidelity = groundstate_manifold_fidelity(final_gs_manifold,states_ending[1:speccount])
+        println("Final fidelity for ramp time $(ramptime): $(final_fidelity)")
+        
+        #=scatter(ramptime,final_fidelity,c="b")
+        end
+        plot([0.0,10.0],[reference_fidelity,reference_fidelity],"--",c="r")
+        xlabel("Ramp time")
+        ylabel("Fidelity with target manifold")
+        title("Fidelity vs ramp time $(lx)x$(ly) N=$(n) U=$(intstren_start)→$(intstren_end) ramp interaction strength")
+        xscale("log")=#
+
+    end
+
+    #= time evolution with linear ramp looking at instantaneous energies
+    if false || if_all
+        speccount = 3
+        dataloc = get_folder_location("cluster-data/exact-diag/time-evo")
+        time_running_args = (nev=speccount,output_level=1,if_instant_gs=true,if_save_data=false,dataloc=dataloc,)
+
+        ramptime = 10.0
+        tmax_global = ramptime
+        tevo_params = Dict([ ("interaction_strength",(linear_ramp,intstren_start,intstren_end,ramptime)),("tmax",tmax_global) ])
+        tevo_data,tevo_dict,instdata,saving_args = run_timeevo([states_starting[1],states_starting[2],states_starting[3]],tevo_params,lattice_params_starting,hamilt_params_starting; time_running_args...)
+
+        times = range(0.0,tmax_global,length=length(instdata[2]["1"]))
+        cols = ["b","g","r"]
+        for i in 1:speccount
+            plot(times,instdata[2][string(i)],c=cols[i],"-p",label="E$(i)")
+            plot(times,tevo_data[2][i][1:end-1],c="k",marker="x")
+        end
+        legend()
+        xlabel("Time")
+        ylabel("Energy")
+        title("Energy vs time for interaction strength ramp $(lx)x$(ly) N=$(n) ramptime $(ramptime) U $(intstren_start)→$(intstren_end)")
+    end=#
+end=#
+
+#= look at 8x4 ulr flat linear ramp data
+if false
+    lx,ly,n = 8,4,4
+    intstren_start = 10.0
+    dataloc = get_folder_location("cluster-data/exact-diag/time-evo/ulr-flat")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("ramptype","linear"),("rampparam","interaction_strength")])
+    all_files = find_data_file(pdict,"tevo",dataloc; file_type="jld2")
+    
+    for f in all_files
+        rez = read_data(joinpath(dataloc,f); output_level=0)
+        if haskey(rez,"final_fidelity")
+            ff = rez["final_fidelity"]
+            ramptime = get_params_dict_from_filename(f)["ramptime"]
+            scatter(ramptime,ff,c="b")
+            xlabel("Ramp time")
+            ylabel("Fidelity with target manifold")
+            title("Fidelity vs ramp time $(lx)x$(ly) N=$(n) U=$(intstren_start)→0.0 ramp ULR")
+            xscale("log")
+        end
+    end
+
+end=#
 
 
 

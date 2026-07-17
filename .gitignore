@@ -7,3 +7,4 @@ Manifest*
 logs*
 QuOCS_Results
 optimal-control/quocs-env/
+__pycache__/

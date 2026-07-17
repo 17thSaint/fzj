@@ -262,15 +262,9 @@ function find_data_file(params_dict,calc_type,location::String="/home/patrick/fz
 				try
 					!(current_file_params_dict[params] in params_dict[params]) && append!(remove_indices,i)
 				catch
-					#=try
-						#println("Error in first Attempt, $current_file")
-						current_file_metadata_dict = read_data(current_file; kwargs...)[2]
-						current_file_metadata_dict[params] in params_dict[params] ? nothing : append!(remove_indices,i)
-					catch
-						#println("Parameter $params could not be found in file $current_file, skipping")
+					if current_file_params_dict[params] != params_dict[params]
 						append!(remove_indices,i)
-					end=#
-					append!(remove_indices,i)
+					end
 				end
 			end
 		end

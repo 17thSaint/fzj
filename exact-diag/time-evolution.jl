@@ -140,7 +140,7 @@ function get_tevo_filename(timeevo_dict::Dict,lattice_dict::Dict,hamilt_dict::Di
     filename_dict["if_periodic_x"] = lattice_dict["if_periodic_x"]
     filename_dict["if_periodic_y"] = lattice_dict["if_periodic_y"]
 
-    filename_dict["dt"] = timeevo_dict["dt"]
+    #filename_dict["dt"] = timeevo_dict["dt"]
 
     if hamilt_dict["disorder_strength"] != 0.0
         filename_dict["disorder_strength"] = hamilt_dict["disorder_strength"]
@@ -167,17 +167,10 @@ function get_tevo_filename(timeevo_dict::Dict,lattice_dict::Dict,hamilt_dict::Di
                 error("Unknown ramp type for time evolution parameter $k")
             end
         end
-
-        # set data storage location based on the ramp parameter
-        if k == "tx"
-            dataloc = get_folder_location("cluster-data/exact-diag/time-evo/tx-ramp")
-            if_both += 1
-        elseif k == "intstren"
-            dataloc = get_folder_location("cluster-data/exact-diag/time-evo/intstren-ramp")
-            if_both += 1
-        end
     end
     dataloc = get(kwargs, :dataloc, dataloc)
+
+    filename_dict["ramptime"] = timeevo_dict["tmax"]
 
     # if ramping multiple parameters, save in "mixed-ramp" folder
     if if_both > 1
@@ -584,8 +577,8 @@ end
 function run_timeevo(starting_gs::Vector,time_params::Dict,lattice_dict::Dict,hamilt_dict::Dict; kwargs...)
     opl::Int = get(kwargs, :output_level, 1)
     
-    tmax_global = 25.0
-    dt_global = 0.05
+    #tmax_global = 25.0
+    #dt_global = 0.05
 
     tmax = time_params["tmax"]    
 

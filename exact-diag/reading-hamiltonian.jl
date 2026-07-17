@@ -124,7 +124,7 @@ function saveHopping(hopping::SparseMatrixCSC{ComplexF64},dataloc::String,lattic
 end
 
 function findHopping(lattice_params::Dict; kwargs...)
-    dataloc = get(kwargs,:dataloc,get_folder_location("cluster-data/exact-diag"))
+    dataloc = get_folder_location("cluster-data/exact-diag")
     output_level = get(kwargs,:output_level,1)
 
     Lx = lattice_params["Lx"]
@@ -136,6 +136,8 @@ end
 
 function getHopping(lattice_params::Dict,hamilt_params::Dict; kwargs...)
     if_found,hopping_data = findHopping(lattice_params; kwargs...)
+
+    !if_found && println("No hopping shape found, building a new one")
 
     !if_found && (hopping = buildHopping(lattice_params; kwargs...))
     if_found && (hopping = hopping_data[1]["hopping_matrix"])
@@ -256,7 +258,7 @@ function saveInteraction(interaction::SparseMatrixCSC{ComplexF64},dataloc::Strin
 end
 
 function findInteraction(lattice_params::Dict; kwargs...)
-    dataloc = get(kwargs,:dataloc,get_folder_location("cluster-data/exact-diag"))
+    dataloc = get_folder_location("cluster-data/exact-diag")
     output_level = get(kwargs,:output_level,1)
 
     Lx = lattice_params["Lx"]
@@ -268,6 +270,8 @@ end
 
 function getInteraction(lattice_params::Dict,hamilt_params::Dict; kwargs...)
     if_found,interaction_data = findInteraction(lattice_params; kwargs...)
+
+    !if_found && println("No interaction shape found, building a new one")
 
     !if_found && (interaction = buildInteraction(lattice_params; kwargs...))
     if_found && (interaction = interaction_data[1]["interaction_matrix"])
@@ -333,6 +337,8 @@ end
 function getPeriodicPotential(lattice_params::Dict,hamilt_params::Dict; kwargs...)
     if_found,potential_data = findPeriodicPotential(lattice_params; kwargs...)
 
+    !if_found && println("No periodic potential shape found, building a new one")
+
     !if_found && (potential = buildPeriodicPotential(lattice_params; kwargs...))
     if_found && (potential = potential_data[1]["periodicpotential_matrix"])
 
@@ -377,7 +383,7 @@ function saveDisorder(disorder::SparseMatrixCSC{ComplexF64},dataloc::String,latt
 end
 
 function findDisorder(lattice_params::Dict; kwargs...)
-    dataloc = get(kwargs,:dataloc,get_folder_location("cluster-data/exact-diag"))
+    dataloc = get_folder_location("cluster-data/exact-diag")
     output_level = get(kwargs,:output_level,1)
 
     Lx = lattice_params["Lx"]
@@ -389,6 +395,8 @@ end
 
 function getDisorder(lattice_params::Dict,hamilt_params::Dict; kwargs...)
     if_found,disorder_data = findDisorder(lattice_params; kwargs...)
+
+    !if_found && println("No disorder shape found, building a new one")
 
     !if_found && (disorder = buildDisorder(lattice_params; kwargs...))
     if_found && (disorder = disorder_data[1]["disorder_matrix"])

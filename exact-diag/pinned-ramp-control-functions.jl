@@ -14,13 +14,15 @@ Depends on:
 =#
 ######################################################
 
-function compute_fidelity_pinned_ramp(pulses,parameters_dictionary)
+# pulse-independent part of the figure of merit: the pinned starting state and the
+# target manifold. Run once per optimization (the QuOCS FoM object caches the
+# returned tuple) instead of re-diagonalizing at every function evaluation.
+function setup_pinned_ramp(parameters_dictionary)
 
     Lx::Int = Int(parameters_dictionary["Lx"])
     Ly::Int = Int(parameters_dictionary["Ly"])
     N::Int = Int(parameters_dictionary["N"])
     speccount::Int = Int(parameters_dictionary["speccount"])
-    dt = parameters_dictionary["dt"]
 
     common_params = Dict{String,Any}(
         "output_level"=>0,"Lx"=>Lx,"Ly"=>Ly,"N"=>N,"lr"=>parameters_dictionary["lr"],
@@ -43,14 +45,25 @@ function compute_fidelity_pinned_ramp(pulses,parameters_dictionary)
     states_ending,_,_,_,_,_,_ = run_normal_ed(pdict_ending; output_level=0)
 
     starting_states = [Vector{ComplexF64}(states_starting[i]) for i in 1:speccount]
+    target_states = [Vector{ComplexF64}(states_ending[i]) for i in 1:speccount]
+
+    return (starting_states,target_states,lattice_params,hamilt_params)
+end
+
+function compute_fidelity_pinned_ramp(pulses,parameters_dictionary,setup)
+
+    starting_states,target_states,lattice_params,hamilt_params = setup
+
     stages = [
         ("ty",collect(pulses[1]),parameters_dictionary["ramptime_firstramp"]),
         ("tx",collect(pulses[2]),parameters_dictionary["ramptime_secondramp"]),
     ]
-    time_running_args = (nev=speccount,output_level=0,if_instant_gs=false,if_save_data=false)
-    final_states = run_ramp_stages(starting_states,stages,lattice_params,hamilt_params,dt; time_running_args...)
+    time_running_args = (nev=length(starting_states),output_level=0,if_instant_gs=false,if_save_data=false)
+    final_states = run_ramp_stages(starting_states,stages,lattice_params,hamilt_params,parameters_dictionary["dt"]; time_running_args...)
 
-    return real(groundstate_manifold_fidelity(final_states,states_ending[1:speccount]))
+    return real(groundstate_manifold_fidelity(final_states,target_states))
 end
+
+compute_fidelity_pinned_ramp(pulses,parameters_dictionary) = compute_fidelity_pinned_ramp(pulses,parameters_dictionary,setup_pinned_ramp(parameters_dictionary))
 
 "fin"
