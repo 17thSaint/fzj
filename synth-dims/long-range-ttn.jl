@@ -270,6 +270,75 @@ function find_dead_linear_sites(restricted_size::Vector{Int},lat_dims::Tuple{Int
     return dead_sites
 end
 
+function get_DipolarInteraction_Ham(Us::Vector,lat,restricted_size; kwargs...)
+	interaction = TTN.OpSum()
+	spin_value = (restricted_size[2] - 1)/2
+	for (idx,stren) in enumerate(Us)
+		if stren == 0.0
+			continue
+		else
+			for j in TTN.eachindex(lat)
+				s_coord = TTN.coordinate(lat,j)
+				if s_coord[1] > restricted_size[1] || s_coord[2] > restricted_size[2]
+					continue
+				end
+				interaction_sites = get_interaction_coords(s_coord,idx-1,lat,(false,false),"virt")
+				#println("Interacting Sites for position $s_coord at distance $(idx-1) in direction $which_dir are ",interaction_sites)
+				
+				for k in interaction_sites
+					if k[1] > restricted_size[1] || k[2] > restricted_size[2]
+						continue
+					end
+					#println("Interacting between ",s_coord," and ",k," with strength ",stren/2)
+					for m in 1:restricted_size[2]
+						eff_m = m - (restricted_size[2] + 1)/2
+						for mp in 1:restricted_size[2]
+							eff_mp = mp - (restricted_size[2] + 1)/2
+							
+							# Fz Fz component
+							interaction += (stren * eff_m * eff_mp / 2,"N",s_coord,"N",Tuple(k))
+							
+							# F-/F+ component
+							coeff = sqrt(spin_value^2 * (spin_value + 1)^2 - spin_value * (spin_value + 1) * (eff_m * (eff_m + 1) + eff_mp * (eff_mp - 1)) + eff_m * eff_mp * (eff_m + 1) * (eff_mp - 1))
+							s1 = Tuple((s_coord[1],m+1))
+							s2 = Tuple((s_coord[1],m))
+							s3 = Tuple((k[1],mp-1))
+							s4 = Tuple((k[1],mp))
+							interaction += (-stren * coeff / (4*2), "Adag",s1,"A",s2,"Adag",s3,"A",s4)
+							s1 = Tuple((s_coord[1],mp - 1))
+							s2 = Tuple((s_coord[1],mp))
+							s3 = Tuple((k[1],m + 1))
+							s4 = Tuple((k[1],m))
+							interaction += (-stren * coeff / (4*2), "Adag",s1,"A",s2,"Adag",s3,"A",s4)
+
+							# F+ F+ component
+							phi = 0.0 # not sure how to calculat this yet
+							coeff = exp(-2*im*phi) * sqrt(spin_value^2 * (spin_value + 1)^2 - spin_value * (spin_value + 1) * (eff_m * (eff_m + 1) + eff_mp * (eff_mp + 1)) + eff_m * eff_mp * (eff_m -+1) * (eff_mp + 1))
+							s1 = Tuple((s_coord[1],m+1))
+							s2 = Tuple((s_coord[1],m))
+							s3 = Tuple((k[1],mp+1))
+							s4 = Tuple((k[1],mp))
+							interaction += (-3 * stren * coeff / (4*2), "Adag",s1,"A",s2,"Adag",s3,"A",s4)
+
+							# F- F- component
+							coeff = exp(2*im*phi) * sqrt(spin_value^2 * (spin_value + 1)^2 - spin_value * (spin_value + 1) * (eff_m * (eff_m - 1) + eff_mp * (eff_mp - 1)) + eff_m * eff_mp * (eff_m - 1) * (eff_mp - 1))
+							s1 = Tuple((s_coord[1],m-1))
+							s2 = Tuple((s_coord[1],m))
+							s3 = Tuple((k[1],mp-1))
+							s4 = Tuple((k[1],mp))
+							interaction += (-3 * stren * coeff / (4*2), "Adag",s1,"A",s2,"Adag",s3,"A",s4)
+							
+							
+							interaction += (stren/2,"Adag * A",s_coord,"Adag * A",Tuple(k))
+						end
+					end
+				end
+			end
+		end
+	end
+	return interaction
+end
+
 function long_range_HH_ham(net,t_strength,phi; kwargs...)
 
 	if kwargs[:if_synth_rectangle]
@@ -411,35 +480,39 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 			which_dir = "both"
 		end
 		interaction = TTN.OpSum()
-		for (idx,stren) in enumerate(long_range_strengths)
-			if stren == 0.0
-				continue
-			else
-				if idx == 1 && kwargs[:max_occ] > 1
-					for j in TTN.eachindex(lat)
-						s_coord = TTN.coordinate(lat,j)
-						if s_coord[1] > restricted_size[1] || s_coord[2] > restricted_size[2]
-							continue
-						end
-						interaction += (stren,"N * N",s_coord)
-						interaction -= (stren,"N",s_coord)
-					end
+		if kwargs[:scaling] == "dd"
+			interaction = get_DipolarInteraction_Ham(long_range_strengths,lat,restricted_size; kwargs...)
+		else
+			for (idx,stren) in enumerate(long_range_strengths)
+				if stren == 0.0
 					continue
 				else
-					for j in TTN.eachindex(lat)
-						s_coord = TTN.coordinate(lat,j)
-						if s_coord[1] > restricted_size[1] || s_coord[2] > restricted_size[2]
-							continue
-						end
-						interaction_sites = get_interaction_coords(s_coord,idx-1,lat,(if_periodic_phys,if_periodic_virt),which_dir)
-						#println("Interacting Sites for position $s_coord at distance $(idx-1) in direction $which_dir are ",interaction_sites)
-						
-						for k in interaction_sites
-							if k[1] > restricted_size[1] || k[2] > restricted_size[2]
+					if idx == 1 && kwargs[:max_occ] > 1
+						for j in TTN.eachindex(lat)
+							s_coord = TTN.coordinate(lat,j)
+							if s_coord[1] > restricted_size[1] || s_coord[2] > restricted_size[2]
 								continue
 							end
-							#println("Interacting between ",s_coord," and ",k," with strength ",stren/2)
-							interaction += (stren/2,"Adag * A",s_coord,"Adag * A",Tuple(k))
+							interaction += (stren,"N * N",s_coord)
+							interaction -= (stren,"N",s_coord)
+						end
+						continue
+					else
+						for j in TTN.eachindex(lat)
+							s_coord = TTN.coordinate(lat,j)
+							if s_coord[1] > restricted_size[1] || s_coord[2] > restricted_size[2]
+								continue
+							end
+							interaction_sites = get_interaction_coords(s_coord,idx-1,lat,(if_periodic_phys,if_periodic_virt),which_dir)
+							#println("Interacting Sites for position $s_coord at distance $(idx-1) in direction $which_dir are ",interaction_sites)
+							
+							for k in interaction_sites
+								if k[1] > restricted_size[1] || k[2] > restricted_size[2]
+									continue
+								end
+								#println("Interacting between ",s_coord," and ",k," with strength ",stren/2)
+								interaction += (stren/2,"Adag * A",s_coord,"Adag * A",Tuple(k))
+							end
 						end
 					end
 				end

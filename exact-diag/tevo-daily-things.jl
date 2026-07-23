@@ -767,8 +767,77 @@ if false
 end=#
 
 
+### Time evolution with the QuOCS AD-optimized interaction strength ramp from optimal-control/config_intstrenRamp_AD.py
+# All parameters must match the ones the optimization ran with (see config_intstrenRamp_AD.py):
+# 4x4 N=2 pbc, U ramped 10.0 -> 0.0 over ramptime 1.0, dt 0.005, intstren_max 12.0
+#= Reference: dCRAB-optimized fidelity 0.9101 (run 20260714_114412), AD-optimized fidelity 0.9158 (run 20260717_114522, best of three AD runs / dCRAB fidelity is lower on the same 200-eval budget)
+if false
 
+    if_all::Bool = true
 
+    # model parameters and starting/ending states
+    if false || if_all
+        lx,ly,n = 4,4,2
+        intstren_start, intstren_end = 10.0, 0.0
+        speccount_intad = 2
+
+        pdict_intad = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren_start),("filling",0.5),("nev",3),("if_find_data",false),("if_save_data",false)])
+        states_starting_intad,_,_,_,_,lattice_params_intad,hamilt_params_intad = run_normal_ed(pdict_intad; output_level=0)
+
+        pdict_ending_intad = merge(pdict_intad,Dict("interaction_strength"=>intstren_end))
+        states_ending_intad,_,_,_,_,_,_ = run_normal_ed(pdict_ending_intad; output_level=0)
+    end
+
+    # load the AD-optimized pulse and run the time evolution with instantaneous energies
+    if false || if_all
+        quocs_folder_intad = "../optimal-control/QuOCS_Results/20260717_114522_intstrenRamp_AD"
+        controls_file_intad = filter(f -> endswith(f,"best_controls.npz"), readdir(quocs_folder_intad))[1]
+        # only read the numeric arrays: NPZ.jl cannot parse the numpy unicode-string arrays
+        # (pulse_names etc.) that QuOCS also stores in the file
+        best_controls_intad = npzread(joinpath(quocs_folder_intad,controls_file_intad),["intstrenRamp","time_grid_for_intstrenRamp"])
+
+        # AD mode hands get_FoM (and therefore dumps) the pulse as complex64 (quocslib
+        # AD pitfall: Controls._get_controls_jax_obj uses complex jax tracers); the
+        # interaction strength itself is real, so drop the (zero) imaginary part
+        pulse_intad = Float64.(real.(best_controls_intad["intstrenRamp"]))
+
+        # pulse is sampled on the RK4 half-step grid (spacing dt/2), so dt must match the
+        # value used in config_intstrenRamp_AD.py: pulse length = ceil(2*ramptime/dt) + 1
+        dt_intad = 0.005
+        ramptime_intad = Float64(real(best_controls_intad["time_grid_for_intstrenRamp"][end]))
+
+        # work on a copy: run_timeevo's timeham writes the ramp's current value back into
+        # the dict, which would leave interaction_strength=0.0 for any later section
+        hamilt_params_energy_intad = copy(hamilt_params_intad)
+
+        time_running_args_intad = (nev=speccount_intad,output_level=1,if_instant_gs=true,if_save_data=false,dataloc="tevo-daily-things-data/")
+        starting_states_intad = [Vector{ComplexF64}(states_starting_intad[i]) for i in 1:speccount_intad]
+        tevo_params_intad = Dict([ ("interaction_strength",(pulse_ramp,ramptime_intad,pulse_intad)),("tmax",ramptime_intad),("dt",dt_intad) ])
+        tevo_data_intad,tevo_dict_intad,instdata_intad,saving_args_intad = run_timeevo(starting_states_intad,tevo_params_intad,lattice_params_intad,hamilt_params_energy_intad; time_running_args_intad...)
+
+        # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
+        final_manifold_intad = [Vector{ComplexF64}(tevo_data_intad[1][i][:,end-1]) for i in 1:speccount_intad]
+        fidelity_intad = real(groundstate_manifold_fidelity(final_manifold_intad,[Vector{ComplexF64}(s) for s in states_ending_intad[1:speccount_intad]]))
+        println("Fidelity with target manifold using AD-optimized pulse: $(fidelity_intad)")
+    end
+
+    # plot the instantaneous vs transported (time-evolved) state energies along the AD ramp
+    if true || if_all
+        times_intad = range(0.0,ramptime_intad,length=length(instdata_intad[2]["1"]))
+
+        figure()
+        cols = ["b","g","r"]
+        for i in 1:speccount_intad
+            plot(times_intad,instdata_intad[2][string(i)],"-p",c=cols[i],label="E$(i) instantaneous")
+            plot(times_intad,tevo_data_intad[2][i][1:end-1],c="k",marker="x",label=(i==1 ? "transported" : nothing))
+        end
+        legend()
+        xlabel("Time")
+        ylabel("Energy")
+        title("Energy vs time for AD interaction strength ramp $(lx)x$(ly) N=$(n) ramptime $(ramptime_intad) U $(intstren_start)→$(intstren_end), fidelity = $(round(fidelity_intad,digits=6))")
+    end
+
+end=#
 
 
 

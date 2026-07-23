@@ -161,7 +161,7 @@ function buildInteraction(lattice_params::Dict; kwargs...)
     dimHilb = size(lattice_params["full_basis"])[2]
     pair_counts = zeros(Float64,dimHilb)
 
-    Threads.@threads for idx in 1:dimHilb
+    for idx in 1:dimHilb
         basis = lattice_params["full_basis"][:,idx]
         for s1 in basis
             for s2 in basis
