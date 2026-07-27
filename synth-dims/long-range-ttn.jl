@@ -5,7 +5,7 @@
 include("../review-practice-codes/ttn.jl")
 include("../other-funcs/basic-2d-stuff.jl")
 include("../review-practice-codes/observables.jl")
-#include("../review-practice-codes/plottings.jl")
+include("../review-practice-codes/plottings.jl")
 using Profile,MKL,TensorOperations,CUDA
 
 function spin_matrix_element(m1,m2,spin,direction::String)
@@ -277,60 +277,90 @@ function get_DipolarInteraction_Ham(Us::Vector,lat,restricted_size; kwargs...)
 		if stren == 0.0
 			continue
 		else
-			for j in TTN.eachindex(lat)
-				s_coord = TTN.coordinate(lat,j)
-				if s_coord[1] > restricted_size[1] || s_coord[2] > restricted_size[2]
-					continue
-				end
-				interaction_sites = get_interaction_coords(s_coord,idx-1,lat,(false,false),"virt")
-				#println("Interacting Sites for position $s_coord at distance $(idx-1) in direction $which_dir are ",interaction_sites)
-				
-				for k in interaction_sites
-					if k[1] > restricted_size[1] || k[2] > restricted_size[2]
-						continue
-					end
-					#println("Interacting between ",s_coord," and ",k," with strength ",stren/2)
-					for m in 1:restricted_size[2]
-						eff_m = m - (restricted_size[2] + 1)/2
-						for mp in 1:restricted_size[2]
-							eff_mp = mp - (restricted_size[2] + 1)/2
-							
-							# Fz Fz component
-							interaction += (stren * eff_m * eff_mp / 2,"N",s_coord,"N",Tuple(k))
-							
-							# F-/F+ component
-							coeff = sqrt(spin_value^2 * (spin_value + 1)^2 - spin_value * (spin_value + 1) * (eff_m * (eff_m + 1) + eff_mp * (eff_mp - 1)) + eff_m * eff_mp * (eff_m + 1) * (eff_mp - 1))
-							s1 = Tuple((s_coord[1],m+1))
-							s2 = Tuple((s_coord[1],m))
-							s3 = Tuple((k[1],mp-1))
-							s4 = Tuple((k[1],mp))
-							interaction += (-stren * coeff / (4*2), "Adag",s1,"A",s2,"Adag",s3,"A",s4)
-							s1 = Tuple((s_coord[1],mp - 1))
-							s2 = Tuple((s_coord[1],mp))
-							s3 = Tuple((k[1],m + 1))
-							s4 = Tuple((k[1],m))
-							interaction += (-stren * coeff / (4*2), "Adag",s1,"A",s2,"Adag",s3,"A",s4)
+			for i in 1:restricted_size[1]
+				for m in 1:restricted_size[2]
+					eff_m = m - (restricted_size[2] + 1)/2
+					for mp in 1:restricted_size[2]
+						eff_mp = mp - (restricted_size[2] + 1)/2
 
-							# F+ F+ component
-							phi = 0.0 # not sure how to calculat this yet
-							coeff = exp(-2*im*phi) * sqrt(spin_value^2 * (spin_value + 1)^2 - spin_value * (spin_value + 1) * (eff_m * (eff_m + 1) + eff_mp * (eff_mp + 1)) + eff_m * eff_mp * (eff_m -+1) * (eff_mp + 1))
-							s1 = Tuple((s_coord[1],m+1))
-							s2 = Tuple((s_coord[1],m))
-							s3 = Tuple((k[1],mp+1))
-							s4 = Tuple((k[1],mp))
-							interaction += (-3 * stren * coeff / (4*2), "Adag",s1,"A",s2,"Adag",s3,"A",s4)
-
-							# F- F- component
-							coeff = exp(2*im*phi) * sqrt(spin_value^2 * (spin_value + 1)^2 - spin_value * (spin_value + 1) * (eff_m * (eff_m - 1) + eff_mp * (eff_mp - 1)) + eff_m * eff_mp * (eff_m - 1) * (eff_mp - 1))
-							s1 = Tuple((s_coord[1],m-1))
-							s2 = Tuple((s_coord[1],m))
-							s3 = Tuple((k[1],mp-1))
-							s4 = Tuple((k[1],mp))
-							interaction += (-3 * stren * coeff / (4*2), "Adag",s1,"A",s2,"Adag",s3,"A",s4)
-							
-							
-							interaction += (stren/2,"Adag * A",s_coord,"Adag * A",Tuple(k))
+						m == mp && continue # skip because then this is an onsite interaction term
+						
+						# Fz Fz component
+						interaction += (stren * eff_m * eff_mp,"N",(i,m),"N",(i,mp))
+						#
+						
+						# F-/F+ component
+						coeff = sqrt(Complex(spin_value^2 * (spin_value + 1)^2 - spin_value * (spin_value + 1) * (eff_m * (eff_m + 1) + eff_mp * (eff_mp - 1)) + eff_m * eff_mp * (eff_m + 1) * (eff_mp - 1)))
+						(m == restricted_size[2] || mp == 1) && (coeff = 0.0)
+						s1 = Tuple((i,m+1))
+						s2 = Tuple((i,m))
+						s3 = Tuple((i,mp-1))
+						s4 = Tuple((i,mp))
+						if m == mp-1
+							interaction += (-stren * coeff / (4*2), "N",s1)
+							interaction += (-stren * coeff / (4*2), "N",s1,"N",s3)
+						elseif m+1 == mp-1
+							# do nothing because leads to double or zero occupation
+							interaction += (0.0,"N",s1,"N",s3)
+						else
+							interaction += (-stren * coeff / (4*2), "Adag",s1,"A",s2,"Adag",s3,"A",s4)
 						end
+						s1 = Tuple((i,mp - 1))
+						s2 = Tuple((i,mp))
+						s3 = Tuple((i,m + 1))
+						s4 = Tuple((i,m))
+						if mp == m+1
+							interaction += (-stren * coeff / (4*2), "N",s1)
+							interaction += (-stren * coeff / (4*2), "N",s1,"N",s2)
+						elseif mp-1 == m+1
+							# do nothing because leads to double or zero occupation
+							interaction += (0.0,"N",s1,"N",s3)
+						else
+							interaction += (-stren * coeff / (4*2), "Adag",s1,"A",s2,"Adag",s3,"A",s4)
+						end
+						#
+
+						# phi = 0.0 this always is exp(\pm 2i phi) = -1, see Overleaf
+						# F+ F+ component
+						coeff = -1 * sqrt(Complex(spin_value^2 * (spin_value + 1)^2 - spin_value * (spin_value + 1) * (eff_m * (eff_m + 1) + eff_mp * (eff_mp + 1)) + eff_m * eff_mp * (eff_m -+1) * (eff_mp + 1)))
+						(m == restricted_size[2] || mp == restricted_size[2]) && (coeff = 0.0)
+						s1 = Tuple((i,m+1))
+						s2 = Tuple((i,m))
+						s3 = Tuple((i,mp+1))
+						s4 = Tuple((i,mp))
+						(mp == m || m+1 == mp+1) && (coeff = 0.0)
+						if m == mp+1
+							interaction += (-3 * stren * coeff / (4*2), "N",s4)
+							interaction += (-3 * stren * coeff / (4*2), "N",s3,"N",s4)
+						elseif m+1 == mp+1
+							# do nothing because leads to double or zero occupation
+							interaction += (0.0,"N",s1,"N",s3)
+						elseif mp == m+1
+							interaction += (-3 * stren * coeff / (4*2), "N",s1,"A",s2,"Adag",s3)
+							interaction += (-3 * stren * coeff / (4*2), "N",s1,"A",s3,"Adag",s2) # not sure this term is accurate but needed for Hermiticity
+						else
+							interaction += (-3 * stren * coeff / (4*2), "Adag",s1,"A",s2,"Adag",s3,"A",s4)
+						end
+						#
+
+						# F- F- component
+						coeff = -1 * sqrt(Complex(spin_value^2 * (spin_value + 1)^2 - spin_value * (spin_value + 1) * (eff_m * (eff_m - 1) + eff_mp * (eff_mp - 1)) + eff_m * eff_mp * (eff_m - 1) * (eff_mp - 1)))
+						(m == 1 || mp == 1) && (coeff = 0.0)
+						s1 = Tuple((i,m-1))
+						s2 = Tuple((i,m))
+						s3 = Tuple((i,mp-1))
+						s4 = Tuple((i,mp))
+						if m == mp-1
+							interaction += (-3 * stren * coeff / (4*2), "N",s4)
+							interaction += (-3 * stren * coeff / (4*2), "N",s3,"N",s4)
+						elseif mp == m-1
+							interaction += (-3 * stren * coeff / (4*2), "N",s1,"A",s2,"Adag",s3)
+							interaction += (-3 * stren * coeff / (4*2), "N",s1,"A",s3,"Adag",s2) # not sure this term is accurate but needed for Hermiticity
+						else
+							interaction += (-3 * stren * coeff / (4*2), "Adag",s1,"A",s2,"Adag",s3,"A",s4)
+						end
+						#
+						
 					end
 				end
 			end
@@ -476,10 +506,10 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	end
 	
 	if if_interaction
+		interaction = TTN.OpSum()
 		if kwargs[:scaling] == "rydberg"
 			which_dir = "both"
 		end
-		interaction = TTN.OpSum()
 		if kwargs[:scaling] == "dd"
 			interaction = get_DipolarInteraction_Ham(long_range_strengths,lat,restricted_size; kwargs...)
 		else
@@ -2215,8 +2245,8 @@ if false
 	all_results = run_synth_dims_generic(params_dict)
 end=#
 
-#= synth-dims for loop runnings
-if false
+# synth-dims for loop runnings
+if true
 	#BLAS.set_num_threads(open_cores)
 	#cols = ["b","g","r"]
 	#nnst = 0.0
@@ -2251,7 +2281,7 @@ if false
 	#dataloc = if_pinning ? get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling") : get_folder_location("cluster-data/synth-dims/torus/new-gauge")
 	#
 
-	lx,ly,n = 4,4,12
+	lx,ly,n = 6,3,3
 	stren = 300.0
 	
 	#alphas = range(0.1,0.30,length=41)
@@ -2271,7 +2301,7 @@ if false
 		
 		#("if_pinning",if_pinning),("dataloc",dataloc),("pinning_strength",pinstren)
 		
-		params_dict = Dict([("if_gpu",false),("if_check_fluxes",false),("cutoff",1e-12),("outputlevel",1),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",1e-5),("particles",n),("mdim",400),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("if_gpu",false),("scaling","dd"),("magnetic_spacing",3.0),("if_check_fluxes",false),("cutoff",1e-8),("outputlevel",1),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",2),("expander_fraction",1e-2),("particles",n),("mdim",400),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		#params_dict = Dict([("if_gpu",false),("outputlevel",1),("nrgtol",5e-6),("if_pinning",true),("pinning_strength",pinstren),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-5),("particles",n),("mdim",500),("if_save_data",true),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		#params_dict = Dict([("if_gpu",true),("outputlevel",1),("scaling","exp"),("corr_length",xi),("nrgtol",1e-5),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-4),("particles",n),("mdim",400),("if_save_data",true),("filling",0.5),("if_find_data",true),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
@@ -2293,6 +2323,10 @@ if false
 		all_states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(params_dict)
 		#nrgs = [all_obs[i].nrg[end] for i in 1:params_dict["es_count"]+1]
 		#plot_spectrum(alphas,nrgs,idx,params_dict["es_count"]+1,"Flux Density",true; plot_title="Pfaffian")
+
+		for (idx,psi) in enumerate(all_states)
+			occs = get_occupancy(psi; plot_title="Level $(idx-1) NRG=$(round(all_obs[idx].nrg[end],digits=4))")
+		end
 
 		#=for i in 1:params_dict["es_count"]+1
 			scatter(tw1,all_results[3][i].nrg[end],c=cols[i])
@@ -2388,7 +2422,7 @@ if false
 			=#
 	#end
 #end
-end=#
+end#
 
 #
 #plot(strens,real.(centermoms),"-p")

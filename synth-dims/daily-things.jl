@@ -1167,8 +1167,8 @@ end=#
 # Random State, No conserve, increase zeros = works
 # Random State, No conserve, increase randn = works
 # Random State, Yes conserve, increase randn = fluxes not equal
-# Random State, Yes conserve, increase zeros = fluxes not equal
-if true
+#= Random State, Yes conserve, increase zeros = fluxes not equal
+if false
     lx,ly,n = 4,4,2
     conserve_qns = false
     stren = 0.0
@@ -1182,7 +1182,7 @@ if true
     ttn = TTN.increase_dim_tree_tensor_network_zeros(old_ttn, maxdim = 100)
     #ttn = TTN.increase_dim_tree_tensor_network_randn(old_ttn, maxdim = 50)
 
-end#
+end=#
 
 #= checking ulr xi 4pt momentum behavior
 if false
@@ -1204,6 +1204,16 @@ if false
     colorbar()
 end=#
 
+# checking on cluster data
+if true
+    lx,ly,n = 16,8,8
+    intstren = 300.0
+    dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/pinned-scaling")
+    pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+    all_files = find_data_file(pdict,"ttn",dataloc)
+    display(all_files)
+
+end
 
 
 
