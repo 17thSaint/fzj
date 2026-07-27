@@ -332,18 +332,24 @@ function get_DipolarInteraction_Ham(Us::Vector,lat,restricted_size; kwargs...)
 						if m == mp+1
 							interaction += (-3 * stren * coeff / (4*2), "N",s4)
 							interaction += (-3 * stren * coeff / (4*2), "N",s3,"N",s4)
-						elseif m+1 == mp+1
-							# do nothing because leads to double or zero occupation
-							interaction += (0.0,"N",s1,"N",s3)
+							
+							# add hermitian conjugate which is F-F- term
+							interaction += (-3 * stren * conj(coeff) / (4*2), "N",s4)
+							interaction += (-3 * stren * conj(coeff) / (4*2), "N",s3,"N",s4)
 						elseif mp == m+1
 							interaction += (-3 * stren * coeff / (4*2), "N",s1,"A",s2,"Adag",s3)
-							interaction += (-3 * stren * coeff / (4*2), "N",s1,"A",s3,"Adag",s2) # not sure this term is accurate but needed for Hermiticity
+							
+							# add hermitian conjugate which is F-F- term
+							interaction += (-3 * stren * conj(coeff) / (4*2), "N",s1,"A",s3,"Adag",s2)
 						else
 							interaction += (-3 * stren * coeff / (4*2), "Adag",s1,"A",s2,"Adag",s3,"A",s4)
+
+							# add hermitian conjugate which is F-F- term
+							interaction += (-3 * stren * conj(coeff) / (4*2), "Adag",s4,"A",s3,"Adag",s2,"A",s1)
 						end
 						#
 
-						# F- F- component
+						#= F- F- component
 						coeff = -1 * sqrt(Complex(spin_value^2 * (spin_value + 1)^2 - spin_value * (spin_value + 1) * (eff_m * (eff_m - 1) + eff_mp * (eff_mp - 1)) + eff_m * eff_mp * (eff_m - 1) * (eff_mp - 1)))
 						(m == 1 || mp == 1) && (coeff = 0.0)
 						s1 = Tuple((i,m-1))
@@ -355,11 +361,11 @@ function get_DipolarInteraction_Ham(Us::Vector,lat,restricted_size; kwargs...)
 							interaction += (-3 * stren * coeff / (4*2), "N",s3,"N",s4)
 						elseif mp == m-1
 							interaction += (-3 * stren * coeff / (4*2), "N",s1,"A",s2,"Adag",s3)
-							interaction += (-3 * stren * coeff / (4*2), "N",s1,"A",s3,"Adag",s2) # not sure this term is accurate but needed for Hermiticity
+							#interaction += (-3 * stren * coeff / (4*2), "N",s1,"A",s3,"Adag",s2) # not sure this term is accurate but needed for Hermiticity
 						else
 							interaction += (-3 * stren * coeff / (4*2), "Adag",s1,"A",s2,"Adag",s3,"A",s4)
 						end
-						#
+						=#
 						
 					end
 				end
@@ -2301,7 +2307,7 @@ if true
 		
 		#("if_pinning",if_pinning),("dataloc",dataloc),("pinning_strength",pinstren)
 		
-		params_dict = Dict([("if_gpu",false),("scaling","dd"),("magnetic_spacing",3.0),("if_check_fluxes",false),("cutoff",1e-8),("outputlevel",1),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",2),("expander_fraction",1e-2),("particles",n),("mdim",400),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("if_gpu",false),("scaling","dd"),("magnetic_spacing",5.0),("if_check_fluxes",false),("cutoff",1e-8),("outputlevel",1),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",5e-1),("particles",n),("mdim",400),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		#params_dict = Dict([("if_gpu",false),("outputlevel",1),("nrgtol",5e-6),("if_pinning",true),("pinning_strength",pinstren),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-5),("particles",n),("mdim",500),("if_save_data",true),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		#params_dict = Dict([("if_gpu",true),("outputlevel",1),("scaling","exp"),("corr_length",xi),("nrgtol",1e-5),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-4),("particles",n),("mdim",400),("if_save_data",true),("filling",0.5),("if_find_data",true),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
