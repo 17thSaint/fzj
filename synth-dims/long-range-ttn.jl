@@ -273,7 +273,7 @@ end
 function get_DipolarInteraction_Ham(Us::Vector,lat,restricted_size; kwargs...)
 	interaction = TTN.OpSum()
 	spin_value = (restricted_size[2] - 1)/2
-	for (idx,stren) in enumerate(Us)
+	for (idx,stren) in enumerate(Us[2:restricted_size[2]])
 		if stren == 0.0
 			continue
 		else
@@ -289,7 +289,7 @@ function get_DipolarInteraction_Ham(Us::Vector,lat,restricted_size; kwargs...)
 						interaction += (stren * eff_m * eff_mp,"N",(i,m),"N",(i,mp))
 						#
 						
-						# F-/F+ component
+						#= F-/F+ component
 						coeff = sqrt(Complex(spin_value^2 * (spin_value + 1)^2 - spin_value * (spin_value + 1) * (eff_m * (eff_m + 1) + eff_mp * (eff_mp - 1)) + eff_m * eff_mp * (eff_m + 1) * (eff_mp - 1)))
 						(m == restricted_size[2] || mp == 1) && (coeff = 0.0)
 						s1 = Tuple((i,m+1))
@@ -318,10 +318,10 @@ function get_DipolarInteraction_Ham(Us::Vector,lat,restricted_size; kwargs...)
 						else
 							interaction += (-stren * coeff / (4*2), "Adag",s1,"A",s2,"Adag",s3,"A",s4)
 						end
-						#
+						=#
 
 						# phi = 0.0 this always is exp(\pm 2i phi) = -1, see Overleaf
-						# F+ F+ component
+						#= F+ F+ component
 						coeff = -1 * sqrt(Complex(spin_value^2 * (spin_value + 1)^2 - spin_value * (spin_value + 1) * (eff_m * (eff_m + 1) + eff_mp * (eff_mp + 1)) + eff_m * eff_mp * (eff_m -+1) * (eff_mp + 1)))
 						(m == restricted_size[2] || mp == restricted_size[2]) && (coeff = 0.0)
 						s1 = Tuple((i,m+1))
@@ -346,24 +346,6 @@ function get_DipolarInteraction_Ham(Us::Vector,lat,restricted_size; kwargs...)
 
 							# add hermitian conjugate which is F-F- term
 							interaction += (-3 * stren * conj(coeff) / (4*2), "Adag",s4,"A",s3,"Adag",s2,"A",s1)
-						end
-						#
-
-						#= F- F- component
-						coeff = -1 * sqrt(Complex(spin_value^2 * (spin_value + 1)^2 - spin_value * (spin_value + 1) * (eff_m * (eff_m - 1) + eff_mp * (eff_mp - 1)) + eff_m * eff_mp * (eff_m - 1) * (eff_mp - 1)))
-						(m == 1 || mp == 1) && (coeff = 0.0)
-						s1 = Tuple((i,m-1))
-						s2 = Tuple((i,m))
-						s3 = Tuple((i,mp-1))
-						s4 = Tuple((i,mp))
-						if m == mp-1
-							interaction += (-3 * stren * coeff / (4*2), "N",s4)
-							interaction += (-3 * stren * coeff / (4*2), "N",s3,"N",s4)
-						elseif mp == m-1
-							interaction += (-3 * stren * coeff / (4*2), "N",s1,"A",s2,"Adag",s3)
-							#interaction += (-3 * stren * coeff / (4*2), "N",s1,"A",s3,"Adag",s2) # not sure this term is accurate but needed for Hermiticity
-						else
-							interaction += (-3 * stren * coeff / (4*2), "Adag",s1,"A",s2,"Adag",s3,"A",s4)
 						end
 						=#
 						
@@ -417,7 +399,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	lat = TTN.physical_lattice(net)
 	
 	hopping_old = get(kwargs, :hopping_old, false)
-	if if_hopping && hopping_old
+	#=if if_hopping && hopping_old
 		if_periodic_phys ? nothing : centralflux_strength = 0.0
 		hopping = TTN.OpSum()
 		#
@@ -509,7 +491,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 			end
 		end
 		append!(resulting_ham,[hopping])
-	end
+	end=#
 	
 	if if_interaction
 		interaction = TTN.OpSum()
@@ -2251,8 +2233,8 @@ if false
 	all_results = run_synth_dims_generic(params_dict)
 end=#
 
-# synth-dims for loop runnings
-if true
+#= synth-dims for loop runnings
+if false
 	#BLAS.set_num_threads(open_cores)
 	#cols = ["b","g","r"]
 	#nnst = 0.0
@@ -2307,7 +2289,7 @@ if true
 		
 		#("if_pinning",if_pinning),("dataloc",dataloc),("pinning_strength",pinstren)
 		
-		params_dict = Dict([("if_gpu",false),("scaling","dd"),("magnetic_spacing",5.0),("if_check_fluxes",false),("cutoff",1e-8),("outputlevel",1),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",5e-1),("particles",n),("mdim",400),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
+		params_dict = Dict([("if_gpu",false),("scaling","dd"),("magnetic_spacing",3.0),("if_check_fluxes",false),("cutoff",1e-8),("outputlevel",1),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",3),("expander_fraction",5e-1),("particles",n),("mdim",400),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		#params_dict = Dict([("if_gpu",false),("outputlevel",1),("nrgtol",5e-6),("if_pinning",true),("pinning_strength",pinstren),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-5),("particles",n),("mdim",500),("if_save_data",true),("filling",0.5),("if_find_data",false),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		#params_dict = Dict([("if_gpu",true),("outputlevel",1),("scaling","exp"),("corr_length",xi),("nrgtol",1e-5),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",1),("expander_fraction",1e-4),("particles",n),("mdim",400),("if_save_data",true),("filling",0.5),("if_find_data",true),("onsite_strength",stren),("if_periodic_phys",true),("if_periodic_synth",true)])
 		# usually in params: mag_off, layers, mdim, longrange_dist
@@ -2331,7 +2313,7 @@ if true
 		#plot_spectrum(alphas,nrgs,idx,params_dict["es_count"]+1,"Flux Density",true; plot_title="Pfaffian")
 
 		for (idx,psi) in enumerate(all_states)
-			occs = get_occupancy(psi; plot_title="Level $(idx-1) NRG=$(round(all_obs[idx].nrg[end],digits=4))")
+			println("Energy of State $(idx-1) = $(all_obs[idx].nrg[end])")
 		end
 
 		#=for i in 1:params_dict["es_count"]+1
@@ -2428,7 +2410,7 @@ if true
 			=#
 	#end
 #end
-end#
+end=#
 
 #
 #plot(strens,real.(centermoms),"-p")

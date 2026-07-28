@@ -748,6 +748,71 @@ function n_particle_basis(lattice_params::Dict; kwargs...)
     return n_particle_basis(N,Lx,Ly; kwargs...)
 end
 
+function addDipolarInteraction(lattice_params::Dict,hamilt_params::Dict)
+    
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+    N = lattice_params["N"]
+    spin_value = (Ly - 1)/2
+
+    U = hamilt_params["U"]
+
+    dipolar_intham = spzeros(ComplexF64,size(lattice_params["full_basis"])[2],size(lattice_params["full_basis"])[2])
+    
+
+    for which_basis in 1:size(lattice_params["full_basis"],2)
+        
+        basis_state = lattice_params["full_basis"][:,which_basis]
+        particle_locations_linear = basis_state
+        particle_locations_coordinate = coordinate.(particle_locations_linear,Lx,Ly)
+        
+        for phys_loc in 1:Lx
+
+            # find interacting particles at given physical site
+            interacting_particles = findall(x->x[1]==phys_loc,particle_locations_coordinate)
+            
+            if length(interacting_particles) > 1 # need more than 1 particle to interact
+                for i in 1:length(interacting_particles) # loop over all pairs of interacting particles
+                    for j in i+1:length(interacting_particles)
+                        dist = abs(particle_locations_coordinate[interacting_particles[i]][2] - particle_locations_coordinate[interacting_particles[j]][2])
+                        dist = min(dist,Ly-dist)
+                        stren = U[dist+1]    
+                        for m in 1:Ly
+                            eff_m = m - (Ly + 1)/2
+                            for mp in 1:Ly
+                                eff_mp = mp - (Ly + 1)/2
+
+                                m == mp && continue # skip because then this is an onsite interaction term
+
+                                # Fz Fz interaction term
+                                s1 = Tuple((phys_loc,m))
+                                s2 = Tuple((phys_loc,mp))
+                                output_weight_FzFz = stren * eff_m * eff_mp
+                                # find basis index of with occupation of s1 and s2
+                                output_basis_FzFz = copy(basis_state)
+                                deleteat!(output_basis_FzFz,[interacting_particles[i],interacting_particles[j]])
+                                push!(output_basis_FzFz,linear_index(s1,Lx,Ly))
+                                push!(output_basis_FzFz,linear_index(s2,Lx,Ly))
+                                if allunique(output_basis_FzFz)
+                                    sort!(output_basis_FzFz,rev=true)
+                                    output_basis_FzFz_index = find_basis_index(output_basis_FzFz)
+                                    dipolar_intham[output_basis_FzFz_index,output_basis_FzFz_index] += output_weight_FzFz
+                                end
+                                #
+
+                            end
+                        end
+                    end
+                end
+            end
+
+        end
+    end
+
+        
+    return dipolar_intham
+end
+
 function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
     
     output_states = Array{Int64,1}(undef,0)
@@ -913,7 +978,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
 
     # interaction
     lr_dist = sum(abs.(U) .> interaction_cutoff) - 1
-    if length(particle_locations_linear) > 1 && lr_dist > 0
+    if length(particle_locations_linear) > 1 && lr_dist > 0 && hamilt_params["scaling_type"] != "dd"
         #println("Doing Interactions")
         if which_dir == "virt"
             which_loc = 1
@@ -986,6 +1051,8 @@ function buildHam(lattice_params::Dict,hamilt_params::Dict; kwargs...)
     # onsite pinning potential
     (haskey(hamilt_params,"if_pinning") && hamilt_params["if_pinning"]) && (addPinning(ham,lattice_params,hamilt_params))
 
+    # add dipolar interaction term
+    (hamilt_params["scaling_type"] == "dd") && (ham += addDipolarInteraction(lattice_params,hamilt_params))
 
     return ham
 end

@@ -3667,6 +3667,24 @@ if false
     println("Time for building: $(time_end_building - time_start_building)")
 end=#
 
+# verify dipolar interaction term
+if true
+    lx,ly,n = 3,3,3
+    intstren = 300.0
+    magnetic_spacing = 3.0
+    pdict = Dict([("output_level",1),("if_check_fluxes",false),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false),("magnetic_spacing",magnetic_spacing),("scaling_type","dd")])
+
+    #latparas,hamparas,runparas = get_normal_model_params_ed(pdict)
+    #full_basis = n_particle_basis(latparas; output_level=1,dataloc=runparas.basis_dataloc)
+    #latparas["full_basis"] = full_basis
+    #which_basis = 21
+    #println("Using basis $which_basis with config $(full_basis[:,which_basis])")
+    #dd = addDipolarInteraction(which_basis,latparas,hamparas)
+
+    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
+
+    display(nrgs[1:3])
+end
 
 
 
