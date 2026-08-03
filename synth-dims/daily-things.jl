@@ -1204,20 +1204,6 @@ if false
     colorbar()
 end=#
 
-# checking dipolar interaction vs ED
-if true
-    lx,ly,n = 3,3,3
-    intstren = 300.0
-    magspacing = 3.0
-    pdict = Dict([("if_check_fluxes",false),("scaling","dd"),("magnetic_spacing",3.0),("cutoff",1e-8),("outputlevel",1),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("es_count",0),("expander_fraction",5e-1),("particles",n),("mdim",400),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true)])
-    model_paras = get_normal_model_params(pdict)
-    net = build_HH_net(model_paras)
-	ham = long_range_HH_ham(net,model_paras[:ts],model_paras[:alpha]; model_paras...)
-
-    #states, hamilt, all_obs, all_densmats, all_runtimes = run_synth_dims_generic(pdict)
-
-end
-
 
 
 

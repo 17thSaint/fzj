@@ -748,7 +748,7 @@ function n_particle_basis(lattice_params::Dict; kwargs...)
     return n_particle_basis(N,Lx,Ly; kwargs...)
 end
 
-function addDipolarInteraction(lattice_params::Dict,hamilt_params::Dict)
+#=function addDipolarInteraction(lattice_params::Dict,hamilt_params::Dict)
     
     Lx = lattice_params["Lx"]
     Ly = lattice_params["Ly"]
@@ -811,7 +811,7 @@ function addDipolarInteraction(lattice_params::Dict,hamilt_params::Dict)
 
         
     return dipolar_intham
-end
+end=#
 
 function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
     
@@ -978,7 +978,7 @@ function applyHam(which_basis::Int64,lattice_params::Dict,hamilt_params::Dict)
 
     # interaction
     lr_dist = sum(abs.(U) .> interaction_cutoff) - 1
-    if length(particle_locations_linear) > 1 && lr_dist > 0 && hamilt_params["scaling_type"] != "dd"
+    if length(particle_locations_linear) > 1 && lr_dist > 0
         #println("Doing Interactions")
         if which_dir == "virt"
             which_loc = 1
@@ -1052,7 +1052,7 @@ function buildHam(lattice_params::Dict,hamilt_params::Dict; kwargs...)
     (haskey(hamilt_params,"if_pinning") && hamilt_params["if_pinning"]) && (addPinning(ham,lattice_params,hamilt_params))
 
     # add dipolar interaction term
-    (hamilt_params["scaling_type"] == "dd") && (ham += addDipolarInteraction(lattice_params,hamilt_params))
+    #(hamilt_params["scaling_type"] == "dd") && (ham += addDipolarInteraction(lattice_params,hamilt_params))
 
     return ham
 end

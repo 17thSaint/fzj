@@ -270,7 +270,7 @@ function find_dead_linear_sites(restricted_size::Vector{Int},lat_dims::Tuple{Int
     return dead_sites
 end
 
-function get_DipolarInteraction_Ham(Us::Vector,lat,restricted_size; kwargs...)
+#=function get_DipolarInteraction_Ham(Us::Vector,lat,restricted_size; kwargs...)
 	interaction = TTN.OpSum()
 	spin_value = (restricted_size[2] - 1)/2
 	for (idx,stren) in enumerate(Us[2:restricted_size[2]])
@@ -355,7 +355,7 @@ function get_DipolarInteraction_Ham(Us::Vector,lat,restricted_size; kwargs...)
 		end
 	end
 	return interaction
-end
+end=#
 
 function long_range_HH_ham(net,t_strength,phi; kwargs...)
 
@@ -399,7 +399,7 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 	lat = TTN.physical_lattice(net)
 	
 	hopping_old = get(kwargs, :hopping_old, false)
-	#=if if_hopping && hopping_old
+	if if_hopping && hopping_old
 		if_periodic_phys ? nothing : centralflux_strength = 0.0
 		hopping = TTN.OpSum()
 		#
@@ -491,46 +491,42 @@ function long_range_HH_ham(net,t_strength,phi; kwargs...)
 			end
 		end
 		append!(resulting_ham,[hopping])
-	end=#
+	end
 	
 	if if_interaction
 		interaction = TTN.OpSum()
 		if kwargs[:scaling] == "rydberg"
 			which_dir = "both"
 		end
-		if kwargs[:scaling] == "dd"
-			interaction = get_DipolarInteraction_Ham(long_range_strengths,lat,restricted_size; kwargs...)
-		else
-			for (idx,stren) in enumerate(long_range_strengths)
-				if stren == 0.0
+		for (idx,stren) in enumerate(long_range_strengths)
+			if stren == 0.0
+				continue
+			else
+				if idx == 1 && kwargs[:max_occ] > 1
+					for j in TTN.eachindex(lat)
+						s_coord = TTN.coordinate(lat,j)
+						if s_coord[1] > restricted_size[1] || s_coord[2] > restricted_size[2]
+							continue
+						end
+						interaction += (stren,"N * N",s_coord)
+						interaction -= (stren,"N",s_coord)
+					end
 					continue
 				else
-					if idx == 1 && kwargs[:max_occ] > 1
-						for j in TTN.eachindex(lat)
-							s_coord = TTN.coordinate(lat,j)
-							if s_coord[1] > restricted_size[1] || s_coord[2] > restricted_size[2]
-								continue
-							end
-							interaction += (stren,"N * N",s_coord)
-							interaction -= (stren,"N",s_coord)
+					for j in TTN.eachindex(lat)
+						s_coord = TTN.coordinate(lat,j)
+						if s_coord[1] > restricted_size[1] || s_coord[2] > restricted_size[2]
+							continue
 						end
-						continue
-					else
-						for j in TTN.eachindex(lat)
-							s_coord = TTN.coordinate(lat,j)
-							if s_coord[1] > restricted_size[1] || s_coord[2] > restricted_size[2]
+						interaction_sites = get_interaction_coords(s_coord,idx-1,lat,(if_periodic_phys,if_periodic_virt),which_dir)
+						#println("Interacting Sites for position $s_coord at distance $(idx-1) in direction $which_dir are ",interaction_sites)
+						
+						for k in interaction_sites
+							if k[1] > restricted_size[1] || k[2] > restricted_size[2]
 								continue
 							end
-							interaction_sites = get_interaction_coords(s_coord,idx-1,lat,(if_periodic_phys,if_periodic_virt),which_dir)
-							#println("Interacting Sites for position $s_coord at distance $(idx-1) in direction $which_dir are ",interaction_sites)
-							
-							for k in interaction_sites
-								if k[1] > restricted_size[1] || k[2] > restricted_size[2]
-									continue
-								end
-								#println("Interacting between ",s_coord," and ",k," with strength ",stren/2)
-								interaction += (stren/2,"Adag * A",s_coord,"Adag * A",Tuple(k))
-							end
+							#println("Interacting between ",s_coord," and ",k," with strength ",stren/2)
+							interaction += (stren/2,"Adag * A",s_coord,"Adag * A",Tuple(k))
 						end
 					end
 				end
@@ -1778,6 +1774,9 @@ function get_normal_model_params(params_dict::Dict)
 	end
 	if sc_type != "flat"
 		dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/ulr-length")
+	end
+	if sc_type == "dd"
+		dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/dd-ints")
 	end
 	loc = get(params_dict, "dataloc", dataloc)
 	

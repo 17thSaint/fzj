@@ -311,6 +311,9 @@ function get_normal_model_params_ed(params_dict::Dict)
     if if_pinning
         dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling")
     end
+    if scaling_type == "dd"
+        dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/dd-ints")
+    end
     dataloc = get(params_dict, "dataloc", dataloc)
 
 

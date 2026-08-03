@@ -3667,30 +3667,195 @@ if false
     println("Time for building: $(time_end_building - time_start_building)")
 end=#
 
-# verify dipolar interaction term
-if true
-    lx,ly,n = 3,3,3
+#= play with dipolar interaction term
+if false
+    lx,ly,n = 8,4,4
     intstren = 300.0
-    magnetic_spacing = 3.0
-    pdict = Dict([("output_level",1),("if_check_fluxes",false),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false),("magnetic_spacing",magnetic_spacing),("scaling_type","dd")])
+    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/dd-ints")
+    
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("hopping_anisotropy",1.0),("interaction_strength",intstren),("if_periodic_x",true),("if_periodic_y",true)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    all_contrast1s_84 = []
+    all_contrast2s_84 = []
+    all_magspacs = []
+    for f in all_files[8:end]
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+        magnetic_spacing = m["magnetic_spacing"]
 
-    #latparas,hamparas,runparas = get_normal_model_params_ed(pdict)
-    #full_basis = n_particle_basis(latparas; output_level=1,dataloc=runparas.basis_dataloc)
-    #latparas["full_basis"] = full_basis
-    #which_basis = 21
-    #println("Using basis $which_basis with config $(full_basis[:,which_basis])")
-    #dd = addDipolarInteraction(which_basis,latparas,hamparas)
+        println("Working on $(f) with magnetic spacing $(magnetic_spacing)")
 
-    states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
+        states = d["state"]
+        #lattice_params = get_lattice_params_from_metadata(m)
 
-    display(nrgs[1:3])
+        #fourpts = four_point(states[1:2],lattice_params)
+        #data_dict = Dict("fourpt_momentum"=>fourpts[1],"fourpt_momentum_1"=>fourpts[2])
+        #modify_data(data_dict,joinpath(dataloc,f),"metadata"; output_level=0)
+        #fourpts = [m["fourpt_momentum"],m["fourpt_momentum_1"]]
+
+        #=fourpts_bulk = [fourpts[1][1,2:end-1],fourpts[2][1,2:end-1]]
+        contrast1 = maximum(fourpts_bulk[1]) - minimum(fourpts_bulk[1])
+        contrast2 = maximum(fourpts_bulk[2]) - minimum(fourpts_bulk[2])
+        scatter(magnetic_spacing,contrast1,c="b")
+        scatter(magnetic_spacing,contrast2,c="r")
+        xlabel("Magnetic Spacing")
+        ylabel("k-DW Contrast")
+        title("k-DW Contrast vs Magnetic Spacing $(lx)x$(ly) N=$n")=#
+        
+        
+        #occs,eigs = get_manifold_occupancy(states[1:2],lattice_params)
+        #datadict = Dict("occs_eig1"=>occs[1],"occs_eig2"=>occs[2],"occs_eigvecs"=>eigs)
+        #modify_data(datadict,joinpath(dataloc,f),"metadata"; output_level=0)
+
+        occs = [m["occs_eig1"],m["occs_eig2"]]
+
+        contrast1 = maximum(occs[1]) - minimum(occs[1])
+        contrast2 = maximum(occs[2]) - minimum(occs[2])
+        append!(all_contrast1s_84,contrast1)
+        append!(all_contrast2s_84,contrast2)
+        append!(all_magspacs,magnetic_spacing)
+        #=scatter(magnetic_spacing,contrast1,c="b")
+        scatter(magnetic_spacing,contrast2,c="r")
+        xlabel("Magnetic Spacing")
+        ylabel("CDW Contrast")
+        title("CDW Contrast vs Magnetic Spacing $(lx)x$(ly) N=$n ULR=$intstren")
+        xscale("log")=#
+
+        #=rez = transpose(0.5 .* (occs[1] .+ occs[2]))
+        fig = figure()
+        imshow(rez,vmin=0.0,vmax=n/(lx*ly),origin="lower")
+        xlabel("Physical Dimension")
+        ylabel("Synthetic Dimension")
+        title("GS1 Manifold Occs $(lx)x$(ly) N=$n Spacing=$(round(magnetic_spacing,digits=4))")=#
+
+        #=scatter(magnetic_spacing,nrgs[1] - nrgs[1],c="b")
+        scatter(magnetic_spacing,nrgs[2] - nrgs[1],c="g")
+        for i in 3:10
+            scatter(magnetic_spacing,nrgs[i] - nrgs[1],c="k")
+        end
+        xlabel("Magnetic Spacing")
+        ylabel("E - E0")
+        title("Energy Spectrum vs Magnetic Spacing $(lx)x$(ly) N=$n ULR=$intstren")=#
+    end
+
+
+    lx,ly,n = 6,3,3
+    magspacs = 10 .^ range(log10(0.5),log10(100.0),length=21)
+    all_contrast1s_63 = []
+    all_contrast2s_63 = []
+    for magspac in magspacs
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",true),("scaling_type","dd"),("magnetic_spacing",magspac),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=0)
+
+        occs,eigs = get_manifold_occupancy(states[1:2],lattice_params)
+
+        #datadict = Dict("occs_eig1"=>occs[1],"occs_eig2"=>occs[2],"occs_eigvecs"=>eigs)
+        #modify_data(datadict,filepath,"metadata"; output_level=0)
+
+        contrast1 = maximum(occs[1]) - minimum(occs[1])
+        contrast2 = maximum(occs[2]) - minimum(occs[2])
+        append!(all_contrast1s_63,contrast1)
+        append!(all_contrast2s_63,contrast2)
+        #=scatter(magspac,contrast1,c="g")
+        scatter(magspac,contrast2,c="k")
+        xlabel("Magnetic Spacing")
+        ylabel("CDW Contrast")
+        #title("CDW Contrast vs Magnetic Spacing $(lx)x$(ly) N=$n ULR=$intstren")
+        xscale("log")=#
+    end
+
+    maxval_84 = all_contrast1s_84[1]
+    minval_84 = all_contrast1s_84[end]
+    reshuffled1s_84 = (all_contrast1s_84 .- minval_84) ./ (maxval_84 - minval_84)
+    reshuffled2s_84 = (all_contrast2s_84 .- minval_84) ./ (maxval_84 - minval_84)
+
+    scatter(all_magspacs,reshuffled1s_84,c="b",label="8x4 Eig 1")
+    scatter(all_magspacs,reshuffled2s_84,c="r",label="8x4 Eig 2")
+    xlabel("Magnetic Spacing")
+    ylabel("Rescaled CDW Contrast")
+    title("Rescaled CDW Contrast vs Magnetic Spacing")
+    xscale("log")
+
+    maxval_63 = all_contrast1s_63[1]
+    minval_63 = all_contrast1s_63[end]
+    reshuffled1s_63 = (all_contrast1s_63 .- minval_63) ./ (maxval_63 - minval_63)
+    reshuffled2s_63 = (all_contrast2s_63 .- minval_63) ./ (maxval_63 - minval_63)
+    scatter(magspacs,reshuffled1s_63,c="g",label="6x3 Eig 1")
+    scatter(magspacs,reshuffled2s_63,c="k",label="6x3 Eig 2")
+
+end=#
+
+
+function find_lc_firstderivative(contrasts_center::Vector,contrasts_right::Vector,magspacs::Vector,shift_value::Float64)
+    first_derivs = (contrasts_right .- contrasts_center) ./ (2 * shift_value)
+    first_derivs_xs = magspacs .+ shift_value
+
+    quadfit(x,p) = p[1] .* (x .- p[2]).^2 .+ p[3]
+    min_index = argmin(first_derivs)
+    num_for_fit = 4
+    xs_for_fit = log10.(first_derivs_xs[min_index - num_for_fit:min_index + num_for_fit])
+    ys_for_fit = first_derivs[min_index - num_for_fit:min_index + num_for_fit]
+    fitdata = curve_fit(quadfit,xs_for_fit,ys_for_fit,[1.0,log10(first_derivs_xs[min_index]),first_derivs[min_index]])
+    lc = 10^(fitdata.param[2])
+
+    return lc,first_derivs_xs,first_derivs,fitdata
 end
 
 
+#= find l_c using derivatives
+if false
+    lx,ly,n = 6,3,3
+    intstren = 300.0
+    shift_value = 0.0001
+    #=magspacs = 10 .^ range(log10(2.0),log10(16.0),length=21)
+    all_contrast1s_center_63 = []
+    all_contrast1s_left_63 = []
+    all_contrast1s_right_63 = []
+    for magspac in magspacs
+        # center value
+        params_dict_center = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",true),("scaling_type","dd"),("magnetic_spacing",magspac),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+        states_center,nrgs_center,_,_,_,lattice_params_center,hamilt_params_center = run_normal_ed(params_dict_center; output_level=0)
 
+        occs_center,eigs = get_manifold_occupancy(states_center[1:2],lattice_params_center)
 
+        contrast1_center = maximum(occs_center[1]) - minimum(occs_center[1])
+        append!(all_contrast1s_center_63,contrast1_center)
 
+        # right value
+        params_dict_right = copy(params_dict_center)
+        params_dict_right["magnetic_spacing"] = magspac + 2*shift_value
+        states_right,nrgs_right,_,_,_,lattice_params_right,hamilt_params_right = run_normal_ed(params_dict_right; output_level=0)
 
+        occs_right,eigs = get_manifold_occupancy(states_right[1:2],lattice_params_right)
+
+        contrast1_right = maximum(occs_right[1]) - minimum(occs_right[1])
+        append!(all_contrast1s_right_63,contrast1_right)
+    end=#
+
+    lc,first_derivs_xs,first_derivs,fitdata = find_lc_firstderivative(all_contrast1s_center_63,all_contrast1s_right_63,magspacs,shift_value)
+
+    plot_fitxs = log10.(range(magspacs[1],magspacs[end],length=100))
+    plot_ys = fitdata.param[1] .* (plot_fitxs .- fitdata.param[2]).^2 .+ fitdata.param[3]
+    plot_xs = 10 .^ plot_fitxs
+
+    fig = figure()
+    scatter(first_derivs_xs,first_derivs,c="r")
+    plot(plot_xs,plot_ys,c="b",label="lc = $(round(lc, digits=2))")
+    legend()
+    xlabel("Magnetic Spacing")
+    ylabel("First Derivative of CDW Contrast")
+    title("First Derivative of CDW Contrast vs Magnetic Spacing $(lx)x$(ly) N=$n ULR=$intstren")
+    xscale("log")
+    ylim(1.1*minimum(first_derivs),-0.1*minimum(first_derivs))
+
+    #=fig = figure()
+    scatter(magspacs,all_contrast1s_center_63,c="r",label="Center")
+    scatter(magspacs,all_contrast1s_right_63,c="b",label="Right")
+    xlabel("Magnetic Spacing")
+    ylabel("CDW Contrast")
+    title("CDW Contrast vs Magnetic Spacing $(lx)x$(ly) N=$n ULR=$intstren")
+    xscale("log")
+    legend()=#
+end=#
 
 
 
