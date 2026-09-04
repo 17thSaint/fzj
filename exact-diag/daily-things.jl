@@ -4031,7 +4031,7 @@ function hill_model(x, p)
 end
 
 # plot all cdw contrasts for 8x4, 6x3, and 10x5
-if true
+#=if false
     lxlyn_list = [(6,3,3),(8,4,4),(10,5,5)]
     lc_vals = Vector{Float64}(undef, length(lxlyn_list))
     cutoff_magspacs = [1.0,0.65,0.8]
@@ -4092,7 +4092,7 @@ if true
     ylabel("Critical Magnetic Spacing "*L"l_c")
     title("Finite Size Scaling of "*L"l_c")
 
-end#
+end=#
 
 
 

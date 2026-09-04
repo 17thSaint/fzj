@@ -840,6 +840,181 @@ if false
 end=#
 
 
+### Time-dependent magnetic field gradient: pulse the gradient, then switch it off
+# The gradient displaces the synthetic states, so the spacing entering the dipolar tail
+# grows as a(t) = a0 + int_0^t B dt' (accumulated by timeham, applied in the
+# "magnetic_gradient" branch of long_range_scaling). B is ramped linearly 0.1 -> 10.0 and
+# then switched straight off, which freezes a at its accumulated value: the interaction
+# profile is imprinted by the pulse and then held. At t = 0 the integral is zero, so the
+# starting Hamiltonian is exactly the ordinary "dd" profile at spacing a0 -- the starting
+# state is that dd groundstate, so the evolution begins in an eigenstate.
+if true
+
+    if_all::Bool = true
+
+    # define starting state: dipole-dipole groundstate at the initial spacing a0
+    if false || if_all
+        lx,ly,n = 4,4,2
+        intstren_maggrad = 10.0
+        a0_maggrad = 1.0            # initial synthetic spacing, i.e. a(t=0)
+        speccount_maggrad = 3       # low-lying states tracked through the pulse
+
+        pdict_maggrad = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("scaling_type","dd"),("magnetic_spacing",a0_maggrad),("interaction_strength",intstren_maggrad),("filling",0.5),("nev",speccount_maggrad),("if_find_data",false),("if_save_data",false)])
+        states_starting_maggrad,nrgs_starting_maggrad,_,_,_,lattice_params_maggrad,hamilt_params_maggrad = run_normal_ed(pdict_maggrad; output_level=0)
+
+        # the t=0 gradient profile (zero accumulated integral) must reproduce the dd profile
+        # the starting state was found with, otherwise the run does not start in an eigenstate
+        us_at_zero_maggrad = long_range_scaling(ly-1,ly,intstren_maggrad; scaling="magnetic_gradient",magnetic_spacing=a0_maggrad,magnetic_gradient_integral=0.0)
+        @assert us_at_zero_maggrad ≈ hamilt_params_maggrad["U"] "t=0 gradient profile $(us_at_zero_maggrad) does not match the dd profile $(hamilt_params_maggrad["U"])"
+        println("Starting U profile: $(hamilt_params_maggrad["U"])")
+    end
+
+    # build the gradient pulse: linear ramp 0.1 -> 10.0 over ramptime, then off
+    if false || if_all
+        bstart_maggrad, bend_maggrad = 0.1, 10.0
+        ramptime_maggrad = 1.0
+        holdtime_maggrad = 0.5      # gradient sits at zero here, so a (and therefore U) is frozen
+        tmax_maggrad = ramptime_maggrad + holdtime_maggrad
+        dt_maggrad = 0.005
+
+        # pulse_ramp samples on the RK4 half-step grid (spacing dt/2) and timeham indexes it
+        # directly, so the pulse must have exactly ceil(tmax/(dt/2)) + 1 entries
+        bgrid_maggrad = collect(0:Int(ceil(tmax_maggrad/(dt_maggrad/2)))) .* (dt_maggrad/2)
+        bpulse_maggrad = [t <= ramptime_maggrad ? bstart_maggrad + (bend_maggrad-bstart_maggrad)*(t/ramptime_maggrad) : 0.0 for t in bgrid_maggrad]
+
+        # same trapezoid rule as get_magnetic_gradient_integral, for the plots and checks below
+        integral_maggrad = cumsum(vcat(0.0, 0.5 .* (bpulse_maggrad[2:end] .+ bpulse_maggrad[1:end-1]) .* (dt_maggrad/2)))
+        spacings_maggrad = a0_maggrad .+ integral_maggrad
+        println("Spacing a: $(a0_maggrad) -> $(spacings_maggrad[end]) (frozen from t=$(ramptime_maggrad) onwards)")
+    end
+
+    # time evolution along the pulse, tracking the instantaneous spectrum
+    if false || if_all
+        # work on a copy: timeham writes the ramped values, the accumulated integral and the
+        # rebuilt U back into the dict, which would otherwise leave the starting-state
+        # parameters overwritten for any later section
+        hamilt_params_tevo_maggrad = copy(hamilt_params_maggrad)
+        hamilt_params_tevo_maggrad["scaling_type"] = "magnetic_gradient"
+
+        time_running_args_maggrad = (nev=speccount_maggrad,output_level=1,if_instant_gs=true,if_save_data=false,dataloc="tevo-daily-things-data/")
+        starting_states_maggrad = [Vector{ComplexF64}(states_starting_maggrad[i]) for i in 1:speccount_maggrad]
+        tevo_params_maggrad = Dict([ ("magnetic_gradient_time",(pulse_ramp,tmax_maggrad,bpulse_maggrad)),("tmax",tmax_maggrad),("dt",dt_maggrad) ])
+        tevo_data_maggrad,tevo_dict_maggrad,instdata_maggrad,saving_args_maggrad = run_timeevo(starting_states_maggrad,tevo_params_maggrad,lattice_params_maggrad,hamilt_params_tevo_maggrad; time_running_args_maggrad...)
+
+        # the U the run ended on must be the one the frozen final spacing gives
+        us_final_maggrad = long_range_scaling(ly-1,ly,intstren_maggrad; scaling="magnetic_gradient",magnetic_spacing=a0_maggrad,magnetic_gradient_integral=integral_maggrad[end])
+        println("Final U profile: $(hamilt_params_tevo_maggrad["U"]) (expected $(us_final_maggrad))")
+        @assert hamilt_params_tevo_maggrad["U"] ≈ us_final_maggrad "final U does not match the frozen final spacing"
+
+        # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
+        final_states_maggrad = [Vector{ComplexF64}(tevo_data_maggrad[1][i][:,end-1]) for i in 1:speccount_maggrad]
+        # the second starting state comes out of a near-degenerate pair, so which vector the ED
+        # returns for it changes from run to run and a manifold-vs-manifold fidelity is not
+        # reproducible here; the population of the final instantaneous manifold by the lowest
+        # transported state is invariant under rotations inside that manifold, so track that
+        final_instant_maggrad = [Vector{ComplexF64}(instdata_maggrad[1][string(i)][:,end]) for i in 1:2]
+        manifold_population_maggrad = sum(abs2(dot(final_states_maggrad[1],instant_state)) for instant_state in final_instant_maggrad)
+        println("Starting energies: $(nrgs_starting_maggrad)")
+        println("Final instantaneous energies: $([instdata_maggrad[2][string(i)][end] for i in 1:speccount_maggrad])")
+        println("Population of the final instantaneous manifold by the lowest transported state: $(manifold_population_maggrad)")
+    end
+
+    # the gradient and the spacing it accumulates
+    if false || if_all
+        figure()
+        plot(bgrid_maggrad,bpulse_maggrad,c="b",label="gradient B")
+        plot(bgrid_maggrad,spacings_maggrad,c="r",label="spacing a = a0 + ∫B dt")
+        legend()
+        xlabel("Time")
+        ylabel("Value")
+        title("Gradient pulse $(bstart_maggrad)→$(bend_maggrad) over $(ramptime_maggrad), then off")
+    end
+
+    # the interaction profile at a few points along the pulse
+    if false || if_all
+        figure()
+        # start / mid-ramp / end-of-ramp / end-of-hold, on the half-step grid
+        snapshot_indices_maggrad = [1, Int(ceil(0.5*ramptime_maggrad/(dt_maggrad/2))), Int(ceil(ramptime_maggrad/(dt_maggrad/2))), length(bgrid_maggrad)]
+        for idx in snapshot_indices_maggrad
+            us_snapshot = long_range_scaling(ly-1,ly,intstren_maggrad; scaling="magnetic_gradient",magnetic_spacing=a0_maggrad,magnetic_gradient_integral=integral_maggrad[idx])
+            plot(0:length(us_snapshot)-1,us_snapshot,"-p",label="t=$(round(bgrid_maggrad[idx],digits=3)), a=$(round(spacings_maggrad[idx],digits=3))")
+        end
+        legend()
+        xlabel("y distance")
+        ylabel("Interaction strength")
+        yscale("log")
+        title("ULR profile along the gradient pulse $(lx)x$(ly) N=$(n) U=$(intstren_maggrad)")
+    end
+
+    # instantaneous vs transported energies
+    if false || if_all
+        times_maggrad = range(0.0,tmax_maggrad,length=length(instdata_maggrad[2]["1"]))
+
+        # once the gradient is off the spacing, and therefore H, is time independent, so both
+        # the instantaneous spectrum and the transported energies have to be flat over the hold
+        hold_start_maggrad = findfirst(t -> t >= ramptime_maggrad, times_maggrad)
+        instant_drift_maggrad = maximum(abs.(instdata_maggrad[2]["1"][hold_start_maggrad:end] .- instdata_maggrad[2]["1"][end]))
+        transported_drift_maggrad = maximum(abs.(tevo_data_maggrad[2][1][hold_start_maggrad:end-1] .- tevo_data_maggrad[2][1][end-1]))
+        println("Energy drift over the hold: instantaneous $(instant_drift_maggrad), transported $(transported_drift_maggrad)")
+
+        figure()
+        cols = ["b","g","r"]
+        for i in 1:speccount_maggrad
+            plot(times_maggrad,instdata_maggrad[2][string(i)],"-p",c=cols[i],label="E$(i) instantaneous")
+            plot(times_maggrad,tevo_data_maggrad[2][i][1:end-1],c="k",marker="x",label=(i==1 ? "transported" : nothing))
+        end
+        axvline(ramptime_maggrad,ls="--",c="k")
+        legend()
+        xlabel("Time")
+        ylabel("Energy")
+        title("Energy vs time for gradient pulse $(lx)x$(ly) N=$(n) B $(bstart_maggrad)→$(bend_maggrad) over $(ramptime_maggrad), manifold population = $(round(manifold_population_maggrad,digits=6))")
+    end
+
+    # animation of the density profile of the lowest transported state
+    if false
+        # column k of the transported data is the state after k RK4 steps, i.e. t = k*dt, and
+        # the last column is the save point that never gets written, hence end-1; the starting
+        # state is prepended so the animation actually opens at t = 0
+        anim_states_maggrad = vcat([Vector{ComplexF64}(states_starting_maggrad[1])],[Vector{ComplexF64}(tevo_data_maggrad[1][1][:,k]) for k in 1:size(tevo_data_maggrad[1][1],2)-1])
+        anim_times_maggrad = [(k-1)*dt_maggrad for k in 1:length(anim_states_maggrad)]
+
+        # every frame_stride'th step only, otherwise this is a few hundred frames
+        frame_stride_maggrad = 5
+        frame_indices_maggrad = 1:frame_stride_maggrad:length(anim_states_maggrad)
+
+        occs_frames_maggrad = [get_occupancy(anim_states_maggrad[k],lattice_params_maggrad; if_plot=false) for k in frame_indices_maggrad]
+        # one colour scale for the whole animation, so frames can be compared by eye
+        vmax_maggrad = maximum(maximum.(occs_frames_maggrad))
+
+        # spacing at each frame time, to show it freezing when the gradient switches off
+        # (spacings_maggrad lives on the half-step grid, so time t sits at index 2t/dt + 1)
+        spacing_frames_maggrad = [spacings_maggrad[min(Int(round(2*anim_times_maggrad[k]/dt_maggrad))+1,length(spacings_maggrad))] for k in frame_indices_maggrad]
+
+        animation_maggrad = PyPlot.PyCall.pyimport("matplotlib.animation")
+        fig_maggrad = figure()
+        img_maggrad = imshow(occs_frames_maggrad[1],origin="lower",vmin=0.0,vmax=vmax_maggrad)
+        ax_maggrad = gca()
+        colorbar()
+        xlabel("Physical")
+        ylabel("Synthetic")
+
+        # matplotlib counts frames from zero
+        function update_density_maggrad(frame)
+            i = frame + 1
+            img_maggrad.set_data(occs_frames_maggrad[i])
+            ax_maggrad.set_title("Density of transported gs, t = $(round(anim_times_maggrad[frame_indices_maggrad[i]],digits=3)), a = $(round(spacing_frames_maggrad[i],digits=3))")
+            return (img_maggrad,)
+        end
+
+        anim_maggrad = animation_maggrad.FuncAnimation(fig_maggrad,update_density_maggrad,frames=length(occs_frames_maggrad),interval=100)
+        gifpath_maggrad = joinpath(get_folder_location("local-plots"),"tevo-density-maggrad-$(lx)x$(ly)-N-$(n)-B-$(bstart_maggrad)-to-$(bend_maggrad)-ramptime-$(ramptime_maggrad).gif")
+        anim_maggrad.save(gifpath_maggrad,writer="pillow",fps=10)
+        println("Saved density animation to $(gifpath_maggrad)")
+    end
+
+end
+
+
 
 
 

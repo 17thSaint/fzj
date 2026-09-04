@@ -9,6 +9,24 @@ Depends on:
 =#
 ######################################################
 
+# accumulated int_0^t B dt' of the magnetic field gradient up to the given timestep.
+# The ramp arrays are sampled on the RK4 half-step grid (spacing dt/2, see linear_ramp)
+# and timeham indexes them directly, so the trapezoid sum runs over that spacing; the
+# two-dt structure of t_evo_params["dt"] is respected in case the step size changes
+# partway through the run. Zero at timestep 1, where the U profile is the undisplaced one.
+function get_magnetic_gradient_integral(timestep::Int,t_evo_params::Dict)
+    gradient_values = t_evo_params["magnetic_gradient_time"]
+    when_dt_ends::Int = t_evo_params["when_dt_ends"][1]
+
+    integral::Float64 = 0.0
+    for i in 2:timestep
+        raw_dt = (i-1 > when_dt_ends ? t_evo_params["dt"][2] : t_evo_params["dt"][1]) / 2
+        integral += 0.5 * (gradient_values[i] + gradient_values[i-1]) * raw_dt
+    end
+
+    return integral
+end
+
 # build Hamiltonian for given parameters and given time
 function timeham(timestep::Int,t_evo_params::Dict,lattice_params::Dict,hamilt_params::Dict; kwargs...)
     
@@ -22,11 +40,22 @@ function timeham(timestep::Int,t_evo_params::Dict,lattice_params::Dict,hamilt_pa
             # these parameters only enter the Hamiltonian through the coupling vector U,
             # which must be rebuilt whenever one of them takes a new value (skipping the
             # rebuild while the value sits constant, e.g. the hold after a ramp ends)
-            if k in ("interaction_strength","corr_length","sigma","blockade_radius","magnetic_spacing") && get(hamilt_params,k,nothing) !== v[timestep]
+            if k in ("interaction_strength","corr_length","sigma","blockade_radius","magnetic_spacing","magnetic_gradient_time") && get(hamilt_params,k,nothing) !== v[timestep]
                 if_rebuild_ulr = true
             end
             hamilt_params[k] = v[timestep]
         end
+    end
+
+    # the magnetic field gradient enters U through its time integral, which keeps growing
+    # while the gradient is non-zero even when the gradient value itself repeats, so the
+    # rebuild has to be keyed on the accumulated integral rather than on the ramped value
+    # (and the integral, not the gradient, is what long_range_scaling needs)
+    magnetic_integral::Float64 = 0.0
+    if haskey(t_evo_params,"magnetic_gradient_time")
+        magnetic_integral = get_magnetic_gradient_integral(timestep,t_evo_params)
+        magnetic_integral !== get(hamilt_params,"magnetic_gradient_integral",nothing) && (if_rebuild_ulr = true)
+        hamilt_params["magnetic_gradient_integral"] = magnetic_integral
     end
 
     if if_rebuild_ulr
@@ -40,7 +69,7 @@ function timeham(timestep::Int,t_evo_params::Dict,lattice_params::Dict,hamilt_pa
         hamilt_params["U"] = long_range_scaling(lr_dist,lattice_params["Ly"],stren;
             scaling=hamilt_params["scaling_type"],corr_length=hamilt_params["corr_length"],
             sigma=hamilt_params["sigma"],blockade_radius=hamilt_params["blockade_radius"],
-            magnetic_spacing=hamilt_params["magnetic_spacing"])
+            magnetic_spacing=hamilt_params["magnetic_spacing"],magnetic_gradient_integral=magnetic_integral)
     end
 
     # build the Hamiltonian, from the saved undressed matrices when if_reading is set
@@ -196,6 +225,9 @@ function get_tevo_filename(timeevo_dict::Dict,lattice_dict::Dict,hamilt_dict::Di
 		elseif hamilt_dict["scaling_type"] == "rydberg"
 			filename_dict["blockade_radius"] = hamilt_dict["blockade_radius"]
 		elseif hamilt_dict["scaling_type"] == "dd"
+			filename_dict["magnetic_spacing"] = hamilt_dict["magnetic_spacing"]
+		elseif hamilt_dict["scaling_type"] == "magnetic_gradient"
+			# magnetic_spacing is the initial spacing a0 the gradient displaces from
 			filename_dict["magnetic_spacing"] = hamilt_dict["magnetic_spacing"]
 		else
 			error("ULR Scaling Type Not Recognized: $(hamilt_dict["scaling_type"])")
