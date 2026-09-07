@@ -842,12 +842,14 @@ end=#
 
 ### Time-dependent magnetic field gradient: pulse the gradient, then switch it off
 # The gradient displaces the synthetic states, so the spacing entering the dipolar tail
-# grows as a(t) = a0 + int_0^t B dt' (accumulated by timeham, applied in the
-# "magnetic_gradient" branch of long_range_scaling). B is ramped linearly 0.1 -> 10.0 and
-# then switched straight off, which freezes a at its accumulated value: the interaction
-# profile is imprinted by the pulse and then held. At t = 0 the integral is zero, so the
-# starting Hamiltonian is exactly the ordinary "dd" profile at spacing a0 -- the starting
-# state is that dd groundstate, so the evolution begins in an eigenstate.
+# follows the driven response a(t) = a0 + int_0^t B(t') sin(t-t') dt' (accumulated by
+# timeham, applied in the "magnetic_gradient" branch of long_range_scaling). B is ramped
+# linearly 0.1 -> 10.0 and then switched straight off; because of the retarded sin kernel
+# the displacement keeps ringing after the pulse ends rather than freezing at whatever it
+# reached, so the interaction profile is still moving through the hold. At t = 0 the
+# integral is zero, so the starting Hamiltonian is exactly the ordinary "dd" profile at
+# spacing a0 -- the starting state is that dd groundstate, so the evolution begins in an
+# eigenstate.
 if true
 
     if_all::Bool = true
@@ -873,7 +875,7 @@ if true
     if false || if_all
         bstart_maggrad, bend_maggrad = 0.1, 10.0
         ramptime_maggrad = 1.0
-        holdtime_maggrad = 0.5      # gradient sits at zero here, so a (and therefore U) is frozen
+        holdtime_maggrad = 0.5      # gradient sits at zero here, but a keeps ringing on the sin kernel
         tmax_maggrad = ramptime_maggrad + holdtime_maggrad
         dt_maggrad = 0.005
 
@@ -882,10 +884,17 @@ if true
         bgrid_maggrad = collect(0:Int(ceil(tmax_maggrad/(dt_maggrad/2)))) .* (dt_maggrad/2)
         bpulse_maggrad = [t <= ramptime_maggrad ? bstart_maggrad + (bend_maggrad-bstart_maggrad)*(t/ramptime_maggrad) : 0.0 for t in bgrid_maggrad]
 
-        # same trapezoid rule as get_magnetic_gradient_integral, for the plots and checks below
-        integral_maggrad = cumsum(vcat(0.0, 0.5 .* (bpulse_maggrad[2:end] .+ bpulse_maggrad[1:end-1]) .* (dt_maggrad/2)))
+        # same retarded trapezoid rule as get_magnetic_gradient_integral, for the plots and
+        # checks below: entry k is int_0^t_k B(t') sin(t_k-t') dt', which has to be redone at
+        # every k because the kernel depends on the upper limit, so no running sum here. The
+        # step size is uniform over the whole run (run_timeevo sets when_change_dt past the
+        # last step), so bgrid_maggrad is exactly the sample-time vector that function builds.
+        integral_maggrad = [k < 2 ? 0.0 :
+            let integrand = bpulse_maggrad[1:k] .* sin.(bgrid_maggrad[k] .- bgrid_maggrad[1:k])
+                0.5 * (dt_maggrad/2) * sum(integrand[1:k-1] .+ integrand[2:k])
+            end for k in 1:length(bgrid_maggrad)]
         spacings_maggrad = a0_maggrad .+ integral_maggrad
-        println("Spacing a: $(a0_maggrad) -> $(spacings_maggrad[end]) (frozen from t=$(ramptime_maggrad) onwards)")
+        println("Spacing a: $(a0_maggrad) -> $(spacings_maggrad[end]) (peak $(maximum(spacings_maggrad)), still ringing at tmax)")
     end
 
     # time evolution along the pulse, tracking the instantaneous spectrum
@@ -901,10 +910,10 @@ if true
         tevo_params_maggrad = Dict([ ("magnetic_gradient_time",(pulse_ramp,tmax_maggrad,bpulse_maggrad)),("tmax",tmax_maggrad),("dt",dt_maggrad) ])
         tevo_data_maggrad,tevo_dict_maggrad,instdata_maggrad,saving_args_maggrad = run_timeevo(starting_states_maggrad,tevo_params_maggrad,lattice_params_maggrad,hamilt_params_tevo_maggrad; time_running_args_maggrad...)
 
-        # the U the run ended on must be the one the frozen final spacing gives
+        # the U the run ended on must be the one the final accumulated spacing gives
         us_final_maggrad = long_range_scaling(ly-1,ly,intstren_maggrad; scaling="magnetic_gradient",magnetic_spacing=a0_maggrad,magnetic_gradient_integral=integral_maggrad[end])
         println("Final U profile: $(hamilt_params_tevo_maggrad["U"]) (expected $(us_final_maggrad))")
-        @assert hamilt_params_tevo_maggrad["U"] ≈ us_final_maggrad "final U does not match the frozen final spacing"
+        @assert hamilt_params_tevo_maggrad["U"] ≈ us_final_maggrad "final U does not match the spacing the retarded integral ends on"
 
         # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
         final_states_maggrad = [Vector{ComplexF64}(tevo_data_maggrad[1][i][:,end-1]) for i in 1:speccount_maggrad]
@@ -923,7 +932,7 @@ if true
     if false || if_all
         figure()
         plot(bgrid_maggrad,bpulse_maggrad,c="b",label="gradient B")
-        plot(bgrid_maggrad,spacings_maggrad,c="r",label="spacing a = a0 + ∫B dt")
+        plot(bgrid_maggrad,spacings_maggrad,c="r",label="spacing a = a0 + ∫B(t')sin(t-t')dt'")
         legend()
         xlabel("Time")
         ylabel("Value")
@@ -970,7 +979,7 @@ if true
         title("Energy vs time for gradient pulse $(lx)x$(ly) N=$(n) B $(bstart_maggrad)→$(bend_maggrad) over $(ramptime_maggrad), manifold population = $(round(manifold_population_maggrad,digits=6))")
     end
 
-    # animation of the density profile of the lowest transported state
+    #= animation of the density profile of the lowest transported state
     if false
         # column k of the transported data is the state after k RK4 steps, i.e. t = k*dt, and
         # the last column is the save point that never gets written, hence end-1; the starting
@@ -1010,7 +1019,7 @@ if true
         gifpath_maggrad = joinpath(get_folder_location("local-plots"),"tevo-density-maggrad-$(lx)x$(ly)-N-$(n)-B-$(bstart_maggrad)-to-$(bend_maggrad)-ramptime-$(ramptime_maggrad).gif")
         anim_maggrad.save(gifpath_maggrad,writer="pillow",fps=10)
         println("Saved density animation to $(gifpath_maggrad)")
-    end
+    end=#
 
 end
 

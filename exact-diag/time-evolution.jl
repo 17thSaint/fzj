@@ -9,22 +9,28 @@ Depends on:
 =#
 ######################################################
 
-# accumulated int_0^t B dt' of the magnetic field gradient up to the given timestep.
+# accumulated int_0^t B sin(t-t') dt' of the magnetic field gradient up to the given timestep.
 # The ramp arrays are sampled on the RK4 half-step grid (spacing dt/2, see linear_ramp)
 # and timeham indexes them directly, so the trapezoid sum runs over that spacing; the
 # two-dt structure of t_evo_params["dt"] is respected in case the step size changes
 # partway through the run. Zero at timestep 1, where the U profile is the undisplaced one.
 function get_magnetic_gradient_integral(timestep::Int,t_evo_params::Dict)
+    timestep < 2 && return 0.0
+
     gradient_values = t_evo_params["magnetic_gradient_time"]
     when_dt_ends::Int = t_evo_params["when_dt_ends"][1]
+    dt_early::Float64 = t_evo_params["dt"][1] / 2
+    dt_late::Float64 = t_evo_params["dt"][2] / 2
 
-    integral::Float64 = 0.0
-    for i in 2:timestep
-        raw_dt = (i-1 > when_dt_ends ? t_evo_params["dt"][2] : t_evo_params["dt"][1]) / 2
-        integral += 0.5 * (gradient_values[i] + gradient_values[i-1]) * raw_dt
-    end
+    # spacings of the sampled points, then their times by prefix sum (t_1 = 0)
+    spacings::Vector{Float64} = ifelse.((1:timestep-1) .> when_dt_ends, dt_late, dt_early)
+    times::Vector{Float64} = pushfirst!(cumsum(spacings),0.0)
+    t::Float64 = times[timestep]
 
-    return integral
+    # retarded integrand B(t') * sin(t-t') at every sample point, then the trapezoid over it
+    integrand::Vector{Float64} = @views gradient_values[1:timestep] .* sin.(t .- times)
+
+    return 0.5 * sum(@views spacings .* (integrand[1:timestep-1] .+ integrand[2:timestep]))
 end
 
 # build Hamiltonian for given parameters and given time

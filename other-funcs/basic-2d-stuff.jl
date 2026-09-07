@@ -298,9 +298,9 @@ function long_range_scaling(x_final::Int64,virt_edge_length::Int64,initial_stren
         end
     elseif scaling_func == "magnetic_gradient"
         # the field gradient displaces the synthetic states, so the spacing entering the
-        # dipolar tail grows as a(t) = a0 + int_0^t B dt'; the integral is accumulated by the
-        # caller (timeham in time-evolution.jl) and is zero at t = 0, where this reduces
-        # exactly to the "dd" profile at the initial spacing a0 = magnetic_spacing
+        # dipolar tail follows a(t) = a0 + int_0^t B(t') sin(t-t') dt'; the integral is
+        # accumulated by the caller (timeham in time-evolution.jl) and is zero at t = 0, where
+        # this reduces exactly to the "dd" profile at the initial spacing a0 = magnetic_spacing
         a = get(kwargs, :magnetic_spacing, 1.0) + get(kwargs, :magnetic_gradient_integral, 0.0)
         a == 0.0 && error("Magnetic gradient spacing is zero: set magnetic_spacing to a non-zero initial spacing")
         strengths = zeros(virt_edge_length)
