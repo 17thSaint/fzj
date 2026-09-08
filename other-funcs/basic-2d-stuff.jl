@@ -296,6 +296,10 @@ function long_range_scaling(x_final::Int64,virt_edge_length::Int64,initial_stren
         for x in 1:virt_edge_length-1
             strengths[x+1] = initial_strength * (1 / (a*x)^3)
         end
+        # need to apply a cap to the strength at 10^4
+        if maximum(strengths[2:end]) > 10^4
+            strengths[2:end] .= 10^4
+        end
     elseif scaling_func == "magnetic_gradient"
         # the field gradient displaces the synthetic states, so the spacing entering the
         # dipolar tail follows a(t) = a0 + int_0^t B(t') sin(t-t') dt'; the integral is
@@ -307,6 +311,9 @@ function long_range_scaling(x_final::Int64,virt_edge_length::Int64,initial_stren
         strengths[1] = initial_strength
         for x in 1:virt_edge_length-1
             strengths[x+1] = initial_strength * (1 / (a*x)^3)
+        end
+        if maximum(strengths[2:end]) > 10^4
+            strengths[2:end] .= 10^4
         end
     else
         error("Scaling function not recognized: ",scaling_func)

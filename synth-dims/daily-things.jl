@@ -1223,6 +1223,8 @@ if true
         if haskey(m, "occs")
             append!(magspacs, magspac)
             append!(contrasts, cdwcontrast)
+        else
+            println("No occupancy data for magspac: $magspac")
         end
     end
     scatter(magspacs, contrasts, c="b")

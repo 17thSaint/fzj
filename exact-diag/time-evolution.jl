@@ -612,6 +612,34 @@ function get_leastramptime(time_params::Dict)
     return minimum(all_ramptimes)
 end
 
+# Largest interaction that actually appears in the Hamiltonian. U is indexed by synthetic
+# separation as U[dist+1], and applyHam only pairs distinct particles that already share
+# the other coordinate, so dist = 0 would mean two particles on one site -- unreachable in
+# a hardcore basis. U[1] therefore never enters the energy (it only feeds the lr_dist reach
+# count) and must be left out of any estimate of the spectral scale. abs is needed because
+# the tail alone can be attractive, where a bare maximum would return a negative scale.
+function get_interaction_scale(hamilt_dict::Dict)
+    us = hamilt_dict["U"]
+    return length(us) > 1 ? maximum(abs,@view us[2:end]) : 0.0
+end
+
+# Largest RK4 step that stays inside the stability region for the current interaction
+# scale: the spectral radius is estimated as (number of interacting pairs) * the largest
+# coupling that enters H, and RK4 on the imaginary axis is stable up to |E|*dt ~ 2.
+# Exposed so callers that have to build a control pulse on the half-step grid before
+# starting the run (the grid spacing is dt/2) can size that grid with the same step the
+# evolution will use.
+# The second branch keeps the step from being so coarse that a short tmax gets only a
+# handful of samples, by falling back to the step a U = 300 interaction would demand. It
+# also catches a vanishing interaction scale, where the first expression is Inf: the
+# hopping, not U, sets the limit there and this fallback stands in for it.
+function get_critical_dt(tmax::Float64,lattice_dict::Dict,hamilt_dict::Dict)
+    npairs = lattice_dict["N"] * (lattice_dict["N"]-1) / 2
+    dt_crit = 2.0 / (npairs * get_interaction_scale(hamilt_dict))
+    dt_crit > 0.01*tmax && (dt_crit = 2.0 / (npairs * 300.0))
+    return dt_crit
+end
+
 function run_timeevo(starting_gs::Vector,time_params::Dict,lattice_dict::Dict,hamilt_dict::Dict; kwargs...)
     opl::Int = get(kwargs, :output_level, 1)
     
@@ -620,11 +648,22 @@ function run_timeevo(starting_gs::Vector,time_params::Dict,lattice_dict::Dict,ha
 
     tmax = time_params["tmax"]    
 
-    dt_crit = 2.0/(lattice_dict["N"]*(lattice_dict["N"]-1)/2 * maximum(hamilt_dict["U"]))
-    dt_crit > 0.01*tmax && (dt_crit = 2.0/(lattice_dict["N"]*(lattice_dict["N"]-1)/2 * 300.0))
+    dt_crit = get_critical_dt(tmax,lattice_dict,hamilt_dict)
 
-    # use caller-supplied dt if provided, otherwise fall back to interaction-derived critical step
+    # use caller-supplied dt if provided, otherwise fall back to interaction-derived critical
+    # step. A supplied step above dt_crit is outside the RK4 stability region: the top of the
+    # spectrum is amplified every step and, because time_evolution renormalizes the state each
+    # step, the divergence never shows as a growing norm -- it silently turns the transported
+    # state into the highest-energy eigenvector instead, so this has to be rejected rather than
+    # warned about
     dt::Float64 = haskey(time_params, "dt") ? time_params["dt"] : dt_crit
+    if dt > dt_crit
+        error("Time step dt = $dt is above the RK4 stability limit dt_crit = $dt_crit for " *
+              "N = $(lattice_dict["N"]) and max interacting U = $(get_interaction_scale(hamilt_dict)): " *
+              "the evolution would diverge and be hidden by the per-step renormalization. " *
+              "Pass a smaller dt, " *
+              "omit \"dt\" from time_params to use dt_crit, or lower the interaction scale.")
+    end
     max_nsteps::Int = Int(ceil(tmax / dt))
     when_change_dt::Int = max_nsteps + 1
     

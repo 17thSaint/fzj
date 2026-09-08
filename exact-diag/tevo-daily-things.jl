@@ -857,9 +857,9 @@ if true
     # define starting state: dipole-dipole groundstate at the initial spacing a0
     if false || if_all
         lx,ly,n = 4,4,2
-        intstren_maggrad = 10.0
-        a0_maggrad = 1.0            # initial synthetic spacing, i.e. a(t=0)
-        speccount_maggrad = 3       # low-lying states tracked through the pulse
+        intstren_maggrad = 300.0
+        a0_maggrad = 0.1            # initial synthetic spacing, i.e. a(t=0)
+        speccount_maggrad = 2       # low-lying states tracked through the pulse
 
         pdict_maggrad = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("scaling_type","dd"),("magnetic_spacing",a0_maggrad),("interaction_strength",intstren_maggrad),("filling",0.5),("nev",speccount_maggrad),("if_find_data",false),("if_save_data",false)])
         states_starting_maggrad,nrgs_starting_maggrad,_,_,_,lattice_params_maggrad,hamilt_params_maggrad = run_normal_ed(pdict_maggrad; output_level=0)
@@ -877,7 +877,13 @@ if true
         ramptime_maggrad = 1.0
         holdtime_maggrad = 0.5      # gradient sits at zero here, but a keeps ringing on the sin kernel
         tmax_maggrad = ramptime_maggrad + holdtime_maggrad
-        dt_maggrad = 0.005
+        # the step comes from the RK4 stability limit for the interaction scale rather than being
+        # picked by hand: max(U) here is set by the tightest spacing the run visits, which is the
+        # initial a0 since the gradient only pushes the states apart, so the t=0 profile is the
+        # worst case and the same step is safe for the whole pulse. run_timeevo recomputes this
+        # and errors if it is handed anything larger
+        dt_maggrad = get_critical_dt(tmax_maggrad,lattice_params_maggrad,hamilt_params_maggrad)
+        println("Critical time step: $(dt_maggrad) ($(Int(ceil(tmax_maggrad/dt_maggrad))) RK4 steps for tmax $(tmax_maggrad))")
 
         # pulse_ramp samples on the RK4 half-step grid (spacing dt/2) and timeham indexes it
         # directly, so the pulse must have exactly ceil(tmax/(dt/2)) + 1 entries
