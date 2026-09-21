@@ -852,12 +852,12 @@ end=#
 # eigenstate.
 if true
 
-    if_all::Bool = true
+    if_all::Bool = false
 
     # define starting state: dipole-dipole groundstate at the initial spacing a0
     if false || if_all
         lx,ly,n = 4,4,2
-        intstren_maggrad = 300.0
+        intstren_maggrad = 10.0
         a0_maggrad = 0.1            # initial synthetic spacing, i.e. a(t=0)
         speccount_maggrad = 2       # low-lying states tracked through the pulse
 
@@ -873,9 +873,9 @@ if true
 
     # build the gradient pulse: linear ramp 0.1 -> 10.0 over ramptime, then off
     if false || if_all
-        bstart_maggrad, bend_maggrad = 0.1, 10.0
-        ramptime_maggrad = 1.0
-        holdtime_maggrad = 0.5      # gradient sits at zero here, but a keeps ringing on the sin kernel
+        bstart_maggrad, bend_maggrad = 0.1, 30.0
+        ramptime_maggrad = 0.1
+        holdtime_maggrad = 0.1      # gradient sits at zero here, but a keeps ringing on the sin kernel
         tmax_maggrad = ramptime_maggrad + holdtime_maggrad
         # the step comes from the RK4 stability limit for the interaction scale rather than being
         # picked by hand: max(U) here is set by the tightest spacing the run visits, which is the
@@ -935,7 +935,7 @@ if true
     end
 
     # the gradient and the spacing it accumulates
-    if false || if_all
+    if true || if_all
         figure()
         plot(bgrid_maggrad,bpulse_maggrad,c="b",label="gradient B")
         plot(bgrid_maggrad,spacings_maggrad,c="r",label="spacing a = a0 + ∫B(t')sin(t-t')dt'")
@@ -946,7 +946,7 @@ if true
     end
 
     # the interaction profile at a few points along the pulse
-    if false || if_all
+    if true || if_all
         figure()
         # start / mid-ramp / end-of-ramp / end-of-hold, on the half-step grid
         snapshot_indices_maggrad = [1, Int(ceil(0.5*ramptime_maggrad/(dt_maggrad/2))), Int(ceil(ramptime_maggrad/(dt_maggrad/2))), length(bgrid_maggrad)]
@@ -962,7 +962,7 @@ if true
     end
 
     # instantaneous vs transported energies
-    if false || if_all
+    if true || if_all
         times_maggrad = range(0.0,tmax_maggrad,length=length(instdata_maggrad[2]["1"]))
 
         # once the gradient is off the spacing, and therefore H, is time independent, so both
@@ -983,6 +983,75 @@ if true
         xlabel("Time")
         ylabel("Energy")
         title("Energy vs time for gradient pulse $(lx)x$(ly) N=$(n) B $(bstart_maggrad)→$(bend_maggrad) over $(ramptime_maggrad), manifold population = $(round(manifold_population_maggrad,digits=6))")
+    end
+
+    # density in real space: synthetic index turned into a physical y position
+    # get_occupancy resolves the density on (physical x, synthetic index m) only. The gradient
+    # is what gives the synthetic direction a real extent: the displacement the retarded kernel
+    # accumulates is exactly the ladder spacing a(t) = a0 + int_0^t B(t')sin(t-t')dt' that
+    # enters the dipolar tail (U ~ 1/(a*x)^3 for synthetic separation x), so row m sits at
+    # physical y_m(t) = (m-1)*a(t). The ladder therefore breathes with a(t): it stretches
+    # through the ramp and keeps ringing over the hold even though the gradient is off, which
+    # is motion of the cloud in real space that the synthetic-index picture cannot show.
+    if true || if_all
+        # column k of the transported data is the state after k RK4 steps, i.e. t = k*dt, and
+        # the last column is the save point that never gets written, hence end-1; the starting
+        # state is prepended so the series actually opens at t = 0
+        states_physy_maggrad = vcat([Vector{ComplexF64}(states_starting_maggrad[1])],[Vector{ComplexF64}(tevo_data_maggrad[1][1][:,k]) for k in 1:size(tevo_data_maggrad[1][1],2)-1])
+        times_physy_maggrad = [(k-1)*dt_maggrad for k in 1:length(states_physy_maggrad)]
+        nframes_physy_maggrad = length(times_physy_maggrad)
+
+        # occs[m,x] at every step: rows are the synthetic index, columns the physical x
+        occs_physy_maggrad = [get_occupancy(s,lattice_params_maggrad; if_plot=false) for s in states_physy_maggrad]
+        @assert all(occ -> sum(occ) ≈ n, occs_physy_maggrad) "occupancies do not sum to the particle number, so the transported states are not normalised"
+
+        # cell edges in time (midpoints between steps) and the spacing evaluated there, so the
+        # mesh below has one more edge than it has cells in each direction
+        tedges_physy_maggrad = vcat(0.0,0.5 .* (times_physy_maggrad[1:end-1] .+ times_physy_maggrad[2:end]),times_physy_maggrad[end])
+        # spacings_maggrad lives on the half-step grid, so time t sits at index 2t/dt + 1
+        a_physy_maggrad = [spacings_maggrad[min(Int(round(2*t/dt_maggrad))+1,length(spacings_maggrad))] for t in times_physy_maggrad]
+        aedges_physy_maggrad = [spacings_maggrad[min(Int(round(2*t/dt_maggrad))+1,length(spacings_maggrad))] for t in tedges_physy_maggrad]
+        @assert a_physy_maggrad[1] ≈ a0_maggrad "the spacing at t=0 is not the initial spacing the starting state was found at"
+
+        println("Physical y of the top synthetic row: $((ly-1)*a_physy_maggrad[1]) -> $((ly-1)*a_physy_maggrad[end]) (peak $((ly-1)*maximum(a_physy_maggrad)))")
+
+        # space-time map: density summed over the physical x direction, against the physical y
+        # the rows actually sit at. The cell edges move with a(t), so the rows fan out as the
+        # gradient pushes them apart instead of sitting on fixed synthetic-index lines
+        figure()
+        dens_y_physy_maggrad = reduce(hcat,[vec(sum(occ,dims=2)) for occ in occs_physy_maggrad])
+        tmesh_physy_maggrad = [tedges_physy_maggrad[k] for j in 1:ly+1, k in 1:nframes_physy_maggrad+1]
+        ymesh_physy_maggrad = [(j-1.5)*aedges_physy_maggrad[k] for j in 1:ly+1, k in 1:nframes_physy_maggrad+1]
+        pcolormesh(tmesh_physy_maggrad,ymesh_physy_maggrad,dens_y_physy_maggrad)
+        colorbar(label="Density (summed over physical x)")
+        axvline(ramptime_maggrad,ls="--",c="w")
+        xlabel("Time")
+        ylabel("Physical y")
+        title("Real-space y density of the transported gs $(lx)x$(ly) N=$(n) B $(bstart_maggrad)→$(bend_maggrad) over $(ramptime_maggrad)")
+
+        # the full real-space density at a few points along the pulse, on a common colour scale
+        # and common axes so the panels can be compared by eye
+        snapshot_times_physy_maggrad = [0.0, 0.5*ramptime_maggrad, ramptime_maggrad, tmax_maggrad]
+        snapshot_frames_physy_maggrad = [argmin(abs.(times_physy_maggrad .- t)) for t in snapshot_times_physy_maggrad]
+        vmax_physy_maggrad = maximum(maximum(occs_physy_maggrad[k]) for k in snapshot_frames_physy_maggrad)
+        # physical x is the ordinary lattice direction, so its cells are one site wide
+        xedges_physy_maggrad = collect(-0.5:1.0:lx-0.5)
+        ylim_physy_maggrad = (ly-0.5) * maximum(a_physy_maggrad[k] for k in snapshot_frames_physy_maggrad)
+
+        figure(figsize=(4*length(snapshot_frames_physy_maggrad),4))
+        for (i,k) in enumerate(snapshot_frames_physy_maggrad)
+            subplot(1,length(snapshot_frames_physy_maggrad),i)
+            yedges_physy_maggrad = [(j-1.5)*a_physy_maggrad[k] for j in 1:ly+1]
+            pcolormesh(xedges_physy_maggrad,yedges_physy_maggrad,occs_physy_maggrad[k],vmin=0.0,vmax=vmax_physy_maggrad)
+            ylim(-0.5*a_physy_maggrad[1],ylim_physy_maggrad)
+            xlabel("Physical x")
+            i == 1 ? ylabel("Physical y") : nothing
+            title("t=$(round(times_physy_maggrad[k],digits=3)), a=$(round(a_physy_maggrad[k],digits=3))")
+        end
+        # the loop leaves the last panel current, so this picks up its mesh; every panel is on
+        # the same vmin/vmax, so the one bar reads for all of them
+        colorbar(label="Density")
+        suptitle("Real-space density of the transported gs $(lx)x$(ly) N=$(n) B $(bstart_maggrad)→$(bend_maggrad) over $(ramptime_maggrad)")
     end
 
     #= animation of the density profile of the lowest transported state
@@ -1028,9 +1097,6 @@ if true
     end=#
 
 end
-
-
-
 
 
 

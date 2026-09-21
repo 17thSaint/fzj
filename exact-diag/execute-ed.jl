@@ -210,12 +210,12 @@ function get_normal_model_params_ed(params_dict::Dict)
     sigma::Float64 = get(params_dict, "sigma", 1.0)
     blockade_radius::Float64 = get(params_dict, "blockade_radius", 1.0)
     magnetic_spacing::Float64 = get(params_dict, "magnetic_spacing", 1.0)
-    magnetic_gradient_time::Vector{Float64} = get(params_dict, "magnetic_gradient_time", [0.0])
+    magnetic_gradient_integral::Float64 = get(params_dict, "magnetic_gradient_integral", 0.0)
     other_params_dict["corr_length"] = corr_length
     other_params_dict["sigma"] = sigma
     other_params_dict["blockade_radius"] = blockade_radius
     other_params_dict["magnetic_spacing"] = magnetic_spacing
-    other_params_dict["magnetic_gradient_time"] = magnetic_gradient_time
+    other_params_dict["magnetic_gradient_integral"] = magnetic_gradient_integral
 
     us::Vector{Float64} = long_range_scaling(lr_dist,Ly,stren; dict_to_symbols(other_params_dict)...)
     interaction_length = scaling_type == "flat" ? lr_dist : corr_length
