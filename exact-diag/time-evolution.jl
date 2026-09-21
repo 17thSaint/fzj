@@ -9,7 +9,12 @@ Depends on:
 =#
 ######################################################
 
-# accumulated int_0^t B sin(t-t') dt' of the magnetic field gradient up to the given timestep.
+# accumulated response int_0^t B(t') sin(w(t-t'))/w dt' of the magnetic field gradient up to
+# the given timestep: the Green's function of the trapped mode xddot + w^2 x = B(t) started
+# from rest, so a constant gradient rings around the static displacement B/w^2 instead of
+# growing without bound. The trap frequency w is t_evo_params["trap_frequency"], which is
+# always present: make_tevo_params sets it for every run, falling back to 1.0 (the kernel this
+# was originally written with) only when the caller names no frequency.
 # The ramp arrays are sampled on the RK4 half-step grid (spacing dt/2, see linear_ramp)
 # and timeham indexes them directly, so the trapezoid sum runs over that spacing; the
 # two-dt structure of t_evo_params["dt"] is respected in case the step size changes
@@ -21,16 +26,18 @@ function get_magnetic_gradient_integral(timestep::Int,t_evo_params::Dict)
     when_dt_ends::Int = t_evo_params["when_dt_ends"][1]
     dt_early::Float64 = t_evo_params["dt"][1] / 2
     dt_late::Float64 = t_evo_params["dt"][2] / 2
+    trap_frequency::Float64 = t_evo_params["trap_frequency"]
 
     # spacings of the sampled points, then their times by prefix sum (t_1 = 0)
     spacings::Vector{Float64} = ifelse.((1:timestep-1) .> when_dt_ends, dt_late, dt_early)
     times::Vector{Float64} = pushfirst!(cumsum(spacings),0.0)
     t::Float64 = times[timestep]
 
-    # retarded integrand B(t') * sin(t-t') at every sample point, then the trapezoid over it
-    integrand::Vector{Float64} = @views gradient_values[1:timestep] .* sin.(t .- times)
+    # retarded integrand B(t') * sin(w(t-t')) at every sample point, then the trapezoid over
+    # it; the 1/w of the oscillator response divides the finished integral
+    integrand::Vector{Float64} = @views gradient_values[1:timestep] .* sin.(trap_frequency .* (t .- times))
 
-    return 0.5 * sum(@views spacings .* (integrand[1:timestep-1] .+ integrand[2:timestep]))
+    return 0.5 * sum(@views spacings .* (integrand[1:timestep-1] .+ integrand[2:timestep])) / trap_frequency
 end
 
 # build Hamiltonian for given parameters and given time
@@ -42,7 +49,7 @@ function timeham(timestep::Int,t_evo_params::Dict,lattice_params::Dict,hamilt_pa
     # reset hamilt_params given the timestep from the t_evo_params
     if_rebuild_ulr = false
     for (k,v) in t_evo_params
-        if k != "dt" && k != "nsteps" && k != "tmax" && k != "when_dt_ends" && k != "current_dt"
+        if k != "dt" && k != "nsteps" && k != "tmax" && k != "when_dt_ends" && k != "current_dt" && k != "trap_frequency"
             # these parameters only enter the Hamiltonian through the coupling vector U,
             # which must be rebuilt whenever one of them takes a new value (skipping the
             # rebuild while the value sits constant, e.g. the hold after a ramp ends)
@@ -192,7 +199,7 @@ function get_tevo_filename(timeevo_dict::Dict,lattice_dict::Dict,hamilt_dict::Di
     if_both = 0
 
     for (k,v) in timeevo_dict
-        if k != "dt" && k != "nsteps" && k != "tmax" && k != "when_dt_ends" && k != "other_dt" && k != "when_change_dt"
+        if k != "dt" && k != "nsteps" && k != "tmax" && k != "when_dt_ends" && k != "other_dt" && k != "when_change_dt" && k != "trap_frequency"
             filename_dict["rampparam"] = k
             if string(v[1]) == "linear_ramp"
                 filename_dict["ramptype"] = "linear"
@@ -204,6 +211,13 @@ function get_tevo_filename(timeevo_dict::Dict,lattice_dict::Dict,hamilt_dict::Di
         end
     end
     dataloc = get(kwargs, :dataloc, dataloc)
+
+    # two gradient runs that differ only in the trap frequency agree on every other field
+    # here, so w has to enter the name or their saved data collides; the default 1.0 is left
+    # out to keep the names of runs made before the trap frequency was a parameter
+    if timeevo_dict["trap_frequency"] != 1.0
+        filename_dict["trap_frequency"] = timeevo_dict["trap_frequency"]
+    end
 
     filename_dict["ramptime"] = timeevo_dict["tmax"]
 
@@ -496,8 +510,14 @@ function make_tevo_params(given_parameters::Dict)
     t_evo_params["nsteps"] = 2*given_parameters["nsteps"] - 1
     t_evo_params["tmax"] = t_evo_params["nsteps"] * t_evo_params["dt"]
 
+    # the trap frequency is a fixed scalar of the gradient kernel rather than a ramped
+    # control, so it is carried over as-is and left out of the ramp expansion below. Set on
+    # every run, so get_magnetic_gradient_integral can read it straight out of t_evo_params;
+    # callers that name no frequency get the 1.0 the retarded kernel was first written with
+    t_evo_params["trap_frequency"] = get(given_parameters,"trap_frequency",1.0)
+
     for (k,v) in given_parameters
-        if k != "dt" && k != "nsteps" && k != "tmax" && k != "when_change_dt" && k != "other_dt"
+        if k != "dt" && k != "nsteps" && k != "tmax" && k != "when_change_dt" && k != "other_dt" && k != "trap_frequency"
             t_evo_params[k] = v[1](t_evo_params["nsteps"],t_evo_params["dt"][1]; v[2]...)
         end
     end
@@ -669,9 +689,17 @@ function run_timeevo(starting_gs::Vector,time_params::Dict,lattice_dict::Dict,ha
     
     tevo_pdict::Dict{String,Any} = Dict([("dt",dt),("tmax",tmax),("nsteps",max_nsteps),("when_change_dt",when_change_dt),("other_dt",dt)])
 
+    # the trap frequency of the magnetic-gradient kernel is a plain scalar, not a ramp
+    # triple/quadruple, so it bypasses the control structuring and reaches make_tevo_params
+    # (and from there get_magnetic_gradient_integral) unchanged. Always set, so every dict
+    # downstream of here carries it whether or not the caller named one: an explicit entry in
+    # time_params wins, otherwise the frequency the state was set up with in
+    # get_normal_model_params_ed, otherwise the 1.0 the retarded kernel was first written with
+    tevo_pdict["trap_frequency"] = get(time_params,"trap_frequency",get(hamilt_dict,"trap_frequency",1.0))
+
     # structure the control parameter values
     for (k,v) in time_params
-        if k != "dt" && k != "tmax"
+        if k != "dt" && k != "tmax" && k != "trap_frequency"
             if length(v) == 4
                 tevo_pdict[k] = (v[1],(starting_value=v[2],ending_value=v[3],starting_time=0.0,ending_time=v[4]))
             elseif length(v) == 5    

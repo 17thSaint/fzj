@@ -211,6 +211,11 @@ function get_normal_model_params_ed(params_dict::Dict)
     blockade_radius::Float64 = get(params_dict, "blockade_radius", 1.0)
     magnetic_spacing::Float64 = get(params_dict, "magnetic_spacing", 1.0)
     magnetic_gradient_integral::Float64 = get(params_dict, "magnetic_gradient_integral", 0.0)
+    # frequency of the trap the gradient displaces the synthetic states in. It does not enter
+    # the Hamiltonian built here -- long_range_scaling only ever sees the accumulated integral,
+    # which already carries w -- but it is the kernel a later time evolution of this state must
+    # use, so it is carried in hamilt_params for run_timeevo to pick up
+    trap_frequency::Float64 = get(params_dict, "trap_frequency", 1.0)
     other_params_dict["corr_length"] = corr_length
     other_params_dict["sigma"] = sigma
     other_params_dict["blockade_radius"] = blockade_radius
@@ -291,6 +296,7 @@ function get_normal_model_params_ed(params_dict::Dict)
                         "sigma"=>sigma,
                         "blockade_radius"=>blockade_radius,
                         "magnetic_spacing"=>magnetic_spacing,
+                        "trap_frequency"=>trap_frequency,
                         "which_dir"=>which_dir,
                         "interaction_cutoff"=>int_cutoff)
 

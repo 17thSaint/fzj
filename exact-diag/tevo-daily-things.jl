@@ -842,8 +842,9 @@ end=#
 
 ### Time-dependent magnetic field gradient: pulse the gradient, then switch it off
 # The gradient displaces the synthetic states, so the spacing entering the dipolar tail
-# follows the driven response a(t) = a0 + int_0^t B(t') sin(t-t') dt' (accumulated by
-# timeham, applied in the "magnetic_gradient" branch of long_range_scaling). B is ramped
+# follows the driven response a(t) = a0 + int_0^t B(t') sin(w(t-t'))/w dt' of a trapped mode
+# of frequency w (accumulated by timeham, applied in the "magnetic_gradient" branch of
+# long_range_scaling). B is ramped
 # linearly 0.1 -> 10.0 and then switched straight off; because of the retarded sin kernel
 # the displacement keeps ringing after the pulse ends rather than freezing at whatever it
 # reached, so the interaction profile is still moving through the hold. At t = 0 the
@@ -852,16 +853,17 @@ end=#
 # eigenstate.
 if true
 
-    if_all::Bool = false
+    if_all::Bool = true
 
     # define starting state: dipole-dipole groundstate at the initial spacing a0
-    if false || if_all
+    if true || if_all
         lx,ly,n = 4,4,2
         intstren_maggrad = 10.0
         a0_maggrad = 0.1            # initial synthetic spacing, i.e. a(t=0)
         speccount_maggrad = 2       # low-lying states tracked through the pulse
+        omega = 10.0
 
-        pdict_maggrad = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("scaling_type","dd"),("magnetic_spacing",a0_maggrad),("interaction_strength",intstren_maggrad),("filling",0.5),("nev",speccount_maggrad),("if_find_data",false),("if_save_data",false)])
+        pdict_maggrad = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("scaling_type","dd"),("trap_frequency",omega),("magnetic_spacing",a0_maggrad),("interaction_strength",intstren_maggrad),("filling",0.5),("nev",speccount_maggrad),("if_find_data",false),("if_save_data",false)])
         states_starting_maggrad,nrgs_starting_maggrad,_,_,_,lattice_params_maggrad,hamilt_params_maggrad = run_normal_ed(pdict_maggrad; output_level=0)
 
         # the t=0 gradient profile (zero accumulated integral) must reproduce the dd profile
@@ -872,10 +874,16 @@ if true
     end
 
     # build the gradient pulse: linear ramp 0.1 -> 10.0 over ramptime, then off
-    if false || if_all
+    if true || if_all
         bstart_maggrad, bend_maggrad = 0.1, 30.0
+        # trap frequency of the displaced mode: sets the ringing period 2pi/w and scales the
+        # response as 1/w^2. This is the only place to set it -- it feeds both the integral
+        # below and tevo_params_maggrad, and it deliberately does not live in pdict_maggrad
+        # because it has no effect on the t=0 Hamiltonian, so changing it never invalidates
+        # the starting state and never needs the ED block above re-run
+        w_maggrad = omega
         ramptime_maggrad = 0.1
-        holdtime_maggrad = 0.1      # gradient sits at zero here, but a keeps ringing on the sin kernel
+        holdtime_maggrad = 2.0      # gradient sits at zero here, but a keeps ringing on the sin kernel
         tmax_maggrad = ramptime_maggrad + holdtime_maggrad
         # the step comes from the RK4 stability limit for the interaction scale rather than being
         # picked by hand: max(U) here is set by the tightest spacing the run visits, which is the
@@ -896,8 +904,8 @@ if true
         # step size is uniform over the whole run (run_timeevo sets when_change_dt past the
         # last step), so bgrid_maggrad is exactly the sample-time vector that function builds.
         integral_maggrad = [k < 2 ? 0.0 :
-            let integrand = bpulse_maggrad[1:k] .* sin.(bgrid_maggrad[k] .- bgrid_maggrad[1:k])
-                0.5 * (dt_maggrad/2) * sum(integrand[1:k-1] .+ integrand[2:k])
+            let integrand = bpulse_maggrad[1:k] .* sin.(w_maggrad .* (bgrid_maggrad[k] .- bgrid_maggrad[1:k]))
+                0.5 * (dt_maggrad/2) * sum(integrand[1:k-1] .+ integrand[2:k]) / w_maggrad
             end for k in 1:length(bgrid_maggrad)]
         spacings_maggrad = a0_maggrad .+ integral_maggrad
         println("Spacing a: $(a0_maggrad) -> $(spacings_maggrad[end]) (peak $(maximum(spacings_maggrad)), still ringing at tmax)")
@@ -913,7 +921,7 @@ if true
 
         time_running_args_maggrad = (nev=speccount_maggrad,output_level=1,if_instant_gs=true,if_save_data=false,dataloc="tevo-daily-things-data/")
         starting_states_maggrad = [Vector{ComplexF64}(states_starting_maggrad[i]) for i in 1:speccount_maggrad]
-        tevo_params_maggrad = Dict([ ("magnetic_gradient_time",(pulse_ramp,tmax_maggrad,bpulse_maggrad)),("tmax",tmax_maggrad),("dt",dt_maggrad) ])
+        tevo_params_maggrad = Dict([ ("magnetic_gradient_time",(pulse_ramp,tmax_maggrad,bpulse_maggrad)),("trap_frequency",w_maggrad),("tmax",tmax_maggrad),("dt",dt_maggrad) ])
         tevo_data_maggrad,tevo_dict_maggrad,instdata_maggrad,saving_args_maggrad = run_timeevo(starting_states_maggrad,tevo_params_maggrad,lattice_params_maggrad,hamilt_params_tevo_maggrad; time_running_args_maggrad...)
 
         # the U the run ended on must be the one the final accumulated spacing gives
@@ -938,7 +946,7 @@ if true
     if true || if_all
         figure()
         plot(bgrid_maggrad,bpulse_maggrad,c="b",label="gradient B")
-        plot(bgrid_maggrad,spacings_maggrad,c="r",label="spacing a = a0 + ∫B(t')sin(t-t')dt'")
+        plot(bgrid_maggrad,spacings_maggrad,c="r",label="spacing a = a0 + ∫B(t')sin(ω(t-t'))dt'/ω")
         legend()
         xlabel("Time")
         ylabel("Value")
@@ -946,7 +954,7 @@ if true
     end
 
     # the interaction profile at a few points along the pulse
-    if true || if_all
+    if false || if_all
         figure()
         # start / mid-ramp / end-of-ramp / end-of-hold, on the half-step grid
         snapshot_indices_maggrad = [1, Int(ceil(0.5*ramptime_maggrad/(dt_maggrad/2))), Int(ceil(ramptime_maggrad/(dt_maggrad/2))), length(bgrid_maggrad)]
@@ -962,7 +970,7 @@ if true
     end
 
     # instantaneous vs transported energies
-    if true || if_all
+    if false || if_all
         times_maggrad = range(0.0,tmax_maggrad,length=length(instdata_maggrad[2]["1"]))
 
         # once the gradient is off the spacing, and therefore H, is time independent, so both
@@ -993,7 +1001,7 @@ if true
     # physical y_m(t) = (m-1)*a(t). The ladder therefore breathes with a(t): it stretches
     # through the ramp and keeps ringing over the hold even though the gradient is off, which
     # is motion of the cloud in real space that the synthetic-index picture cannot show.
-    if true || if_all
+    if false || if_all
         # column k of the transported data is the state after k RK4 steps, i.e. t = k*dt, and
         # the last column is the save point that never gets written, hence end-1; the starting
         # state is prepended so the series actually opens at t = 0
