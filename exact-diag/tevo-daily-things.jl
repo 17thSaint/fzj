@@ -1062,48 +1062,6 @@ if true
         suptitle("Real-space density of the transported gs $(lx)x$(ly) N=$(n) B $(bstart_maggrad)→$(bend_maggrad) over $(ramptime_maggrad)")
     end
 
-    #= animation of the density profile of the lowest transported state
-    if false
-        # column k of the transported data is the state after k RK4 steps, i.e. t = k*dt, and
-        # the last column is the save point that never gets written, hence end-1; the starting
-        # state is prepended so the animation actually opens at t = 0
-        anim_states_maggrad = vcat([Vector{ComplexF64}(states_starting_maggrad[1])],[Vector{ComplexF64}(tevo_data_maggrad[1][1][:,k]) for k in 1:size(tevo_data_maggrad[1][1],2)-1])
-        anim_times_maggrad = [(k-1)*dt_maggrad for k in 1:length(anim_states_maggrad)]
-
-        # every frame_stride'th step only, otherwise this is a few hundred frames
-        frame_stride_maggrad = 5
-        frame_indices_maggrad = 1:frame_stride_maggrad:length(anim_states_maggrad)
-
-        occs_frames_maggrad = [get_occupancy(anim_states_maggrad[k],lattice_params_maggrad; if_plot=false) for k in frame_indices_maggrad]
-        # one colour scale for the whole animation, so frames can be compared by eye
-        vmax_maggrad = maximum(maximum.(occs_frames_maggrad))
-
-        # spacing at each frame time, to show it freezing when the gradient switches off
-        # (spacings_maggrad lives on the half-step grid, so time t sits at index 2t/dt + 1)
-        spacing_frames_maggrad = [spacings_maggrad[min(Int(round(2*anim_times_maggrad[k]/dt_maggrad))+1,length(spacings_maggrad))] for k in frame_indices_maggrad]
-
-        animation_maggrad = PyPlot.PyCall.pyimport("matplotlib.animation")
-        fig_maggrad = figure()
-        img_maggrad = imshow(occs_frames_maggrad[1],origin="lower",vmin=0.0,vmax=vmax_maggrad)
-        ax_maggrad = gca()
-        colorbar()
-        xlabel("Physical")
-        ylabel("Synthetic")
-
-        # matplotlib counts frames from zero
-        function update_density_maggrad(frame)
-            i = frame + 1
-            img_maggrad.set_data(occs_frames_maggrad[i])
-            ax_maggrad.set_title("Density of transported gs, t = $(round(anim_times_maggrad[frame_indices_maggrad[i]],digits=3)), a = $(round(spacing_frames_maggrad[i],digits=3))")
-            return (img_maggrad,)
-        end
-
-        anim_maggrad = animation_maggrad.FuncAnimation(fig_maggrad,update_density_maggrad,frames=length(occs_frames_maggrad),interval=100)
-        gifpath_maggrad = joinpath(get_folder_location("local-plots"),"tevo-density-maggrad-$(lx)x$(ly)-N-$(n)-B-$(bstart_maggrad)-to-$(bend_maggrad)-ramptime-$(ramptime_maggrad).gif")
-        anim_maggrad.save(gifpath_maggrad,writer="pillow",fps=10)
-        println("Saved density animation to $(gifpath_maggrad)")
-    end=#
-
 end
 
 

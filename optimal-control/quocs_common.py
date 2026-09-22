@@ -13,6 +13,7 @@ plotting of the best controls from the BestDump npz.
 import glob
 import math
 import os
+import subprocess
 import time
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -20,10 +21,14 @@ EXACT_DIAG_DIR = os.path.normpath(os.path.join(_HERE, "..", "exact-diag"))
 FIGURES_DIR = os.path.join(_HERE, "local-figs")
 
 # Set up the Julia environment from the exact-diag project before importing juliacall.
-# Julia version is limited to 1.11
 _JULIAUP_BIN = "/home/patrick/.juliaup/bin"
 os.environ["PATH"] = f"{_JULIAUP_BIN}:{os.environ.get('PATH', '')}"
-os.environ["JULIAUP_CHANNEL"] = "1.11"
+# Julia was pinned to 1.11 here; juliaup errors out rather than falling back when the
+# pinned channel has since been removed, so only pin it when it is actually installed
+# and otherwise let juliaup pick its default channel
+if subprocess.run([os.path.join(_JULIAUP_BIN, "juliaup"), "status"],
+                  capture_output=True, text=True).stdout.find("1.11") >= 0:
+    os.environ["JULIAUP_CHANNEL"] = "1.11"
 # juliacall does not read JULIA_PROJECT -- it needs PYTHON_JULIACALL_PROJECT (paired
 # with PYTHON_JULIACALL_EXE) or it silently falls back to its own private juliapkg-managed
 # environment, which doesn't have exact-diag's dependencies (JLD2, ITensors, ...)
@@ -90,9 +95,16 @@ def fourier_pulse(pulse_name: str,
                   upper_limit: float,
                   amplitude_variation: float,
                   initial_guess_lambda: str,
-                  basis_vector_number: int = 5) -> dict:
+                  basis_vector_number: int = 5,
+                  scaling_lambda: str = "lambda t: (t / t[-1]) * (1.0 - t / t[-1])") -> dict:
     """Standard dCRAB/AD pulse dictionary: Fourier basis, parabolic scaling that
-    pins both endpoints of the update, and hard amplitude limits."""
+    pins both endpoints of the update, and hard amplitude limits.
+
+    The pulse is assembled as (base + update) * scaling(t) + initial_guess(t), then
+    clipped to [lower_limit, upper_limit]. scaling_lambda is therefore what decides which
+    endpoints are frozen at the initial guess: the default parabola pins both, while
+    "lambda t: t / t[-1]" pins only the start and leaves the final value free to optimize.
+    """
     return {
         "pulse_name": pulse_name,
         "upper_limit": upper_limit,
@@ -113,7 +125,7 @@ def fourier_pulse(pulse_name: str,
         },
         "scaling_function": {
             "function_type": "lambda_function",
-            "lambda_function": "lambda t: (t / t[-1]) * (1.0 - t / t[-1])",
+            "lambda_function": scaling_lambda,
         },
         "basis": {
             "basis_name": "Fourier",
