@@ -848,10 +848,10 @@ end=#
 # linearly 0.1 -> 10.0 and then switched straight off; because of the retarded sin kernel
 # the displacement keeps ringing after the pulse ends rather than freezing at whatever it
 # reached, so the interaction profile is still moving through the hold. At t = 0 the
-# integral is zero, so the starting Hamiltonian is exactly the ordinary "dd" profile at
+#= integral is zero, so the starting Hamiltonian is exactly the ordinary "dd" profile at
 # spacing a0 -- the starting state is that dd groundstate, so the evolution begins in an
 # eigenstate.
-if true
+if false
 
     if_all::Bool = true
 
@@ -1060,6 +1060,315 @@ if true
         # the same vmin/vmax, so the one bar reads for all of them
         colorbar(label="Density")
         suptitle("Real-space density of the transported gs $(lx)x$(ly) N=$(n) B $(bstart_maggrad)→$(bend_maggrad) over $(ramptime_maggrad)")
+    end
+
+end=#
+
+
+
+### Posicast / zero-vibration two-step gradient pulse: settle the synthetic spacing exactly
+# The retarded kernel a(t) = a0 + int_0^t B(t') sin(w(t-t'))/w dt' that long_range_scaling's
+# "magnetic_gradient" branch is driven by is the Green's function of an undamped oscillator:
+# x = a - a0 obeys xddot + w^2 x = B(t) from rest. Nothing removes energy from that mode, so
+# whatever ringing a pulse leaves behind stays forever -- which is exactly what the previous
+# (ramp-then-off) block suffers from, and why its interaction profile never stops moving.
+#
+# A step to B rings about the static displacement B/w^2 and so overshoots it by exactly a
+# factor of two, reaching 2B/w^2 at wt = pi where the mode is momentarily at rest. A point at
+# rest stays at rest if it sits at the equilibrium of the current dynamics, and we control
+# where that equilibrium is, so switching at tsw = pi/w to the gradient whose equilibrium is
+# the present position collapses the trajectory onto a fixed point:
+#
+#     B(t) = B1 = w^2*da/2   for 0 <= t < tsw,      B(t) = B2 = w^2*da = 2*B1   for t >= tsw,
+#     tsw = pi/w,            da = atarg - a0.
+#
+# The second step is just the standing gradient that statically holds the target displacement;
+# the first is precisely half of it, applied for precisely half a trap period. Three properties
+# matter here specifically because U ~ 1/a^3:
+#   - xdot = (B1/w)*sin(wt) >= 0 on [0,tsw], so a climbs monotonically from a0 to atarg with no
+#     overshoot and no zero crossing, and U never diverges;
+#   - min_t a(t) = a0 at t = 0 only, so max_t U(t) = U(a0) and the RK4 step computed from the
+#     t = 0 Hamiltonian bounds the whole run -- which is the assumption get_critical_dt makes;
+#   - after tsw the Hamiltonian is genuinely static, not merely correct on average.
+# This is Smith's 1957 posicast controller / the ZV input shaper, and in the cold-atom setting
+# the same logic as shortcuts to adiabaticity for transport: rather than moving slowly enough
+# never to excite the mode, excite it deliberately and then cancel the excitation exactly.
+#
+# Caveat worth being explicit about: with atarg = 2.0 and a0 = 0.1 the nearest-neighbour
+# coupling falls 10/(0.1)^3 = 10000 -> 10/(2.0)^3 = 1.25 in half a trap period. That is a
+# violent quench and the transported state is not expected to follow the instantaneous
+# manifold. The pulse is designed for a(t), not for fidelity -- lower atarg for adiabaticity.
+if true
+
+    if_all::Bool = true
+
+    # define starting state: dipole-dipole groundstate at the initial spacing a0
+    if true || if_all
+        lx,ly,n = 4,4,2
+        intstren_posicast = 10.0
+        a0_posicast = 0.1            # initial synthetic spacing, i.e. a(t=0)
+        speccount_posicast = 2       # low-lying states tracked through the pulse
+        omega_posicast = 10.0        # trap frequency of the displaced mode
+
+        pdict_posicast = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("scaling_type","dd"),("trap_frequency",omega_posicast),("magnetic_spacing",a0_posicast),("interaction_strength",intstren_posicast),("filling",0.5),("nev",speccount_posicast),("if_find_data",false),("if_save_data",false)])
+        states_starting_posicast,nrgs_starting_posicast,_,_,_,lattice_params_posicast,hamilt_params_posicast = run_normal_ed(pdict_posicast; output_level=0)
+
+        # the t=0 gradient profile (zero accumulated integral) must reproduce the dd profile
+        # the starting state was found with, otherwise the run does not start in an eigenstate
+        us_at_zero_posicast = long_range_scaling(ly-1,ly,intstren_posicast; scaling="magnetic_gradient",magnetic_spacing=a0_posicast,magnetic_gradient_integral=0.0)
+        @assert us_at_zero_posicast ≈ hamilt_params_posicast["U"] "t=0 gradient profile $(us_at_zero_posicast) does not match the dd profile $(hamilt_params_posicast["U"])"
+        println("Starting U profile: $(hamilt_params_posicast["U"])")
+    end
+
+    # build the two-step pulse and the step it lives on
+    if true || if_all
+        atarg_posicast = 2.0                                    # where the spacing is to park
+        da_posicast = atarg_posicast - a0_posicast
+        b1_posicast = omega_posicast^2 * da_posicast / 2        # first step: half the holding gradient
+        b2_posicast = omega_posicast^2 * da_posicast            # second step: the standing gradient
+        tsw_posicast = pi / omega_posicast                      # switch at half a trap period
+
+        # the binding amplitude constraint is the second step, not the first: holding a displaced
+        # spacing needs a standing gradient, so atarg <= a0 + Bmax/w^2 for any non-ringing
+        # solution, shaped or not. The two-step pulse buys a perfect trajectory, not a larger
+        # reachable target. Bmax = 200 is the ceiling the dCRAB runs in config_maggradPulse.py use
+        bmax_posicast = 200.0
+        @assert b2_posicast <= bmax_posicast "holding gradient B2 = $(b2_posicast) exceeds Bmax = $(bmax_posicast): the largest spacing that can settle at all is a0 + Bmax/w^2 = $(a0_posicast + bmax_posicast/omega_posicast^2)"
+
+        # settling is complete at tsw, so the remaining half-periods are there purely to
+        # demonstrate that nothing rings afterwards and to give the state time to evolve under
+        # the now-static Hamiltonian
+        nhalfperiods_posicast = 4
+        tmax_posicast = nhalfperiods_posicast * tsw_posicast
+
+        # the step comes from the RK4 stability limit for the interaction scale rather than being
+        # picked by hand. max(U) over the run is set by the tightest spacing visited, and the
+        # pulse rises monotonically from a0, so the t=0 profile is the worst case and the same
+        # step is safe throughout -- this is the property the shape was chosen for
+        dtcrit_posicast = get_critical_dt(tmax_posicast,lattice_params_posicast,hamilt_params_posicast)
+
+        # ... then snapped down so that tsw is an exact multiple of the half-step spacing dt/2.
+        # The catch only works if the switch is applied at the instant the mode is at rest, and
+        # timeham can only see the pulse on its sample grid, so the switch must land on a sample
+        nsw_posicast = Int(ceil(tsw_posicast / (dtcrit_posicast/2)))
+        dt_posicast = 2 * tsw_posicast / nsw_posicast
+        @assert dt_posicast <= dtcrit_posicast "snapped dt $(dt_posicast) is above the RK4 stability limit $(dtcrit_posicast)"
+
+        # pulse_ramp samples on the RK4 half-step grid (spacing dt/2) and timeham indexes it
+        # directly, so the pulse must have exactly ceil(tmax/(dt/2)) + 1 entries -- the same
+        # expression pulse_ramp recomputes, so the two agree whichever way the ceil rounds
+        nhalf_posicast = Int(ceil(tmax_posicast/(dt_posicast/2)))
+        bgrid_posicast = collect(0:nhalf_posicast) .* (dt_posicast/2)
+        isw_posicast = nsw_posicast + 1     # 1-based index of the sample sitting on tsw
+        @assert bgrid_posicast[isw_posicast] ≈ tsw_posicast "the switch sample sits at $(bgrid_posicast[isw_posicast]) rather than tsw = $(tsw_posicast)"
+
+        bpulse_posicast = fill(b2_posicast,nhalf_posicast+1)
+        bpulse_posicast[1:isw_posicast-1] .= b1_posicast
+        # the one sample sitting on the discontinuity carries the mean of the two steps. This is
+        # not a fudge: for the trapezoid rule the two intervals either side of tsw then integrate
+        # to exactly B1*int_{tsw-h}^{tsw} + B2*int_{tsw}^{tsw+h}, i.e. the true step function,
+        # instead of ramping B1 -> B2 across a half-step. Leaving the full B2 here is worse than
+        # not snapping dt at all, because snapping puts a sample exactly where the error is
+        # largest: measured residual over the parked stretch is 3e-4 with the plain rule against
+        # 3e-16 with this one (and 6e-5 with neither fix, where the switch misses the grid by luck)
+        bpulse_posicast[isw_posicast] = 0.5*(b1_posicast + b2_posicast)
+
+        println("Two-step pulse: B1 = $(b1_posicast), B2 = $(b2_posicast), tsw = $(round(tsw_posicast,digits=5))")
+        println("Critical time step: $(dtcrit_posicast), snapped to $(dt_posicast) ($(Int(ceil(tmax_posicast/dt_posicast))) RK4 steps for tmax $(round(tmax_posicast,digits=5)))")
+    end
+
+    # the spacing the pulse accumulates, and the checks that it is the intended one
+    if true || if_all
+        # same retarded trapezoid rule as get_magnetic_gradient_integral, evaluated here for the
+        # plots and checks below. Written O(n) rather than O(n^2) by splitting the kernel,
+        # sin(w(t-t')) = sin(wt)cos(wt') - cos(wt)sin(wt'), which turns the retarded integral into
+        # two cumulative trapezoids over integrands that do not depend on the upper limit. Same
+        # samples and same weights as the literal rule, so it is the same quadrature, not an
+        # approximation to it -- the spot checks below confirm that against the function itself
+        cumtrap_posicast = f -> pushfirst!(cumsum(0.5*(dt_posicast/2) .* (f[1:end-1] .+ f[2:end])),0.0)
+        cosgrid_posicast, singrid_posicast = cos.(omega_posicast .* bgrid_posicast), sin.(omega_posicast .* bgrid_posicast)
+        ic_posicast = cumtrap_posicast(bpulse_posicast .* cosgrid_posicast)
+        is_posicast = cumtrap_posicast(bpulse_posicast .* singrid_posicast)
+        integral_posicast = (singrid_posicast .* ic_posicast .- cosgrid_posicast .* is_posicast) ./ omega_posicast
+        spacings_posicast = a0_posicast .+ integral_posicast
+
+        # check it against get_magnetic_gradient_integral itself, i.e. against the quadrature the
+        # evolution actually runs, rather than against a second copy of my own arithmetic. A
+        # uniform step throughout is what run_timeevo sets up (when_change_dt lands past the last
+        # step), so when_dt_ends is put beyond the end here to match
+        checkparams_posicast = Dict{String,Any}([("magnetic_gradient_time",bpulse_posicast),("when_dt_ends",[nhalf_posicast+1,nhalf_posicast+1]),("dt",[dt_posicast,dt_posicast]),("trap_frequency",omega_posicast)])
+        for k in [1, 2, isw_posicast÷2, isw_posicast, isw_posicast+1, nhalf_posicast+1]
+            @assert isapprox(get_magnetic_gradient_integral(k,checkparams_posicast),integral_posicast[k]; atol=1e-12) "the O(n) kernel split disagrees with get_magnetic_gradient_integral at sample $k"
+        end
+
+        # against the closed form: x = (da/2)(1 - cos wt) before the switch, x = da after it
+        analytic_posicast = [t < tsw_posicast ? a0_posicast + 0.5*da_posicast*(1-cos(omega_posicast*t)) : atarg_posicast for t in bgrid_posicast]
+        quaderr_posicast = maximum(abs.(spacings_posicast .- analytic_posicast))
+        # the residual ringing: peak-to-peak spread of a over everything past the switch. Zero in
+        # exact arithmetic, and what any imperfect pulse would show as a surviving oscillation
+        ringing_posicast = maximum(spacings_posicast[isw_posicast:end]) - minimum(spacings_posicast[isw_posicast:end])
+        println("Spacing a: $(a0_posicast) -> $(spacings_posicast[end]) (target $(atarg_posicast), min over the run $(minimum(spacings_posicast)))")
+        println("Deviation from the closed form: $(quaderr_posicast); residual ringing after the switch (peak-to-peak): $(ringing_posicast)")
+        @assert quaderr_posicast < 1e-5 "the sampled pulse does not reproduce the closed-form response to 1e-5"
+        @assert ringing_posicast < 1e-9 "the spacing still rings by $(ringing_posicast) after the switch, so the catch is landing at the wrong phase"
+        # the monotone rise is what makes the t=0 RK4 step valid for the whole run
+        @assert minimum(spacings_posicast) ≈ a0_posicast "the spacing dips below a0, so max(U) is not U(a0) and the critical dt no longer bounds the run"
+    end
+
+    # time evolution along the pulse, tracking the instantaneous spectrum
+    if false || if_all
+        # work on a copy: timeham writes the ramped values, the accumulated integral and the
+        # rebuilt U back into the dict, which would otherwise leave the starting-state
+        # parameters overwritten for any later section
+        hamilt_params_tevo_posicast = copy(hamilt_params_posicast)
+        hamilt_params_tevo_posicast["scaling_type"] = "magnetic_gradient"
+
+        time_running_args_posicast = (nev=speccount_posicast,output_level=1,if_instant_gs=true,if_save_data=false,dataloc="tevo-daily-things-data/")
+        starting_states_posicast = [Vector{ComplexF64}(states_starting_posicast[i]) for i in 1:speccount_posicast]
+        tevo_params_posicast = Dict([ ("magnetic_gradient_time",(pulse_ramp,tmax_posicast,bpulse_posicast)),("trap_frequency",omega_posicast),("tmax",tmax_posicast),("dt",dt_posicast) ])
+        tevo_data_posicast,tevo_dict_posicast,instdata_posicast,saving_args_posicast = run_timeevo(starting_states_posicast,tevo_params_posicast,lattice_params_posicast,hamilt_params_tevo_posicast; time_running_args_posicast...)
+
+        # the U the run ended on must be the profile the target spacing gives. Comparing against
+        # atarg rather than against integral_posicast[end] is the point of the whole construction:
+        # the final Hamiltonian is the static one for the target, not whatever the ringing left
+        us_final_posicast = long_range_scaling(ly-1,ly,intstren_posicast; scaling="magnetic_gradient",magnetic_spacing=a0_posicast,magnetic_gradient_integral=da_posicast)
+        println("Final U profile: $(hamilt_params_tevo_posicast["U"]) (expected $(us_final_posicast))")
+        @assert hamilt_params_tevo_posicast["U"] ≈ us_final_posicast "final U is not the static profile at the target spacing"
+
+        # end-1 skips the final save column, which is allocated but never written
+        final_states_posicast = [Vector{ComplexF64}(tevo_data_posicast[1][i][:,end-1]) for i in 1:speccount_posicast]
+        # the second starting state comes out of a near-degenerate pair, so which vector the ED
+        # returns for it changes from run to run and a manifold-vs-manifold fidelity is not
+        # reproducible here; the population of the final instantaneous manifold by the lowest
+        # transported state is invariant under rotations inside that manifold, so track that
+        final_instant_posicast = [Vector{ComplexF64}(instdata_posicast[1][string(i)][:,end]) for i in 1:2]
+        manifold_population_posicast = sum(abs2(dot(final_states_posicast[1],instant_state)) for instant_state in final_instant_posicast)
+        println("Starting energies: $(nrgs_starting_posicast)")
+        println("Final instantaneous energies: $([instdata_posicast[2][string(i)][end] for i in 1:speccount_posicast])")
+        println("Population of the final instantaneous manifold by the lowest transported state: $(manifold_population_posicast)")
+    end
+
+    # the two-step gradient and the spacing it accumulates
+    if false || if_all
+        figure()
+        plot(bgrid_posicast,bpulse_posicast,c="b",label="gradient B")
+        plot(bgrid_posicast,spacings_posicast,c="r",label="spacing a = a0 + ∫B(t')sin(ω(t-t'))dt'/ω")
+        axhline(atarg_posicast,ls=":",c="r",label="target a = $(atarg_posicast)")
+        axvline(tsw_posicast,ls="--",c="k",label="switch tsw = π/ω")
+        legend()
+        xlabel("Time")
+        ylabel("Value")
+        title("Two-step pulse B1=$(b1_posicast)→B2=$(b2_posicast) at tsw=$(round(tsw_posicast,digits=4)), ω=$(omega_posicast), ringing $(round(ringing_posicast,sigdigits=2))")
+    end
+
+    # the interaction profile at a few points along the pulse
+    if false || if_all
+        figure()
+        # start / mid-rise / switch / end, on the half-step grid
+        snapshot_indices_posicast = [1, Int(round(0.5*tsw_posicast/(dt_posicast/2)))+1, isw_posicast, nhalf_posicast+1]
+        for idx in snapshot_indices_posicast
+            us_snapshot = long_range_scaling(ly-1,ly,intstren_posicast; scaling="magnetic_gradient",magnetic_spacing=a0_posicast,magnetic_gradient_integral=integral_posicast[idx])
+            plot(0:length(us_snapshot)-1,us_snapshot,"-p",label="t=$(round(bgrid_posicast[idx],digits=3)), a=$(round(spacings_posicast[idx],digits=3))")
+        end
+        legend()
+        xlabel("y distance")
+        ylabel("Interaction strength")
+        yscale("log")
+        title("ULR profile along the two-step pulse $(lx)x$(ly) N=$(n) U=$(intstren_posicast)")
+    end
+
+    # instantaneous vs transported energies
+    if false || if_all
+        # instdata holds one entry per RK4 step, written at t = k*dt for k = 1..nsteps, so the
+        # series starts one step in rather than at t = 0
+        times_posicast = [k*dt_posicast for k in 1:length(instdata_posicast[2]["1"])]
+
+        # past the switch the spacing, and therefore H, is time independent, so both the
+        # instantaneous spectrum and the transported energies have to be flat from tsw onward.
+        # This is the check that distinguishes "settled" from "correct on average"
+        settled_start_posicast = findfirst(t -> t >= tsw_posicast, times_posicast)
+        instant_drift_posicast = maximum(abs.(instdata_posicast[2]["1"][settled_start_posicast:end] .- instdata_posicast[2]["1"][end]))
+        transported_drift_posicast = maximum(abs.(tevo_data_posicast[2][1][settled_start_posicast:end-1] .- tevo_data_posicast[2][1][end-1]))
+        println("Energy drift after the switch: instantaneous $(instant_drift_posicast), transported $(transported_drift_posicast)")
+
+        figure()
+        cols = ["b","g","r"]
+        for i in 1:speccount_posicast
+            plot(times_posicast,instdata_posicast[2][string(i)],"-p",c=cols[i],label="E$(i) instantaneous")
+            plot(times_posicast,tevo_data_posicast[2][i][1:end-1],c="k",marker="x",label=(i==1 ? "transported" : nothing))
+        end
+        axvline(tsw_posicast,ls="--",c="k")
+        legend()
+        xlabel("Time")
+        ylabel("Energy")
+        title("Energy vs time, two-step pulse $(lx)x$(ly) N=$(n) a $(a0_posicast)→$(atarg_posicast), manifold population = $(round(manifold_population_posicast,digits=6))")
+    end
+
+    # density in real space: synthetic index turned into a physical y position
+    # get_occupancy resolves the density on (physical x, synthetic index m) only. The gradient
+    # is what gives the synthetic direction a real extent: the displacement the retarded kernel
+    # accumulates is exactly the ladder spacing a(t) that enters the dipolar tail, so row m sits
+    # at physical y_m(t) = (m-1)*a(t). Unlike the ramp-then-off pulse, this ladder stretches
+    # monotonically to its target and then stops dead -- the rows fan out over the first half
+    # period and sit still for the rest of the run
+    if false || if_all
+        # column k of the transported data is the state after k RK4 steps, i.e. t = k*dt, and
+        # the last column is the save point that never gets written, hence end-1; the starting
+        # state is prepended so the series actually opens at t = 0
+        states_physy_posicast = vcat([Vector{ComplexF64}(states_starting_posicast[1])],[Vector{ComplexF64}(tevo_data_posicast[1][1][:,k]) for k in 1:size(tevo_data_posicast[1][1],2)-1])
+        times_physy_posicast = [(k-1)*dt_posicast for k in 1:length(states_physy_posicast)]
+        nframes_physy_posicast = length(times_physy_posicast)
+
+        # occs[m,x] at every step: rows are the synthetic index, columns the physical x
+        occs_physy_posicast = [get_occupancy(s,lattice_params_posicast; if_plot=false) for s in states_physy_posicast]
+        @assert all(occ -> sum(occ) ≈ n, occs_physy_posicast) "occupancies do not sum to the particle number, so the transported states are not normalised"
+
+        # cell edges in time (midpoints between steps) and the spacing evaluated there, so the
+        # mesh below has one more edge than it has cells in each direction
+        tedges_physy_posicast = vcat(0.0,0.5 .* (times_physy_posicast[1:end-1] .+ times_physy_posicast[2:end]),times_physy_posicast[end])
+        # spacings_posicast lives on the half-step grid, so time t sits at index 2t/dt + 1
+        a_physy_posicast = [spacings_posicast[min(Int(round(2*t/dt_posicast))+1,length(spacings_posicast))] for t in times_physy_posicast]
+        aedges_physy_posicast = [spacings_posicast[min(Int(round(2*t/dt_posicast))+1,length(spacings_posicast))] for t in tedges_physy_posicast]
+        @assert a_physy_posicast[1] ≈ a0_posicast "the spacing at t=0 is not the initial spacing the starting state was found at"
+
+        println("Physical y of the top synthetic row: $((ly-1)*a_physy_posicast[1]) -> $((ly-1)*a_physy_posicast[end])")
+
+        # space-time map: density summed over the physical x direction, against the physical y
+        # the rows actually sit at
+        figure()
+        dens_y_physy_posicast = reduce(hcat,[vec(sum(occ,dims=2)) for occ in occs_physy_posicast])
+        tmesh_physy_posicast = [tedges_physy_posicast[k] for j in 1:ly+1, k in 1:nframes_physy_posicast+1]
+        ymesh_physy_posicast = [(j-1.5)*aedges_physy_posicast[k] for j in 1:ly+1, k in 1:nframes_physy_posicast+1]
+        pcolormesh(tmesh_physy_posicast,ymesh_physy_posicast,dens_y_physy_posicast)
+        colorbar(label="Density (summed over physical x)")
+        axvline(tsw_posicast,ls="--",c="w")
+        xlabel("Time")
+        ylabel("Physical y")
+        title("Real-space y density of the transported gs $(lx)x$(ly) N=$(n), two-step a $(a0_posicast)→$(atarg_posicast)")
+
+        # the full real-space density at a few points along the pulse, on a common colour scale
+        # and common axes so the panels can be compared by eye
+        snapshot_times_physy_posicast = [0.0, 0.5*tsw_posicast, tsw_posicast, tmax_posicast]
+        snapshot_frames_physy_posicast = [argmin(abs.(times_physy_posicast .- t)) for t in snapshot_times_physy_posicast]
+        vmax_physy_posicast = maximum(maximum(occs_physy_posicast[k]) for k in snapshot_frames_physy_posicast)
+        # physical x is the ordinary lattice direction, so its cells are one site wide
+        xedges_physy_posicast = collect(-0.5:1.0:lx-0.5)
+        ylim_physy_posicast = (ly-0.5) * maximum(a_physy_posicast[k] for k in snapshot_frames_physy_posicast)
+
+        figure(figsize=(4*length(snapshot_frames_physy_posicast),4))
+        for (i,k) in enumerate(snapshot_frames_physy_posicast)
+            subplot(1,length(snapshot_frames_physy_posicast),i)
+            yedges_physy_posicast = [(j-1.5)*a_physy_posicast[k] for j in 1:ly+1]
+            pcolormesh(xedges_physy_posicast,yedges_physy_posicast,occs_physy_posicast[k],vmin=0.0,vmax=vmax_physy_posicast)
+            ylim(-0.5*a_physy_posicast[1],ylim_physy_posicast)
+            xlabel("Physical x")
+            i == 1 ? ylabel("Physical y") : nothing
+            title("t=$(round(times_physy_posicast[k],digits=3)), a=$(round(a_physy_posicast[k],digits=3))")
+        end
+        # the loop leaves the last panel current, so this picks up its mesh; every panel is on
+        # the same vmin/vmax, so the one bar reads for all of them
+        colorbar(label="Density")
+        suptitle("Real-space density of the transported gs $(lx)x$(ly) N=$(n), two-step a $(a0_posicast)→$(atarg_posicast)")
     end
 
 end
