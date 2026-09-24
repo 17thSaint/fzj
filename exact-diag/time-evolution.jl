@@ -40,6 +40,35 @@ function get_magnetic_gradient_integral(timestep::Int,t_evo_params::Dict)
     return 0.5 * sum(@views spacings .* (integrand[1:timestep-1] .+ integrand[2:timestep])) / trap_frequency
 end
 
+# Inverse of get_magnetic_gradient_integral: the gradient B(t) that drives a prescribed spacing
+# a(t), read off the same trapped-mode equation, B = addot + w^2 (a - a0), with a0 the spacing
+# the mode is displaced from (the dd spacing of the starting state, a[1] by default).
+# spacing_values is sampled on a uniform grid of spacing h (the RK4 half-step dt/2 when it is a
+# ramp array) and B is returned on the same samples: central second differences inside, and the
+# second-order one-sided stencils at the two ends, so a smooth a(t) gives O(h^2) everywhere.
+# Also returns the initial kick adot(0+). The mode starts from rest and a finite B only sets the
+# acceleration, so a(t) leaving a0 with a slope cannot come from B alone -- it needs an impulse of
+# that area at t = 0 (response kick*sin(wt)/w on top of the integral of B). Zero, to O(h^2), for
+# any a(t) a finite gradient can produce; e.g. 1.5 for a linear ramp 0.5 -> 2.0 over T = 1.
+# Where a(t) has a kink inside the grid, the returned B shows it as a single-sample spike of area
+# ~ the velocity jump (the discrete delta); where B itself jumps, the sample straddling the
+# switch gets a stencil-averaged value.
+function get_magnetic_gradient_from_spacing(spacing_values::AbstractVector{<:Real},h::Float64,trap_frequency::Float64; a0::Float64=Float64(spacing_values[1]))
+    n = length(spacing_values)
+    @assert n >= 4 "need at least 4 samples for the one-sided end stencils, got $(n)"
+    a = Float64.(spacing_values)
+
+    addot = similar(a)
+    @views addot[2:n-1] .= (a[3:n] .- 2 .* a[2:n-1] .+ a[1:n-2]) ./ h^2
+    addot[1] = (2a[1] - 5a[2] + 4a[3] - a[4]) / h^2
+    addot[n] = (2a[n] - 5a[n-1] + 4a[n-2] - a[n-3]) / h^2
+
+    gradient = addot .+ trap_frequency^2 .* (a .- a0)
+    kick = (-3a[1] + 4a[2] - a[3]) / (2h)
+
+    return gradient, kick
+end
+
 # build Hamiltonian for given parameters and given time
 function timeham(timestep::Int,t_evo_params::Dict,lattice_params::Dict,hamilt_params::Dict; kwargs...)
     

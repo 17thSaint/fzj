@@ -1374,6 +1374,9 @@ if false
 
 end=#
 
+
+
+
 ### ZVD three-step gradient pulse: settle the spacing and tolerate a mis-measured trap frequency
 # Same retarded kernel as the two-step block -- x = a - a0 obeys xddot + w^2 x = B(t) from rest,
 # undamped, so any ringing left at the end of the pulse is permanent. The two-step (posicast /
@@ -1399,8 +1402,8 @@ end=#
 # spelled-out branches, so the same code builds either shaper from its (A_i, t_i) list.
 #
 # Note the O(eps^2) robustness is the reason for the extra step but is asserted here, not
-# demonstrated -- nothing in this block drives the pulse at a detuned frequency.
-if true
+#= demonstrated -- nothing in this block drives the pulse at a detuned frequency.
+if false
 
     if_all::Bool = true
 
@@ -1596,6 +1599,278 @@ if true
         xlabel("Time")
         ylabel("Physical y")
         title("Real-space y density of the transported gs $(lx)x$(ly) N=$(n), ZVD a $(a0_zvd)→$(atarg_zvd)")
+    end
+
+end=#
+
+
+
+### Ramp from strongly interacting dd state to weak dd state by ramping the magnetic spacing
+# Baseline for a QuOCS optimization of the magnetic_spacing ramp: the spacing analogue of the
+# interaction strength ramp blocks above. Instead of lowering the overall strength, the dd
+# profile U_r = intstren/(r*a)^3 is weakened by pulling the synthetic states apart, a 0.5 -> 2.0
+# at fixed intstren = 10, i.e. nearest-neighbour coupling 80 -> 1.25. Both endpoint manifolds are
+# dd groundstates, so an adiabatic ramp can reach fidelity 1.
+# The ramp is specified through the gradient rather than the spacing: B(t) is the ZVD staircase
+# of the three-step block above, and a(t) is its closed-form response, handed to the evolution as
+# a magnetic_spacing pulse_ramp. Going this way round keeps a(t) physical -- a finite gradient
+# can only start the mode from rest, so a(t) leaves a0 with zero slope, whereas the linear ramp
+# this block used first (fidelity 0.9253 at T = 1) needed delta kicks at both ends.
+# dt is pinned at 0.005 (the intstren optimizations' value) rather than left to get_critical_dt,
+# so a later dCRAB pulse lives on the same half-step grid as config_intstrenRamp.py. That is only
+#= safe while a(t) >= a_start: U grows as 1/a^3, and dt_crit comes from the t = 0 Hamiltonian.
+if true
+
+    if_all::Bool = true
+
+    # starting and ending states: dd groundstate manifolds at the two spacings
+    if false || if_all
+        lx,ly,n = 4,4,2
+        intstren_ms = 10.0
+        a_start_ms, a_end_ms = 0.5, 2.0
+        omega_ms = 10.0         # trap frequency of the displaced mode, as in the posicast/ZVD blocks
+        speccount_ms = 2
+
+        pdict_ms = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("scaling_type","dd"),("trap_frequency",omega_ms),("magnetic_spacing",a_start_ms),("interaction_strength",intstren_ms),("filling",0.5),("nev",speccount_ms+2),("if_find_data",false),("if_save_data",false)])
+        _,_,_,_,_,lattice_params_ms,hamilt_params_ms = run_normal_ed(pdict_ms; output_level=0)
+
+        pdict_ending_ms = merge(pdict_ms,Dict("magnetic_spacing"=>a_end_ms))
+        _,_,_,_,_,_,hamilt_params_ending_ms = run_normal_ed(pdict_ending_ms; output_level=0)
+
+        # both endpoints have a 2-fold degenerate groundstate, and a fresh Lanczos draw sometimes
+        # returns only one of the pair (seen at a = 2.0: target "manifold" = gs + first excited,
+        # fidelity capped near 0.5). The 120-dim space is tiny, so diagonalize densely instead
+        using LinearAlgebra
+        eig_starting_ms = eigen(Hermitian(Matrix(hamilt_params_ms["H"])))
+        eig_ending_ms = eigen(Hermitian(Matrix(hamilt_params_ending_ms["H"])))
+        nrgs_starting_ms, nrgs_ending_ms = eig_starting_ms.values[1:speccount_ms+2], eig_ending_ms.values[1:speccount_ms+2]
+        states_starting_ms = [eig_starting_ms.vectors[:,i] for i in 1:speccount_ms+2]
+        states_ending_ms = [eig_ending_ms.vectors[:,i] for i in 1:speccount_ms+2]
+        for nrgs in (nrgs_starting_ms,nrgs_ending_ms)
+            @assert nrgs[speccount_ms] - nrgs[1] < 1e-8 && nrgs[speccount_ms+1] - nrgs[speccount_ms] > 1e-3 "groundstate manifold is not an isolated $(speccount_ms)-fold degenerate level: $(nrgs)"
+        end
+
+        println("Starting U profile: $(hamilt_params_ms["U"])")
+        println("Starting energies: $(nrgs_starting_ms)")
+        println("Ending energies: $(nrgs_ending_ms)")
+
+        # sudden-quench floor: what the ramp has to beat
+        reference_fidelity_ms = real(groundstate_manifold_fidelity(states_ending_ms[1:speccount_ms],states_starting_ms[1:speccount_ms]))
+        println("Sudden-quench fidelity a $(a_start_ms)→$(a_end_ms): $(reference_fidelity_ms)")
+    end
+
+    # ZVD gradient pulse and the spacing it drives. x = a - a0 obeys xddot + w^2 x = B(t) from
+    # rest; the staircase Bf*[1/4,3/4,1] switching at 0, pi/w, 2pi/w is the impulse train
+    # (1/4,1/2,1/4) convolved with a step, so x is the matching sum of shifted step responses,
+    # x(t) = da * sum_{t_i <= t} A_i (1 - cos w(t - t_i)), which parks at da from 2pi/w onward.
+    # a(t) is sampled from that closed form, not integrated from B, so the switches need not sit
+    # on the half-step grid (a is C1 across them; only addot jumps)
+    if false || if_all
+        ramptime_ms = 1.0
+        dt_ms = 0.005
+
+        da_ms = a_end_ms - a_start_ms
+        bf_ms = omega_ms^2 * da_ms                  # final standing gradient, = peak B
+        amps_ms = [0.25, 0.5, 0.25]                 # ZVD impulse amplitudes, as fractions of Bf
+        timps_ms = [0.0, 1.0, 2.0] .* (pi/omega_ms)
+        @assert timps_ms[end] <= ramptime_ms "ZVD pulse settles at $(timps_ms[end]), after the end of the ramp $(ramptime_ms)"
+
+        gradient_ms(t) = bf_ms * sum((A for (A,ti) in zip(amps_ms,timps_ms) if ti <= t); init=0.0)
+        spacing_ms(t) = a_start_ms + da_ms * sum((A*(1 - cos(omega_ms*(t - ti))) for (A,ti) in zip(amps_ms,timps_ms) if ti <= t); init=0.0)
+
+        # same half-step grid and length pulse_ramp expects: ceil(ramptime/(dt/2)) + 1 samples
+        h_ms = dt_ms / 2
+        times_a_ms = (0:Int(ceil(ramptime_ms/h_ms))) .* h_ms
+        a_ms = spacing_ms.(times_a_ms)
+
+        # a starts exactly at a0 and only rises, so the t = 0 RK4 step bounds the whole run, and
+        # from the last impulse on it sits at a_end (the cos terms cancel identically)
+        @assert minimum(a_ms) == a_start_ms "spacing dips below a_start, the pinned dt is no longer stable"
+        settled_ms = times_a_ms .>= timps_ms[end]
+        @assert maximum(abs, a_ms[settled_ms] .- a_end_ms) < 1e-12 "spacing has not settled at a_end after the last impulse"
+
+        # check the closed form against the equation of motion by inverting it back to B, at every
+        # sample whose stencil does not straddle a switch (O(h^2 w^4 da) truncation error, hence
+        # the explicit tolerance), and that it starts from rest, i.e. needs no kick at t = 0
+        b_back_ms, kick_back_ms = get_magnetic_gradient_from_spacing(a_ms,h_ms,omega_ms)
+        smooth_ms = [i for i in 1:length(a_ms) if !any(ti -> abs(times_a_ms[i] - ti) < 1.5h_ms, timps_ms[2:end])]
+        err_b_back_ms = maximum(abs, b_back_ms[smooth_ms] .- gradient_ms.(times_a_ms[smooth_ms]))
+        println("ZVD spacing ramp: settles at t=$(timps_ms[end]), B recovered from a(t) to $(err_b_back_ms) (Bf = $(bf_ms)), kick at t=0 $(kick_back_ms)")
+        @assert err_b_back_ms < 1e-3*bf_ms "a(t) does not satisfy xddot + w^2 x = B(t)"
+        @assert abs(kick_back_ms) < 1e-3*da_ms "a(t) leaves a0 with a slope, which no finite gradient can produce"
+    end
+
+    # ZVD spacing ramp with instantaneous energies
+    if false || if_all
+        # work on a copy: run_timeevo's timeham writes the ramp's current value back into
+        # the dict, which would leave magnetic_spacing=a_end for any later section
+        hamilt_params_energy_ms = copy(hamilt_params_ms)
+
+        time_running_args_ms = (nev=speccount_ms,output_level=1,if_instant_gs=true,if_save_data=false,dataloc="tevo-daily-things-data/")
+        starting_states_ms = [Vector{ComplexF64}(states_starting_ms[i]) for i in 1:speccount_ms]
+        tevo_params_ms = Dict([ ("magnetic_spacing",(pulse_ramp,ramptime_ms,a_ms)),("tmax",ramptime_ms),("dt",dt_ms) ])
+        tevo_data_ms,tevo_dict_ms,instdata_ms,saving_args_ms = run_timeevo(starting_states_ms,tevo_params_ms,lattice_params_ms,hamilt_params_energy_ms; time_running_args_ms...)
+
+        # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
+        final_manifold_ms = [Vector{ComplexF64}(tevo_data_ms[1][i][:,end-1]) for i in 1:speccount_ms]
+        fidelity_ms = real(groundstate_manifold_fidelity(final_manifold_ms,[Vector{ComplexF64}(s) for s in states_ending_ms[1:speccount_ms]]))
+        println("Fidelity with target manifold using ZVD spacing ramp T=$(ramptime_ms): $(fidelity_ms)")
+    end
+
+    # plot the instantaneous vs transported energies along the ramp
+    if true || if_all
+        times_ms = range(0.0,ramptime_ms,length=length(instdata_ms[2]["1"]))
+
+        figure()
+        cols = ["b","g","r"]
+        for i in 1:speccount_ms
+            plot(times_ms,instdata_ms[2][string(i)],"-p",c=cols[i],label="E$(i) instantaneous")
+            plot(times_ms,tevo_data_ms[2][i][1:end-1],c="k",marker="x",label=(i==1 ? "transported" : nothing))
+        end
+        legend()
+        xlabel("Time")
+        ylabel("Energy")
+        title("Energy vs time for ZVD spacing ramp $(lx)x$(ly) N=$(n) U=$(intstren_ms) T=$(ramptime_ms) a $(a_start_ms)→$(a_end_ms), fidelity = $(round(fidelity_ms,digits=6))")
+    end
+
+    # plot the applied gradient and the spacing it drives
+    if true || if_all
+        fig, axs = subplots(2,1,sharex=true)
+        levels_ms = bf_ms .* cumsum(amps_ms)
+        axs[1].step(vcat(timps_ms,ramptime_ms),vcat(levels_ms,levels_ms[end]),where="post",c="b")
+        axs[1].axhline(bf_ms,ls="--",c="gray",label="holding gradient w²(a_end-a0)")
+        axs[1].set_ylabel("Magnetic gradient B(t)")
+        axs[1].set_title("ZVD gradient pulse and the spacing it drives, w=$(omega_ms)")
+        axs[1].legend()
+        axs[1].set_ylim(0.0,1.1*bf_ms)
+        axs[2].plot(times_a_ms,a_ms,c="k")
+        for ti in timps_ms
+            axs[2].axvline(ti,ls=":",c="gray")
+        end
+        axs[2].set_xlabel("Time")
+        axs[2].set_ylabel("Spacing a(t)")
+        axs[2].set_ylim(0.0,1.1*a_end_ms)
+    end
+
+end=#
+
+
+
+### Time evolution with the QuOCS dCRAB-optimized magnetic spacing ramp from optimal-control/config_magspacRamp.py
+# All parameters must match the ones the optimization ran with (see config_magspacRamp.py):
+# 4x4 N=2 pbc, dd intstren 10, a 0.5 -> 2.0 over ramptime 1.0, pulse on the dt = 0.005 half-step
+# grid, a >= 0.1. The initial guess was the ZVD spacing ramp of the block above, and the update
+# was scaled by 16 (t/T)^2 (1 - t/T)^2, which pins value and slope of a(t) at both ends, so the
+# optimized a(t) still leaves a_start and reaches a_end at rest: B(t) stays finite, no kicks.
+# The fidelity is computed twice: with the fast split-operator evolution the optimizer used
+# (magspac-ramp-control-functions.jl), and independently with run_timeevo's RK4, which is only
+# stable down to the smallest spacing the pulse reaches -- so dt is refined by an integer factor
+# from dt_crit at min(a), with the pulse linearly interpolated onto the finer half-step grid
+# (the fast evolution also treats a(t) as linear between samples).
+if true
+
+    if_all::Bool = true
+
+    include("magspac-ramp-control-functions.jl")
+
+    # endpoint manifolds and fast-evolution setup, same parameters as the optimization
+    if false || if_all
+        lx,ly,n = 4,4,2
+        speccount_msopt = 2
+        intstren_msopt = 10.0
+        a_start_msopt, a_end_msopt = 0.5, 2.0
+        ramptime_msopt = 1.0
+        dt_msopt = 0.005
+        omega_msopt = 10.0      # of the ZVD guess, and of the gradient read back from a(t)
+
+        params_msopt = Dict("Lx"=>lx,"Ly"=>ly,"N"=>n,"speccount"=>speccount_msopt,"intstren"=>intstren_msopt,"a_start"=>a_start_msopt,"a_end"=>a_end_msopt,"ramptime"=>ramptime_msopt,"dt"=>dt_msopt)
+        setup_msopt = setup_magspac_ramp(params_msopt)
+    end
+
+    # load the optimized pulse; fidelities of it and of the ZVD guess with the fast evolution
+    if false || if_all
+        quocs_folder_msopt = "../optimal-control/QuOCS_Results/20260924_150154_magspacRamp_dCRAB"
+        controls_file_msopt = filter(f -> endswith(f,"best_controls.npz"), readdir(quocs_folder_msopt))[1]
+        # only read the numeric arrays: NPZ.jl cannot parse the numpy unicode-string arrays
+        # (pulse_names etc.) that QuOCS also stores in the file
+        best_controls_msopt = npzread(joinpath(quocs_folder_msopt,controls_file_msopt),["magspacRamp","time_grid_for_magspacRamp"])
+        a_msopt = Float64.(real.(best_controls_msopt["magspacRamp"]))
+        times_a_msopt = Float64.(real.(best_controls_msopt["time_grid_for_magspacRamp"]))
+        a_guess_msopt = zvd_spacing_pulse(a_start_msopt,a_end_msopt,omega_msopt,ramptime_msopt,dt_msopt)
+
+        fidelity_msopt = compute_fidelity_magspac_ramp([a_msopt],params_msopt,setup_msopt)
+        fidelity_guess_msopt = compute_fidelity_magspac_ramp([a_guess_msopt],params_msopt,setup_msopt)
+        println("Fast evolution: optimized fidelity $(fidelity_msopt), ZVD guess $(fidelity_guess_msopt), min a $(minimum(a_msopt))")
+    end
+
+    # independent check with run_timeevo, with instantaneous energies for the plot below
+    if false || if_all
+        pdict_msopt = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("scaling_type","dd"),("trap_frequency",omega_msopt),("magnetic_spacing",a_start_msopt),("interaction_strength",intstren_msopt),("filling",0.5),("nev",speccount_msopt),("if_find_data",false),("if_save_data",false)])
+        _,_,_,_,_,lattice_params_msopt,hamilt_params_msopt = run_normal_ed(pdict_msopt; output_level=0)
+
+        # RK4 step for the strongest couplings the pulse reaches, as an integer refinement of dt
+        u_at_min_a_msopt = long_range_scaling(length(hamilt_params_msopt["U"])-1,ly,intstren_msopt; scaling="dd",magnetic_spacing=minimum(a_msopt))
+        dt_crit_msopt = get_critical_dt(ramptime_msopt,lattice_params_msopt,Dict("U"=>u_at_min_a_msopt))
+        refine_msopt = max(1,ceil(Int,dt_msopt/dt_crit_msopt))
+        dt_run_msopt = dt_msopt / refine_msopt
+
+        # the pulse on the finer half-step grid, at the length pulse_ramp expects
+        times_run_msopt = (0:Int(ceil(ramptime_msopt/(dt_run_msopt/2)))) .* (dt_run_msopt/2)
+        a_run_msopt = map(times_run_msopt) do t
+            i = clamp(searchsortedlast(times_a_msopt,t),1,length(times_a_msopt)-1)
+            w = (t - times_a_msopt[i]) / (times_a_msopt[i+1] - times_a_msopt[i])
+            (1 - w)*a_msopt[i] + w*a_msopt[i+1]
+        end
+        println("run_timeevo: min a $(minimum(a_msopt)) -> dt_crit $(dt_crit_msopt), dt refined x$(refine_msopt) to $(dt_run_msopt)")
+
+        # work on a copy: run_timeevo's timeham writes the ramp's current value back into
+        # the dict, which would leave magnetic_spacing=a_end for any later section
+        hamilt_params_energy_msopt = copy(hamilt_params_msopt)
+        starting_states_msopt = setup_msopt[1]
+        time_running_args_msopt = (nev=speccount_msopt,output_level=0,if_instant_gs=true,if_save_data=false,dataloc="tevo-daily-things-data/")
+        tevo_params_msopt = Dict([ ("magnetic_spacing",(pulse_ramp,ramptime_msopt,a_run_msopt)),("tmax",ramptime_msopt),("dt",dt_run_msopt) ])
+        tevo_data_msopt,tevo_dict_msopt,instdata_msopt,_ = run_timeevo(starting_states_msopt,tevo_params_msopt,lattice_params_msopt,hamilt_params_energy_msopt; time_running_args_msopt...)
+
+        # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
+        final_manifold_msopt = [Vector{ComplexF64}(tevo_data_msopt[1][i][:,end-1]) for i in 1:speccount_msopt]
+        fidelity_rk4_msopt = real(groundstate_manifold_fidelity(final_manifold_msopt,setup_msopt[2]))
+        println("Fidelity with target manifold using the optimized spacing ramp: $(fidelity_rk4_msopt) (run_timeevo), $(fidelity_msopt) (fast evolution)")
+    end
+
+    # plot the instantaneous vs transported energies along the optimized ramp
+    if true || if_all
+        times_msopt = range(0.0,ramptime_msopt,length=length(instdata_msopt[2]["1"]))
+
+        figure()
+        cols = ["b","g","r"]
+        for i in 1:speccount_msopt
+            plot(times_msopt,instdata_msopt[2][string(i)],"-p",c=cols[i],label="E$(i) instantaneous")
+            plot(times_msopt,tevo_data_msopt[2][i][1:end-1],c="k",marker="x",label=(i==1 ? "transported" : nothing))
+        end
+        legend()
+        xlabel("Time")
+        ylabel("Energy")
+        title("Energy vs time for dCRAB spacing ramp $(lx)x$(ly) N=$(n) a $(a_start_msopt)→$(a_end_msopt), fidelity = $(round(fidelity_rk4_msopt,digits=6))")
+    end
+
+    # plot the optimized a(t) against the ZVD guess, and the gradient each needs
+    if true || if_all
+        h_msopt = dt_msopt / 2
+        b_msopt, kick_msopt = get_magnetic_gradient_from_spacing(a_msopt,h_msopt,omega_msopt)
+        b_guess_msopt, kick_guess_msopt = get_magnetic_gradient_from_spacing(a_guess_msopt,h_msopt,omega_msopt)
+        println("Gradient read back from a(t): optimized max|B| $(maximum(abs,b_msopt)), kick at t=0 $(kick_msopt); ZVD guess max|B| $(maximum(abs,b_guess_msopt)), kick $(kick_guess_msopt)")
+
+        fig, axs = subplots(2,1,sharex=true)
+        axs[1].plot(times_a_msopt,a_guess_msopt,"--",c="gray",label="ZVD guess, F = $(round(fidelity_guess_msopt,digits=4))")
+        axs[1].plot(times_a_msopt,a_msopt,c="k",label="dCRAB, F = $(round(fidelity_msopt,digits=4))")
+        axs[1].set_ylabel("Spacing a(t)")
+        axs[1].set_title("dCRAB-optimized spacing ramp and its gradient, w=$(omega_msopt)")
+        axs[1].legend()
+        axs[2].plot(times_a_msopt,b_guess_msopt,"--",c="gray",label="ZVD guess")
+        axs[2].plot(times_a_msopt,b_msopt,c="b",label="dCRAB")
+        axs[2].set_xlabel("Time")
+        axs[2].set_ylabel("Magnetic gradient B(t)")
+        axs[2].legend()
     end
 
 end
