@@ -1094,11 +1094,12 @@ end=#
 # the same logic as shortcuts to adiabaticity for transport: rather than moving slowly enough
 # never to excite the mode, excite it deliberately and then cancel the excitation exactly.
 #
-# Caveat worth being explicit about: with atarg = 2.0 and a0 = 0.1 the nearest-neighbour
+#= Caveat, with the measured outcome: with atarg = 2.0 and a0 = 0.1 the nearest-neighbour
 # coupling falls 10/(0.1)^3 = 10000 -> 10/(2.0)^3 = 1.25 in half a trap period. That is a
-# violent quench and the transported state is not expected to follow the instantaneous
-# manifold. The pulse is designed for a(t), not for fidelity -- lower atarg for adiabaticity.
-if true
+# violent quench, but it costs less than a first look suggests -- the lowest transported state
+# still ends with 0.857 of its weight in the final instantaneous manifold. The pulse is
+# designed for a(t), not for fidelity; lower atarg if adiabaticity is what is wanted.
+if false
 
     if_all::Bool = true
 
@@ -1369,6 +1370,232 @@ if true
         # the same vmin/vmax, so the one bar reads for all of them
         colorbar(label="Density")
         suptitle("Real-space density of the transported gs $(lx)x$(ly) N=$(n), two-step a $(a0_posicast)→$(atarg_posicast)")
+    end
+
+end=#
+
+### ZVD three-step gradient pulse: settle the spacing and tolerate a mis-measured trap frequency
+# Same retarded kernel as the two-step block -- x = a - a0 obeys xddot + w^2 x = B(t) from rest,
+# undamped, so any ringing left at the end of the pulse is permanent. The two-step (posicast /
+# ZV) catch is exact but fragile: it relies on pi/w being the true half period, and at an actual
+# frequency w(1+eps) the switch lands off the rest point, leaving a residual linear in eps.
+#
+# Input shaping puts this in the right frame: a shaped command is the step convolved with an
+# impulse train A_i at times t_i, and the residual oscillation it leaves is proportional to
+# sum_i A_i exp(i w t_i). The ZV shaper (1/2, 1/2 at 0, T/2) zeroes that sum -- that is exactly
+# the two-step pulse. The ZVD shaper (1/4, 1/2, 1/4 at 0, T/2, T with T = 2pi/w) zeroes the sum
+# *and* its derivative with respect to w, so the residual is O(eps^2) instead of O(eps). It buys
+# that with one extra half period of settling time.
+#
+# Convolving a step of final amplitude Bf = w^2*da with that train gives the staircase
+#
+#     B(t) = Bf * [1/4, 3/4, 1]   on   [0, T/2), [T/2, T), [T, inf),
+#
+# the cumulative sums of the impulse amplitudes. The response is the matching superposition of
+# shifted step responses, x(t) = da * sum_{t_i <= t} A_i*(1 - cos w(t-t_i)), which parks at da/2
+# at T/2 and at da from T onward. Both segments rise monotonically, so as with the two-step pulse
+# min_t a(t) = a0 at t = 0 only: max_t U(t) = U(a0) and the RK4 step from the t = 0 Hamiltonian
+# bounds the whole run. Everything below is written over the impulse train rather than over
+# spelled-out branches, so the same code builds either shaper from its (A_i, t_i) list.
+#
+# Note the O(eps^2) robustness is the reason for the extra step but is asserted here, not
+# demonstrated -- nothing in this block drives the pulse at a detuned frequency.
+if true
+
+    if_all::Bool = true
+
+    # starting state: dipole-dipole groundstate at the initial spacing a0, which the t=0 gradient
+    # profile (zero accumulated integral) has to reproduce or the run does not start in an eigenstate
+    if true || if_all
+        lx,ly,n = 4,4,2
+        intstren_zvd = 10.0
+        a0_zvd, atarg_zvd = 0.1, 2.0
+        omega_zvd = 10.0
+        speccount_zvd = 2
+
+        pdict_zvd = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("scaling_type","dd"),("trap_frequency",omega_zvd),("magnetic_spacing",a0_zvd),("interaction_strength",intstren_zvd),("filling",0.5),("nev",speccount_zvd),("if_find_data",false),("if_save_data",false)])
+        states_starting_zvd,nrgs_starting_zvd,_,_,_,lattice_params_zvd,hamilt_params_zvd = run_normal_ed(pdict_zvd; output_level=0)
+        @assert long_range_scaling(ly-1,ly,intstren_zvd; scaling="magnetic_gradient",magnetic_spacing=a0_zvd,magnetic_gradient_integral=0.0) ≈ hamilt_params_zvd["U"] "t=0 gradient profile does not match the dd profile the starting state was found with"
+        println("Starting U profile: $(hamilt_params_zvd["U"])")
+    end
+
+    # the impulse train, the staircase it convolves to, and the spacing that comes back
+    if true || if_all
+        da_zvd = atarg_zvd - a0_zvd
+        bf_zvd = omega_zvd^2 * da_zvd               # final standing gradient, = peak |B|
+        amps_zvd = [0.25, 0.5, 0.25]                # ZVD impulse amplitudes, as fractions of Bf
+        timps_zvd = [0.0, 1.0, 2.0] .* (pi/omega_zvd)
+
+        # the two shaper conditions, checked rather than trusted: the first kills the residual
+        # amplitude, the second its first derivative in w (which is what ZV lacks)
+        @assert abs(sum(a*cis(omega_zvd*t) for (a,t) in zip(amps_zvd,timps_zvd))) < 1e-12 "impulse train does not satisfy the zero-vibration condition"
+        @assert abs(sum(a*t*cis(omega_zvd*t) for (a,t) in zip(amps_zvd,timps_zvd))) < 1e-12 "impulse train does not satisfy the zero-derivative condition"
+        # holding a displaced spacing needs a standing gradient, so atarg <= a0 + Bmax/w^2 caps
+        # any non-ringing solution, shaped or not; ZVD does not raise that ceiling
+        @assert bf_zvd <= 200.0 "standing gradient Bf = $(bf_zvd) exceeds Bmax = 200.0; largest spacing that can settle is $(a0_zvd + 200.0/omega_zvd^2)"
+
+        # settling completes at the last impulse, T = 2pi/w; the remaining half period is there to
+        # show nothing rings afterwards. dt comes from the RK4 stability limit for the interaction
+        # scale, then is snapped down so that pi/w sits an exact whole number of half-steps away --
+        # every impulse time is a multiple of pi/w, so one snap puts all of them on the grid, and
+        # the switches have to land on samples or the catches are applied at the wrong phase
+        tmax_zvd = 3 * (pi/omega_zvd)
+        dtcrit_zvd = get_critical_dt(tmax_zvd,lattice_params_zvd,hamilt_params_zvd)
+        nsw_zvd = Int(ceil((pi/omega_zvd) / (dtcrit_zvd/2)))
+        dt_zvd = 2 * (pi/omega_zvd) / nsw_zvd
+        @assert dt_zvd <= dtcrit_zvd "snapped dt $(dt_zvd) is above the RK4 stability limit $(dtcrit_zvd)"
+
+        # pulse_ramp samples on the half-step grid (spacing dt/2) and timeham indexes it directly,
+        # so the pulse needs exactly ceil(tmax/(dt/2)) + 1 entries -- the same expression pulse_ramp
+        # recomputes, so the two agree whichever way the ceil rounds
+        nhalf_zvd = Int(ceil(tmax_zvd/(dt_zvd/2)))
+        bgrid_zvd = collect(0:nhalf_zvd) .* (dt_zvd/2)
+        iimps_zvd = Int.(round.(timps_zvd ./ (dt_zvd/2))) .+ 1
+        @assert bgrid_zvd[iimps_zvd] ≈ timps_zvd "the impulse samples sit at $(bgrid_zvd[iimps_zvd]) rather than $(timps_zvd)"
+
+        # accumulate the staircase impulse by impulse. Each interior jump sample carries half the
+        # amplitude it is jumping by, which is not a fudge: for the trapezoid rule the two intervals
+        # either side then integrate to exactly the true step function rather than ramping across a
+        # half-step, and without it the residual is O(w*da*h) -- worse than not snapping dt at all,
+        # since snapping puts a sample exactly where that error is largest. t = 0 is the exception
+        # and takes the full amplitude: there is no "before" side inside the integration domain, so
+        # halving it would just lose half of the first interval
+        bpulse_zvd = zeros(Float64,nhalf_zvd+1)
+        for (amp,idx) in zip(amps_zvd,iimps_zvd)
+            bpulse_zvd[idx] += bf_zvd * amp * (idx == 1 ? 1.0 : 0.5)
+            bpulse_zvd[idx+1:end] .+= bf_zvd * amp
+        end
+
+        # same retarded trapezoid as get_magnetic_gradient_integral, written O(n) instead of O(n^2)
+        # by splitting sin(w(t-t')) = sin(wt)cos(wt') - cos(wt)sin(wt'), which turns the retarded
+        # integral into two cumulative trapezoids over integrands independent of the upper limit.
+        # Same samples and weights, so it is the same quadrature rather than an approximation to it
+        cumtrap_zvd = f -> pushfirst!(cumsum(0.5*(dt_zvd/2) .* (f[1:end-1] .+ f[2:end])),0.0)
+        cosg_zvd, sing_zvd = cos.(omega_zvd .* bgrid_zvd), sin.(omega_zvd .* bgrid_zvd)
+        integral_zvd = (sing_zvd .* cumtrap_zvd(bpulse_zvd .* cosg_zvd) .- cosg_zvd .* cumtrap_zvd(bpulse_zvd .* sing_zvd)) ./ omega_zvd
+        spacings_zvd = a0_zvd .+ integral_zvd
+
+        # check it against get_magnetic_gradient_integral itself, i.e. against the quadrature the
+        # evolution actually runs, not a second copy of the same arithmetic. A uniform step
+        # throughout is what run_timeevo sets up, so when_dt_ends goes past the end here to match
+        checkparams_zvd = Dict{String,Any}([("magnetic_gradient_time",bpulse_zvd),("when_dt_ends",[nhalf_zvd+1,nhalf_zvd+1]),("dt",[dt_zvd,dt_zvd]),("trap_frequency",omega_zvd)])
+        for k in vcat(1,2,iimps_zvd,iimps_zvd.+1,nhalf_zvd+1)
+            @assert isapprox(get_magnetic_gradient_integral(k,checkparams_zvd),integral_zvd[k]; atol=1e-12) "the O(n) kernel split disagrees with get_magnetic_gradient_integral at sample $k"
+        end
+
+        # closed form: the superposition of step responses from the impulses that have fired
+        analytic_zvd = [a0_zvd + da_zvd*sum(amp*(1-cos(omega_zvd*(t-ti))) for (amp,ti) in zip(amps_zvd,timps_zvd) if t >= ti; init=0.0) for t in bgrid_zvd]
+        quaderr_zvd = maximum(abs.(spacings_zvd .- analytic_zvd))
+        # residual ringing: peak-to-peak spread of a past the last impulse, zero in exact arithmetic
+        settled_zvd = iimps_zvd[end]
+        ringing_zvd = maximum(spacings_zvd[settled_zvd:end]) - minimum(spacings_zvd[settled_zvd:end])
+        println("ZVD staircase: Bf*[1/4,3/4,1] = $(bf_zvd .* cumsum(amps_zvd)) at t = $(round.(timps_zvd,digits=5))")
+        println("Critical time step: $(dtcrit_zvd), snapped to $(dt_zvd) ($(Int(ceil(tmax_zvd/dt_zvd))) RK4 steps for tmax $(round(tmax_zvd,digits=5)))")
+        println("Spacing a: $(a0_zvd) -> $(spacings_zvd[end]) (target $(atarg_zvd), halfway park $(spacings_zvd[iimps_zvd[2]]), min over the run $(minimum(spacings_zvd)))")
+        println("Deviation from the closed form: $(quaderr_zvd); residual ringing after the last impulse (peak-to-peak): $(ringing_zvd)")
+
+        @assert quaderr_zvd < 1e-5 "the sampled staircase does not reproduce the closed-form response to 1e-5"
+        @assert ringing_zvd < 1e-9 "the spacing still rings by $(ringing_zvd), so a catch is landing at the wrong phase"
+        # atol, not the default rtol of ~1.5e-8: the halfway park carries about half the O(h^2)
+        # quadrature error bounded by quaderr_zvd above, so it lands ~8e-8 off the exact value
+        @assert isapprox(spacings_zvd[iimps_zvd[2]],a0_zvd + da_zvd/2; atol=1e-5) "the first catch parks at $(spacings_zvd[iimps_zvd[2]]) rather than halfway to the target at $(a0_zvd + da_zvd/2)"
+        # the monotone rise over both segments is what makes the t=0 RK4 step valid for the whole run
+        @assert minimum(spacings_zvd) ≈ a0_zvd "the spacing dips below a0, so max(U) is not U(a0) and the critical dt no longer bounds the run"
+        @assert minimum(diff(spacings_zvd[1:settled_zvd])) > -1e-15 "the rise to the target is not monotonic"
+    end
+
+    # time evolution along the staircase, tracking the instantaneous spectrum
+    if false || if_all
+        # work on a copy: timeham writes the ramped values, the accumulated integral and the rebuilt
+        # U back into the dict, which would otherwise leave the starting-state parameters overwritten
+        hamilt_params_tevo_zvd = copy(hamilt_params_zvd)
+        hamilt_params_tevo_zvd["scaling_type"] = "magnetic_gradient"
+
+        starting_states_zvd = [Vector{ComplexF64}(states_starting_zvd[i]) for i in 1:speccount_zvd]
+        tevo_params_zvd = Dict([ ("magnetic_gradient_time",(pulse_ramp,tmax_zvd,bpulse_zvd)),("trap_frequency",omega_zvd),("tmax",tmax_zvd),("dt",dt_zvd) ])
+        tevo_data_zvd,tevo_dict_zvd,instdata_zvd,saving_args_zvd = run_timeevo(starting_states_zvd,tevo_params_zvd,lattice_params_zvd,hamilt_params_tevo_zvd; nev=speccount_zvd,output_level=1,if_instant_gs=true,if_save_data=false,dataloc="tevo-daily-things-data/")
+
+        # the run must end on the static profile the target spacing gives -- comparing against atarg
+        # rather than against integral_zvd[end] is the point of the construction
+        us_final_zvd = long_range_scaling(ly-1,ly,intstren_zvd; scaling="magnetic_gradient",magnetic_spacing=a0_zvd,magnetic_gradient_integral=da_zvd)
+        println("Final U profile: $(hamilt_params_tevo_zvd["U"]) (expected $(us_final_zvd))")
+        @assert hamilt_params_tevo_zvd["U"] ≈ us_final_zvd "final U is not the static profile at the target spacing"
+
+        # end-1 skips the final transported column, which is allocated but never written; which
+        # vector ED returns for the near-degenerate partner is not reproducible run to run, so track
+        # the population of the final instantaneous manifold instead of a state-to-state fidelity
+        final_state_zvd = Vector{ComplexF64}(tevo_data_zvd[1][1][:,end-1])
+        manifold_population_zvd = sum(abs2(dot(final_state_zvd,Vector{ComplexF64}(instdata_zvd[1][string(i)][:,end]))) for i in 1:speccount_zvd)
+        println("Starting energies: $(nrgs_starting_zvd)")
+        println("Final instantaneous energies: $([instdata_zvd[2][string(i)][end] for i in 1:speccount_zvd])")
+        println("Population of the final instantaneous manifold by the lowest transported state: $(manifold_population_zvd)")
+    end
+
+    # the staircase and the spacing it accumulates
+    if false || if_all
+        figure()
+        plot(bgrid_zvd,bpulse_zvd,c="b",label="gradient B")
+        plot(bgrid_zvd,spacings_zvd,c="r",label="spacing a = a0 + ∫B(t')sin(ω(t-t'))dt'/ω")
+        axhline(atarg_zvd,ls=":",c="r",label="target a = $(atarg_zvd)")
+        for (i,t) in enumerate(timps_zvd[2:end])
+            axvline(t,ls="--",c="k",label=(i==1 ? "impulses at T/2, T" : nothing))
+        end
+        legend()
+        xlabel("Time")
+        ylabel("Value")
+        title("ZVD staircase Bf=$(bf_zvd)*[1/4,3/4,1], ω=$(omega_zvd), ringing $(round(ringing_zvd,sigdigits=2))")
+    end
+
+    # instantaneous vs transported energies: past the last impulse the spacing, and so H, is time
+    # independent, and both series have to be flat. This is what separates "settled" from
+    # "correct on average"
+    if false || if_all
+        times_zvd = [k*dt_zvd for k in 1:length(instdata_zvd[2]["1"])]
+        settled_start_zvd = findfirst(t -> t >= timps_zvd[end], times_zvd)
+        println("Energy drift after the last impulse: instantaneous $(maximum(abs.(instdata_zvd[2]["1"][settled_start_zvd:end] .- instdata_zvd[2]["1"][end]))), transported $(maximum(abs.(tevo_data_zvd[2][1][settled_start_zvd:end-1] .- tevo_data_zvd[2][1][end-1])))")
+
+        figure()
+        for (i,col) in enumerate(["b","g","r"][1:speccount_zvd])
+            plot(times_zvd,instdata_zvd[2][string(i)],"-p",c=col,label="E$(i) instantaneous")
+            plot(times_zvd,tevo_data_zvd[2][i][1:end-1],c="k",marker="x",label=(i==1 ? "transported" : nothing))
+        end
+        for t in timps_zvd[2:end]; axvline(t,ls="--",c="k"); end
+        legend()
+        xlabel("Time")
+        ylabel("Energy")
+        title("Energy vs time, ZVD pulse $(lx)x$(ly) N=$(n) a $(a0_zvd)→$(atarg_zvd), manifold population = $(round(manifold_population_zvd,digits=6))")
+    end
+
+    # real-space density: get_occupancy resolves the density on (physical x, synthetic index m)
+    # only, and it is the gradient that gives the synthetic direction a real extent -- the
+    # displacement the kernel accumulates is the ladder spacing a(t) entering the dipolar tail, so
+    # row m sits at physical y_m(t) = (m-1)*a(t). The ZVD ladder therefore fans out in two stages,
+    # pausing at half the target displacement over T/2 <= t <= T, and then stops dead
+    if false || if_all
+        # column k is the state after k RK4 steps, t = k*dt, and the last column is never written,
+        # hence end-1; the starting state is prepended so the series opens at t = 0
+        states_py_zvd = vcat([Vector{ComplexF64}(states_starting_zvd[1])],[Vector{ComplexF64}(tevo_data_zvd[1][1][:,k]) for k in 1:size(tevo_data_zvd[1][1],2)-1])
+        times_py_zvd = [(k-1)*dt_zvd for k in 1:length(states_py_zvd)]
+        occs_py_zvd = [get_occupancy(s,lattice_params_zvd; if_plot=false) for s in states_py_zvd]
+        @assert all(occ -> sum(occ) ≈ n, occs_py_zvd) "occupancies do not sum to the particle number, so the transported states are not normalised"
+
+        # cell edges in time (midpoints between steps) and the spacing evaluated there, so the mesh
+        # carries one more edge than it has cells; spacings_zvd lives on the half-step grid, so time
+        # t sits at index 2t/dt + 1
+        tedges_py_zvd = vcat(0.0,0.5 .* (times_py_zvd[1:end-1] .+ times_py_zvd[2:end]),times_py_zvd[end])
+        aat_py_zvd = t -> spacings_zvd[min(Int(round(2*t/dt_zvd))+1,length(spacings_zvd))]
+        @assert aat_py_zvd(0.0) ≈ a0_zvd "the spacing at t=0 is not the initial spacing the starting state was found at"
+        println("Physical y of the top synthetic row: $((ly-1)*aat_py_zvd(0.0)) -> $((ly-1)*aat_py_zvd(times_py_zvd[end]))")
+
+        figure()
+        pcolormesh([tedges_py_zvd[k] for j in 1:ly+1, k in 1:length(tedges_py_zvd)],
+                   [(j-1.5)*aat_py_zvd(tedges_py_zvd[k]) for j in 1:ly+1, k in 1:length(tedges_py_zvd)],
+                   reduce(hcat,[vec(sum(occ,dims=2)) for occ in occs_py_zvd]))
+        colorbar(label="Density (summed over physical x)")
+        for t in timps_zvd[2:end]; axvline(t,ls="--",c="w"); end
+        xlabel("Time")
+        ylabel("Physical y")
+        title("Real-space y density of the transported gs $(lx)x$(ly) N=$(n), ZVD a $(a0_zvd)→$(atarg_zvd)")
     end
 
 end
