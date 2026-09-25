@@ -9,9 +9,8 @@ config_intstrenRamp_AD.py is the gradient-based (automatic differentiation)
 counterpart of this optimization.
 """
 
-from quocs_common import (JuliaFoM, dcrab_algorithm_settings, fourier_pulse,
-                          include_julia, jl, linear_ramp_lambda, load_best_controls,
-                          plot_best_pulses, run_optimization)
+from quocs_common import (JuliaFoM, dcrab_algorithm_settings, finish_run, fourier_pulse,
+                          include_julia, jl, linear_ramp_lambda, run_optimization)
 
 include_julia("intstren-ramp-control-functions.jl")
 
@@ -92,12 +91,10 @@ def main():
         "dt": dt,
     }))
 
-    best_controls = load_best_controls(optimization_obj)
-    fidelity = abs(optimization_obj.opt_alg_obj.best_FoM)
-    plot_best_pulses(best_controls,
-                     [("intstrenRamp", "time_intstrenRamp", "Interaction strength")],
-                     title=f"Optimized Intstren-Ramp Fidelity: {fidelity:.4f}",
-                     filename="intstrenRamp_optimized.png")
+    finish_run(optimization_obj,
+               [("intstrenRamp", "time_intstrenRamp", "Interaction strength")],
+               title="Optimized Intstren-Ramp Fidelity: {fom:.4f}",
+               prefix="intstrenRamp")
 
 
 if __name__ == "__main__":

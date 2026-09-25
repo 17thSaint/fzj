@@ -40,6 +40,24 @@ function get_magnetic_gradient_integral(timestep::Int,t_evo_params::Dict)
     return 0.5 * sum(@views spacings .* (integrand[1:timestep-1] .+ integrand[2:timestep])) / trap_frequency
 end
 
+# The same response at every sample at once, plus the mode's velocity:
+#     x(t_k) = (1/w) int_0^t_k B(t') sin(w(t_k - t')) dt',   xdot(t_k) = int_0^t_k B(t') cos(w(t_k - t')) dt',
+# for gradient samples separated by the interval lengths `steps` (t_1 = 0), with the trapezoid
+# weights of get_magnetic_gradient_integral. Splitting sin(w(t-t')) = sin(wt)cos(wt') - cos(wt)sin(wt')
+# pulls the upper limit out of the integrand and leaves two cumulative trapezoids, so all n samples
+# cost O(n) together instead of O(n) each. Pass a Float64 h for a uniform grid.
+function magnetic_gradient_response(gradient_values::AbstractVector{<:Real},steps::AbstractVector{<:Real},trap_frequency::Float64)
+    n = length(gradient_values)
+    @assert length(steps) == n - 1 "need one step per interval: $(n) samples, $(length(steps)) steps"
+    wt = trap_frequency .* pushfirst!(cumsum(Float64.(steps)),0.0)
+    c, s = cos.(wt), sin.(wt)
+    cumtrap(f) = pushfirst!(cumsum(@views 0.5 .* steps .* (f[1:n-1] .+ f[2:n])),0.0)
+    ic, is = cumtrap(gradient_values .* c), cumtrap(gradient_values .* s)
+    return (s .* ic .- c .* is) ./ trap_frequency, c .* ic .+ s .* is
+end
+
+magnetic_gradient_response(gradient_values::AbstractVector{<:Real},h::Float64,trap_frequency::Float64) = magnetic_gradient_response(gradient_values,fill(h,length(gradient_values)-1),trap_frequency)
+
 # Inverse of get_magnetic_gradient_integral: the gradient B(t) that drives a prescribed spacing
 # a(t), read off the same trapped-mode equation, B = addot + w^2 (a - a0), with a0 the spacing
 # the mode is displaced from (the dd spacing of the starting state, a[1] by default).
@@ -78,7 +96,7 @@ function timeham(timestep::Int,t_evo_params::Dict,lattice_params::Dict,hamilt_pa
     # reset hamilt_params given the timestep from the t_evo_params
     if_rebuild_ulr = false
     for (k,v) in t_evo_params
-        if k != "dt" && k != "nsteps" && k != "tmax" && k != "when_dt_ends" && k != "current_dt" && k != "trap_frequency"
+        if !(k in ("dt","nsteps","tmax","when_dt_ends","current_dt","trap_frequency","magnetic_gradient_integral_time"))
             # these parameters only enter the Hamiltonian through the coupling vector U,
             # which must be rebuilt whenever one of them takes a new value (skipping the
             # rebuild while the value sits constant, e.g. the hold after a ramp ends)
@@ -92,10 +110,11 @@ function timeham(timestep::Int,t_evo_params::Dict,lattice_params::Dict,hamilt_pa
     # the magnetic field gradient enters U through its time integral, which keeps growing
     # while the gradient is non-zero even when the gradient value itself repeats, so the
     # rebuild has to be keyed on the accumulated integral rather than on the ramped value
-    # (and the integral, not the gradient, is what long_range_scaling needs)
+    # (and the integral, not the gradient, is what long_range_scaling needs). make_tevo_params
+    # precomputes it for the whole run, so this is a lookup rather than an O(n) sum per call
     magnetic_integral::Float64 = 0.0
     if haskey(t_evo_params,"magnetic_gradient_time")
-        magnetic_integral = get_magnetic_gradient_integral(timestep,t_evo_params)
+        magnetic_integral = t_evo_params["magnetic_gradient_integral_time"][timestep]
         magnetic_integral !== get(hamilt_params,"magnetic_gradient_integral",nothing) && (if_rebuild_ulr = true)
         hamilt_params["magnetic_gradient_integral"] = magnetic_integral
     end
@@ -383,7 +402,7 @@ function time_evolution(starting_wavefunc::Vector{ComplexF64},starting_ham::Spar
 
     opl > 0 && println("Starting time evolution")
 
-    display(t_evo_params)
+    opl > 0 && display(t_evo_params)
 
     # perform the time evolution
     for timestep in 1:2:nsteps
@@ -475,7 +494,7 @@ function time_evolution(starting_wavefunc::Vector{Vector{ComplexF64}},starting_h
 
     opl > 0 && println("Starting time evolution")
 
-    display(t_evo_params)
+    opl > 0 && display(t_evo_params)
 
     # perform the time evolution
     for timestep in 1:2:nsteps
@@ -551,6 +570,15 @@ function make_tevo_params(given_parameters::Dict)
         end
     end
 
+    # the retarded gradient integral timeham needs at every half-step, computed once for the
+    # whole run, with the sample spacings get_magnetic_gradient_integral uses (two-dt aware)
+    if haskey(t_evo_params,"magnetic_gradient_time")
+        n = length(t_evo_params["magnetic_gradient_time"])
+        dt_early, dt_late = t_evo_params["dt"] ./ 2
+        steps = ifelse.((1:n-1) .> t_evo_params["when_dt_ends"][1], dt_late, dt_early)
+        t_evo_params["magnetic_gradient_integral_time"] = magnetic_gradient_response(t_evo_params["magnetic_gradient_time"],steps,t_evo_params["trap_frequency"])[1]
+    end
+
     return t_evo_params
 end
 
@@ -589,6 +617,10 @@ function pulse_ramp(nsteps::Int,dt::Float64; kwargs...)
 
     return vcat(pulse_values, pulse_values[end] .* ones(nsteps - steps_until_end + 1))
 end
+
+# the sample times of that grid for a pulse of length ending_time: the ceil(ending_time/(dt/2)) + 1
+# half-steps pulse_ramp expects
+halfstep_times(ending_time::Float64,dt::Float64) = (0:Int(ceil(ending_time/(dt/2)))) .* (dt/2)
 
 function find_when_change_dt(tmax::Float64,leastramptime::Float64; kwargs...)
     max_nsteps::Int = get(kwargs, :max_nsteps, 1e4)
@@ -687,6 +719,16 @@ function get_critical_dt(tmax::Float64,lattice_dict::Dict,hamilt_dict::Dict)
     dt_crit = 2.0 / (npairs * get_interaction_scale(hamilt_dict))
     dt_crit > 0.01*tmax && (dt_crit = 2.0 / (npairs * 300.0))
     return dt_crit
+end
+
+# The same limit for the dd profile at an arbitrary spacing, for spacing / gradient pulses: the
+# step from the t = 0 Hamiltonian only bounds a run while a(t) stays at or above its starting
+# value, and U ~ 1/a^3 grows quickly as a pulse pulls the states together
+function get_critical_dt_at_spacing(spacing::Float64,tmax::Float64,lattice_dict::Dict,hamilt_dict::Dict)
+    hp = copy(hamilt_dict)
+    hp["U"] = long_range_scaling(get(hamilt_dict,"lr_dist",length(hamilt_dict["U"])-1),lattice_dict["Ly"],
+                                 hamilt_dict["interaction_strength"]; scaling="dd",magnetic_spacing=spacing)
+    return get_critical_dt(tmax,lattice_dict,hp)
 end
 
 function run_timeevo(starting_gs::Vector,time_params::Dict,lattice_dict::Dict,hamilt_dict::Dict; kwargs...)

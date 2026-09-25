@@ -1766,7 +1766,7 @@ end=#
 # (magspac-ramp-control-functions.jl), and independently with run_timeevo's RK4, which is only
 # stable down to the smallest spacing the pulse reaches -- so dt is refined by an integer factor
 # from dt_crit at min(a), with the pulse linearly interpolated onto the finer half-step grid
-# (the fast evolution also treats a(t) as linear between samples).
+#= (the fast evolution also treats a(t) as linear between samples).
 if true
 
     if_all::Bool = true
@@ -1870,6 +1870,145 @@ if true
         axs[2].plot(times_a_msopt,b_msopt,c="b",label="dCRAB")
         axs[2].set_xlabel("Time")
         axs[2].set_ylabel("Magnetic gradient B(t)")
+        axs[2].legend()
+    end
+
+end=#
+
+
+### Time evolution with the QuOCS dCRAB-optimized magnetic GRADIENT from optimal-control/config_magspacGrad.py
+# Same transport as the spacing-ramp blocks above (4x4 N=2 pbc, dd intstren 10, a 0.5 -> 2.0), but
+# over the ZVD pulse's own duration T = 2pi/w rather than 1.0, on a grid of exactly 256 half-steps
+# (dt = 2T/256, so both ZVD switches sit on samples), and the control is the gradient B(t) itself, with the
+# hard cap |B| <= 300 (2x the ZVD pulse). Optimizing a(t) directly (block above) reached F = 0.939
+# only by shaking the lattice, read-back |B| ~ 3300; here a(t) is the trapped mode's response to B,
+#     a(t) = a_start + (1/w) int_0^t B(t') sin(w(t - t')) dt',
+# so every pulse is physical by construction. The end condition comes from the optimization: B(T)
+# is pinned at the holding gradient w^2 (a_end - a_start) = 150, and the FoM subtracts the amplitude
+# R = sqrt((a(T) - a_end)^2 + (adot(T)/w)^2) the mode would ring with after T.
+# The fidelity is computed twice: with the fast split-operator evolution of a(t) the optimizer used,
+# and independently with run_timeevo driven through the "magnetic_gradient" scaling, i.e. B goes
+# in and timeham accumulates the spacing itself via get_magnetic_gradient_integral
+# (dt refined from dt_crit at min(a) if needed, with B linearly interpolated onto the finer grid).
+if true
+
+    if_all::Bool = true
+
+    include("magspac-ramp-control-functions.jl")
+
+    # endpoint manifolds and fast-evolution setup, same parameters as the optimization
+    if false || if_all
+        lx,ly,n = 4,4,2
+        speccount_mg = 2
+        intstren_mg = 10.0
+        a_start_mg, a_end_mg = 0.5, 2.0
+        omega_mg = 10.0
+        ramptime_mg = 2pi/omega_mg      # the ZVD pulse's settling time
+        dt_mg = 2*(ramptime_mg/256)     # power of two: ramptime/(dt/2) is exactly 256.0, so no stray sample
+        bmax_mg = 300.0
+
+        params_mg = Dict("Lx"=>lx,"Ly"=>ly,"N"=>n,"speccount"=>speccount_mg,"intstren"=>intstren_mg,"a_start"=>a_start_mg,"a_end"=>a_end_mg,"ramptime"=>ramptime_mg,"dt"=>dt_mg,"trap_frequency"=>omega_mg,"a_floor"=>0.1)
+        setup_mg = setup_magspac_ramp(params_mg)
+    end
+
+    # load the optimized gradient, the spacing it drives, and the FoM terms of it and of the ZVD guess
+    if false || if_all
+        quocs_folder_mg = "../optimal-control/QuOCS_Results/20260925_102851_magspacGrad_dCRAB"
+        controls_file_mg = filter(f -> endswith(f,"best_controls.npz"), readdir(quocs_folder_mg))[1]
+        # only read the numeric arrays: NPZ.jl cannot parse the numpy unicode-string arrays
+        # (pulse_names etc.) that QuOCS also stores in the file
+        best_controls_mg = npzread(joinpath(quocs_folder_mg,controls_file_mg),["magspacGrad","time_grid_for_magspacGrad"])
+        b_mg = Float64.(real.(best_controls_mg["magspacGrad"]))
+        times_b_mg = Float64.(real.(best_controls_mg["time_grid_for_magspacGrad"]))
+        b_guess_mg = zvd_gradient_pulse(a_start_mg,a_end_mg,omega_mg,ramptime_mg,dt_mg)
+
+        h_mg = dt_mg / 2
+        a_mg = a_start_mg .+ magnetic_gradient_response(b_mg,h_mg,omega_mg)[1]
+        a_guess_mg = a_start_mg .+ magnetic_gradient_response(b_guess_mg,h_mg,omega_mg)[1]
+        fom_mg, fidelity_mg, ringing_mg, min_a_mg = magspac_gradient_fom(b_mg,params_mg,setup_mg)
+        _, fidelity_guess_mg, ringing_guess_mg, _ = magspac_gradient_fom(b_guess_mg,params_mg,setup_mg)
+        println("Fast evolution: optimized fidelity $(fidelity_mg), ringing $(ringing_mg) (FoM $(fom_mg)); ZVD guess fidelity $(fidelity_guess_mg), ringing $(ringing_guess_mg)")
+        println("Optimized gradient: max|B| $(maximum(abs,b_mg)) (cap $(bmax_mg)), B(0) $(b_mg[1]), B(T) $(b_mg[end]); a in [$(minimum(a_mg)), $(maximum(a_mg))], a(T) $(a_mg[end])")
+        @assert maximum(abs,b_mg) <= bmax_mg "the loaded gradient exceeds the cap it was optimized under"
+        @assert b_mg[end] ≈ omega_mg^2*(a_end_mg - a_start_mg) "B(T) is not the holding gradient"
+
+        # the O(n) response against get_magnetic_gradient_integral itself, the quadrature run_timeevo
+        # uses below, at a handful of samples (uniform step, so when_dt_ends goes past the end)
+        checkparams_mg = Dict{String,Any}([("magnetic_gradient_time",b_mg),("when_dt_ends",[length(b_mg)+1,length(b_mg)+1]),("dt",[dt_mg,dt_mg]),("trap_frequency",omega_mg)])
+        for k in (1,2,length(b_mg)÷3,length(b_mg)÷2,length(b_mg))
+            @assert isapprox(get_magnetic_gradient_integral(k,checkparams_mg),a_mg[k] - a_start_mg; atol=1e-12) "the O(n) kernel split disagrees with get_magnetic_gradient_integral at sample $k"
+        end
+    end
+
+    # independent check with run_timeevo driven by the gradient, with instantaneous energies for the plot
+    if false || if_all
+        pdict_mg = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("scaling_type","dd"),("trap_frequency",omega_mg),("magnetic_spacing",a_start_mg),("interaction_strength",intstren_mg),("filling",0.5),("nev",speccount_mg),("if_find_data",false),("if_save_data",false)])
+        _,_,_,_,_,lattice_params_mg,hamilt_params_mg = run_normal_ed(pdict_mg; output_level=0)
+        @assert long_range_scaling(length(hamilt_params_mg["U"])-1,ly,intstren_mg; scaling="magnetic_gradient",magnetic_spacing=a_start_mg,magnetic_gradient_integral=0.0) ≈ hamilt_params_mg["U"] "t=0 gradient profile does not match the dd profile the starting state was found with"
+
+        # RK4 step for the strongest couplings the spacing reaches, as an integer refinement of dt
+        u_at_min_a_mg = long_range_scaling(length(hamilt_params_mg["U"])-1,ly,intstren_mg; scaling="dd",magnetic_spacing=minimum(a_mg))
+        dt_crit_mg = get_critical_dt(ramptime_mg,lattice_params_mg,Dict("U"=>u_at_min_a_mg))
+        refine_mg = max(1,ceil(Int,dt_mg/dt_crit_mg))
+        dt_run_mg = dt_mg / refine_mg
+
+        # the gradient on the finer half-step grid, at the length pulse_ramp expects
+        times_run_mg = (0:Int(ceil(ramptime_mg/(dt_run_mg/2)))) .* (dt_run_mg/2)
+        b_run_mg = map(times_run_mg) do t
+            i = clamp(searchsortedlast(times_b_mg,t),1,length(times_b_mg)-1)
+            w = (t - times_b_mg[i]) / (times_b_mg[i+1] - times_b_mg[i])
+            (1 - w)*b_mg[i] + w*b_mg[i+1]
+        end
+        println("run_timeevo: min a $(minimum(a_mg)) -> dt_crit $(dt_crit_mg), dt refined x$(refine_mg) to $(dt_run_mg)")
+
+        # work on a copy: timeham writes the ramped values, the accumulated integral and the rebuilt
+        # U back into the dict, which would otherwise leave the starting-state parameters overwritten
+        hamilt_params_tevo_mg = copy(hamilt_params_mg)
+        hamilt_params_tevo_mg["scaling_type"] = "magnetic_gradient"
+        starting_states_mg = setup_mg[1]
+        time_running_args_mg = (nev=speccount_mg,output_level=0,if_instant_gs=true,if_save_data=false,dataloc="tevo-daily-things-data/")
+        tevo_params_mg = Dict([ ("magnetic_gradient_time",(pulse_ramp,ramptime_mg,b_run_mg)),("trap_frequency",omega_mg),("tmax",ramptime_mg),("dt",dt_run_mg) ])
+        tevo_data_mg,tevo_dict_mg,instdata_mg,_ = run_timeevo(starting_states_mg,tevo_params_mg,lattice_params_mg,hamilt_params_tevo_mg; time_running_args_mg...)
+
+        # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
+        final_manifold_mg = [Vector{ComplexF64}(tevo_data_mg[1][i][:,end-1]) for i in 1:speccount_mg]
+        fidelity_rk4_mg = real(groundstate_manifold_fidelity(final_manifold_mg,setup_mg[2]))
+        println("Final U profile: $(hamilt_params_tevo_mg["U"])")
+        println("Fidelity with target manifold using the optimized gradient: $(fidelity_rk4_mg) (run_timeevo), $(fidelity_mg) (fast evolution)")
+    end
+
+    # plot the instantaneous vs transported energies along the optimized ramp
+    if true || if_all
+        times_mg = range(0.0,ramptime_mg,length=length(instdata_mg[2]["1"]))
+
+        figure()
+        cols = ["b","g","r"]
+        for i in 1:speccount_mg
+            plot(times_mg,instdata_mg[2][string(i)],"-p",c=cols[i],label="E$(i) instantaneous")
+            plot(times_mg,tevo_data_mg[2][i][1:end-1],c="k",marker="x",label=(i==1 ? "transported" : nothing))
+        end
+        legend()
+        xlabel("Time")
+        ylabel("Energy")
+        title("Energy vs time for dCRAB gradient $(lx)x$(ly) N=$(n) a $(a_start_mg)→$(a_end_mg), |B|≤$(bmax_mg), fidelity = $(round(fidelity_rk4_mg,digits=6))")
+    end
+
+    # plot the optimized gradient against the ZVD guess, and the spacing each drives
+    if true || if_all
+        fig, axs = subplots(2,1,sharex=true)
+        axs[1].plot(times_b_mg,b_guess_mg,"--",c="gray",label="ZVD guess")
+        axs[1].plot(times_b_mg,b_mg,c="b",label="dCRAB")
+        for bl in (-bmax_mg,bmax_mg)
+            axs[1].axhline(bl,ls=":",c="r")
+        end
+        axs[1].axhline(omega_mg^2*(a_end_mg - a_start_mg),ls="--",c="k",lw=0.8,label="holding gradient w²(a_end-a0)")
+        axs[1].set_ylabel("Magnetic gradient B(t)")
+        axs[1].set_title("dCRAB-optimized gradient (cap $(bmax_mg)) and the spacing it drives, w=$(omega_mg)")
+        axs[1].legend()
+        axs[2].plot(times_b_mg,a_guess_mg,"--",c="gray",label="ZVD guess, F = $(round(fidelity_guess_mg,digits=4))")
+        axs[2].plot(times_b_mg,a_mg,c="k",label="dCRAB, F = $(round(fidelity_mg,digits=4)), R = $(round(ringing_mg,sigdigits=2))")
+        axs[2].set_xlabel("Time")
+        axs[2].set_ylabel("Spacing a(t)")
         axs[2].legend()
     end
 

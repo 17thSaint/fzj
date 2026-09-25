@@ -15,9 +15,8 @@ import math
 
 import numpy as np
 
-from quocs_common import (JuliaFoM, fourier_pulse, include_julia, jl,
-                          linear_ramp_lambda, load_best_controls, plot_best_pulses,
-                          run_optimization)
+from quocs_common import (JuliaFoM, finish_run, fourier_pulse, include_julia, jl,
+                          linear_ramp_lambda, run_optimization)
 
 include_julia("intstren-ramp-ad-functions.jl")
 
@@ -126,6 +125,7 @@ class intstrenRampAD(JuliaFoM):
     def _make_fidelity(self):
         ham_hop, hint_diag = self._ham_hop, self._hint_diag
         starting_states, target_states = self._starting_states, self._target_states
+        n_states = starting_states.shape[1]
         dt = self.dt
 
         # @ works for both the dense and the BCOO hopping representation
@@ -147,9 +147,9 @@ class intstrenRampAD(JuliaFoM):
             # group the half-step samples into (n_steps, 3) triples (t, t+dt/2, t+dt)
             u_triples = jnp.stack([pulse[0:-2:2], pulse[1:-1:2], pulse[2::2]], axis=1)
             final_states, _ = jax.lax.scan(rk4_step, starting_states, u_triples)
-            # groundstate_manifold_fidelity: 0.5 * tr(F^dag F), F_ij = <psi_i|target_j>
+            # groundstate_manifold_fidelity: tr(F^dag F) / n, F_ij = <psi_i|target_j>
             overlap_matrix = final_states.conj().T @ target_states
-            return 0.5 * jnp.sum(jnp.abs(overlap_matrix) ** 2)
+            return jnp.sum(jnp.abs(overlap_matrix) ** 2) / n_states
 
         return fidelity
 
@@ -210,12 +210,10 @@ def main():
         "dt": dt,
     }))
 
-    best_controls = load_best_controls(optimization_obj)
-    fidelity = abs(optimization_obj.opt_alg_obj.best_FoM)
-    plot_best_pulses(best_controls,
-                     [("intstrenRamp", "time_intstrenRamp", "Interaction strength")],
-                     title=f"AD-Optimized Intstren-Ramp Fidelity: {fidelity:.4f}",
-                     filename="intstrenRamp_AD_optimized.png")
+    finish_run(optimization_obj,
+               [("intstrenRamp", "time_intstrenRamp", "Interaction strength")],
+               title="AD-Optimized Intstren-Ramp Fidelity: {fom:.4f}",
+               prefix="intstrenRamp_AD")
 
 
 if __name__ == "__main__":

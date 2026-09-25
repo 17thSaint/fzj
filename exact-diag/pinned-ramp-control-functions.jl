@@ -8,7 +8,7 @@ corner-pinned product state to the isotropic-hopping FCI ground-state manifold:
     pinned state --(ty: 0 -> end_ty)--> intermediate state --(tx: 0 -> end_tx)--> final state
 
 Depends on:
-    control-functions.jl
+    control-functions.jl (optimization_ed_params, groundstate_manifold_fidelity)
     time-evolution.jl (pulse_ramp, run_ramp_stages)
 
 =#
@@ -19,17 +19,10 @@ Depends on:
 # returned tuple) instead of re-diagonalizing at every function evaluation.
 function setup_pinned_ramp(parameters_dictionary)
 
-    Lx::Int = Int(parameters_dictionary["Lx"])
-    Ly::Int = Int(parameters_dictionary["Ly"])
     N::Int = Int(parameters_dictionary["N"])
     speccount::Int = Int(parameters_dictionary["speccount"])
 
-    common_params = Dict{String,Any}(
-        "output_level"=>0,"Lx"=>Lx,"Ly"=>Ly,"N"=>N,"lr"=>parameters_dictionary["lr"],
-        "if_periodic_x"=>parameters_dictionary["if_periodic_x"],"if_periodic_y"=>parameters_dictionary["if_periodic_y"],
-        "hopping_anisotropy"=>1.0,"interaction_strength"=>parameters_dictionary["interaction_strength"],
-        "filling"=>0.5,"nev"=>speccount,"if_find_data"=>false,"if_save_data"=>false,
-    )
+    common_params = optimization_ed_params(parameters_dictionary)
 
     # starting_config arrives from Python as a flat [col1,row1,col2,row2,...] list,
     # one (col,row) pair per particle -- see pinnedRamp.starting_config
@@ -63,7 +56,5 @@ function compute_fidelity_pinned_ramp(pulses,parameters_dictionary,setup)
 
     return real(groundstate_manifold_fidelity(final_states,target_states))
 end
-
-compute_fidelity_pinned_ramp(pulses,parameters_dictionary) = compute_fidelity_pinned_ramp(pulses,parameters_dictionary,setup_pinned_ramp(parameters_dictionary))
 
 "fin"

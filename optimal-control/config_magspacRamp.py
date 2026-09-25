@@ -18,13 +18,10 @@ with get_magnetic_gradient_from_spacing. Hard limits: a >= 0.1 (the evolution is
 unconditionally stable there, see the Julia file) and effectively no upper bound.
 """
 
-import os
-
 import numpy as np
 
-from quocs_common import (JuliaFoM, dcrab_algorithm_settings, fourier_pulse,
-                          halfstep_bins, include_julia, jl, load_best_controls,
-                          plot_best_pulses, run_optimization)
+from quocs_common import (JuliaFoM, dcrab_algorithm_settings, finish_run, fourier_pulse,
+                          halfstep_bins, include_julia, jl, run_optimization)
 
 include_julia("magspac-ramp-control-functions.jl")
 
@@ -104,14 +101,11 @@ def main():
 
     optimization_obj = run_optimization(optimization_dictionary, fom)
 
-    best_controls = load_best_controls(optimization_obj)
-    fidelity = abs(optimization_obj.opt_alg_obj.best_FoM)
+    _, fidelity = finish_run(optimization_obj,
+                             [(PULSE_NAME, TIME_NAME, "Magnetic spacing a(t)")],
+                             title=f"Optimized spacing ramp, fidelity {{fom:.4f}} (ZVD guess {guess_fidelity:.4f})",
+                             prefix="magspacRamp")
     print(f"Optimized fidelity: {fidelity:.6f} (ZVD guess {guess_fidelity:.6f})")
-    run_name = os.path.basename(os.path.normpath(optimization_obj.results_path))
-    plot_best_pulses(best_controls,
-                     [(PULSE_NAME, TIME_NAME, "Magnetic spacing a(t)")],
-                     title=f"Optimized spacing ramp, fidelity {fidelity:.4f} (ZVD guess {guess_fidelity:.4f})",
-                     filename=f"magspacRamp_{run_name}.png")
 
 
 if __name__ == "__main__":

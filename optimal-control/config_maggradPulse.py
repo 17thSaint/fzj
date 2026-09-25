@@ -100,6 +100,24 @@ PULSE_NAME = "maggradPulse"
 TIME_NAME = "time_maggradPulse"
 
 
+def retarded_response(b: np.ndarray, step: float, trap_frequency: float,
+                      cos_wt: np.ndarray, sin_wt: np.ndarray) -> np.ndarray:
+    """(1/w) int_0^t B(t') sin(w(t - t')) dt' at every sample of a uniform grid of spacing step.
+
+    Uses the same trapezoid samples and weights as get_magnetic_gradient_integral
+    (exact-diag/time-evolution.jl), but splitting the kernel as
+    sin(w(t-t')) = sin(wt)cos(wt') - cos(wt)sin(wt') pulls the upper-limit dependence out of the
+    integrand. What is left are two ordinary cumulative integrals, so the whole retarded response
+    costs O(n) rather than redoing an O(n) sum at each of the n upper limits -- which matters,
+    because n is ~25000 here. The numpy twin of magnetic_gradient_response (time-evolution.jl),
+    kept in numpy so an evaluation stays ~1 ms; cos_wt / sin_wt are the kernel factors on the grid.
+    """
+    bc, bs = b * cos_wt, b * sin_wt
+    cum_c = np.concatenate(([0.0], np.cumsum(0.5 * step * (bc[:-1] + bc[1:]))))
+    cum_s = np.concatenate(([0.0], np.cumsum(0.5 * step * (bs[:-1] + bs[1:]))))
+    return (sin_wt * cum_c - cos_wt * cum_s) / trap_frequency
+
+
 class maggradPulse(JuliaFoM):
 
     def __init__(self, args_dict: dict = None):
@@ -156,24 +174,11 @@ class maggradPulse(JuliaFoM):
         assert self._in_window.any(), "averaging window contains no grid points"
 
     def spacings(self, drive_pulse: np.ndarray) -> np.ndarray:
-        """a(t) on the full tmax half-step grid, for a gradient given over the drive window.
-
-        Uses the same trapezoid samples and weights as get_magnetic_gradient_integral
-        (exact-diag/time-evolution.jl), but splitting the kernel as
-        sin(w(t-t')) = sin(wt)cos(wt') - cos(wt)sin(wt') pulls the upper-limit dependence
-        out of the integrand. What is left are two ordinary cumulative integrals, so the
-        whole retarded response costs O(n) rather than redoing an O(n) sum at each of the n
-        upper limits -- which matters, because n is ~25000 here. Verified against the naive
-        rule to ~1e-19 (see the self-check in main()).
-        """
+        """a(t) on the full tmax half-step grid, for a gradient given over the drive window
+        (retarded_response; verified against the naive rule to ~1e-19 in main())."""
         b = np.zeros(self._t.size)
         b[:drive_pulse.size] = drive_pulse            # the gradient is off through the hold
-
-        step = self.dt / 2
-        bc, bs = b * self._cos, b * self._sin
-        cum_c = np.concatenate(([0.0], np.cumsum(0.5 * step * (bc[:-1] + bc[1:]))))
-        cum_s = np.concatenate(([0.0], np.cumsum(0.5 * step * (bs[:-1] + bs[1:]))))
-        return self.a0 + (self._sin * cum_c - self._cos * cum_s) / self.trap_frequency
+        return self.a0 + retarded_response(b, self.dt / 2, self.trap_frequency, self._cos, self._sin)
 
     def cost(self, drive_pulse: np.ndarray) -> float:
         a = self.spacings(drive_pulse)
@@ -286,7 +291,7 @@ def build_optimization_dictionary(dt: float, drive_time: float = drive_time) -> 
 
 def check_response_implementation(fom: maggradPulse, n_coarse: int = 2000) -> float:
     """Reproduce get_magnetic_gradient_integral's O(n^2) rule on a coarse grid and compare
-    against the cumulative form spacings() uses. Cheap insurance that the two agree."""
+    against the cumulative form retarded_response uses. Cheap insurance that the two agree."""
     step = fom.dt / 2
     t = np.arange(n_coarse) * step
     b = np.random.default_rng(0).normal(size=t.size)
@@ -294,11 +299,8 @@ def check_response_implementation(fom: maggradPulse, n_coarse: int = 2000) -> fl
     for k in range(1, t.size):
         integrand = b[:k + 1] * np.sin(fom.trap_frequency * (t[k] - t[:k + 1]))
         naive[k] = 0.5 * step * np.sum(integrand[:-1] + integrand[1:]) / fom.trap_frequency
-    bc, bs = b * np.cos(fom.trap_frequency * t), b * np.sin(fom.trap_frequency * t)
-    cum_c = np.concatenate(([0.0], np.cumsum(0.5 * step * (bc[:-1] + bc[1:]))))
-    cum_s = np.concatenate(([0.0], np.cumsum(0.5 * step * (bs[:-1] + bs[1:]))))
-    fast = (np.sin(fom.trap_frequency * t) * cum_c
-            - np.cos(fom.trap_frequency * t) * cum_s) / fom.trap_frequency
+    fast = retarded_response(b, step, fom.trap_frequency,
+                             np.cos(fom.trap_frequency * t), np.sin(fom.trap_frequency * t))
     return float(np.abs(naive - fast).max())
 
 
@@ -331,9 +333,9 @@ def report(fom: maggradPulse, drive_pulse: np.ndarray, label: str) -> np.ndarray
         print(f"    a(t) passes through zero (min {a.min():.4f}); U ~ 1/a^3 diverges at the "
               f"crossing, so a time evolution of this pulse needs the RK4 step checked there.")
     elif a.min() < fom.a0:
-        tighter = float(jl.maggrad_critical_dt_at_spacing(a.min(), fom.tmax,
-                                                          fom._setup.lattice_params,
-                                                          fom._setup.hamilt_params))
+        tighter = float(jl.get_critical_dt_at_spacing(a.min(), fom.tmax,
+                                                      fom._setup.lattice_params,
+                                                      fom._setup.hamilt_params))
         print(f"    NOTE: a dips below a0, so U ~ 1/a^3 exceeds the t=0 scale the grid was "
               f"built for. A time evolution of this pulse needs dt <= {tighter:.2e} "
               f"(grid was built at dt = {fom.dt:.2e}); resample or set min_spacing_penalty.")

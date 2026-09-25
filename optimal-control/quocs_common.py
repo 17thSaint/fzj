@@ -7,7 +7,8 @@ handle is exported for the configs to call their figure-of-merit functions with.
 Also collects everything the config files would otherwise copy-paste: the Julia
 dict conversion, the pulse/bins conventions of pulse_ramp (time-evolution.jl),
 the standard dCRAB settings block, the timed optimizer runner, and reading /
-plotting of the best controls from the BestDump npz.
+plotting of the best controls from the BestDump npz (finish_run: the common end of
+every config's main(), with one figure per run).
 """
 
 import glob
@@ -224,3 +225,22 @@ def plot_best_pulses(best_controls, pulse_specs, title: str, filename: str) -> s
     fig.savefig(figure_path)
     print(f"Saved {figure_path}")
     return figure_path
+
+
+def run_name(optimization_obj) -> str:
+    """The run's QuOCS_Results folder name, e.g. 20260925_102851_magspacGrad_dCRAB."""
+    return os.path.basename(os.path.normpath(optimization_obj.results_path))
+
+
+def finish_run(optimization_obj, pulse_specs, title: str, prefix: str):
+    """The common end of a config's main(): load the best controls from the BestDump npz and
+    save their plot as local-figs/<prefix>_<run name>.png, one figure per run.
+
+    title is formatted with fom = |best FoM|, e.g. "Optimized ramp, fidelity {fom:.4f}".
+    Returns (best_controls, fom).
+    """
+    best_controls = load_best_controls(optimization_obj)
+    fom = abs(optimization_obj.opt_alg_obj.best_FoM)
+    plot_best_pulses(best_controls, pulse_specs, title=title.format(fom=fom),
+                     filename=f"{prefix}_{run_name(optimization_obj)}.png")
+    return best_controls, fom

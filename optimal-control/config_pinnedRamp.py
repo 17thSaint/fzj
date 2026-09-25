@@ -6,9 +6,8 @@ FCI ground-state manifold, using compute_fidelity_pinned_ramp /
 setup_pinned_ramp (exact-diag/pinned-ramp-control-functions.jl).
 """
 
-from quocs_common import (JuliaFoM, dcrab_algorithm_settings, fourier_pulse,
-                          include_julia, jl, linear_ramp_lambda, load_best_controls,
-                          plot_best_pulses, run_optimization)
+from quocs_common import (JuliaFoM, dcrab_algorithm_settings, finish_run, fourier_pulse,
+                          include_julia, jl, linear_ramp_lambda, run_optimization)
 
 include_julia("pinned-ramp-control-functions.jl")
 
@@ -92,13 +91,11 @@ def main():
         "dt": dt,
     }))
 
-    best_controls = load_best_controls(optimization_obj)
-    fidelity = abs(optimization_obj.opt_alg_obj.best_FoM)
-    plot_best_pulses(best_controls,
-                     [("tyRamp", "time_tyRamp", "ty"),
-                      ("txRamp", "time_txRamp", "tx")],
-                     title=f"Optimized Pinned-Ramp Fidelity: {fidelity:.4f}",
-                     filename="pinnedRamp_optimized.png")
+    finish_run(optimization_obj,
+               [("tyRamp", "time_tyRamp", "ty"),
+                ("txRamp", "time_txRamp", "tx")],
+               title="Optimized Pinned-Ramp Fidelity: {fom:.4f}",
+               prefix="pinnedRamp")
 
 
 if __name__ == "__main__":

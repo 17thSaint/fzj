@@ -5,9 +5,8 @@ connects the tx ~ 0 ground state to the isotropic ground state, using
 compute_fidelity / setup_tx_ramp (exact-diag/control-functions.jl).
 """
 
-from quocs_common import (JuliaFoM, dcrab_algorithm_settings, fourier_pulse, jl,
-                          linear_ramp_lambda, load_best_controls, plot_best_pulses,
-                          run_optimization)
+from quocs_common import (JuliaFoM, dcrab_algorithm_settings, finish_run, fourier_pulse,
+                          jl, linear_ramp_lambda, run_optimization)
 
 
 class txRamp(JuliaFoM):
@@ -83,12 +82,10 @@ def main():
         "dt": dt,
     }))
 
-    best_controls = load_best_controls(optimization_obj)
-    fidelity = abs(optimization_obj.opt_alg_obj.best_FoM)
-    plot_best_pulses(best_controls,
-                     [("txRamp", "time_txRamp", "tx")],
-                     title=f"Optimized Ramp Fidelity: {fidelity:.4f}",
-                     filename="txRamp_optimized.png")
+    finish_run(optimization_obj,
+               [("txRamp", "time_txRamp", "tx")],
+               title="Optimized Ramp Fidelity: {fom:.4f}",
+               prefix="txRamp")
 
 
 if __name__ == "__main__":

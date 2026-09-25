@@ -40,31 +40,17 @@ Depends on:
 
 function setup_intstren_ramp_ad(parameters_dictionary)
 
-    Lx::Int = Int(parameters_dictionary["Lx"])
     Ly::Int = Int(parameters_dictionary["Ly"])
-    N::Int = Int(parameters_dictionary["N"])
     speccount::Int = Int(parameters_dictionary["speccount"])
     intstren_start::Float64 = Float64(parameters_dictionary["intstren_start"])
     intstren_end::Float64 = Float64(parameters_dictionary["intstren_end"])
 
-    common_params = Dict{String,Any}(
-        "output_level"=>0,"Lx"=>Lx,"Ly"=>Ly,"N"=>N,"lr"=>parameters_dictionary["lr"],
-        "if_periodic_x"=>parameters_dictionary["if_periodic_x"],"if_periodic_y"=>parameters_dictionary["if_periodic_y"],
-        "hopping_anisotropy"=>1.0,"filling"=>0.5,"nev"=>speccount,"if_find_data"=>false,"if_save_data"=>false,
-    )
-
-    # forward the interaction profile settings so non-flat (exp / rydberg / dd / gaussian)
-    # scalings reach get_normal_model_params_ed instead of silently falling back to flat
-    for k in ("scaling_type","corr_length","sigma","blockade_radius","magnetic_spacing")
-        haskey(parameters_dictionary,k) && (common_params[k] = parameters_dictionary[k])
-    end
-
     # strongly interacting ULR starting manifold
-    pdict_starting = merge(common_params,Dict("interaction_strength"=>intstren_start))
+    pdict_starting = optimization_ed_params(parameters_dictionary,"interaction_strength"=>intstren_start)
     states_starting,nrgs_starting,_,_,_,lattice_params,hamilt_params = run_normal_ed(pdict_starting; output_level=0)
 
     # target FCI ground-state manifold
-    pdict_ending = merge(common_params,Dict("interaction_strength"=>intstren_end))
+    pdict_ending = optimization_ed_params(parameters_dictionary,"interaction_strength"=>intstren_end)
     states_ending,nrgs_ending,_,_,_,_,_ = run_normal_ed(pdict_ending; output_level=0)
 
     # these terms would not scale with the interaction strength, so they cannot be
