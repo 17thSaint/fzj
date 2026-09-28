@@ -1207,7 +1207,7 @@ end=#
 
 # look at ttn occs under DD ints
 if true
-    lx,ly,n = 12,6,6
+    lx,ly,n = 16,8,8
     dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/dd-ints")
     pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
     all_files = find_data_file(pdict,"ttn",dataloc)
