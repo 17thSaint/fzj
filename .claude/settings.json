@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(julia --project=* /tmp/claude-1000/-home-patrick-fzj-main-git/*/scratchpad/*)",
+      "Bash(/home/patrick/fzj/main-git/optimal-control/quocs-env/bin/python /tmp/claude-1000/-home-patrick-fzj-main-git/*/scratchpad/*)",
+
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+
+      "Read(//home/patrick/fzj/**)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(grep *)",
+      "Bash(find *)",
+      "Bash(wc *)",
+      "Bash(du *)",
+
+      "Edit(/CLAUDE.md)",
+      "Edit(/**/CONTEXT.md)"
+    ],
+    "ask": [
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Bash(rsync *)",
+      "Bash(sh *sync*)",
+      "Bash(git push*)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(rm -fr *)",
+      "Bash(rm -r *)",
+      "Bash(rm *cluster-data*)",
+      "Bash(find * -delete*)",
+      "Edit(/cluster-data/**)"
+    ]
+  }
+}
