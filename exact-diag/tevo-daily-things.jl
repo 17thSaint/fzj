@@ -1619,7 +1619,7 @@ end=#
 # dt is pinned at 0.005 (the intstren optimizations' value) rather than left to get_critical_dt,
 # so a later dCRAB pulse lives on the same half-step grid as config_intstrenRamp.py. That is only
 #= safe while a(t) >= a_start: U grows as 1/a^3, and dt_crit comes from the t = 0 Hamiltonian.
-if true
+if false
 
     if_all::Bool = true
 
@@ -1767,7 +1767,7 @@ end=#
 # stable down to the smallest spacing the pulse reaches -- so dt is refined by an integer factor
 # from dt_crit at min(a), with the pulse linearly interpolated onto the finer half-step grid
 #= (the fast evolution also treats a(t) as linear between samples).
-if true
+if false
 
     if_all::Bool = true
 
@@ -1890,7 +1890,7 @@ end=#
 # and independently with run_timeevo driven through the "magnetic_gradient" scaling, i.e. B goes
 # in and timeham accumulates the spacing itself via get_magnetic_gradient_integral
 # (dt refined from dt_crit at min(a) if needed, with B linearly interpolated onto the finer grid).
-if true
+if false
 
     if_all::Bool = true
 
@@ -2049,3 +2049,153 @@ end
 
 
 "fin"
+### Regular CRAB / dCRAB for the magnetic gradient: optimal-control/config_magspacGradCRAB.py, then replay
+# Same problem as the dCRAB gradient block above (4x4 N=2 pbc, dd intstren 10, a 0.5 -> 2.0,
+# T = 2pi/w on 256 half-steps, |B| <= 300, FoM = fidelity - ringing R), optimizer as advised:
+# regular CRAB (one super-iteration, one Nelder-Mead search), 4 randomized principal harmonics
+# (one frequency in each [k - 1/2, k + 1/2] cycles per T), and both ends pinned at the gradients that
+# hold the lattice at rest, B(0) = 0 and B(T) = w^2 (a_end - a_start) = 150, with a smooth guess
+# B = 150 (1 - cos(pi t/T))/2 between them (fidelity 0.9048 but ringing R 0.50).
+# The first sub-block runs the optimization in the quocs-env Python for seeds 1-4 (a few s each, writes
+# QuOCS_Results/<stamp>_magspacGrad_CRAB_seed<k> folders and local-figs pngs; with si_crab > 1 it is dCRAB
+# from the same guess and pins, folders <stamp>_magspacGradSmooth_dCRAB_seed<k>, ~30 s each); the rest
+# replay the best dCRAB run (2026-09-30: 10 SI seed 2, F 0.9208).
+if true
+
+    if_all::Bool = true
+
+    include("magspac-ramp-control-functions.jl")
+
+    # run the CRAB optimization once per seed (plain CRAB's result depends on its one frequency draw);
+    # the config boots its own Julia and must run from optimal-control/. Off by default: seeds 1-4 exist
+    # (2026-09-30, CRAB and 10-SI dCRAB) and every run adds a results folder
+    if false
+        si_crab = 10    # super-iterations: 1 = plain CRAB
+        for seed in 1:4
+            run(Cmd(`$(abspath("../optimal-control/quocs-env/bin/python")) config_magspacGradCRAB.py $(seed) $(si_crab)`; dir=abspath("../optimal-control")))
+        end
+    end
+
+    # endpoint manifolds and fast-evolution setup, same parameters as the optimization
+    if false || if_all
+        lx,ly,n = 4,4,2
+        speccount_crab = 2
+        intstren_crab = 10.0
+        a_start_crab, a_end_crab = 0.5, 2.0
+        omega_crab = 10.0
+        ramptime_crab = 2pi/omega_crab
+        dt_crab = 2*(ramptime_crab/256)
+        bmax_crab = 300.0
+        bhold_crab = omega_crab^2*(a_end_crab - a_start_crab)
+
+        params_crab = Dict("Lx"=>lx,"Ly"=>ly,"N"=>n,"speccount"=>speccount_crab,"intstren"=>intstren_crab,"a_start"=>a_start_crab,"a_end"=>a_end_crab,"ramptime"=>ramptime_crab,"dt"=>dt_crab,"trap_frequency"=>omega_crab,"a_floor"=>0.1)
+        setup_crab = setup_magspac_ramp(params_crab)
+    end
+
+    # compare the dCRAB runs (seeds), keep the best one, and the FoM terms of it and of the smooth guess
+    if false || if_all
+        results_crab = "../optimal-control/QuOCS_Results"
+        # only the dCRAB (10 SI) runs; plain CRAB runs are "_magspacGrad_CRAB"
+        runs_crab = sort(filter(f -> occursin("_magspacGradSmooth_dCRAB",f),readdir(results_crab)))
+        # only read the numeric arrays: NPZ.jl cannot parse the numpy unicode-string arrays
+        # (pulse_names etc.) that QuOCS also stores in the file
+        load_crab(folder) = npzread(joinpath(results_crab,folder,filter(f -> endswith(f,"best_controls.npz"),readdir(joinpath(results_crab,folder)))[1]),["magspacGrad","time_grid_for_magspacGrad"])
+        foms_crab = [magspac_gradient_fom(Float64.(real.(load_crab(r)["magspacGrad"])),params_crab,setup_crab) for r in runs_crab]
+        for (r,f) in zip(runs_crab,foms_crab)
+            println("$(r): FoM $(f[1]), fidelity $(f[2]), ringing $(f[3])")
+        end
+        quocs_folder_crab = runs_crab[argmax(first.(foms_crab))]
+        best_controls_crab = load_crab(quocs_folder_crab)
+        b_crab = Float64.(real.(best_controls_crab["magspacGrad"]))
+        times_b_crab = Float64.(real.(best_controls_crab["time_grid_for_magspacGrad"]))
+        b_guess_crab = bhold_crab .* (1 .- cos.(pi .* times_b_crab ./ ramptime_crab)) ./ 2
+        method_crab = occursin("dCRAB",quocs_folder_crab) ? "dCRAB" : "CRAB"
+        println("Replaying the best run, $(quocs_folder_crab)")
+
+        h_crab = dt_crab / 2
+        a_crab = a_start_crab .+ magnetic_gradient_response(b_crab,h_crab,omega_crab)[1]
+        a_guess_crab = a_start_crab .+ magnetic_gradient_response(b_guess_crab,h_crab,omega_crab)[1]
+        fom_crab, fidelity_crab, ringing_crab, min_a_crab = magspac_gradient_fom(b_crab,params_crab,setup_crab)
+        _, fidelity_guess_crab, ringing_guess_crab, _ = magspac_gradient_fom(b_guess_crab,params_crab,setup_crab)
+        println("Fast evolution: $(method_crab) fidelity $(fidelity_crab), ringing $(ringing_crab) (FoM $(fom_crab)); smooth guess fidelity $(fidelity_guess_crab), ringing $(ringing_guess_crab)")
+        println("$(method_crab) gradient: max|B| $(maximum(abs,b_crab)) (cap $(bmax_crab)), B(0) $(b_crab[1]), B(T) $(b_crab[end]); a in [$(minimum(a_crab)), $(maximum(a_crab))], a(T) $(a_crab[end])")
+        @assert maximum(abs,b_crab) <= bmax_crab "the loaded gradient exceeds the cap it was optimized under"
+        @assert b_crab[1] == 0.0 && b_crab[end] ≈ bhold_crab "the ends are not pinned at the holding gradients"
+    end
+
+    # independent check with run_timeevo driven by the gradient, with instantaneous energies for the plot
+    if false || if_all
+        pdict_crab = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("scaling_type","dd"),("trap_frequency",omega_crab),("magnetic_spacing",a_start_crab),("interaction_strength",intstren_crab),("filling",0.5),("nev",speccount_crab),("if_find_data",false),("if_save_data",false)])
+        _,_,_,_,_,lattice_params_crab,hamilt_params_crab = run_normal_ed(pdict_crab; output_level=0)
+
+        # RK4 step for the strongest couplings the spacing reaches, as an integer refinement of dt
+        u_at_min_a_crab = long_range_scaling(length(hamilt_params_crab["U"])-1,ly,intstren_crab; scaling="dd",magnetic_spacing=minimum(a_crab))
+        dt_crit_crab = get_critical_dt(ramptime_crab,lattice_params_crab,Dict("U"=>u_at_min_a_crab))
+        refine_crab = max(1,ceil(Int,dt_crab/dt_crit_crab))
+        dt_run_crab = dt_crab / refine_crab
+
+        # the gradient on the finer half-step grid, at the length pulse_ramp expects
+        times_run_crab = (0:Int(ceil(ramptime_crab/(dt_run_crab/2)))) .* (dt_run_crab/2)
+        b_run_crab = map(times_run_crab) do t
+            i = clamp(searchsortedlast(times_b_crab,t),1,length(times_b_crab)-1)
+            w = (t - times_b_crab[i]) / (times_b_crab[i+1] - times_b_crab[i])
+            (1 - w)*b_crab[i] + w*b_crab[i+1]
+        end
+        println("run_timeevo: min a $(minimum(a_crab)) -> dt_crit $(dt_crit_crab), dt refined x$(refine_crab) to $(dt_run_crab)")
+
+        # work on a copy: timeham writes the ramped values back into the dict
+        hamilt_params_tevo_crab = copy(hamilt_params_crab)
+        hamilt_params_tevo_crab["scaling_type"] = "magnetic_gradient"
+        # nev only sets how many instantaneous eigenstates are tracked; the evolved states are the 2 of the manifold
+        nevinst_crab = 3
+        time_running_args_crab = (nev=nevinst_crab,output_level=0,if_instant_gs=true,if_save_data=false,dataloc="tevo-daily-things-data/")
+        tevo_params_crab = Dict([ ("magnetic_gradient_time",(pulse_ramp,ramptime_crab,b_run_crab)),("trap_frequency",omega_crab),("tmax",ramptime_crab),("dt",dt_run_crab) ])
+        tevo_data_crab,tevo_dict_crab,instdata_crab,_ = run_timeevo(setup_crab[1],tevo_params_crab,lattice_params_crab,hamilt_params_tevo_crab; time_running_args_crab...)
+
+        # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
+        final_manifold_crab = [Vector{ComplexF64}(tevo_data_crab[1][i][:,end-1]) for i in 1:speccount_crab]
+        fidelity_rk4_crab = real(groundstate_manifold_fidelity(final_manifold_crab,setup_crab[2]))
+        println("Fidelity with target manifold using the $(method_crab) gradient: $(fidelity_rk4_crab) (run_timeevo), $(fidelity_crab) (fast evolution)")
+    end
+
+    # plot the instantaneous energies of the lowest 3 states vs the transported energies of the two
+    # evolved manifold states, both under the same best pulse
+    if false || if_all
+        times_crab = range(0.0,ramptime_crab,length=length(instdata_crab[2]["1"]))
+
+        figure()
+        cols = ["b","g","r"]
+        for i in 1:nevinst_crab
+            plot(times_crab,instdata_crab[2][string(i)],"-p",c=cols[i],label="E$(i) instantaneous")
+        end
+        for (i,mk) in zip(1:speccount_crab,("x","+"))
+            plot(times_crab,tevo_data_crab[2][i][1:end-1],c="k",marker=mk,label="transported manifold state $(i)")
+        end
+        legend()
+        xlabel("Time")
+        ylabel("Energy")
+        title("Energy vs time for $(method_crab) gradient $(lx)x$(ly) N=$(n) a $(a_start_crab)→$(a_end_crab)\n|B|≤$(bmax_crab), fidelity = $(round(fidelity_rk4_crab,digits=6))")
+        tight_layout()
+    end
+
+    # plot the best gradient against the smooth guess, and the spacing each drives
+    if false || if_all
+        fig, axs = subplots(2,1,sharex=true)
+        axs[1].plot(times_b_crab,b_guess_crab,"--",c="gray",label="smooth guess")
+        axs[1].plot(times_b_crab,b_crab,c="b",label=method_crab)
+        for bl in (-bmax_crab,bmax_crab)
+            axs[1].axhline(bl,ls=":",c="r")
+        end
+        axs[1].axhline(bhold_crab,ls="--",c="k",lw=0.8,label="holding gradient w²(a_end-a0)")
+        axs[1].set_ylabel("Magnetic gradient B(t)")
+        axs[1].set_title("$(method_crab)-optimized gradient (4 freqs/SI, NM, cap $(bmax_crab))\nand the spacing it drives, w=$(omega_crab)")
+        axs[1].legend()
+        axs[2].plot(times_b_crab,a_guess_crab,"--",c="gray",label="smooth guess, F = $(round(fidelity_guess_crab,digits=4)), R = $(round(ringing_guess_crab,sigdigits=2))")
+        axs[2].plot(times_b_crab,a_crab,c="k",label="$(method_crab), F = $(round(fidelity_crab,digits=4)), R = $(round(ringing_crab,sigdigits=2))")
+        axs[2].set_xlabel("Time")
+        axs[2].set_ylabel("Spacing a(t)")
+        axs[2].legend()
+        tight_layout()
+    end
+
+end

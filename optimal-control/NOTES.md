@@ -196,3 +196,39 @@ pitfalls by topic.
   R 4.6e-3 (vs 7.5e-5); optimizer removes it.
 - Run 20260925_102851: **F 0.9204, R 1.9e-6**, |B| touches 300, min a 0.5; run_timeevo via scaling
   "magnetic_gradient" agrees to 6e-7. T = 1.0 run (20260925_102017): 0.9221.
+
+### magspacGradCRAB — plain CRAB for B(t) (`config_magspacGradCRAB.py`)
+- Advised setup (2026-09-30): regular CRAB = dCRAB with `super_iteration_number=1`; 4 frequencies
+  from `Uniform` [0.5, 4.5] (stratified: one in each [k−½, k+½] cycles/T); Nelder–Mead; zero
+  guess dropped (user) for a smooth guess B = 150(1−cos πt/T)/2 so both ends sit at the holding
+  gradients (B(0)=0 holds a_start, B(T)=w²Δa holds a_end), default parabolic envelope pins them.
+  Everything else = magspacGrad (T = 2π/w, 256 half-steps, |B| ≤ 300, FoM = F − R).
+  Optional seed argument (`python config_magspacGradCRAB.py <seed>`, folder `_seed<k>`).
+- Guess: F 0.9048, R 0.50. Seeds 1–4 (runs 20260930_14344[6-7]): F 0.9048 / **0.9052** / 0.9049 /
+  0.9002, R ~2.5e-6, each fatol-converged after ~265 evals (budget 5000); coefficients O(10–100),
+  |B| ≤ 155, a(t) monotone. run_timeevo replay of seed 2: 0.905219 (fast 0.905222).
+- Reading: NM removes the ringing and stops in the guess's basin; fidelity is set by the guess's
+  shape, not found. Below ZVD 0.9111 and ZVD-guess dCRAB 0.9204.
+- dCRAB option: `python config_magspacGradCRAB.py <seed> <super_iterations>`; SI > 1 sets
+  `max_eval` 400 per SI (Nelder–Mead `stopping_criteria`) and names runs
+  `magspacGradSmooth_dCRAB_seed<k>` (not matched by the CRAB block's loader). Runs 20260930_150652,
+  10 SI: best FoM per SI (seed 1–4) 0.9194 / **0.9208** / 0.9186 / 0.9197, R 2.6–5.7e-6, 2500–3100
+  evals, ~27 s; seeds 3, 4 touch |B| = 300. Pairwise RMS pulse difference 82–180 at equal F: many
+  different pulses reach ~0.92, so no unique optimal shape at T = 2π/w.
+- Best (seed 2) replayed by the last block of `tevo-daily-things.jl` (loads only the dCRAB runs,
+  picks max FoM): run_timeevo 0.920779 vs fast 0.920780. a(t) is non-monotonic: 0.5 → 1.15 at
+  t ≈ 0.18, back to 0.55 at t ≈ 0.32, then → 2.0 (overshoot 2.03); |B| ≤ 211, dips to −70.
+  Energy plot with `nev` = 3 (only sets the instantaneous states; 2 manifold states are evolved):
+  E1/E2 degenerate throughout; transported energy leaves them by t ≈ 0.05 and ends ~0.11 above
+  (E3 ~0.28 above).
+- Code B is δB from the physical holding gradient w²a0 (trap rest point a = 0; user, 2026-09-30),
+  so the |B| ≤ 300 cap is −250…350 physical. Same for all magspac/maggrad configs.
+
+### Larger systems (planned, 2026-09-30)
+- Motivation: at 4x4 N=2 (dim C(16,2) = 120) a quench gives ~0.90 and control adds ~0.02; quench
+  fidelity is expected to fall roughly exponentially with N (unverified), leaving room for control.
+- 8x4 N=4: C(32,4) = 35,960; 10x5 N=5: C(50,5) ≈ 2.1M.
+- `setup_magspac_ramp` / `evolve_magspac_ramp` are dense (H, exp(−iH0 d), `eigen`): ~20 GB per
+  matrix at 8x4, so that route is out. Options: `run_timeevo` (sparse RK4) as the FoM, or a sparse
+  Krylov version of the fast FoM. Endpoint manifolds need Lanczos with a check on the degenerate
+  pair (§3 pitfall).
