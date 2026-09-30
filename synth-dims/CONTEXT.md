@@ -37,7 +37,8 @@ Sizes: 6x3, 8x4, 10x5 (ED); 12x6, 14x7, 16x8 (TTN, H100).
 - **Result: l_c → size-independent C = 0.91 l_B** (sizes 6x3–16x8 without 14x7). The nonlocality
   threshold is set by an intrinsic FQH length (l_B), not system size — answers the paper's open
   question and rules out the boundary-interaction hypothesis (would make l_c size dependent).
-- Work in the uncommitted "check CDW order parameter vs magnetic spacing…" block, `ed-plus-ttns.jl`.
+- Analysis lives in the "check CDW order parameter vs magnetic spacing…" block, `ed-plus-ttns.jl`
+  (committed a24a9b9).
 - **14x7 TTN still running.** When it lands: add to the size list, refit, and recheck the
   hand-excluded points (14x7 a=2.1, 12x6 a=1.53).
 
