@@ -1426,8 +1426,13 @@ function hill_model(x, p)
     return 1.0 ./ (1.0 .+ (x ./ x50).^alpha)
 end
 
-# plot all contrast vs magspac for various lattice sizes (ED+TTN) and fit to Hill function
-#=if false
+function exp_fit(x, p)
+    A, B, C = p
+    return A .* exp.(-B .* x) .+ C
+end
+
+#= plot all contrast vs magspac for various lattice sizes (ED+TTN) and fit to Hill function
+if false
     lxlyn_list = [(6,3,3),(8,4,4),(10,5,5),(12,6,6),(14,7,7),(16,8,8)]
     cols = ["r","g","b","c","m","k"]
     lc_vals = Vector{Float64}(undef, length(lxlyn_list))
@@ -1517,11 +1522,127 @@ end
 
 end=#
 
-# The strength of the interaction at the boundary of the cylinder is a function of system size
-# it could be that the transition is a function of the interaction strength at the boundary and thus is system size dependent
+# check CDW order parameter vs magnetic spacing for various system sizes
 if true
+    lxlyn_list = [(6,3,3),(8,4,4),(10,5,5),(12,6,6),(16,8,8)]
+    #=cols = ["r","g","b","c","m","k"]
+    lc_vals = Vector{Float64}(undef, length(lxlyn_list))
+    orderparam_vals = []
+    magspac_vals = []
+    cutoff_magspacs = [1.0,0.65,0.8,0.1,0.1,0.1]
+    intstren = 300.0
+    dataloc_ed = get_folder_location("cluster-data/exact-diag/torus/new-gauge/dd-ints")
+    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge/dd-ints")
+    for (idx,(lx,ly,n)) in enumerate(lxlyn_list)
+        println("Working on $(lx)x$(ly) N=$(n)")
+        all_orderparams_raw = []
+        all_magspacs_raw = []
+        if lx <= 10
+            pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("hopping_anisotropy",1.0),("scaling","dd"),("if_periodic_x",true),("if_periodic_y",true)])
+            all_files = find_data_file(pdict,"ed",dataloc_ed; output_level=0,file_type="jld2")
+
+            for f in all_files
+                d,m = read_data(joinpath(dataloc_ed,f); output_level=0)
+                magnetic_spacing = m["magnetic_spacing"]
+                magnetic_spacing < cutoff_magspacs[idx] && continue
+                append!(all_magspacs_raw,magnetic_spacing)
+
+                occs = m["occs_eig1"]
+                orderparam::ComplexF64 = 0.0
+                for x in 1:lx
+                    for y in 1:ly
+                        orderparam += occs[x,y] * exp(im*pi*x)
+                    end
+                end
+                orderparam /= (lx*ly)
+                append!(all_orderparams_raw,abs(orderparam))
+            end
+        else
+            pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
+            all_files = find_data_file(pdict,"ttn",dataloc_ttn; output_level=0)
+
+            for f in all_files
+                d,m = read_data(joinpath(dataloc_ttn,f); output_level=0)
+                magspac = m["magnetic_spacing"]
+
+                magspac == 2.1 && lx == 14 && continue
+                magspac == 1.53 && lx == 12 && continue
+
+                occs = haskey(m, "occs") ? m["occs"] : zeros(Float64, ly, lx)
+                orderparam::ComplexF64 = 0.0
+                for x in 1:lx
+                    for y in 1:ly
+                        orderparam += occs[y,x] * exp(im*pi*x)
+                    end
+                end
+                orderparam /= (lx*ly)
+                
+                if haskey(m, "occs")
+                    append!(all_magspacs_raw, magspac)
+                    append!(all_orderparams_raw, abs(orderparam))
+                else
+                    println("No occupancy data for magspac: $magspac")
+                end
+            end
+        end
+
+        sorting_rule = sortperm(all_magspacs_raw)
+        all_orderparams = all_orderparams_raw[sorting_rule]
+        all_magspacs = all_magspacs_raw[sorting_rule]
+
+        normalized_orderparams = (all_orderparams .- minimum(all_orderparams)) ./ (maximum(all_orderparams) - minimum(all_orderparams))
+
+        append!(orderparam_vals, [normalized_orderparams])
+        append!(magspac_vals, [all_magspacs])
+    end=#
+    for (idx,(lx,ly,n)) in enumerate(lxlyn_list)
+        scatter(magspac_vals[idx],orderparam_vals[idx],label=L"L_y"*"=$(ly)", c=cols[idx])
+
+        valid_indices = orderparam_vals[idx] .> 1e-6
+        fit_magspacs = magspac_vals[idx][valid_indices]
+        fit_normalized_orderparams = orderparam_vals[idx][valid_indices]
+
+        lb = [minimum(fit_magspacs), 0.1]
+        ub = [maximum(fit_magspacs), 10.0]
+
+        # using Hill curve fit
+        p0 = [mean(fit_magspacs), 3.0]  #Initial guess for x50 and alpha
+        fit_result = curve_fit(hill_model, fit_magspacs, fit_normalized_orderparams, p0, lower=lb, upper=ub)
+        x50_fit, alpha_fit = fit_result.param
+        lc_vals[idx] = x50_fit
+        plot_fit_xs = 10 .^ range(log10(minimum(fit_magspacs)), log10(maximum(fit_magspacs)), length=100)
+        plot_fit_ys = hill_model(plot_fit_xs, fit_result.param)
+        plot(plot_fit_xs, plot_fit_ys, c=cols[idx], label=L"L_y"*"=$(ly) Fit")
+    end
+    xlabel("Magnetic Spacing")
+    ylabel("CDW Order Parameter")
+    title("CDW Order Parameter vs Magnetic Spacing for Various Lattice Sizes")
+    xscale("log")
+    legend()
+
+    
+    plotting_lcs = [lc_vals[idx] / sqrt(ly/(2*pi)) for (idx,(lx,ly,n)) in enumerate(lxlyn_list)]
+    p0 = [mean(plotting_lcs), 3.0, minimum(plotting_lcs)]
+    xs = [ly for (lx,ly,n) in lxlyn_list]
+    fit_result = curve_fit(exp_fit, xs, plotting_lcs, p0)
+    A_fit, B_fit, C_fit = fit_result.param
+
+    
+    fig = figure()
+    scatter(xs,plotting_lcs,label="Data",c="k",marker="x")
+    plot(range(minimum(xs),maximum(xs),length=100),exp_fit(range(minimum(xs),maximum(xs),length=100),fit_result.param),label="Fit",c="r")
+    xlabel("Lattice Size "*L"L_y")
+    ylabel("Critical Magnetic Spacing "*L"l_c / l_B")
+    title("Critical Magnetic Spacing vs Lattice Size, Plateau = $(round(C_fit, digits=3))")
+end
+
+
+# The strength of the interaction at the boundary of the cylinder is a function of system size
+#= it could be that the transition is a function of the interaction strength at the boundary and thus is system size dependent
+if false
     lxs = [6,8,10,12,14,16]
     
+    fig = figure()
     for (idx,lx) in enumerate(lxs)
         ly = Int(lx/2)
         n = Int(lx/2)
@@ -1530,10 +1651,10 @@ if true
         critical_spacing = lc_vals[idx]
         magnetic_length = 1/sqrt(2*pi/ly)
 
-        xs = range(0.1,ly-1,length=50)
+        xs = range(0.5,ly+1,length=50)
 
         us = intstren .* (1 ./ (critical_spacing .* xs).^3)
-        plot(xs,us,label="Ly=$(ly)")
+        plot(xs ./ ly,us,label="Ly=$(ly)")
         xlabel("Spacing r / "*L"l_B")
         ylabel("Interaction Strength")
         yscale("log")
@@ -1558,7 +1679,7 @@ if true
     ylabel("Critical Magnetic Spacing "*L"l_c")
 
     scatter([3,4,5,6,7,8],lc_vals,c="k",marker="x",label="Data")=#
-end
+end=#
 
 
 

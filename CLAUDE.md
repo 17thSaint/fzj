@@ -9,7 +9,8 @@ Julia ED + TTN and Python QuOCS code for FQH / fractional Chern insulators in sy
 
 - Project facts live in these files, not in Claude's memory. When a session produces a result,
   decision or bug, update CONTEXT.md (state, results, open questions, log) and NOTES.md (technical
-  detail) in the same session; tidy rather than append. Unclear which project: ask.
+  detail) in the same session (the user can run `/status`); tidy rather than append. Unclear
+  which project: ask.
 - **Confidential:** these files, the paper draft and unpublished results stay in this private repo
   (`17thSaint/fzj`) — never publish as Artifacts, push elsewhere, or send to external services.
 - Working style: one step at a time; ask questions before structural/workflow changes, show a
