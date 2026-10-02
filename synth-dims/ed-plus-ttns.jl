@@ -1595,8 +1595,11 @@ if true
         append!(orderparam_vals, [normalized_orderparams])
         append!(magspac_vals, [all_magspacs])
     end=#
+    
+    fig, axs = subplots(2, 1, figsize=(6, 8))
     for (idx,(lx,ly,n)) in enumerate(lxlyn_list)
-        scatter(magspac_vals[idx],orderparam_vals[idx],label=L"L_y"*"=$(ly)", c=cols[idx])
+        magnetic_length = 1/sqrt(2*pi/ly)
+        axs[1].plot(magspac_vals[idx] ./ magnetic_length,orderparam_vals[idx],"-p",label=L"L_y"*"=$(ly)", c=cols[idx])
 
         valid_indices = orderparam_vals[idx] .> 1e-6
         fit_magspacs = magspac_vals[idx][valid_indices]
@@ -1610,15 +1613,17 @@ if true
         fit_result = curve_fit(hill_model, fit_magspacs, fit_normalized_orderparams, p0, lower=lb, upper=ub)
         x50_fit, alpha_fit = fit_result.param
         lc_vals[idx] = x50_fit
-        plot_fit_xs = 10 .^ range(log10(minimum(fit_magspacs)), log10(maximum(fit_magspacs)), length=100)
+        #=plot_fit_xs = 10 .^ range(log10(minimum(fit_magspacs)), log10(maximum(fit_magspacs)), length=100)
         plot_fit_ys = hill_model(plot_fit_xs, fit_result.param)
-        plot(plot_fit_xs, plot_fit_ys, c=cols[idx], label=L"L_y"*"=$(ly) Fit")
+        plot(plot_fit_xs, plot_fit_ys, c=cols[idx], label=L"L_y"*"=$(ly) Fit")=#
     end
-    xlabel("Magnetic Spacing")
-    ylabel("CDW Order Parameter")
-    title("CDW Order Parameter vs Magnetic Spacing for Various Lattice Sizes")
-    xscale("log")
-    legend()
+    axs[1].plot(range(0.1,100.0,length=100),0.5 .* ones(100),"--",c="k")
+    axs[1].set_xlabel("Gradient Spacing, s / " * L"l_B")
+    axs[1].set_ylabel("Normalized CDW Order Parameter")
+    #title("CDW Order Parameter vs Magnetic Spacing for Various Lattice Sizes")
+    axs[1].set_xscale("log")
+    axs[1].set_xlim(0.4,70.0)
+    axs[1].legend()
 
     
     plotting_lcs = [lc_vals[idx] / sqrt(ly/(2*pi)) for (idx,(lx,ly,n)) in enumerate(lxlyn_list)]
@@ -1627,13 +1632,13 @@ if true
     fit_result = curve_fit(exp_fit, xs, plotting_lcs, p0)
     A_fit, B_fit, C_fit = fit_result.param
 
-    
-    fig = figure()
-    scatter(xs,plotting_lcs,label="Data",c="k",marker="x")
-    plot(range(minimum(xs),maximum(xs),length=100),exp_fit(range(minimum(xs),maximum(xs),length=100),fit_result.param),label="Fit",c="r")
-    xlabel("Lattice Size "*L"L_y")
-    ylabel("Critical Magnetic Spacing "*L"l_c / l_B")
-    title("Critical Magnetic Spacing vs Lattice Size, Plateau = $(round(C_fit, digits=3))")
+    axs[2].scatter(xs,plotting_lcs,c="k",marker="x")
+    axs[2].plot(range(minimum(xs),maximum(xs),length=100),exp_fit(range(minimum(xs),maximum(xs),length=100),fit_result.param),label="Exp Fit, "*L"s_{c}^{\infty}"*"=$(round(C_fit, digits=3))"*L"l_B",c="r")
+    axs[2].set_xlabel("Lattice Size, "*L"L_y")
+    axs[2].set_ylabel("Critical Gradient Spacing, "*L"s_c / l_B")
+    axs[2].legend()
+    tight_layout()
+    #title("Critical Magnetic Spacing vs Lattice Size, Plateau = $(round(C_fit, digits=3))")
 end
 
 

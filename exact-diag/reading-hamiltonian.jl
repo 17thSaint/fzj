@@ -134,7 +134,17 @@ function findHopping(lattice_params::Dict; kwargs...)
     return check_data_exists(metadata_dict,"hopping"; location=dataloc,output_level=output_level,file_type="jld2")
 end
 
+# dressed hopping matrices by everything dressHopping (and the saved undressed matrix) depends on.
+# Dressing is the slow part of getHamiltonian (2.1 s at 8x4 N=4 vs ~8 ms reading, 31 ms dressing the
+# interaction) and the hopping stays fixed while timeham rebuilds H for a ramped interaction, so it is
+# dressed once per parameter set; getHopping hands out copies, since callers may modify the result
+dressed_hopping_cache::Dict{Tuple,SparseMatrixCSC{ComplexF64,Int}} = Dict{Tuple,SparseMatrixCSC{ComplexF64,Int}}()
+
 function getHopping(lattice_params::Dict,hamilt_params::Dict; kwargs...)
+    key = (lattice_params["Lx"],lattice_params["Ly"],lattice_params["N"],lattice_params["if_periodic_x"],lattice_params["if_periodic_y"],
+           Tuple(lattice_params["twist_angle"]),hamilt_params["tx"],hamilt_params["ty"],Tuple(hamilt_params["alpha"]),hamilt_params["flux_direction"])
+    haskey(dressed_hopping_cache,key) && return copy(dressed_hopping_cache[key])
+
     if_found,hopping_data = findHopping(lattice_params; kwargs...)
 
     !if_found && println("No hopping shape found, building a new one")
@@ -143,7 +153,8 @@ function getHopping(lattice_params::Dict,hamilt_params::Dict; kwargs...)
     if_found && (hopping = hopping_data[1]["hopping_matrix"])
     
     hopping = dressHopping(hamilt_params,lattice_params,hopping; kwargs...)
-    
+    dressed_hopping_cache[key] = copy(hopping)
+
     return hopping
 end
 

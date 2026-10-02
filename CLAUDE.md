@@ -32,6 +32,12 @@ preparation route with Ui tuned by a Stern–Gerlach gradient (→ optimal-contr
 - `*daily-things.jl` files are `### header` + `if true/false` blocks run from the user's REPL;
   toggle, don't delete.
 - ED test system 4x4 N=2 pbc (also 8x4 N=4, 10x5 N=5); TTN from 12x6 N=6.
+- New blocks/code build Hamiltonians by reading and dressing the saved undressed matrices
+  whenever that works: `"if_reading"=>true` in ED dicts, `if_reading=true` in `run_timeevo` kwargs
+  (also covers the instantaneous spectrum), not `buildHam` (~2 s vs ~25 s per H at 8x4). Don't
+  change old blocks or the `false` defaults. Not possible with a twist
+  angle or `which_dir != "virt"`. A missing undressed file is built and **saved** to
+  `cluster-data/exact-diag` (`if_save` defaults true) — that's a write, ask first.
 
 ## How to run (Claude)
 

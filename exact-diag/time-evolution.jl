@@ -397,7 +397,7 @@ function time_evolution(starting_wavefunc::Vector{ComplexF64},starting_ham::Spar
         for i in 1:nev
             instant_spec[string(i)] = spzeros(ComplexF64,length(wavefunc),Int(1+(nsteps-1)/2))
         end
-        running_args = get_quick_running_args(nev)
+        running_args = get_quick_running_args(nev; if_reading=get(kwargs,:if_reading,false))
     end
 
     opl > 0 && println("Starting time evolution")
@@ -489,7 +489,7 @@ function time_evolution(starting_wavefunc::Vector{Vector{ComplexF64}},starting_h
         # vector only ever yields one Ritz pair per degenerate eigenvalue, however large
         # krylovdim is) -- only worth it for small Hilbert spaces since it rebuilds and
         # fully diagonalizes the dense Hamiltonian every RK4 step
-        running_args = get_quick_running_args(nev; if_exact=if_instant_exact)
+        running_args = get_quick_running_args(nev; if_exact=if_instant_exact,if_reading=get(kwargs,:if_reading,false))
     end
 
     opl > 0 && println("Starting time evolution")

@@ -1889,7 +1889,7 @@ end=#
 # The fidelity is computed twice: with the fast split-operator evolution of a(t) the optimizer used,
 # and independently with run_timeevo driven through the "magnetic_gradient" scaling, i.e. B goes
 # in and timeham accumulates the spacing itself via get_magnetic_gradient_integral
-# (dt refined from dt_crit at min(a) if needed, with B linearly interpolated onto the finer grid).
+#= (dt refined from dt_crit at min(a) if needed, with B linearly interpolated onto the finer grid).
 if false
 
     if_all::Bool = true
@@ -2012,43 +2012,9 @@ if false
         axs[2].legend()
     end
 
-end
+end=#
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-"fin"
 ### Regular CRAB / dCRAB for the magnetic gradient: optimal-control/config_magspacGradCRAB.py, then replay
 # Same problem as the dCRAB gradient block above (4x4 N=2 pbc, dd intstren 10, a 0.5 -> 2.0,
 # T = 2pi/w on 256 half-steps, |B| <= 300, FoM = fidelity - ringing R), optimizer as advised:
@@ -2059,8 +2025,8 @@ end
 # The first sub-block runs the optimization in the quocs-env Python for seeds 1-4 (a few s each, writes
 # QuOCS_Results/<stamp>_magspacGrad_CRAB_seed<k> folders and local-figs pngs; with si_crab > 1 it is dCRAB
 # from the same guess and pins, folders <stamp>_magspacGradSmooth_dCRAB_seed<k>, ~30 s each); the rest
-# replay the best dCRAB run (2026-09-30: 10 SI seed 2, F 0.9208).
-if true
+#= replay the best dCRAB run (2026-09-30: 10 SI seed 2, F 0.9208).
+if false
 
     if_all::Bool = true
 
@@ -2198,4 +2164,264 @@ if true
         tight_layout()
     end
 
+end=#
+
+
+### ZVD gradient pulse on the magspac transport: instantaneous vs transported energies
+# The ZVD staircase B = Bf [1/4, 3/4, 1] (Bf = w^2 (a_end - a_start)) as a plain pulse, no
+# optimization: dd groundstate manifold at a_start -> the one at a_end over T = 2pi/w, the transport
+# of the magspacGrad / CRAB blocks above (dd intstren 10, a 0.5 -> 2.0, w = 10), run with run_timeevo
+# through the "magnetic_gradient" scaling. Set up for the larger lattice (6x3 N=3, dim 816, 2026-10-02):
+# setup_magspac_ramp's 1e-8 degeneracy assert fails there (splitting 1e-3 at a = 0.5, 0.051 at a = 2.0,
+# next level 0.335 / 0.163 above), so the endpoint manifolds are diagonalized densely here and only
+# required to sit below a gap. Fast-evolution reference at 6x3 N=3 (tolerance relaxed): F 0.9464,
+#= quench 0.9313; at 4x4 N=2 ZVD gives 0.9111.
+if true
+
+    if_all::Bool = true
+
+    include("magspac-ramp-control-functions.jl")
+
+    # lattice, transport and the half-step grid: a power-of-two count of half-steps over T (so
+    # T/(dt/2) is exact and both ZVD switches sit on samples), doubled until dt is below the RK4
+    # limit at a_start; the ZVD a(t) rises monotonically, so a_start bounds the whole run
+    if false || if_all
+        lx,ly,n = 6,3,3
+        speccount_zvdE = 2
+        nevinst_zvdE = 4         # instantaneous levels to plot
+        intstren_zvdE = 10.0
+        a_start_zvdE, a_end_zvdE = 0.5, 2.0
+        omega_zvdE = 10.0
+        ramptime_zvdE = 2pi/omega_zvdE
+        # dense diagonalization (endpoints and the instantaneous spectrum) while it fits in memory,
+        # Lanczos above: 8x4 N=4 is 35960 states, ~20 GB per dense complex matrix
+        if_exact_zvdE = binomial(lx*ly,n) <= 5000
+
+        pdict_zvdE = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("scaling_type","dd"),("trap_frequency",omega_zvdE),("magnetic_spacing",a_start_zvdE),("interaction_strength",intstren_zvdE),("filling",0.5),("nev",speccount_zvdE),("if_reading",true),("if_find_data",false),("if_save_data",false)])
+        _,_,_,_,_,lattice_params_zvdE,hamilt_params_zvdE = run_normal_ed(pdict_zvdE; output_level=0)
+
+        dt_crit_zvdE = get_critical_dt(ramptime_zvdE,lattice_params_zvdE,hamilt_params_zvdE)
+        nhalf_zvdE = 256 * 2^max(0,ceil(Int,log2(2*ramptime_zvdE/(256*dt_crit_zvdE))))
+        dt_zvdE = 2*(ramptime_zvdE/nhalf_zvdE)
+        println("dt_crit $(dt_crit_zvdE) -> $(nhalf_zvdE) half-steps, dt $(dt_zvdE)")
+    end
+
+    # endpoint manifolds: the speccount lowest states, which must be split by less than the gap above
+    # them. Dense where possible, since Lanczos can return only part of a degenerate pair; with
+    # Lanczos a missed partner shows up as a failed gap check
+    if false || if_all
+        manifolds_zvdE = map((a_start_zvdE,a_end_zvdE)) do a
+            pd = copy(pdict_zvdE)
+            pd["magnetic_spacing"] = a
+            if if_exact_zvdE
+                _,_,_,_,_,_,hp = run_normal_ed(pd; output_level=0)
+                eig = eigen(Hermitian(Matrix(hp["H"])))
+                nrgs = eig.values
+                vecs = [eig.vectors[:,i] for i in 1:speccount_zvdE]
+            else
+                pd["nev"] = nevinst_zvdE
+                vecs,nrgs,_,_,_,_,_ = run_normal_ed(pd; output_level=0)
+                nrgs = real.(nrgs)
+            end
+            println("a = $(a): lowest levels relative to E0 $(round.(nrgs[1:nevinst_zvdE] .- nrgs[1],digits=4))")
+            @assert nrgs[speccount_zvdE] - nrgs[1] < nrgs[speccount_zvdE+1] - nrgs[speccount_zvdE] "the lowest $(speccount_zvdE) levels at a = $(a) are not separated from the rest by a gap"
+            [Vector{ComplexF64}(vecs[i]) for i in 1:speccount_zvdE]
+        end
+        starting_states_zvdE, target_states_zvdE = manifolds_zvdE
+        println("Quench (overlap of the endpoint manifolds): $(real(groundstate_manifold_fidelity(starting_states_zvdE,target_states_zvdE)))")
+    end
+
+    # the ZVD gradient on the run grid and the spacing it drives
+    if false || if_all
+        b_zvdE = zvd_gradient_pulse(a_start_zvdE,a_end_zvdE,omega_zvdE,ramptime_zvdE,dt_zvdE)
+        times_b_zvdE = halfstep_times(ramptime_zvdE,dt_zvdE)
+        a_zvdE = a_start_zvdE .+ magnetic_gradient_response(b_zvdE,dt_zvdE/2,omega_zvdE)[1]
+        @assert minimum(a_zvdE) >= a_start_zvdE - 1e-12 "a(t) dips below a_start, so dt_crit from the t = 0 Hamiltonian does not bound the run"
+    end
+
+    # time evolution with the instantaneous spectrum along the way
+    if false || if_all
+        # work on a copy: timeham writes the ramped values back into the dict
+        hamilt_params_tevo_zvdE = copy(hamilt_params_zvdE)
+        hamilt_params_tevo_zvdE["scaling_type"] = "magnetic_gradient"
+        time_running_args_zvdE = (nev=nevinst_zvdE,output_level=0,if_instant_gs=true,if_instant_exact=if_exact_zvdE,if_reading=true,if_save_data=false,dataloc="tevo-daily-things-data/")
+        tevo_params_zvdE = Dict([ ("magnetic_gradient_time",(pulse_ramp,ramptime_zvdE,b_zvdE)),("trap_frequency",omega_zvdE),("tmax",ramptime_zvdE),("dt",dt_zvdE) ])
+        tevo_data_zvdE,tevo_dict_zvdE,instdata_zvdE,_ = run_timeevo(starting_states_zvdE,tevo_params_zvdE,lattice_params_zvdE,hamilt_params_tevo_zvdE; time_running_args_zvdE...)
+
+        # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
+        final_manifold_zvdE = [Vector{ComplexF64}(tevo_data_zvdE[1][i][:,end-1]) for i in 1:speccount_zvdE]
+        fidelity_zvdE = real(groundstate_manifold_fidelity(final_manifold_zvdE,target_states_zvdE))
+        println("Fidelity with target manifold after the ZVD pulse: $(fidelity_zvdE)")
+    end
+
+    # spacing and gradient on top, instantaneous levels vs the transported energies of the two
+    # evolved manifold states below
+    if false || if_all
+        fig, axs = subplots(2,1,sharex=true,figsize=(8,8),gridspec_kw=Dict("height_ratios"=>[1,2]))
+        axs[1].plot(times_b_zvdE,a_zvdE,c="k")
+        axs[1].set_ylabel("Spacing a(t)")
+        axb = axs[1].twinx()
+        axb.plot(times_b_zvdE,b_zvdE,c="b",lw=0.8)
+        axb.set_ylabel("Gradient B(t)",color="b")
+        axs[1].set_title("ZVD gradient pulse $(lx)x$(ly) N=$(n), a $(a_start_zvdE)→$(a_end_zvdE), w=$(omega_zvdE)\nfidelity = $(round(fidelity_zvdE,digits=6))")
+
+        times_zvdE = range(0.0,ramptime_zvdE,length=length(instdata_zvdE[2]["1"]))
+        cols = ["b","g","r","m","c","y"]
+        for i in 1:nevinst_zvdE
+            axs[2].plot(times_zvdE,instdata_zvdE[2][string(i)],"-",c=cols[i],label="E$(i) instantaneous")
+        end
+        for (i,mk) in zip(1:speccount_zvdE,("x","+"))
+            axs[2].plot(times_zvdE,tevo_data_zvdE[2][i][1:end-1],c="k",ls="none",marker=mk,ms=5,markevery=max(1,length(times_zvdE)÷40),label="transported manifold state $(i)")
+        end
+        axs[2].legend()
+        axs[2].set_xlabel("Time")
+        axs[2].set_ylabel("Energy")
+        tight_layout()
+    end
+
+end=#
+
+
+
+### ZVD gradient pulse on the magspac transport: instantaneous vs transported energies, 8x4 N=4
+# Same as the block above, run at 8x4 N=4 (35960 states): quench overlap 0.848 (vs 0.896 at 4x4,
+# 0.931 at 6x3), the first size where it drops. Too big for dense diagonalization (~20 GB per
+# matrix), so the endpoints and the instantaneous spectrum use Lanczos; at a = 0.5 Lanczos returns
+# the exactly degenerate pair (next level 0.366 above), at a = 2.0 a pair split by 0.004 (next 0.286).
+# 512 half-steps (dt 0.0025). H is read and dressed (dressed hopping cached), ~50-70 ms per build;
+# the per-step Lanczos for the instantaneous levels dominates, expect ~30-60 min. Prints progress.
+if true
+
+    if_all::Bool = true
+
+    include("magspac-ramp-control-functions.jl")
+
+    # lattice, transport and the half-step grid: a power-of-two count of half-steps over T (so
+    # T/(dt/2) is exact and both ZVD switches sit on samples), doubled until dt is below the RK4
+    # limit at a_start; the ZVD a(t) rises monotonically, so a_start bounds the whole run
+    if false || if_all
+        lx,ly,n = 8,4,4
+        speccount_zvd84 = 2
+        nevinst_zvd84 = 4         # instantaneous levels to plot
+        intstren_zvd84 = 10.0
+        a_start_zvd84, a_end_zvd84 = 0.5, 2.0
+        omega_zvd84 = 10.0
+        ramptime_zvd84 = 2pi/omega_zvd84
+        # dense diagonalization (endpoints and the instantaneous spectrum) while it fits in memory,
+        # Lanczos above: 8x4 N=4 is 35960 states, ~20 GB per dense complex matrix
+        if_exact_zvd84 = binomial(lx*ly,n) <= 5000
+
+        pdict_zvd84 = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("scaling_type","dd"),("trap_frequency",omega_zvd84),("magnetic_spacing",a_start_zvd84),("interaction_strength",intstren_zvd84),("filling",0.5),("nev",speccount_zvd84),("if_reading",true),("if_find_data",false),("if_save_data",false)])
+        _,_,_,_,_,lattice_params_zvd84,hamilt_params_zvd84 = run_normal_ed(pdict_zvd84; output_level=0)
+
+        dt_crit_zvd84 = get_critical_dt(ramptime_zvd84,lattice_params_zvd84,hamilt_params_zvd84)
+        nhalf_zvd84 = 256 * 2^max(0,ceil(Int,log2(2*ramptime_zvd84/(256*dt_crit_zvd84))))
+        dt_zvd84 = 2*(ramptime_zvd84/nhalf_zvd84)
+        println("dt_crit $(dt_crit_zvd84) -> $(nhalf_zvd84) half-steps, dt $(dt_zvd84)")
+    end
+
+    # endpoint manifolds: the speccount lowest states, which must be split by less than the gap above
+    # them. Dense where possible, since Lanczos can return only part of a degenerate pair; with
+    # Lanczos a missed partner shows up as a failed gap check
+    if false || if_all
+        manifolds_zvd84 = map((a_start_zvd84,a_end_zvd84)) do a
+            pd = copy(pdict_zvd84)
+            pd["magnetic_spacing"] = a
+            if if_exact_zvd84
+                _,_,_,_,_,_,hp = run_normal_ed(pd; output_level=0)
+                eig = eigen(Hermitian(Matrix(hp["H"])))
+                nrgs = eig.values
+                vecs = [eig.vectors[:,i] for i in 1:speccount_zvd84]
+            else
+                pd["nev"] = nevinst_zvd84
+                vecs,nrgs,_,_,_,_,_ = run_normal_ed(pd; output_level=0)
+                nrgs = real.(nrgs)
+            end
+            println("a = $(a): lowest levels relative to E0 $(round.(nrgs[1:nevinst_zvd84] .- nrgs[1],digits=4))")
+            @assert nrgs[speccount_zvd84] - nrgs[1] < nrgs[speccount_zvd84+1] - nrgs[speccount_zvd84] "the lowest $(speccount_zvd84) levels at a = $(a) are not separated from the rest by a gap"
+            [Vector{ComplexF64}(vecs[i]) for i in 1:speccount_zvd84]
+        end
+        starting_states_zvd84, target_states_zvd84 = manifolds_zvd84
+        println("Quench (overlap of the endpoint manifolds): $(real(groundstate_manifold_fidelity(starting_states_zvd84,target_states_zvd84)))")
+    end
+
+    # the ZVD gradient on the run grid and the spacing it drives
+    if false || if_all
+        b_zvd84 = zvd_gradient_pulse(a_start_zvd84,a_end_zvd84,omega_zvd84,ramptime_zvd84,dt_zvd84)
+        times_b_zvd84 = halfstep_times(ramptime_zvd84,dt_zvd84)
+        a_zvd84 = a_start_zvd84 .+ magnetic_gradient_response(b_zvd84,dt_zvd84/2,omega_zvd84)[1]
+        @assert minimum(a_zvd84) >= a_start_zvd84 - 1e-12 "a(t) dips below a_start, so dt_crit from the t = 0 Hamiltonian does not bound the run"
+    end
+
+    # time evolution with the instantaneous spectrum along the way
+    if false || if_all
+        # work on a copy: timeham writes the ramped values back into the dict
+        hamilt_params_tevo_zvd84 = copy(hamilt_params_zvd84)
+        hamilt_params_tevo_zvd84["scaling_type"] = "magnetic_gradient"
+        time_running_args_zvd84 = (nev=nevinst_zvd84,output_level=1,if_instant_gs=true,if_instant_exact=if_exact_zvd84,if_reading=true,if_save_data=false,dataloc="tevo-daily-things-data/")
+        tevo_params_zvd84 = Dict([ ("magnetic_gradient_time",(pulse_ramp,ramptime_zvd84,b_zvd84)),("trap_frequency",omega_zvd84),("tmax",ramptime_zvd84),("dt",dt_zvd84) ])
+        tevo_data_zvd84,tevo_dict_zvd84,instdata_zvd84,_ = run_timeevo(starting_states_zvd84,tevo_params_zvd84,lattice_params_zvd84,hamilt_params_tevo_zvd84; time_running_args_zvd84...)
+
+        # end-1 skips the final save point which lands at tmax rather than the last full Trotter step
+        final_manifold_zvd84 = [Vector{ComplexF64}(tevo_data_zvd84[1][i][:,end-1]) for i in 1:speccount_zvd84]
+        fidelity_zvd84 = real(groundstate_manifold_fidelity(final_manifold_zvd84,target_states_zvd84))
+        println("Fidelity with target manifold after the ZVD pulse: $(fidelity_zvd84)")
+    end
+
+    # spacing and gradient on top, instantaneous levels vs the transported energies of the two
+    # evolved manifold states below
+    if false || if_all
+        fig, axs = subplots(2,1,sharex=true,figsize=(8,8),gridspec_kw=Dict("height_ratios"=>[1,2]))
+        axs[1].plot(times_b_zvd84,a_zvd84,c="k")
+        axs[1].set_ylabel("Spacing a(t)")
+        axb = axs[1].twinx()
+        axb.plot(times_b_zvd84,b_zvd84,c="b",lw=0.8)
+        axb.set_ylabel("Gradient B(t)",color="b")
+        axs[1].set_title("ZVD gradient pulse $(lx)x$(ly) N=$(n), a $(a_start_zvd84)→$(a_end_zvd84), w=$(omega_zvd84)\nfidelity = $(round(fidelity_zvd84,digits=6))")
+
+        times_zvd84 = range(0.0,ramptime_zvd84,length=length(instdata_zvd84[2]["1"]))
+        cols = ["b","g","r","m","c","y"]
+        for i in 1:nevinst_zvd84
+            axs[2].plot(times_zvd84,instdata_zvd84[2][string(i)],"-",c=cols[i],label="E$(i) instantaneous")
+        end
+        for (i,mk) in zip(1:speccount_zvd84,("x","+"))
+            axs[2].plot(times_zvd84,tevo_data_zvd84[2][i][1:end-1],c="k",ls="none",marker=mk,ms=5,markevery=max(1,length(times_zvd84)÷40),label="transported manifold state $(i)")
+        end
+        axs[2].legend()
+        axs[2].set_xlabel("Time")
+        axs[2].set_ylabel("Energy")
+        tight_layout()
+    end
+
 end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"fin"
+
