@@ -1524,8 +1524,8 @@ end=#
 
 # check CDW order parameter vs magnetic spacing for various system sizes
 if true
-    lxlyn_list = [(6,3,3),(8,4,4),(10,5,5),(12,6,6),(16,8,8)]
-    #=cols = ["r","g","b","c","m","k"]
+    lxlyn_list = [(6,3,3),(8,4,4),(10,5,5),(12,6,6),(14,7,7),(16,8,8)]
+    cols = ["r","g","b","c","m","k"]
     lc_vals = Vector{Float64}(undef, length(lxlyn_list))
     orderparam_vals = []
     magspac_vals = []
@@ -1594,7 +1594,7 @@ if true
 
         append!(orderparam_vals, [normalized_orderparams])
         append!(magspac_vals, [all_magspacs])
-    end=#
+    end
     
     fig, axs = subplots(2, 1, figsize=(6, 8))
     for (idx,(lx,ly,n)) in enumerate(lxlyn_list)

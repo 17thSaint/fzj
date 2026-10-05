@@ -2292,7 +2292,7 @@ end=#
 # the per-step Lanczos for the instantaneous levels dominates, expect ~30-60 min. Prints progress.
 if true
 
-    if_all::Bool = true
+    if_all::Bool = false
 
     include("magspac-ramp-control-functions.jl")
 
