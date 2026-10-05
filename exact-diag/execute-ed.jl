@@ -87,9 +87,6 @@ function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
 			fdict["blockade_radius"] = hamilt_params["blockade_radius"]
         elseif hamilt_params["scaling_type"] == "dd"
             fdict["magnetic_spacing"] = hamilt_params["magnetic_spacing"]
-        elseif hamilt_params["scaling_type"] == "magnetic_gradient"
-            # magnetic_spacing is the initial spacing a0 the gradient displaces from
-            fdict["magnetic_spacing"] = hamilt_params["magnetic_spacing"]
 		else
 			error("ULR Scaling Type Not Recognized: $(hamilt_params["scaling_type"])")
 		end
@@ -146,12 +143,12 @@ function get_normal_params_from_lattham(lattice_params::Dict,hamilt_params::Dict
     return new_params
 end
 
-function get_quick_running_args(nev::Int; if_exact::Bool=false, if_reading::Bool=false)
+function get_quick_running_args(nev::Int; if_exact::Bool=false)
     # set running operation parameters
     running_args::NamedTuple = (nev=nev,
                     if_exact=if_exact,
                     if_function=false,
-                    if_reading=if_reading,
+                    if_reading=false,
                     if_densmat=false,
                     if_find_data=false,
                     if_save_data=false,
@@ -210,18 +207,11 @@ function get_normal_model_params_ed(params_dict::Dict)
     sigma::Float64 = get(params_dict, "sigma", 1.0)
     blockade_radius::Float64 = get(params_dict, "blockade_radius", 1.0)
     magnetic_spacing::Float64 = get(params_dict, "magnetic_spacing", 1.0)
-    magnetic_gradient_integral::Float64 = get(params_dict, "magnetic_gradient_integral", 0.0)
-    # frequency of the trap the gradient displaces the synthetic states in. It does not enter
-    # the Hamiltonian built here -- long_range_scaling only ever sees the accumulated integral,
-    # which already carries w -- but it is the kernel a later time evolution of this state must
-    # use, so it is carried in hamilt_params for run_timeevo to pick up
-    trap_frequency::Float64 = get(params_dict, "trap_frequency", 1.0)
     other_params_dict["corr_length"] = corr_length
     other_params_dict["sigma"] = sigma
     other_params_dict["blockade_radius"] = blockade_radius
     other_params_dict["magnetic_spacing"] = magnetic_spacing
-    other_params_dict["magnetic_gradient_integral"] = magnetic_gradient_integral
-
+    
     us::Vector{Float64} = long_range_scaling(lr_dist,Ly,stren; dict_to_symbols(other_params_dict)...)
     interaction_length = scaling_type == "flat" ? lr_dist : corr_length
 
@@ -296,7 +286,6 @@ function get_normal_model_params_ed(params_dict::Dict)
                         "sigma"=>sigma,
                         "blockade_radius"=>blockade_radius,
                         "magnetic_spacing"=>magnetic_spacing,
-                        "trap_frequency"=>trap_frequency,
                         "which_dir"=>which_dir,
                         "interaction_cutoff"=>int_cutoff)
 
@@ -522,7 +511,8 @@ if false
         #other_params_dict = make_args_dict(ARGS)
         #intstren = 3.2#other_params_dict["onsite_strength"]
         #xi = 2.0#other_params_dict["corr_length"]
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_pinning",true),("pinning_strength",1e-2),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",true)])
+        #params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_pinning",true),("pinning_strength",1e-2),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",true)])
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_pinning",false),("pinning_strength",1e-2),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",true)])
 
         #println("Starting from here")
 
