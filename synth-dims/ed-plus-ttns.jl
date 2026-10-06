@@ -1426,10 +1426,10 @@ function hill_model(x, p)
     return 1.0 ./ (1.0 .+ (x ./ x50).^alpha)
 end
 
+# Rising Hill Function: y = 1 / (1 + (x/x50)^(-alpha))
 function hill_rising(x, p)
     x50, alpha = p
-    xs = max.(x, 0.0)
-    return xs.^alpha ./ (abs(x50)^alpha .+ xs.^alpha)
+    return 1.0 ./ (1.0 .+ (x ./ x50).^(-alpha))
 end
 
 function exp_fit(x, p)
@@ -1700,14 +1700,14 @@ end=#
 # check CDW order parameter vs Gamma = V / (s^3) for various system sizes
 if true
     lxlyn_list = [(6,3,3),(8,4,4),(10,5,5),(12,6,6),(14,7,7),(16,8,8)]
-    #=cols = ["r","g","b","c","m","k"]
+    cols = ["r","g","b","c","m","k"]
     datadict = Dict()
     intstrens = [300.0,50.0]
     for intstren in intstrens
         datadict[string(intstren)] = Dict()
         datadict[string(intstren)]["orderparam"] = []
         datadict[string(intstren)]["gamma"] = []
-        datadict[string(intstren)]["gamma_c"] = Vector{Float64}(undef, length(lxlyn_list))
+        datadict[string(intstren)]["gamma_c"] = []
     end
     cutoff_magspacs = [0.5,0.65,0.8,0.1,0.1,0.1]
     dataloc_ed = get_folder_location("cluster-data/exact-diag/torus/new-gauge/dd-ints")
@@ -1725,21 +1725,42 @@ if true
                     println("No ED data found for $(lx)x$(ly) N=$(n) ULR=$(intstren)")
                     continue
                 end
-                for f in all_files
-                    d,m = read_data(joinpath(dataloc_ed,f); output_level=0)
-                    magnetic_spacing = m["magnetic_spacing"]
-                    intstren == 300.0 && magnetic_spacing < cutoff_magspacs[idx] && continue
-                    append!(all_gammas_raw, intstren / (magnetic_spacing^3))
 
-                    occs = m["occs_eig1"]
-                    orderparam::ComplexF64 = 0.0
-                    for x in 1:lx
-                        for y in 1:ly
-                            orderparam += occs[x,y] * exp(im*pi*x)
+                if pdict["Lx"] == 10 && intstren == 50.0
+                    d,m = read_data(joinpath(dataloc_ed,all_files[1]); output_level=0)
+                    magspacs = m["all_magspacs"]
+                    all_occs = m["all_occs_eig1"]
+                    for i in 1:length(magspacs)
+                        magnetic_spacing = magspacs[i]
+                        magnetic_spacing < 0.4 && continue
+                        occs = all_occs[i]
+                        orderparam::ComplexF64 = 0.0
+                        for x in 1:lx
+                            for y in 1:ly
+                                orderparam += occs[x,y] * exp(im*pi*x)
+                            end
                         end
+                        orderparam /= (lx*ly)
+                        append!(all_orderparams_raw,abs(orderparam))
+                        append!(all_gammas_raw, intstren / (magnetic_spacing^3))
                     end
-                    orderparam /= (lx*ly)
-                    append!(all_orderparams_raw,abs(orderparam))
+                else
+                    for f in all_files
+                        d,m = read_data(joinpath(dataloc_ed,f); output_level=0)
+                        magnetic_spacing = m["magnetic_spacing"]
+                        intstren == 300.0 && magnetic_spacing < cutoff_magspacs[idx] && continue
+                        append!(all_gammas_raw, intstren / (magnetic_spacing^3))
+
+                        occs = m["occs_eig1"]
+                        orderparam::ComplexF64 = 0.0
+                        for x in 1:lx
+                            for y in 1:ly
+                                orderparam += occs[x,y] * exp(im*pi*x)
+                            end
+                        end
+                        orderparam /= (lx*ly)
+                        append!(all_orderparams_raw,abs(orderparam))
+                    end
                 end
             else
                 pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("onsite_strength",intstren),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
@@ -1783,7 +1804,7 @@ if true
             append!(datadict[string(intstren)]["orderparam"], [normalized_orderparams])
             append!(datadict[string(intstren)]["gamma"], [all_gammas])
         end
-    end=#
+    end
 
     fig, axs = subplots(2, 1, figsize=(6, 8))
     markers = ["o","x","^","D","v","s"]
@@ -1796,6 +1817,7 @@ if true
             xs = datadict[string(intstren)]["gamma"][idx]
             ys = datadict[string(intstren)]["orderparam"][idx]
             axs[1].scatter(xs, ys, marker=markers[ii], label=L"L_y"*"=$(ly), V=$(intstren)", c=cols[idx])
+            #axs[1].plot(xs, ys, marker=markers[ii], label=L"L_y"*"=$(ly), V=$(intstren)", c=cols[idx])
 
             # Perform a fit to the data
             valid_indices = ys .> 1e-6
@@ -1807,12 +1829,12 @@ if true
 
             # using Hill curve fit
             p0 = [mean(fit_gammas), 3.0]  #Initial guess for x50 and alpha
-            fit_result = curve_fit(hill_model, fit_gammas, fit_normalized_orderparams, p0, lower=lb, upper=ub)
+            fit_result = curve_fit(hill_rising, fit_gammas, fit_normalized_orderparams, p0, lower=lb, upper=ub)
             x50_fit, alpha_fit = fit_result.param
-            datadict[string(intstren)]["gamma_c"][idx] = x50_fit
+            append!(datadict[string(intstren)]["gamma_c"], x50_fit)
             plot_fit_xs = 10 .^ range(log10(minimum(fit_gammas)), log10(maximum(fit_gammas)), length=100)
             plot_fit_ys = hill_rising(plot_fit_xs, fit_result.param)
-            axs[1].plot(plot_fit_xs, plot_fit_ys, c=cols[idx])
+            axs[1].plot(plot_fit_xs, plot_fit_ys, c=cols[idx])#
         end
         axs[1].set_xlabel(L"\Gamma = \frac{V}{s^3}")
         axs[1].set_ylabel("Normalized CDW Order Parameter")
@@ -1826,27 +1848,22 @@ if true
             if idx > length(datadict[string(intstren)]["gamma_c"])
                 continue
             end
-            axs[2].scatter(ly, datadict[string(intstren)]["gamma_c"][idx], c=cols[idx], marker=markers[ii], label=L"L_y"*"=$(ly), V=$(intstren)")
+            #magnetic_length = 1/sqrt(2*pi/ly)
+            xplots = ly
+            yplots = datadict[string(intstren)]["gamma_c"][idx]
+            axs[2].scatter(xplots, yplots, c=cols[idx], marker=markers[ii], label=L"L_y"*"=$(ly), V=$(intstren)")
         end
     end
     axs[2].set_xlabel("Lattice Size, "*L"L_y")
-    axs[2].set_ylabel(L"\Gamma_c")
-    
-    #=plotting_lcs = [lc_vals[idx] / sqrt(ly/(2*pi)) for (idx,(lx,ly,n)) in enumerate(lxlyn_list)]
-    plotting_lcs_errors = [lc_errors[idx] / sqrt(ly/(2*pi)) for (idx,(lx,ly,n)) in enumerate(lxlyn_list)]
-    p0 = [mean(plotting_lcs), 3.0, minimum(plotting_lcs)]
-    xs = [ly for (lx,ly,n) in lxlyn_list]
-    fit_result = curve_fit(exp_fit, xs, plotting_lcs, plotting_lcs_errors, p0)
-    A_fit, B_fit, C_fit = fit_result.param
+    #axs[2].set_xlabel(L"1 / \sqrt{L_y}")
+    #axs[2].set_xlabel("Magnetic Length, "*L"l_B")
+    axs[2].set_ylabel(L"\Gamma_{c}")
 
-    #axs[2].scatter(xs,plotting_lcs,c="k",marker="x")
-    axs[2].errorbar(xs, plotting_lcs, yerr=plotting_lcs_errors, fmt="x", c="k", label="Data")
-    axs[2].plot(range(minimum(xs),maximum(xs),length=100),exp_fit(range(minimum(xs),maximum(xs),length=100),fit_result.param),label="Exp Fit, "*L"s_{c}^{\infty}"*"=$(round(C_fit, digits=3))"*L"l_B",c="r")
-    axs[2].set_xlabel("Lattice Size, "*L"L_y")
-    axs[2].set_ylabel("Critical Gradient Spacing, "*L"s_c / l_B")
-    axs[2].legend()
-    tight_layout()=#
-    #title("Critical Magnetic Spacing vs Lattice Size, Plateau = $(round(C_fit, digits=3))")
+    ys = [datadict[string(intstren)]["gamma_c"] for intstren in intstrens]
+    xs = [ly for (lx,ly,n) in lxlyn_list]
+    xs = vcat(xs, xs)
+    ys = Iterators.flatten(ys) |> collect
+    
 end
 
 
