@@ -1697,8 +1697,8 @@ if false
 end=#
 
 
-# check CDW order parameter vs Gamma = V / (s^3) for various system sizes
-if true
+#= check CDW order parameter vs Gamma = V / (s^3) for various system sizes
+if false
     lxlyn_list = [(6,3,3),(8,4,4),(10,5,5),(12,6,6),(14,7,7),(16,8,8)]
     cols = ["r","g","b","c","m","k"]
     datadict = Dict()
@@ -1864,9 +1864,7 @@ if true
     xs = vcat(xs, xs)
     ys = Iterators.flatten(ys) |> collect
     
-end
-
-
+end=#
 
 
 

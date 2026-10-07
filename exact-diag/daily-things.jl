@@ -4096,6 +4096,75 @@ end=#
 
 
 
+# look at CDW transition for Gamma with cylinder or open boundary conditions
+if true
+    lx,ly,n = 8,4,4
+    intstren = 50.0
+    if_cylinder = true      # true: periodic x, open y (cylinder); false: open x and y (obc)
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",if_cylinder),("if_periodic_y",false),("interaction_strength",intstren)])
+    dataloc = get_folder_location("cluster-data/exact-diag/" * (if_cylinder ? "cylinder" : "obc") * "/dd-ints")
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    #display(all_files)
+
+    cols = ["b","r","g","c","m","y","k"]
+
+    # on the cylinder x-translation symmetry makes <n_x> uniform in every eigenstate, so use the column
+    # correlations of column_cdw_statistics; read from metadata, or computed and saved if missing
+    lattice_params = Dict{String,Any}([("Lx",lx),("Ly",ly),("N",n)])     # full_basis only added if a file needs it
+    spis = []
+    ratios = []
+    binders = []
+    gammas = []
+    magspacs = []
+    for f in all_files
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+        magnetic_spacing = m["magnetic_spacing"]
+        magnetic_spacing < 0.25 && continue     # Lanczos unconverged below here (|H| > 1e4)
+
+        if haskey(m,"column_corr1")
+            column_corr1,column_corr2 = m["column_corr1"],m["column_corr2"]
+            evencolumn_dist1,evencolumn_dist2 = m["evencolumn_dist1"],m["evencolumn_dist2"]
+        else
+            haskey(lattice_params,"full_basis") || (lattice_params["full_basis"] = n_particle_basis(n,lx,ly; output_level=0,if_save_data=false))
+            column_corr1,evencolumn_dist1 = column_cdw_statistics(d["state"][1],lattice_params)
+            column_corr2,evencolumn_dist2 = column_cdw_statistics(d["state"][2],lattice_params)
+            datadict = Dict([("column_corr1",column_corr1),("column_corr2",column_corr2),("evencolumn_dist1",evencolumn_dist1),("evencolumn_dist2",evencolumn_dist2)])
+            modify_data(datadict,joinpath(dataloc,f),"metadata"; output_level=1,file_type="jld2")
+        end
+
+        # trace over the two lowest states, independent of how they are mixed
+        sp,ratio,binder = cdw_order_parameters((column_corr1 .+ column_corr2) ./ 2,(evencolumn_dist1 .+ evencolumn_dist2) ./ 2)
+
+        append!(spis,sp)
+        append!(ratios,ratio)
+        append!(binders,binder)
+        append!(gammas,intstren / (magnetic_spacing)^3)
+        append!(magspacs,magnetic_spacing)
+
+    end
+    perm = sortperm(magspacs)
+
+    fig = figure()
+    plot(gammas[perm],spis[perm],c="b",marker="o",label=L"S(\pi)")
+    plot(gammas[perm],ratios[perm],c="r",marker="x",label=L"1 - S(\pi - 2\pi/L_x)/S(\pi)")
+    plot(gammas[perm],binders[perm],c="g",marker="s",label="Binder")
+    xlabel(L" \Gamma = V / s^3")
+    ylabel("CDW Order Parameter")
+    title((if_cylinder ? "Cylinder" : "OBC") * " $(lx)x$(ly) N=$(n)")
+    xscale("log")
+    legend()
+
+    fig = figure()
+    plot(magspacs[perm],spis[perm],c="b",marker="o",label=L"S(\pi)")
+    plot(magspacs[perm],ratios[perm],c="r",marker="x",label=L"1 - S(\pi - 2\pi/L_x)/S(\pi)")
+    plot(magspacs[perm],binders[perm],c="g",marker="s",label="Binder")
+    xlabel("Magnetic Spacing")
+    ylabel("CDW Order Parameter")
+    title((if_cylinder ? "Cylinder" : "OBC") * " $(lx)x$(ly) N=$(n)")
+    xscale("log")
+    legend()
+
+end
 
 
 

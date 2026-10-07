@@ -473,10 +473,10 @@ if false
     #which_one = args_dict["which_one"]
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
-    lx,ly,n = 8,4,4
-    intstren = 300.0
+    lx,ly,n = 6,3,3
+    intstren = 50.0
     #xi = 1.0
-    #dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge")
+    dataloc = get_folder_location("cluster-data/exact-diag/obc/dd-ints")
     #anis = 1e-4
     #intstrens = range(0.0,10.0,length=11)
     #intlens = range(0.0,ly,length=11)
@@ -485,6 +485,7 @@ if false
     #for (idx,xi) in enumerate(intlens)
     #for (idx,anis) in enumerate(anises)
 
+    xis = 10 .^ (range(-1,1.3,length=11))
     
     #=BLAS.set_num_threads(5)
     args_dict = make_args_dict(ARGS)
@@ -500,6 +501,7 @@ if false
     #tws2 = range(0.0,1.0,length=3)
     #for (idx,tw1) in enumerate(tws)
     #for (idx2,tw2) in enumerate(tws)
+    for (idx,xi) in enumerate(xis)
     #for tw1 in tws
     #for ii in 1:1
         #if tw1 == 0.0 && tw2 == 0.0
@@ -512,7 +514,8 @@ if false
         #intstren = 3.2#other_params_dict["onsite_strength"]
         #xi = 2.0#other_params_dict["corr_length"]
         #params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_pinning",true),("pinning_strength",1e-2),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",true)])
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_pinning",false),("pinning_strength",1e-2),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",true)])
+        #params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_pinning",false),("pinning_strength",1e-2),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",true)])
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("scaling_type","dd"),("magnetic_spacing",xi),("dataloc",dataloc),("lr","all"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",true)])
 
         #println("Starting from here")
 
@@ -520,6 +523,16 @@ if false
             states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
         end
 
+        occs1 = get_occupancy(states[1],lattice_params; if_plot=false)
+        occs2 = get_occupancy(states[2],lattice_params; if_plot=false)
+        datadict = Dict([("occs1",occs1),("occs2",occs2)])
+        modify_data(datadict,filepath,"metadata"; output_level=1,file_type="jld2")
+
+        # column statistics for the CDW order parameters, read back with cdw_order_parameters
+        column_corr1,evencolumn_dist1 = column_cdw_statistics(states[1],lattice_params)
+        column_corr2,evencolumn_dist2 = column_cdw_statistics(states[2],lattice_params)
+        datadict = Dict([("column_corr1",column_corr1),("column_corr2",column_corr2),("evencolumn_dist1",evencolumn_dist1),("evencolumn_dist2",evencolumn_dist2)])
+        modify_data(datadict,filepath,"metadata"; output_level=1,file_type="jld2")
 
         #=fourpt = four_point(states[1],lattice_params; if_plot=false)
         fourpt_2 = four_point(states[2],lattice_params; if_plot=false)
@@ -627,7 +640,7 @@ if false
         #gammas1[idx,idx2] = gamma1
         #gammas2[idx,idx2] = gamma2
 
-    #end
+    end
     #end
 
     #=fig = figure()

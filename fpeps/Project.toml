@@ -1,0 +1,10 @@
+[deps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+KrylovKit = "0b1a1467-8014-51b9-945f-bf0ae24f4b77"
+LsqFit = "2fda8390-95c7-5789-9bda-21331edee243"
+MKL = "33e6dc65-8f57-5167-99aa-e5a354878fb2"
+ParallelGradient = "2abb11c0-4451-46e5-9056-fbb582a36d1b"
+QuantumNaturalGradient = "8d03283f-5cc1-4355-9ceb-601ddb1c7e78"
+QuantumNaturalfPEPS = "8cccb88f-824b-4ada-bd77-4bd123faaa4e"
+TTN = "b44c321c-291e-437f-af1d-05cac99632ef"
+TensorOperations = "6aa20fa7-93e2-5fca-9bc0-fbd0db3c71a2"

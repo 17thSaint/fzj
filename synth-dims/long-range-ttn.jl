@@ -5,7 +5,7 @@
 include("../review-practice-codes/ttn.jl")
 include("../other-funcs/basic-2d-stuff.jl")
 include("../review-practice-codes/observables.jl")
-include("../review-practice-codes/plottings.jl")
+#include("../review-practice-codes/plottings.jl")
 using Profile,MKL,TensorOperations,CUDA
 
 function spin_matrix_element(m1,m2,spin,direction::String)
