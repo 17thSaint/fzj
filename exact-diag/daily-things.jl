@@ -4096,8 +4096,8 @@ end=#
 
 
 
-# look at CDW transition for Gamma with cylinder or open boundary conditions
-if true
+#= look at CDW transition for Gamma with cylinder or open boundary conditions
+if false
     lx,ly,n = 8,4,4
     intstren = 50.0
     if_cylinder = true      # true: periodic x, open y (cylinder); false: open x and y (obc)
@@ -4164,11 +4164,78 @@ if true
     xscale("log")
     legend()
 
+end=#
+
+# cdw transition for 6xi N=3 scaling for cylinder using new order param
+if true
+    using LsqFit
+    lxlyns = [(6,4,3),(6,5,3),(6,6,3),(6,7,3)]
+    if_cylinder = false
+    ifccval = if_cylinder ? "cylinder" : "obc"
+    intstren = 50.0
+    dataloc = get_folder_location("cluster-data/exact-diag/$(ifccval)/dd-ints")
+
+    datadict = Dict()
+    for (lx,ly,n) in lxlyns
+        datadict[string(ly)] = Dict()
+        datadict[string(ly)]["sp"] = []
+        datadict[string(ly)]["binder"] = []
+        datadict[string(ly)]["magspacs"] = []
+    end
+
+    for (lx,ly,n) in lxlyns
+        pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",if_cylinder),("if_periodic_y",false),("interaction_strength",intstren)])
+        all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+
+        for f in all_files
+            d,m = read_data(joinpath(dataloc,f); output_level=0)
+            magnetic_spacing = m["magnetic_spacing"]
+            magnetic_spacing < 0.2 && continue      # 6x6, 6x7 dip below s = 0.15 (likely unconverged)
+            append!(datadict[string(ly)]["magspacs"],magnetic_spacing)
+
+            column_corr1,column_corr2 = m["column_corr1"],m["column_corr2"]
+            evencolumn_dist1,evencolumn_dist2 = m["evencolumn_dist1"],m["evencolumn_dist2"]
+
+            sp,_,binder = cdw_order_parameters((column_corr1 .+ column_corr2) ./ 2,(evencolumn_dist1 .+ evencolumn_dist2) ./ 2)
+
+            append!(datadict[string(ly)]["sp"],sp)
+            append!(datadict[string(ly)]["binder"],binder)
+        end
+    end
+
+    fig, axs = subplots(3, 1, figsize=(6, 11))
+    for (i,(key,lab)) in enumerate([("sp","2-point CDW Order Parameter"),("binder","Binder Cumulant")])
+        for (j,(lx,ly,n)) in enumerate(lxlyns)
+            xs = intstren ./ (datadict[string(ly)]["magspacs"] .^ 3)
+            perm = sortperm(xs)
+            xs = xs[perm]
+            ys = datadict[string(ly)][key][perm]
+            normalized_ys = (ys .- minimum(ys)) ./ (maximum(ys) - minimum(ys))
+
+            # rising Hill fit from the pre-transition dip upward, x50 = gamma_c
+            k = argmin(normalized_ys)
+            fit_result = curve_fit((x,p) -> 1 .- hill_model(x,p),xs[k:end],normalized_ys[k:end],[3*xs[k],3.0])
+            datadict[string(ly)]["gamma_c_"*key] = (fit_result.param[1],stderror(fit_result)[1])
+
+            fit_xs = 10 .^ range(log10(xs[k]),log10(xs[end]),length=100)
+            axs[i].plot(xs,normalized_ys,"p",c="C$(j)",label=L"L_y="*"$(ly)")
+            axs[i].plot(fit_xs,1 .- hill_model(fit_xs,fit_result.param),"-",c="C$(j)")
+        end
+        axs[i].set_xlabel(L"\Gamma = V / s^3")
+        axs[i].set_ylabel(lab)
+        axs[i].set_xscale("log")
+        axs[i].legend()
+
+        gamma_cs = [datadict[string(ly)]["gamma_c_"*key] for (lx,ly,n) in lxlyns]
+        axs[3].errorbar([ly for (lx,ly,n) in lxlyns],first.(gamma_cs),yerr=last.(gamma_cs),fmt="o",label=lab)
+    end
+    axs[3].set_xlabel(L"L_y")
+    axs[3].set_ylabel(L"\Gamma_c")
+    axs[3].set_yscale("log")
+    axs[3].legend()
+    tight_layout()
+
 end
-
-
-
-
 
 
 

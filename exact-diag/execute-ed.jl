@@ -46,7 +46,7 @@ end
 
 include_other_files(["other-funcs/basic-2d-stuff.jl","other-funcs/basic-2d-observables.jl","exact-diag/two-dimensions.jl","exact-diag/observables.jl","exact-diag/hatsugai-mbcn.jl"])
 #include_other_files(["exact-diag/time-evolution.jl"])
-#include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
+include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
 
 function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     if hamilt_params["U"][2] == 0.0
@@ -473,7 +473,7 @@ if false
     #which_one = args_dict["which_one"]
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
-    lx,ly,n = 6,3,3
+    lx,ly,n = 6,7,3
     intstren = 50.0
     #xi = 1.0
     dataloc = get_folder_location("cluster-data/exact-diag/obc/dd-ints")
@@ -485,7 +485,7 @@ if false
     #for (idx,xi) in enumerate(intlens)
     #for (idx,anis) in enumerate(anises)
 
-    xis = 10 .^ (range(-1,1.3,length=11))
+    xis = 10 .^ (range(log10(0.3),log10(1.1),length=11))
     
     #=BLAS.set_num_threads(5)
     args_dict = make_args_dict(ARGS)
@@ -523,10 +523,10 @@ if false
             states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
         end
 
-        occs1 = get_occupancy(states[1],lattice_params; if_plot=false)
-        occs2 = get_occupancy(states[2],lattice_params; if_plot=false)
-        datadict = Dict([("occs1",occs1),("occs2",occs2)])
-        modify_data(datadict,filepath,"metadata"; output_level=1,file_type="jld2")
+        #occs1 = get_occupancy(states[1],lattice_params; if_plot=false)
+        #occs2 = get_occupancy(states[2],lattice_params; if_plot=false)
+        #datadict = Dict([("occs1",occs1),("occs2",occs2)])
+        #modify_data(datadict,filepath,"metadata"; output_level=1,file_type="jld2")
 
         # column statistics for the CDW order parameters, read back with cdw_order_parameters
         column_corr1,evencolumn_dist1 = column_cdw_statistics(states[1],lattice_params)
