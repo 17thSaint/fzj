@@ -38,9 +38,9 @@ end
 include_other_files(["exact-diag/execute-ed.jl"])
 
 # the interaction-profile settings a figure of merit may carry, forwarded to the ED so a non-flat
-# scaling (exp / gaussian / rydberg / dd) reaches get_normal_model_params_ed instead of silently
+# scaling (exp / gaussian / rydberg / dd / powerlaw) reaches get_normal_model_params_ed instead of silently
 # falling back to flat
-const OPTIMIZATION_PROFILE_KEYS = ("scaling_type","corr_length","sigma","blockade_radius","magnetic_spacing","trap_frequency","interaction_strength")
+const OPTIMIZATION_PROFILE_KEYS = ("scaling_type","corr_length","sigma","blockade_radius","magnetic_spacing","exponent","trap_frequency","interaction_strength")
 
 # The ED parameter dict an optimization setup diagonalizes with: the lattice from the figure of
 # merit's parameters_dictionary (as quocs_common.JuliaFoM serializes it), the defaults every

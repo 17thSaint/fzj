@@ -61,22 +61,25 @@ end
 
 #= set ham in data file to nothing
 if false
-    dataloc = get_folder_location("cluster-data/exact-diag/torus/new-gauge/pinned-scaling/pinning-ulr-transition")
-    all_files = readdir(dataloc)
-    filter!(x -> occursin("jld2",x),all_files)
-    for f in all_files
-        d,m = read_data(joinpath(dataloc,f); output_level=0)
+    all_folders = ["dd-ints"]
+    for which_folder in all_folders
+        dataloc = get_folder_location("cluster-data/exact-diag/obc/$(which_folder)")
+        all_files = readdir(dataloc)
+        filter!(x -> occursin("jld2",x),all_files)
+        for f in all_files
+            d,m = read_data(joinpath(dataloc,f); output_level=0)
 
-        if !isnothing(m["full_basis"])
-            println("Modifying file: $f")
-            modify_data(Dict([("full_basis",nothing)]),joinpath(dataloc,f),"metadata"; output_level=0)
+            if !isnothing(m["full_basis"])
+                println("Modifying file: $f")
+                modify_data(Dict([("full_basis",nothing)]),joinpath(dataloc,f),"metadata"; output_level=0)
+            end
+
+            if !isnothing(m["H"])
+                println("Modifying file: $f")
+                modify_data(Dict([("H",nothing)]),joinpath(dataloc,f),"metadata"; output_level=0)
+            end
+
         end
-
-        if !isnothing(m["H"])
-            println("Modifying file: $f")
-            modify_data(Dict([("H",nothing)]),joinpath(dataloc,f),"metadata"; output_level=0)
-        end
-
     end
 end=#
 
@@ -4166,8 +4169,8 @@ if false
 
 end=#
 
-# cdw transition for 6xi N=3 scaling for cylinder using new order param
-if true
+#= cdw transition for 6xi N=3 scaling for cylinder using new order param
+if false
     using LsqFit
     lxlyns = [(6,4,3),(6,5,3),(6,6,3),(6,7,3)]
     if_cylinder = false
@@ -4235,8 +4238,212 @@ if true
     axs[3].legend()
     tight_layout()
 
-end
+end=#
 
+#= cdw transition for 6xi N=3 scaling with power law exponent p, Γ = V / s^p (p = 0: flat Ui, Γ = V)
+if false
+    using LsqFit
+    lxlyns = [(6,4,3),(6,5,3),(6,6,3),(6,7,3)]
+    ps = [0.0,0.5,1.0,1.5,2.0,2.5,3.0]
+    intstren = 50.0
+    # order parameters from the ground state alone; for Ly >= 5 state 2 is an excited state, not a
+    # CDW partner (E2 - E1 stays finite at large Γ), false = average of states 1 and 2 as before
+    if_gs_only = true
+    # p = 0 is the flat Ui data (scanned in V), p = 3 the dd data, other p are in obc/powerlaw-<p with . -> p>
+    power_folder(p) = p == 0.0 ? "flat-ints" : p == 3.0 ? "dd-ints" : "powerlaw-" * replace(string(p),"." => "p")
+
+    datadict = Dict()
+    for p in ps
+        dataloc = get_folder_location("cluster-data/exact-diag/obc/$(power_folder(p))")
+        for (lx,ly,n) in lxlyns
+            key = (p,ly)
+            datadict[key] = Dict{String,Any}("sp"=>Float64[],"binder"=>Float64[],"gammas"=>Float64[])
+            pdict = Dict{String,Any}([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",false),("if_periodic_y",false)])
+            p != 0.0 && (pdict["interaction_strength"] = intstren)
+            all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+
+            for f in all_files
+                d,m = read_data(joinpath(dataloc,f); output_level=0)
+                magnetic_spacing = m["magnetic_spacing"]
+                p == 3.0 && magnetic_spacing < 0.2 && continue      # dd 6x6, 6x7 dip below s = 0.15 (likely unconverged)
+                # flat files carry the default magnetic_spacing = 1.0, there Γ is the strength itself
+                append!(datadict[key]["gammas"],p == 0.0 ? m["interaction_strength"] : intstren / magnetic_spacing^p)
+
+                column_corr1,column_corr2 = m["column_corr1"],m["column_corr2"]
+                evencolumn_dist1,evencolumn_dist2 = m["evencolumn_dist1"],m["evencolumn_dist2"]
+
+                if if_gs_only
+                    sp,_,binder = cdw_order_parameters(column_corr1,evencolumn_dist1)
+                else
+                    sp,_,binder = cdw_order_parameters((column_corr1 .+ column_corr2) ./ 2,(evencolumn_dist1 .+ evencolumn_dist2) ./ 2)
+                end
+
+                append!(datadict[key]["sp"],sp)
+                append!(datadict[key]["binder"],binder)
+            end
+        end
+    end
+
+    fig, axs = subplots(2, length(ps), figsize=(3.5*length(ps), 7))
+    fig2, axs2 = subplots(1, 2, figsize=(11, 4.5))
+    obs_bs = Dict("sp"=>Float64[],"binder"=>Float64[],"sp_err"=>Float64[],"binder_err"=>Float64[])
+    lys = [ly for (lx,ly,n) in lxlyns]
+    for (ip,p) in enumerate(ps)
+        for (i,(obs,lab)) in enumerate([("sp","2-point CDW Order Parameter"),("binder","Binder Cumulant")])
+            for (j,(lx,ly,n)) in enumerate(lxlyns)
+                xs = datadict[(p,ly)]["gammas"]
+                perm = sortperm(xs)
+                xs = xs[perm]
+                ys = datadict[(p,ly)][obs][perm]
+                normalized_ys = (ys .- minimum(ys)) ./ (maximum(ys) - minimum(ys))
+
+                # rising Hill fit from the pre-transition dip upward, x50 = gamma_c
+                k = argmin(normalized_ys)
+                fit_result = curve_fit((x,q) -> 1 .- hill_model(x,q),xs[k:end],normalized_ys[k:end],[3*xs[k],3.0])
+                datadict[(p,ly)]["gamma_c_"*obs] = (fit_result.param[1],stderror(fit_result)[1])
+
+                fit_xs = 10 .^ range(log10(xs[k]),log10(xs[end]),length=100)
+                axs[i,ip].plot(xs,normalized_ys,"p",c="C$(j)",label=L"L_y="*"$(ly)")
+                axs[i,ip].plot(fit_xs,1 .- hill_model(fit_xs,fit_result.param),"-",c="C$(j)")
+            end
+            axs[i,ip].set_xlabel(p == 0.0 ? L"\Gamma = V" : L"\Gamma = V / s^p")
+            axs[i,ip].set_ylabel(lab)
+            axs[i,ip].set_title("p = $p, " * (if_gs_only ? "ground state" : "states 1, 2 averaged"))
+            axs[i,ip].set_xscale("log")
+            axs[i,ip].legend()
+
+            # Γ_c ∝ Ly^b from a log-log line through the 4 points
+            gamma_cs = [datadict[(p,ly)]["gamma_c_"*obs] for ly in lys]
+            # standard error of b from the residuals of the line (includes the deviation from a power law)
+            design = [log.(lys) ones(length(lys))]
+            line = design \ log.(first.(gamma_cs))
+            residuals = log.(first.(gamma_cs)) .- design * line
+            b,b_err = line[1],sqrt(sum(abs2,residuals) / (length(lys) - 2) * inv(design' * design)[1,1])
+            push!(obs_bs[obs],b)
+            push!(obs_bs[obs*"_err"],b_err)
+            println("p = $p, $obs: Γ_c = $(round.(first.(gamma_cs),sigdigits=3)) ± $(round.(last.(gamma_cs),sigdigits=2)), Γ_c ∝ Ly^($(round(b,digits=2)) ± $(round(b_err,digits=2)))")
+            axs2[1].errorbar(lys,first.(gamma_cs),yerr=last.(gamma_cs),fmt=obs == "sp" ? "o-" : "s--",c="C$(ip-1)",mfc=obs == "sp" ? "C$(ip-1)" : "none",label=obs == "sp" ? "p = $p" : nothing)
+        end
+    end
+    axs2[1].set_xlabel(L"L_y")
+    axs2[1].set_ylabel(L"\Gamma_c"*" (filled S(π), open Binder)")
+    axs2[1].set_xscale("log")
+    axs2[1].set_yscale("log")
+    axs2[1].set_xticks(lys)
+    axs2[1].set_xticklabels(string.(lys))
+    axs2[1].tick_params(axis="x",which="minor",labelbottom=false)
+    axs2[1].legend()
+    axs2[2].errorbar(ps,obs_bs["sp"],yerr=obs_bs["sp_err"],fmt="o-",capsize=3,label="2-point CDW Order Parameter")
+    axs2[2].errorbar(ps,obs_bs["binder"],yerr=obs_bs["binder_err"],fmt="s--",mfc="none",capsize=3,label="Binder Cumulant")
+    axs2[2].set_xlabel(L"p")
+    axs2[2].set_ylabel(L"b"*" in "*L"\Gamma_c \propto L_y^b")
+    axs2[2].legend()
+    fig2.suptitle(if_gs_only ? "ground state" : "states 1, 2 averaged")
+    fig2.tight_layout()
+    fig.tight_layout()
+
+end=#
+
+#= cdw transition for 8xi N=4 scaling with power law exponent p, cluster sweep (one file per size and p, whole Γ sweep in its metadata)
+if true
+    using LsqFit
+    lxlyns = [(8,4,4),(8,5,4),(8,6,4),(8,7,4)]
+    ps = [0.0,0.5,1.0,1.5,2.0,2.5,3.0]      # add 3.0 once the dd-ints sweep is back
+    intstren = 50.0
+    if_gs_only = true
+    power_folder(p) = p == 0.0 ? "flat-ints" : p == 3.0 ? "dd-ints" : "powerlaw-" * replace(string(p),"." => "p")
+    sweep_keys = ["all_gammas","all_columncorrs1","all_columncorrs2","all_evencolumndist1","all_evencolumndist2"]
+
+    datadict = Dict()
+    for p in ps
+        dataloc = get_folder_location("cluster-data/exact-diag/obc/$(power_folder(p))")
+        for (lx,ly,n) in lxlyns
+            key = (p,ly)
+            datadict[key] = Dict{String,Any}("sp"=>Float64[],"binder"=>Float64[],"gammas"=>Float64[])
+            pdict = Dict{String,Any}([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",false),("if_periodic_y",false)])
+            p != 0.0 && (pdict["interaction_strength"] = intstren)
+            all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+
+            for f in all_files
+                # metadata only (the states are big); files without the sweep (old per-point 8x4 dd) are skipped
+                m = jldopen(joinpath(dataloc,f),"r") do fh
+                    haskey(fh["metadata"],"all_gammas") ? Dict(k => fh["metadata"][k] for k in sweep_keys) : nothing
+                end
+                isnothing(m) && continue
+
+                for i in eachindex(m["all_gammas"])
+                    if if_gs_only
+                        sp,_,binder = cdw_order_parameters(Matrix{Float64}(m["all_columncorrs1"][i]),Vector{Float64}(m["all_evencolumndist1"][i]))
+                    else
+                        sp,_,binder = cdw_order_parameters((m["all_columncorrs1"][i] .+ m["all_columncorrs2"][i]) ./ 2,(m["all_evencolumndist1"][i] .+ m["all_evencolumndist2"][i]) ./ 2)
+                    end
+                    append!(datadict[key]["gammas"],m["all_gammas"][i])
+                    append!(datadict[key]["sp"],sp)
+                    append!(datadict[key]["binder"],binder)
+                end
+            end
+        end
+    end
+
+    fig, axs = subplots(2, length(ps), figsize=(3.5*length(ps), 7))
+    fig2, axs2 = subplots(1, 2, figsize=(11, 4.5))
+    obs_bs = Dict("sp"=>Float64[],"binder"=>Float64[],"sp_err"=>Float64[],"binder_err"=>Float64[])
+    lys = [ly for (lx,ly,n) in lxlyns]
+    for (ip,p) in enumerate(ps)
+        for (i,(obs,lab)) in enumerate([("sp","2-point CDW Order Parameter"),("binder","Binder Cumulant")])
+            for (j,(lx,ly,n)) in enumerate(lxlyns)
+                xs = datadict[(p,ly)]["gammas"]
+                perm = sortperm(xs)
+                xs = xs[perm]
+                ys = datadict[(p,ly)][obs][perm]
+                normalized_ys = (ys .- minimum(ys)) ./ (maximum(ys) - minimum(ys))
+
+                # rising Hill fit from the pre-transition dip upward, x50 = gamma_c
+                k = argmin(normalized_ys)
+                fit_result = curve_fit((x,q) -> 1 .- hill_model(x,q),xs[k:end],normalized_ys[k:end],[3*xs[k],3.0])
+                datadict[(p,ly)]["gamma_c_"*obs] = (fit_result.param[1],stderror(fit_result)[1])
+
+                fit_xs = 10 .^ range(log10(xs[k]),log10(xs[end]),length=100)
+                axs[i,ip].plot(xs,normalized_ys,"p",c="C$(j)",label=L"L_y="*"$(ly)")
+                axs[i,ip].plot(fit_xs,1 .- hill_model(fit_xs,fit_result.param),"-",c="C$(j)")
+            end
+            axs[i,ip].set_xlabel(p == 0.0 ? L"\Gamma = V" : L"\Gamma = V / s^p")
+            axs[i,ip].set_ylabel(lab)
+            axs[i,ip].set_title("p = $p, " * (if_gs_only ? "ground state" : "states 1, 2 averaged"))
+            axs[i,ip].set_xscale("log")
+            axs[i,ip].legend()
+
+            # Γ_c ∝ Ly^b from a log-log line through the 4 points
+            gamma_cs = [datadict[(p,ly)]["gamma_c_"*obs] for ly in lys]
+            # standard error of b from the residuals of the line (includes the deviation from a power law)
+            design = [log.(lys) ones(length(lys))]
+            line = design \ log.(first.(gamma_cs))
+            residuals = log.(first.(gamma_cs)) .- design * line
+            b,b_err = line[1],sqrt(sum(abs2,residuals) / (length(lys) - 2) * inv(design' * design)[1,1])
+            push!(obs_bs[obs],b)
+            push!(obs_bs[obs*"_err"],b_err)
+            println("p = $p, $obs: Γ_c = $(round.(first.(gamma_cs),sigdigits=3)) ± $(round.(last.(gamma_cs),sigdigits=2)), Γ_c ∝ Ly^($(round(b,digits=2)) ± $(round(b_err,digits=2)))")
+            axs2[1].errorbar(lys,first.(gamma_cs),yerr=last.(gamma_cs),fmt=obs == "sp" ? "o-" : "s--",c="C$(ip-1)",mfc=obs == "sp" ? "C$(ip-1)" : "none",label=obs == "sp" ? "p = $p" : nothing)
+        end
+    end
+    axs2[1].set_xlabel(L"L_y")
+    axs2[1].set_ylabel(L"\Gamma_c"*" (filled S(π), open Binder)")
+    axs2[1].set_xscale("log")
+    axs2[1].set_yscale("log")
+    axs2[1].set_xticks(lys)
+    axs2[1].set_xticklabels(string.(lys))
+    axs2[1].tick_params(axis="x",which="minor",labelbottom=false)
+    axs2[1].legend()
+    axs2[2].errorbar(ps,obs_bs["sp"],yerr=obs_bs["sp_err"],fmt="o-",capsize=3,label="2-point CDW Order Parameter")
+    axs2[2].errorbar(ps,obs_bs["binder"],yerr=obs_bs["binder_err"],fmt="s--",mfc="none",capsize=3,label="Binder Cumulant")
+    axs2[2].set_xlabel(L"p")
+    axs2[2].set_ylabel(L"b"*" in "*L"\Gamma_c \propto L_y^b")
+    axs2[2].legend()
+    fig2.suptitle("8xLy N=4, " * (if_gs_only ? "ground state" : "states 1, 2 averaged"))
+    fig2.tight_layout()
+    fig.tight_layout()
+
+end=#
 
 
 

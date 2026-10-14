@@ -30,7 +30,7 @@ class intstrenRamp(JuliaFoM):
         self.if_periodic_y = args_dict.setdefault("if_periodic_y", True)
 
         # interaction profile over distance: "flat" (default), "exp", "gaussian",
-        # "rydberg" or "dd", with their respective length/width parameters (defaults
+        # "rydberg", "dd" or "powerlaw" (+ exponent), with their respective length/width parameters (defaults
         # mirror get_normal_model_params_ed); forwarded to Julia by
         # setup_intstren_ramp's scaling loop
         self.scaling_type = args_dict.setdefault("scaling_type", "flat")
@@ -38,6 +38,7 @@ class intstrenRamp(JuliaFoM):
         self.sigma = args_dict.setdefault("sigma", 1.0)
         self.blockade_radius = args_dict.setdefault("blockade_radius", 1.0)
         self.magnetic_spacing = args_dict.setdefault("magnetic_spacing", 1.0)
+        self.exponent = args_dict.setdefault("exponent", 3.0)
 
         # ramp targets. The ramp duration is fixed (only the pulse shape is optimized)
         # and must match the ramptime value the pulse dictionary's bins are derived from

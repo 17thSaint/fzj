@@ -75,7 +75,7 @@ function setup_intstren_ramp_ad(parameters_dictionary)
     hp_max["U"] = long_range_scaling(lr_dist,Ly,intstren_max;
         scaling=hp_max["scaling_type"],corr_length=hp_max["corr_length"],
         sigma=hp_max["sigma"],blockade_radius=hp_max["blockade_radius"],
-        magnetic_spacing=hp_max["magnetic_spacing"])
+        magnetic_spacing=hp_max["magnetic_spacing"],exponent=get(hp_max,"exponent",3.0))
     ham_int = getInteraction(lattice_params,hp_max; output_level=0) ./ intstren_max
 
     isdiag(ham_int) || error("interaction matrix is expected to be diagonal")

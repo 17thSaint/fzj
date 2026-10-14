@@ -100,7 +100,7 @@ function timeham(timestep::Int,t_evo_params::Dict,lattice_params::Dict,hamilt_pa
             # these parameters only enter the Hamiltonian through the coupling vector U,
             # which must be rebuilt whenever one of them takes a new value (skipping the
             # rebuild while the value sits constant, e.g. the hold after a ramp ends)
-            if k in ("interaction_strength","corr_length","sigma","blockade_radius","magnetic_spacing","magnetic_gradient_time") && get(hamilt_params,k,nothing) !== v[timestep]
+            if k in ("interaction_strength","corr_length","sigma","blockade_radius","magnetic_spacing","exponent","magnetic_gradient_time") && get(hamilt_params,k,nothing) !== v[timestep]
                 if_rebuild_ulr = true
             end
             hamilt_params[k] = v[timestep]
@@ -130,7 +130,8 @@ function timeham(timestep::Int,t_evo_params::Dict,lattice_params::Dict,hamilt_pa
         hamilt_params["U"] = long_range_scaling(lr_dist,lattice_params["Ly"],stren;
             scaling=hamilt_params["scaling_type"],corr_length=hamilt_params["corr_length"],
             sigma=hamilt_params["sigma"],blockade_radius=hamilt_params["blockade_radius"],
-            magnetic_spacing=hamilt_params["magnetic_spacing"],magnetic_gradient_integral=magnetic_integral)
+            magnetic_spacing=hamilt_params["magnetic_spacing"],exponent=get(hamilt_params,"exponent",3.0),
+            magnetic_gradient_integral=magnetic_integral)
     end
 
     # build the Hamiltonian, from the saved undressed matrices when if_reading is set
@@ -294,6 +295,9 @@ function get_tevo_filename(timeevo_dict::Dict,lattice_dict::Dict,hamilt_dict::Di
 			filename_dict["blockade_radius"] = hamilt_dict["blockade_radius"]
 		elseif hamilt_dict["scaling_type"] == "dd"
 			filename_dict["magnetic_spacing"] = hamilt_dict["magnetic_spacing"]
+		elseif hamilt_dict["scaling_type"] == "powerlaw"
+			filename_dict["magnetic_spacing"] = hamilt_dict["magnetic_spacing"]
+			filename_dict["exponent"] = hamilt_dict["exponent"]
 		elseif hamilt_dict["scaling_type"] == "magnetic_gradient"
 			# magnetic_spacing is the initial spacing a0 the gradient displaces from
 			filename_dict["magnetic_spacing"] = hamilt_dict["magnetic_spacing"]
@@ -723,11 +727,14 @@ end
 
 # The same limit for the dd profile at an arbitrary spacing, for spacing / gradient pulses: the
 # step from the t = 0 Hamiltonian only bounds a run while a(t) stays at or above its starting
-# value, and U ~ 1/a^3 grows quickly as a pulse pulls the states together
+# value, and U ~ 1/a^3 grows quickly as a pulse pulls the states together. A "powerlaw" run
+# uses its own exponent, U ~ 1/a^p; every other scaling type falls back to the dd profile
 function get_critical_dt_at_spacing(spacing::Float64,tmax::Float64,lattice_dict::Dict,hamilt_dict::Dict)
     hp = copy(hamilt_dict)
+    scaling = get(hamilt_dict,"scaling_type","dd") == "powerlaw" ? "powerlaw" : "dd"
     hp["U"] = long_range_scaling(get(hamilt_dict,"lr_dist",length(hamilt_dict["U"])-1),lattice_dict["Ly"],
-                                 hamilt_dict["interaction_strength"]; scaling="dd",magnetic_spacing=spacing)
+                                 hamilt_dict["interaction_strength"]; scaling=scaling,magnetic_spacing=spacing,
+                                 exponent=get(hamilt_dict,"exponent",3.0))
     return get_critical_dt(tmax,lattice_dict,hp)
 end
 

@@ -321,6 +321,14 @@ function long_range_scaling(x_final::Int64,virt_edge_length::Int64,initial_stren
         #=if maximum(strengths[2:end]) > 10^5
             strengths[2:end] .= 10^5
         end=#
+    elseif scaling_func == "powerlaw"
+        exponent = kwargs[:exponent]
+        spacing = kwargs[:magnetic_spacing]
+        strengths = zeros(virt_edge_length)
+        strengths[1] = initial_strength
+        for x in 1:virt_edge_length-1
+            strengths[x+1] = initial_strength * (1 / ((spacing*x)^exponent))
+        end
     else
         error("Scaling function not recognized: ",scaling_func)
 	end

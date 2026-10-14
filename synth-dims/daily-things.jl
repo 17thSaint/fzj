@@ -1205,8 +1205,8 @@ if false
 end=#
 
 
-# look at ttn occs under DD ints
-if true
+#= look at ttn occs under DD ints
+if false
     lx,ly,n = 16,8,8
     dataloc = get_folder_location("cluster-data/synth-dims/torus/new-gauge/dd-ints")
     pdict = Dict([("Lx",lx),("Ly",ly),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("hopping_anisotropy",1.0)])
@@ -1231,6 +1231,27 @@ if true
     xlabel("Magnetic Spacing")
     ylabel("CDW Contrast")
     xscale("log")
+
+end=#
+
+
+
+
+
+
+# look at currents and correlations
+if true
+    lx,ly,n = 14,7,7
+    dataloc_laugh_torus = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict_laugh = Dict([("Lx",lx),("Ly",ly),("particles",n),("hopping_anisotropy",1.0),("if_periodic_phys",true),("if_periodic_synth",true),("onsite_strength",0.0)])
+
+    all_files_laugh = find_data_file(pdict_laugh,"ttn",dataloc_laugh_torus; output_level=0)
+    display(all_files_laugh)
+
+    
+
+
+
 
 end
 

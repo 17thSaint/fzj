@@ -118,9 +118,9 @@ pitfalls by topic.
   `interaction_cutoff` (1e-5) at u=1 but above it at large u would be missing. Checked via endpoint
   eigenstate residuals (~1e-14 flat; ~1e-6 non-flat from 5-digit rounding of U; tolerance
   1e-5·N(N−1)). Pinning/disorder/periodic potential rejected (don't scale linearly with u).
-- Non-flat profiles (exp/gaussian/rydberg/dd) supported — every `long_range_scaling` branch is
+- Non-flat profiles (exp/gaussian/rydberg/dd/powerlaw) supported — every `long_range_scaling` branch is
   u·profile; both FoMs forward `scaling_type`/`corr_length`/`sigma`/`blockade_radius`/
-  `magnetic_spacing`. Validated exp (1.5) and rydberg (1.2): FoM diff ~1e-8, grads ~1e-11.
+  `magnetic_spacing`/`exponent` (powerlaw untested here). Validated exp (1.5) and rydberg (1.2): FoM diff ~1e-8, grads ~1e-11.
 - JAX propagation: RK4 half-step grid mirroring `runge_kutta_step` incl. per-step renormalization,
   `lax.scan`, fidelity 0.5·tr(F†F); interaction applied elementwise (diagonal); hopping dense below
   1024 dims, `BCOO` sparse above (both verified identical). FoM matches Julia to 1e-16 (linear) /

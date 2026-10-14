@@ -87,6 +87,9 @@ function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
 			fdict["blockade_radius"] = hamilt_params["blockade_radius"]
         elseif hamilt_params["scaling_type"] == "dd"
             fdict["magnetic_spacing"] = hamilt_params["magnetic_spacing"]
+        elseif hamilt_params["scaling_type"] == "powerlaw"
+            fdict["magnetic_spacing"] = hamilt_params["magnetic_spacing"]
+            fdict["exponent"] = hamilt_params["exponent"]
 		else
 			error("ULR Scaling Type Not Recognized: $(hamilt_params["scaling_type"])")
 		end
@@ -207,10 +210,12 @@ function get_normal_model_params_ed(params_dict::Dict)
     sigma::Float64 = get(params_dict, "sigma", 1.0)
     blockade_radius::Float64 = get(params_dict, "blockade_radius", 1.0)
     magnetic_spacing::Float64 = get(params_dict, "magnetic_spacing", 1.0)
+    exponent::Float64 = get(params_dict, "exponent", 3.0)
     other_params_dict["corr_length"] = corr_length
     other_params_dict["sigma"] = sigma
     other_params_dict["blockade_radius"] = blockade_radius
     other_params_dict["magnetic_spacing"] = magnetic_spacing
+    other_params_dict["exponent"] = exponent
     
     us::Vector{Float64} = long_range_scaling(lr_dist,Ly,stren; dict_to_symbols(other_params_dict)...)
     interaction_length = scaling_type == "flat" ? lr_dist : corr_length
@@ -286,6 +291,7 @@ function get_normal_model_params_ed(params_dict::Dict)
                         "sigma"=>sigma,
                         "blockade_radius"=>blockade_radius,
                         "magnetic_spacing"=>magnetic_spacing,
+                        "exponent"=>exponent,
                         "which_dir"=>which_dir,
                         "interaction_cutoff"=>int_cutoff)
 
@@ -473,7 +479,7 @@ if false
     #which_one = args_dict["which_one"]
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
-    lx,ly,n = 6,7,3
+    lx,ly,n = 6,5,3
     intstren = 50.0
     #xi = 1.0
     dataloc = get_folder_location("cluster-data/exact-diag/obc/dd-ints")
@@ -485,7 +491,7 @@ if false
     #for (idx,xi) in enumerate(intlens)
     #for (idx,anis) in enumerate(anises)
 
-    xis = 10 .^ (range(log10(0.3),log10(1.1),length=11))
+    xis = 10 .^ (range(log10(10.0),log10(100.0),length=21))
     
     #=BLAS.set_num_threads(5)
     args_dict = make_args_dict(ARGS)
@@ -515,7 +521,8 @@ if false
         #xi = 2.0#other_params_dict["corr_length"]
         #params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_pinning",true),("pinning_strength",1e-2),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",true)])
         #params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_pinning",false),("pinning_strength",1e-2),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",true)])
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("scaling_type","dd"),("magnetic_spacing",xi),("dataloc",dataloc),("lr","all"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",true)])
+        #params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("scaling_type","dd"),("magnetic_spacing",xi),("dataloc",dataloc),("lr","all"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
+        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("scaling_type","powerlaw"),("exponent",1.0),("magnetic_spacing",xi),("dataloc",dataloc),("lr","all"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
 
         #println("Starting from here")
 
@@ -531,8 +538,16 @@ if false
         # column statistics for the CDW order parameters, read back with cdw_order_parameters
         column_corr1,evencolumn_dist1 = column_cdw_statistics(states[1],lattice_params)
         column_corr2,evencolumn_dist2 = column_cdw_statistics(states[2],lattice_params)
-        datadict = Dict([("column_corr1",column_corr1),("column_corr2",column_corr2),("evencolumn_dist1",evencolumn_dist1),("evencolumn_dist2",evencolumn_dist2)])
-        modify_data(datadict,filepath,"metadata"; output_level=1,file_type="jld2")
+        #datadict = Dict([("column_corr1",column_corr1),("column_corr2",column_corr2),("evencolumn_dist1",evencolumn_dist1),("evencolumn_dist2",evencolumn_dist2)])
+        #modify_data(datadict,filepath,"metadata"; output_level=1,file_type="jld2")
+
+        sp,_,binder = cdw_order_parameters((column_corr1 .+ column_corr2) ./ 2,(evencolumn_dist1 .+ evencolumn_dist2) ./ 2)
+        scatter(xi,sp,c="b")
+        scatter(xi,binder,c="r")
+        xscale("log")
+        xlabel("Spacing")
+        ylabel("CDW Order Parameter / Binder Cumulant")
+        title("Transition $(lx)x$(ly) N=$n for Power Law with Exponent $(params_dict["exponent"])")
 
         #=fourpt = four_point(states[1],lattice_params; if_plot=false)
         fourpt_2 = four_point(states[2],lattice_params; if_plot=false)
@@ -681,6 +696,134 @@ if false
     colorbar()
     title("Gamma2 Magnitude")=#
 
+end=#
+
+# Γ sweeps on open strips for the power-law synthetic interaction, one usual ed-… file per Γ point
+# Run on the cluster from exact-diag/, either one task of the list below per array job,
+#     #SBATCH --array=0-34
+#     julia execute-ed.jl "which_one" $SLURM_ARRAY_TASK_ID
+# (tasks 0-6 are 8x4 for p = 0, 0.5, ..., 3, then 8x5, 8x6, 8x7, 10x4), or by hand,
+#     julia execute-ed.jl "Lx" 8 "Ly" 4 "particles" 4 ["exponent" 1.5]   (all exponents without "exponent")
+# Every point is saved by run_normal_ed as usual (20 states + H, up to ~450 MB a point at 10x4, ~90 GB
+# in total) in the exponent's folder (obc/flat-ints, obc/powerlaw-<p>, obc/dd-ints for p = 3), and
+# then gets "gamma", the column statistics and the occupancies of states 1 and 2 added to its metadata
+# (column_corr1/2, evencolumn_dist1/2, occs1/2, as in the 6×Ly runner above). A restarted job skips
+# the points whose file already has them and reads back the ones saved without them.
+# if_reading needs the undressed hopping/interaction matrices of the size; the first job of a size
+# builds and saves them (on the laptop 8x6 ~2 min, 10x4 ~30 min, 8x7 > 80 min) while holding a lock
+# file next to them, the other jobs of that size wait for it. A job killed while building leaves the
+# lock behind: delete cluster-data/exact-diag/building-undressed-*.lock before resubmitting.
+#= Laptop timings per point with the matrices read: 10x4 ~5 min, 8x7 ~3-4 min, 8x6 ~1.5 min.
+if false
+    args_dict = make_args_dict(ARGS)
+    intstren = 50.0
+    if_reading = true
+    sweep_sizes = [(8,4,4),(8,5,4),(8,6,4),(8,7,4),(10,4,5)]
+    all_exponents = [0.0,0.5,1.0,1.5,2.0,2.5,3.0]
+    sweep_tasks = [(lx,ly,n,p) for (lx,ly,n) in sweep_sizes for p in all_exponents]
+    if haskey(args_dict,"which_one")
+        lx,ly,n,p = sweep_tasks[args_dict["which_one"]+1]
+        exponents = [p]
+    else
+        lx,ly,n = args_dict["Lx"],args_dict["Ly"],args_dict["particles"]
+        exponents = haskey(args_dict,"exponent") ? [Float64(args_dict["exponent"])] : all_exponents
+    end
+    # same folders as the per-point 6×Ly data: p = 0 flat Ui, p = 3 dd, other p in obc/powerlaw-<p with . -> p>
+    power_folder(p) = p == 0.0 ? "flat-ints" : p == 3.0 ? "dd-ints" : "powerlaw-" * replace(string(p),"." => "p")
+    println("Γ sweep for $(lx)x$(ly) N=$n, exponents $exponents")
+
+    # p = 0 is the flat Ui (Γ = V, scanned in V); p > 0 has V = 50, Γ = V / s^p, as "dd" for p = 3
+    # (same U as "powerlaw" with exponent 3, and the dd-ints filenames) and "powerlaw" otherwise
+    # if_save = false only for building the undressed matrices, which shouldn't leave a point file behind
+    function sweep_params(p,gamma; if_save=true)
+        pdict = Dict{String,Any}([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("if_reading",if_reading),("lr","all"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("filling",0.5),("nev",20),("if_find_data",if_save),("if_save_data",if_save),("if_densmat",false)])
+        if_save && (pdict["dataloc"] = get_folder_location("cluster-data/exact-diag/obc/$(power_folder(p))"))
+        if p == 0.0
+            pdict["scaling_type"] = "flat"
+            pdict["interaction_strength"] = gamma
+        elseif p == 3.0
+            pdict["scaling_type"] = "dd"
+            pdict["magnetic_spacing"] = round((intstren/gamma)^(1/3),digits=10)
+            pdict["interaction_strength"] = intstren
+        else
+            pdict["scaling_type"] = "powerlaw"
+            pdict["exponent"] = p
+            pdict["magnetic_spacing"] = round((intstren/gamma)^(1/p),digits=10)
+            pdict["interaction_strength"] = intstren
+        end
+        return pdict
+    end
+
+    # undressed matrices (names as in saveHopping / saveInteraction): built once per size under a lock
+    undressed_loc = get_folder_location("cluster-data/exact-diag")
+    undressed_ready() = isfile(joinpath(undressed_loc,"hopping-N-$(n)-Lx-$(lx)-Ly-$(ly)-if_periodic_x-false-if_periodic_y-false.jld2")) &&
+                        isfile(joinpath(undressed_loc,"interaction-N-$(n)-Lx-$(lx)-Ly-$(ly).jld2"))
+    if if_reading && !undressed_ready()
+        # exclusive create: exactly one job gets the lock file, the others find it already there
+        lockfile = joinpath(undressed_loc,"building-undressed-N-$(n)-Lx-$(lx)-Ly-$(ly)-obc.lock")
+        got_lock = try
+            close(Base.Filesystem.open(lockfile,Base.Filesystem.JL_O_WRONLY | Base.Filesystem.JL_O_CREAT | Base.Filesystem.JL_O_EXCL,0o644))
+            true
+        catch
+            false
+        end
+        if got_lock
+            println("Building the undressed matrices for $(lx)x$(ly) N=$n")
+            try
+                run_normal_ed(sweep_params(0.0,1.0; if_save=false); output_level=0)
+            finally
+                rm(lockfile)
+            end
+        else
+            println("Waiting for another job to build the undressed matrices ($lockfile)")
+            while isfile(lockfile)
+                sleep(60)
+            end
+        end
+        undressed_ready() || error("Undressed matrices for $(lx)x$(ly) N=$n still missing after the build")
+    end
+
+    # ground-state Γ_c (Hill fit) of the 6×Ly N=3 series, used only to centre the fine window
+    gamma_guess = Dict(0.0=>[1.94,2.78,3.41,3.98], 0.5=>[2.75,4.23,5.35,6.43], 1.0=>[4.0,6.31,8.4,10.7],
+                       1.5=>[5.86,9.29,13.4,19.0], 2.0=>[8.6,13.8,22.0,32.6], 2.5=>[12.8,20.4,35.2,56.9],
+                       3.0=>[18.9,29.7,56.3,103.0])
+
+    for p in exponents
+        # 13 coarse points over Γ = 0.1–1000 plus 12 in [Γ_guess/6, 10 Γ_guess] (25 coarse ones for an exponent without a guess)
+        if haskey(gamma_guess,p)
+            gc = gamma_guess[p][clamp(ly-3,1,4)]
+            gammas = sort(unique(round.(vcat(10 .^ range(-1,3,length=13), 10 .^ range(log10(gc/6),log10(10*gc),length=12)),sigdigits=8)))
+        else
+            gammas = round.(10 .^ range(-1,3,length=25),sigdigits=8)
+        end
+
+        # write_data_jld2 writes into pwd() when the folder is missing, so fail instead of creating one
+        dataloc = get_folder_location("cluster-data/exact-diag/obc/$(power_folder(p))")
+        isdir(dataloc) || error("Missing data folder $dataloc for p = $p")
+
+        for (idx,gamma) in enumerate(gammas)
+            pdict = sweep_params(p,gamma)
+            # skip a point whose file is complete, checked without loading the states
+            _,_,running_args = get_normal_model_params_ed(pdict)
+            filepath = make_sure_file_type(joinpath(dataloc,running_args.filename),"jld2")
+            if isfile(filepath) && jldopen(f -> haskey(f["metadata"],"occs2"),filepath,"r")
+                println("p = $p, Γ = $(round(gamma,sigdigits=4)): already done")
+                continue
+            end
+
+            # computes and saves the point, or reads it back if it was saved without the metadata below
+            start_time = time()
+            states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=0)
+            column_corr1,evencolumn_dist1 = column_cdw_statistics(states[1],lattice_params)
+            column_corr2,evencolumn_dist2 = column_cdw_statistics(states[2],lattice_params)
+            occs1 = get_occupancy(states[1],lattice_params; if_plot=false)
+            occs2 = get_occupancy(states[2],lattice_params; if_plot=false)
+            datadict = Dict([("gamma",gamma),("column_corr1",column_corr1),("column_corr2",column_corr2),("evencolumn_dist1",evencolumn_dist1),("evencolumn_dist2",evencolumn_dist2),("occs1",occs1),("occs2",occs2)])
+            modify_data(datadict,filepath,"metadata"; output_level=0)
+            println("p = $p, Γ = $(round(gamma,sigdigits=4)): $idx/$(length(gammas)) in $(round(time()-start_time,digits=1)) s",if_found ? " (read back)" : "")
+            flush(stdout)
+        end
+    end
 end=#
 
 #= testing time evolution
