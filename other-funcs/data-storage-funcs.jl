@@ -262,7 +262,7 @@ function find_data_file(params_dict,calc_type,location::String="/home/patrick/fz
 				try
 					!(current_file_params_dict[params] in params_dict[params]) && append!(remove_indices,i)
 				catch
-					if current_file_params_dict[params] != params_dict[params]
+					if !haskey(current_file_params_dict, params) || current_file_params_dict[params] != params_dict[params]
 						append!(remove_indices,i)
 					end
 				end

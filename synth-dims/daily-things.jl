@@ -1236,26 +1236,53 @@ end=#
 
 
 
+#= look at correlations, mostly see same as Felix
+if false
+    lx,ly,n = 16,8,8
+    layers = 7
+
+    dataloc_ttn = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
+    pdict_ttn_laugh = Dict([("hopping_anisotropy",1.0),("layers",layers),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("onsite_strength",0.0)])
+    all_files_ttn_laugh = find_data_file(pdict_ttn_laugh,"ttn",dataloc_ttn)
+
+    pdict_ttn_cdw = Dict([("hopping_anisotropy",1.0),("layers",layers),("particles",n),("if_periodic_phys",true),("if_periodic_synth",true),("onsite_strength",10.0)])
+    all_files_ttn_cdw = find_data_file(pdict_ttn_cdw,"ttn",dataloc_ttn)
+
+    d_laugh,m_laugh = read_data(joinpath(dataloc_ttn,all_files_ttn_laugh[1]); output_level=0)
+    d_cdw,m_cdw = read_data(joinpath(dataloc_ttn,all_files_ttn_cdw[1]); output_level=0)
+
+    physcorr_laugh = physical_correlation(d_laugh["densmat"],lx,ly; if_plot=false)
+    synthcorr_laugh = synthetic_correlation(d_laugh["densmat"],lx,ly; if_plot=false)
+
+    physcorr_cdw = physical_correlation(d_cdw["densmat"],lx,ly; if_plot=false)
+    synthcorr_cdw = synthetic_correlation(d_cdw["densmat"],lx,ly; if_plot=false)
+
+    magnetic_length = 1.0 / sqrt(2 * pi * n / (lx * ly))
+    exp_phys_xs = range(1,8,length=100)
+    exp_synth_xs = range(1,4,length=100)
+    exp_phys_ys = exp.(-(exp_phys_xs).^2 ./ (4*magnetic_length^2))
+    exp_synth_ys = exp.(-(exp_synth_xs).^2 ./ (4*magnetic_length^2))
+
+    fig,axs = subplots(1,2,figsize=(12,5))
+
+    axs[1].plot(1:lx-1,physcorr_laugh[:,1],"-p",c="b",label="Laughlin")    
+    axs[1].plot(1:lx-1,physcorr_cdw[:,1],"-p",c="r",label="CDW")
+    axs[1].plot(exp_phys_xs,exp_phys_ys,"--",c="k",label="exp(-x/4lB^2)")
+    axs[1].set_xlabel("x")
+    axs[1].set_ylabel("Physical Correlation")
+    axs[1].legend()
+    axs[1].set_yscale("log")
+
+    axs[2].plot(1:ly-1,synthcorr_laugh[2,:],"-p",c="b",label="Laughlin")    
+    axs[2].plot(1:ly-1,synthcorr_cdw[2,:],"-p",c="r",label="CDW")
+    axs[2].plot(exp_synth_xs,exp_synth_ys,"--",c="k",label="exp(-y/4lB^2)")
+    axs[2].set_xlabel("y")
+    axs[2].set_ylabel("Synthetic Correlation")
+    axs[2].legend()
+    axs[2].set_yscale("log")
 
 
-
-# look at currents and correlations
-if true
-    lx,ly,n = 14,7,7
-    dataloc_laugh_torus = get_folder_location("cluster-data/synth-dims/torus/new-gauge")
-    pdict_laugh = Dict([("Lx",lx),("Ly",ly),("particles",n),("hopping_anisotropy",1.0),("if_periodic_phys",true),("if_periodic_synth",true),("onsite_strength",0.0)])
-
-    all_files_laugh = find_data_file(pdict_laugh,"ttn",dataloc_laugh_torus; output_level=0)
-    display(all_files_laugh)
-
-    
-
-
-
-
-end
-
-
+end=#
 
 
 "fin"

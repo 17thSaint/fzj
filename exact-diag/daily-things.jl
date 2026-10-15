@@ -4446,6 +4446,81 @@ if true
 end=#
 
 
+#= look at correlations and currents for torus, correlations show exponential decays, currents are always zero but careful of flux attachment direction
+if false
+    lx,ly,n = 4,8,2
+
+    pdict_laugh = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+    states_laugh,nrgs_laugh,rhos_laugh,filepath_laugh,if_found_laugh,lattice_params_laugh,hamilt_params_laugh = run_normal_ed(pdict_laugh; output_level=1)
+    densmat_laugh = density_matrix(states_laugh[1],lattice_params_laugh; output_level=1)
+
+    pdict_cdw = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",50.0),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+    states_cdw,nrgs_cdw,rhos_cdw,filepath_cdw,if_found_cdw,lattice_params_cdw,hamilt_params_cdw = run_normal_ed(pdict_cdw; output_level=1)
+    densmat_cdw = density_matrix(states_cdw[1],lattice_params_cdw; output_level=1)
+
+    synthcorr_laugh = synthetic_correlation(densmat_laugh,lx,ly; if_plot=false)
+    synthcorr_cdw = synthetic_correlation(densmat_cdw,lx,ly; if_plot=false)
+
+    magnetic_length = 1.0 / sqrt(2 * pi * n / (lx * ly))
+    exp_phys_xs = range(1,8,length=100)
+    exp_phys_ys = exp.(-(exp_phys_xs).^2 ./ (4*magnetic_length^2))
+
+    fig = figure()
+    plot(1:ly,synthcorr_laugh[2,:],"-p",c="b",label="Laughlin")    
+    plot(1:ly,synthcorr_cdw[2,:],"-p",c="r",label="CDW")
+    plot(exp_phys_xs,exp_phys_ys,"--",c="k",label="exp(-y/4lB^2)")
+    xlabel("y")
+    ylabel("Synthetic Correlation")
+    legend()
+    yscale("log")
+    ylim(1e-3,2.0)
+
+    lx,ly,n = 8,4,4
+
+    pdict_laugh = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("flux_direction","x"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+    states_laugh,nrgs_laugh,rhos_laugh,filepath_laugh,if_found_laugh,lattice_params_laugh,hamilt_params_laugh = run_normal_ed(pdict_laugh; output_level=1)
+    densmat_laugh = density_matrix(states_laugh[1],lattice_params_laugh; output_level=1)
+
+    pdict_cdw = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("flux_direction","x"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",50.0),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+    states_cdw,nrgs_cdw,rhos_cdw,filepath_cdw,if_found_cdw,lattice_params_cdw,hamilt_params_cdw = run_normal_ed(pdict_cdw; output_level=1)
+    densmat_cdw = density_matrix(states_cdw[1],lattice_params_cdw; output_level=1)
+
+    physcorr_laugh = physical_correlation(densmat_laugh,lx,ly; if_plot=false)
+    physcorr_cdw = physical_correlation(densmat_cdw,lx,ly; if_plot=false)
+
+    magnetic_length = 1.0 / sqrt(2 * pi * n / (lx * ly))
+    exp_phys_xs = range(1,8,length=100)
+    exp_phys_ys = exp.(-(exp_phys_xs).^2 ./ (4*magnetic_length^2))
+
+    fig = figure()
+    plot(1:lx,physcorr_laugh[:,1],"-p",c="b",label="Laughlin")    
+    plot(1:lx,physcorr_cdw[:,1],"-p",c="r",label="CDW")
+    plot(exp_phys_xs,exp_phys_ys,"--",c="k",label="exp(-x/4lB^2)")
+    xlabel("x")
+    ylabel("Physical Correlation")
+    legend()
+    yscale("log")
+    ylim(1e-3,2.0)
+end=#
+
+# correlations and currents for cylinder
+if true
+    lx,ly,n = 4,8,2
+    
+    pdict_laugh = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("flux_direction","x"),("if_periodic_x",true),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+    states_laugh,nrgs_laugh,rhos_laugh,filepath_laugh,if_found_laugh,lattice_params_laugh,hamilt_params_laugh = run_normal_ed(pdict_laugh; output_level=1)
+    densmat_laugh = density_matrix(states_laugh[1],lattice_params_laugh; output_level=1)
+
+    physcurr_laugh = physical_current(densmat_laugh,lattice_params_laugh; plot_title="Laughlin")
+
+    pdict_cdw = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("flux_direction","x"),("if_periodic_x",true),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",50.0),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+    states_cdw,nrgs_cdw,rhos_cdw,filepath_cdw,if_found_cdw,lattice_params_cdw,hamilt_params_cdw = run_normal_ed(pdict_cdw; output_level=1)
+    densmat_cdw = density_matrix(states_cdw[1],lattice_params_cdw; output_level=1)
+
+    physcurr_cdw = physical_current(densmat_cdw,lattice_params_cdw; plot_title="CDW")
+
+end
+
 
 
 

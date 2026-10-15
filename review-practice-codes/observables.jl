@@ -611,7 +611,7 @@ function find_particle_type(ttn::TTN.TreeTensorNetwork)
     if join(split(split(string(TTN.tags(TTN.inds(ttn[1,1])[1])),",")[1],"")[2:end]) == "Boson"
         return "Boson"
     else
-        return "Fermion"
+        error("Particle type not recognized. Only Boson is currently supported.")
     end
 end
 
