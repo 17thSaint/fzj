@@ -4503,23 +4503,80 @@ if false
     ylim(1e-3,2.0)
 end=#
 
-# correlations and currents for cylinder
-if true
+#= currents for cylinder, weakened a bit by the all-to-all interaction
+if false
     lx,ly,n = 4,8,2
     
     pdict_laugh = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("flux_direction","x"),("if_periodic_x",true),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
     states_laugh,nrgs_laugh,rhos_laugh,filepath_laugh,if_found_laugh,lattice_params_laugh,hamilt_params_laugh = run_normal_ed(pdict_laugh; output_level=1)
     densmat_laugh = density_matrix(states_laugh[1],lattice_params_laugh; output_level=1)
 
-    physcurr_laugh = physical_current(densmat_laugh,lattice_params_laugh; plot_title="Laughlin")
+    physcurr_laugh = physical_current(densmat_laugh,lattice_params_laugh; if_plot=false)
 
-    pdict_cdw = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("flux_direction","x"),("if_periodic_x",true),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",50.0),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+    fig,axs = subplots(2, 1, figsize=(6, 4))
+    axs[1].plot(1:ly,physcurr_laugh[1,:],"-p",label="Laughlin")
+
+    intstrens = range(0.5,50.0,length=11)
+    for intstren in intstrens
+        pdict_cdw = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("flux_direction","x"),("if_periodic_x",true),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+        states_cdw,nrgs_cdw,rhos_cdw,filepath_cdw,if_found_cdw,lattice_params_cdw,hamilt_params_cdw = run_normal_ed(pdict_cdw; output_level=1)
+        densmat_cdw = density_matrix(states_cdw[1],lattice_params_cdw; output_level=1)
+
+        physcurr_cdw = physical_current(densmat_cdw,lattice_params_cdw; if_plot=false)
+
+        axs[1].plot(1:ly,physcurr_cdw[1,:],"-p",label="ULR=$(round(intstren,digits=1))")
+
+        axs[2].scatter(intstren,physcurr_cdw[1,2],c="b")
+        axs[2].scatter(intstren,physcurr_cdw[1,1],c="r")
+        axs[2].scatter(intstren,physcurr_cdw[1,3],c="g")
+    end
+
+    axs[1].set_xlabel("y")
+    axs[1].set_ylabel("Physical Current")
+    axs[1].legend()
+
+    axs[2].set_xlabel("Interaction Strength")
+    axs[2].set_ylabel("Single Site Physical Current")
+    axs[2].legend()
+
+end=#
+
+
+#= currents and correlations for OBC
+if false
+    #lx,ly,n = 4,8,2
+    lx,ly,n = 8,4,4
+
+    pdict_laugh = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("flux_direction","x"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+    states_laugh,nrgs_laugh,rhos_laugh,filepath_laugh,if_found_laugh,lattice_params_laugh,hamilt_params_laugh = run_normal_ed(pdict_laugh; output_level=1)
+    densmat_laugh = density_matrix(states_laugh[1],lattice_params_laugh; output_level=1)
+
+    physcorr_laugh = physical_correlation(densmat_laugh,lx,ly; plot_title="Laughlin")
+    #synthcorr_laugh = synthetic_correlation(densmat_laugh,lx,ly; plot_title="Laughlin")
+
+    #physcurr_laugh = physical_current(densmat_laugh,lattice_params_laugh; plot_title="Laughlin")
+    synthcurr_laugh = synthetic_current(densmat_laugh,lattice_params_laugh; plot_title="Laughlin")
+
+    pdict_cdw = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("flux_direction","x"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",50.0),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
     states_cdw,nrgs_cdw,rhos_cdw,filepath_cdw,if_found_cdw,lattice_params_cdw,hamilt_params_cdw = run_normal_ed(pdict_cdw; output_level=1)
     densmat_cdw = density_matrix(states_cdw[1],lattice_params_cdw; output_level=1)
 
-    physcurr_cdw = physical_current(densmat_cdw,lattice_params_cdw; plot_title="CDW")
+    #synthcorr_cdw = synthetic_correlation(densmat_cdw,lx,ly; plot_title="CDW")
+    #physcurr_cdw = physical_current(densmat_cdw,lattice_params_cdw; plot_title="CDW")
 
-end
+    physcorr_cdw = physical_correlation(densmat_cdw,lx,ly; plot_title="CDW")
+    synthcurr_cdw = synthetic_current(densmat_cdw,lattice_params_cdw; plot_title="CDW")
+
+end=#
+
+
+
+
+
+
+
+
+
 
 
 
