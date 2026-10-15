@@ -4569,10 +4569,83 @@ if false
 
 end=#
 
+#= try Calabrese-Cardy finite size scaling of the half-bipartition entanglement entropy to get central charge
+if false
 
+    dataloc = get_folder_location("cluster-data/exact-diag/cylinder/flat-ints")
+    intstren = 0.0
+    lxs = [6,8,10]
+    ly = 4
+    ees = []
+    for lx in lxs
 
+        n = Int(lx/2)
+        pdict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("dataloc",dataloc),("if_periodic_x",true),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=1)
+        psi = states[1]
 
+        # half bipartition along the vertical line x = Lx/2: A = all sites with x <= Lx/2
+        subsysA = [linear_index((x,y),lx,ly) for y in 1:ly for x in 1:div(lx,2)]
+        subsysB = find_subsystem_B(subsysA,lx,ly)
+        rho_A, unique_A_configs = compute_reduced_density_matrix(psi, lattice_params["full_basis"], subsysA, subsysB)
+        ee = entanglement_entropy(rho_A)
+        #append!(ees,ee)
+        datadict = Dict([("ee_half",ee),("H",nothing),("full_basis",nothing)])
+        modify_data(datadict,filepath,"metadata"; output_level=1,file_type="jld2")
 
+    end
+
+end=#
+
+# try Calabrese-Cardy scaling cut size to get central charge
+# it works for individual, put it all together and do scaling of fitted c
+# for laughlin and CDW to see where it lands
+if true
+    intstren = 0.0
+    lx,ly,n = 8,4,4
+    dataloc = get_folder_location("cluster-data/exact-diag/cylinder/flat-ints")
+    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+    psi = d["state"][1]
+
+    #= vertical bipartitions A = all sites with x <= l, periodic x so S = (c/3) log((Lx/pi) sin(pi l/Lx)) + const
+    # only compute l <= Lx/2 (rho_A gets huge for large A), pure state so S(l) = S(Lx - l)
+    cuts = collect(1:lx-1)
+    ees = zeros(Float64,length(cuts))
+    for l in 1:div(lx,2)
+        println("Working on cut l = $l / $lx")
+        subsysA = [linear_index((x,y),lx,ly) for y in 1:ly for x in 1:l]
+        subsysB = find_subsystem_B(subsysA,lx,ly)
+        rho_A, unique_A_configs = compute_reduced_density_matrix(psi, lattice_params["full_basis"], subsysA, subsysB)
+        ees[l] = entanglement_entropy(rho_A)
+    end
+    datadict = Dict([("ee_cuts",ees),])
+    modify_data(datadict,joinpath(dataloc,all_files[1]),"metadata"; output_level=1,file_type="jld2")=#
+    ees = m["ee_cuts"]
+    cuts = collect(1:lx-1)
+    for l in div(lx,2)+1:lx-1
+        ees[l] = ees[lx-l]
+    end
+    chords = log.((lx/pi) .* sin.(pi .* cuts ./ lx))
+
+    # S = (c/3) chord + const, fit only the computed cuts l <= Lx/2 (the mirrored ones are copies)
+    using LsqFit
+    fitcuts = 1:div(lx,2)
+    cc_model(x,q) = (q[1]/3) .* x .+ q[2]
+    fit_result = curve_fit(cc_model,chords[fitcuts],ees[fitcuts],[1.0,0.0])
+    c_fit = fit_result.param[1]
+    c_err = length(fitcuts) > 2 ? LsqFit.stderror(fit_result)[1] : NaN
+    println("$(lx)x$(ly) N=$n cylinder ULR=$intstren: c = $c_fit ± $c_err")
+
+    fig = figure()
+    scatter(chords,ees,c="b")
+    plot(chords,cc_model(chords,fit_result.param),c="r")
+    xlabel(L"\log[(L_x/\pi)\sin(\pi \ell/L_x)]")
+    ylabel("Entanglement Entropy")
+    title("$(lx)x$(ly) N=$n cylinder ULR=$intstren, c=$(round(c_fit,digits=3)) ± $(round(c_err,digits=3))")
+
+end
 
 
 

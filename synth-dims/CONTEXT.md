@@ -1,6 +1,6 @@
 # Dipolar phase transition — status
 
-Update **Current state**, **Open questions** and **Log** as things change. Last updated: 2026-10-14
+Update **Current state**, **Open questions** and **Log** as things change. Last updated: 2026-10-15
 
 ## Goal
 
@@ -16,6 +16,14 @@ Open y (OBC / cylinder, ED), V = 50: 6×Ly N=3 and 8×Ly N=4 with Ly = 4–7, 10
 Other exponents: scaling `"powerlaw"` with key `"exponent"` = p (p = 3 equals `"dd"`).
 
 ## Current state (2026-10-14)
+
+**Entanglement / central charge (2026-10-15, side thread):** vertical cuts (A = all sites with
+x ≤ ℓ, all y) on the cylinder (x periodic, y open), Calabrese–Cardy fit
+S = (c/3) log[(Lx/π) sin(πℓ/Lx)] + const over ℓ ≤ Lx/2 (S(ℓ) = S(Lx − ℓ) for the pure GS).
+Flat Ui = 0, Ly = 4: 6x4 N=3 c = 3.2 ± 0.1, 8x4 N=4 c = 2.7 ± 0.07 (3 resp. 4 independent
+points). Not a CFT value: the fit is dominated by the area-law offset at Lx ≤ 8; the 6x4 GS is
+gapped (E2 − E1 = 0.10; 8x4: 0.016). Block "try Calabrese-Cardy scaling cut size…" at the end
+of `exact-diag/daily-things.jl` (reads states, saves `ee_cuts`, fits c with LsqFit).
 
 **Bottom line:** OBC ground-state data for p = 0 (flat), 0.5, …, 3 at 6×Ly N=3 and 8×Ly N=4
 (Ly = 4–7), plus 10x4 N=5. All p go from the same Laughlin state to the same large-Γ state;
@@ -103,6 +111,17 @@ needed to resolve the p dependence (see Next).
   experiment Ly (number of synthetic states) is fixed and Lx → ∞.
 
 ## Next (start here)
+
+**Finite-size scaling of the fitted c (2026-10-15, next).** Follow the comment above the open
+block: put the per-size cut scans together (one loop over sizes) and scale the fitted c with
+Lx, for Laughlin (Ui = 0) and the CDW (large Ui), to see where c lands (expect c → 0 in the
+gapped CDW; Laughlin on a thin cylinder may also be gapped, or show c = 1 from the two edges).
+- Data now: only Ui = 0, 6x4 N=3 and 8x4 N=4 in `cylinder/flat-ints`. CDW points and 10x4 N=5
+  need new ED runs (saving = write, ask; the user makes folders).
+- 10x4 needs a better EE route: dense ρ_A at ℓ = 5 is 21700² (7.5 GB). ρ_A is block-diagonal in
+  N_A, and the Schmidt values come from SVDs of the blocks Ψ_{N_A} (C(20,k) × C(20,5−k) at
+  10x4), so a block-SVD version of `compute_reduced_density_matrix` makes every cut cheap.
+- With 3–4 independent ℓ per size the fit is crude; TTN/MPS would give longer Lx.
 
 **Larger sizes to resolve the p dependence (decision open, 2026-10-14).** User's idea: fPEPS
 (`fpeps/execute-fpeps.jl`) for more system sizes. Discussed first:
@@ -211,6 +230,8 @@ Notes for any new p:
     V = 0.1–1000 (15 each, same grid recipe in V), same metadata; filenames carry only
     `interaction_strength` (no `scaling`).
   - ED `cluster-data/exact-diag/cylinder/dd-ints/`: V=50, 6×{4,5,6} N=3 (15 each), 6x7 (11), 8x4 (22).
+  - ED `cluster-data/exact-diag/cylinder/flat-ints/` (2026-10-15): flat Ui = 0, 6x4 N=3 and 8x4
+    N=4, states + `ee_half` + `ee_cuts` in metadata; `full_basis` and `H` set to `nothing`.
   - Lx sweep (2026-10-14), all 7 p, in the same `obc/<folder>`: 8×{4,5,6,7} N=4 and 10x4 N=5, one
     file per (size, p), named after the smallest s (flat: V = 0.1), whose metadata holds the sweep:
     `all_gammas`, `all_columncorrs1/2`, `all_evencolumndist1/2`, `all_occs1/2` (25 points; no
@@ -232,9 +253,18 @@ Notes for any new p:
 - [ ] V = 50 TTN data at 12x6+ for the torus?
 - [ ] Does fPEPS reach useful open sizes / accuracy (N conservation, D convergence of Γ_c)?
 - [ ] C⁴ / PES vs s at TTN sizes (the paper's more robust diagnostics).
+- [ ] Does the fitted c (vertical cuts, cylinder) converge with Lx, and to what, in the Laughlin
+  and CDW regimes? 6x4 / 8x4 at Ui = 0 give 3.2 / 2.7, i.e. not converged.
 
 ## Gotchas
 
+- `cylinder/flat-ints`: `full_basis` is `nothing` in the metadata, rebuild with
+  `get_lattice_params_from_metadata(m)` (same basis order, checked against `ee_half`). 8x4
+  `ee_cuts` has zeros for ℓ > Lx/2 (saved before mirroring; 6x4 is mirrored): mirror on reading.
+- `compute_reduced_density_matrix` returns a dense ρ_A over all N_A ≤ N configs of A: keep
+  ℓ ≤ Lx/2 (8x4 ℓ = 7 would be 24158², 9 GB).
+- CurveFit is v1.4 (no `linear_fit`; the old TEE block at ~line 1853 fails): use LsqFit
+  `curve_fit` or `design \ y`. CurveFit and LsqFit both export `stderror`.
 - Manifold is 2-fold on the torus: densities from diagonalizing ⟨Ψi|n|Ψj⟩ (`occs_eig1`). On open
   y it isn't for Ly ≥ 5 (E2 − E1 ~ 0.03–0.09 at Γ → ∞): use the GS (`column_corr1`); averaging
   states 1, 2 (the old default) mixes in an excited state and inflates Γ_c at large Ly.
@@ -293,3 +323,9 @@ Notes for any new p:
   metadata. 8×Ly block: Γ_c(Ly) still grows, Ly = 4 Γ_c flat in Lx, GS signal collapses with Ly as
   at 6×Ly. Error bars on b; local exponents: single power law poor for small p, clean for p ≥ 2.
   User: larger sizes needed, idea fPEPS; size family / MPS-TTN vs fPEPS discussed (Next).
+- 2026-10-15 — EE / central-charge side thread (`exact-diag/daily-things.jl`, end). Half-cut EE
+  (x ≤ Lx/2), OBC 6x4 N=3 flat Ui: S = 1.749 (Ui = 0), 0.948 (Ui = 50). Periodic x / open y
+  chosen for Calabrese–Cardy (cut scanned along the physical direction). Cut-size scan on the
+  cylinder, Ui = 0: c = 3.2 ± 0.1 (6x4), 2.7 ± 0.07 (8x4). `compute_reduced_density_matrix`
+  rewritten as ρ_A = Ψ Ψ† with sparse Ψ[a,b] (was an O(dim²) pair loop; same ρ_A to 1e-16).
+  Next: finite-size scaling of c for Laughlin and CDW.

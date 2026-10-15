@@ -829,25 +829,27 @@ function group_by_subsystems(wavefunc, full_basis, subsystem_A, subsystem_B)
 end
 
 # Compute the reduced density matrix for subsystem A
+# each basis state is one (config_A, config_B) pair, so psi is a sparse matrix psi[a,b] and rho_A = psi psi^dagger
 function compute_reduced_density_matrix(wavefunc, full_basis, subsystem_A, subsystem_B)
-    grouped_coeffs = group_by_subsystems(wavefunc, full_basis, subsystem_A, subsystem_B)
-    unique_A_configs = unique(key[1] for key in keys(grouped_coeffs))
-    dim_A = length(unique_A_configs)
-    rho_A = zeros(ComplexF64, dim_A, dim_A)
+    set_A = Set(subsystem_A)
+    config_A_to_index = Dict{Vector{Int},Int}()
+    config_B_to_index = Dict{Vector{Int},Int}()
+    rows = zeros(Int, size(full_basis,2))
+    cols = zeros(Int, size(full_basis,2))
+    for i in 1:size(full_basis,2)
+        config = full_basis[:,i]
+        config_A = [pos for pos in config if pos in set_A]
+        config_B = [pos for pos in config if !(pos in set_A)]
+        rows[i] = get!(config_A_to_index, config_A, length(config_A_to_index) + 1)
+        cols[i] = get!(config_B_to_index, config_B, length(config_B_to_index) + 1)
+    end
 
-    # Map each unique_A_config to an index
-    config_A_to_index = Dict(config => i for (i, config) in enumerate(unique_A_configs))
+    psi_mat = sparse(rows, cols, ComplexF64.(wavefunc), length(config_A_to_index), length(config_B_to_index))
+    rho_A = Matrix(psi_mat * psi_mat')
 
-    # Compute rho_A matrix elements
-    for ((config_A1, config_B1), coeff1) in grouped_coeffs
-        #println(round(100*idx/length(grouped_coeffs),digits=4)," % done")
-        for ((config_A2, config_B2), coeff2) in grouped_coeffs
-            if config_B1 == config_B2
-                i = config_A_to_index[config_A1]
-                j = config_A_to_index[config_A2]
-                rho_A[i, j] += coeff1 * conj(coeff2)
-            end
-        end
+    unique_A_configs = Vector{Vector{Int}}(undef, length(config_A_to_index))
+    for (config, i) in config_A_to_index
+        unique_A_configs[i] = config
     end
 
     return rho_A, unique_A_configs
