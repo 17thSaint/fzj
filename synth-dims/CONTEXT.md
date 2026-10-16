@@ -1,6 +1,6 @@
 # Dipolar phase transition — status
 
-Update **Current state**, **Open questions** and **Log** as things change. Last updated: 2026-10-15
+Update **Current state**, **Open questions** and **Log** as things change. Last updated: 2026-10-16
 
 ## Goal
 
@@ -17,28 +17,56 @@ Other exponents: scaling `"powerlaw"` with key `"exponent"` = p (p = 3 equals `"
 
 ## Current state (2026-10-14)
 
-**Entanglement / central charge (2026-10-15, side thread):** vertical cuts (A = all sites with
-x ≤ ℓ, all y) on the cylinder (x periodic, y open), Calabrese–Cardy fit
-S = (c/3) log[(Lx/π) sin(πℓ/Lx)] + const over ℓ ≤ Lx/2 (S(ℓ) = S(Lx − ℓ) for the pure GS).
-Fits (2026-10-16, ℓ ≥ 1 / ℓ ≥ 2, Lx = 6, 8, 10; 2–5 points, rms ≲ 0.02):
+**Edge / central-charge side thread (2026-10-15/16, ED, flat Ui = 0 vs 50, cylinder x periodic,
+y open; blocks "try Calabrese-Cardy scaling cut size…" and "GS one-body correlations along x per
+row" at the end of `exact-diag/daily-things.jl`).** Aim: Laughlin = gapped bulk + gapless edges,
+CDW = gapped everywhere (c → 0). Established: the CDW edge is gapped under strong all-to-all Ui.
+- Expected c: S = ((c_L + c_R)/6) log chord, i.e. 1/6 per chiral edge crossed (a chiral boson is
+  half a non-chiral one: Dirac = R ⊕ L Weyl, S_R = S_L). The vertical cut crosses both edges
+  (R + L) → c_fit = 1, not 2; a cut through one edge only → c_fit = 1/2. Gapped bulk adds only
+  area law and −γ. Refs: Holzhey–Larsen–Wilczek NPB 424 (1994); Calabrese–Cardy JSTAT P06002
+  (2004); Castro et al. JHEP 07, 114 (2014) (c_L ≠ c_R); Wen PRB 41, 12838 (1990); synthetic
+  ladders: Calvanese Strinati et al. PRX 7, 021033 (2017).
+- Diagnostics (GS only; excited states too expensive in TTN): S(ℓ) for vertical cuts (x ≤ ℓ) vs
+  the chord variable log[(Lx/π) sin(πℓ/Lx)], slope c/3: linear = gapless edge, saturating =
+  gapped edge (hybridized or CDW). Row correlations |⟨b†_{r,y} b_{0,y}⟩| vs chord distance: edge
+  rows power law vs bulk rows exponential. Bulk gap from torus data, not the cylinder.
+- Fitted c (ℓ ≥ 1 / ℓ ≥ 2; Lx = 6, 8, 10; 2–5 points):
 
     | c fit | Ly = 4, Ui = 0 | Ly = 4, Ui = 50 | Ly = 6, Ui = 0 | Ly = 6, Ui = 50 |
     |---|---|---|---|---|
     | ℓ ≥ 1 | 3.2, 2.7, 2.9 | 1.46, 1.23, 1.06 | 2.76, 2.63 | 1.76, 1.59 |
     | ℓ ≥ 2 | 3.9, 3.0, 3.1 | 1.37, 0.95, 0.74 | 3.06, 2.75 | 1.59, 1.36 |
 
-Spectra E − E1 (Lx = 6/8/10): Ly = 4 Ui = 0: E2 0.105/0.0158/0.0155, E3 0.112/0.059/0.056 (E3·Lx
-rises 0.47 → 0.56, gap saturating), yet S(ℓ) at 10x4 still rises (2.09, 2.26, 2.32 for ℓ = 3–5) and
-c doesn't drop at Lx = 10: ambiguous. Ly = 6 (α = 1/5) Ui = 0: E2 0.181/0.129, E3 0.199/0.143,
-gap·Lx ≈ const (1.08/1.03; v ≈ 0.17), no anomalous low state: consistent with a gapless edge, 1/Lx (2 sizes; bulk gap from torus).
-Ui = 50: TT doublet (Ly = 4: 0.023/0.011/0.0054, halves per ΔLx = 2; Ly = 6: 0.080/0.056) under a gap
-≈ 0.2 (Ly = 4), ≈ 0.1 (Ly = 6; Γ/Γ_c ≈ 14 vs 26); S(ℓ) saturates, c falls. If the Laughlin strip
-were gapped, c → 0 for Lx ≫ ξx and the fit could not separate it from TT.
-At fixed ρ1D, N_φ = Lx for every Ly: wider Ly doesn't add orbitals, edge separation grows only as
-(Ly−1)/l_B = √(2π(Ly−1)) (4.3 → 5.6 l_B for Ly 4 → 6), S(1) ≈ 1.2 at both Ly. ℓ ≤ 4 spans
-0.5–2 particles (spacing 1/ρ1D = 2): the fits are UV-dominated at every Ly; need Lx ≳ 16 (TTN).
-Block "try Calabrese-Cardy scaling cut size…" at the end
-of `exact-diag/daily-things.jl` (reads states, saves `ee_cuts`, fits c with LsqFit).
+- Spectra E − E1: Ly = 6 Ui = 0: E2 0.181/0.129, E3 0.199/0.143 (Lx = 6/8), gap·Lx ≈ const (v ≈ 0.17).
+  Ly = 4 Ui = 0: E2 0.105/0.0158/0.0155, E3 0.112/0.059/0.056 (Lx = 6/8/10), flattening.
+  Ui = 50: TT doublet (Ly = 4: 0.023/0.011/0.0054; Ly = 6: 0.080/0.056) under a gap ≈ 0.2 / 0.1.
+- Row correlations, r = 1–4 at Lx = 8: Ui = 0 edge row stays large (8x6: 0.91, 0.72, 0.54, 0.46;
+  8x4: 0.69, 0.47, 0.51, 0.49), middle rows fall (8x6 y=3: 0.71, 0.31, 0.12, 0.03). Ui = 50 all
+  rows fall alike (≈ 0.6, 0.15, 0.03–0.06, 0.01–0.03).
+- Bond currents (2026-10-16, blocks "currents on the cylinder…" and "currents and correlations on
+  OBC…" before the CC blocks; earlier versions lacked the Peierls phase). Equilibrium
+  (magnetization) currents exist in both phases (max 0.146 vs 0.095 at 8x4), so magnitude isn't
+  diagnostic; the shape is.
+  - Cylinder 4x8 N=2, J_x(y), y = 1–4 (mirror rows opposite): Ui = 0: −0.015, −0.094, +0.057,
+    +0.049 (edge flow + bulk backflow, net ≈ 0 per half); Ui = 50: −0.006, −0.025, −0.026, −0.014
+    (whole half flows one way, net −0.071, no separate edge channel). Inner rows reverse at
+    Ui ≈ 5, near flat Γ_c (2–4 for Ly = 4–7): possible order-parameter-free marker (unchecked).
+    Outer rows nearly empty (n = 0.007).
+  - OBC 8x4 N=4: the takeaway is the correlations. Laughlin edge rows coherent over the whole
+    length (0.5–0.8 to r = 7), inner rows decay to 0.24; CDW every row exponential, ξ ≈ 1 site
+    (×10 per 2 sites), edge as fast as bulk → no edge channel. Currents: Laughlin lumpy density
+    with local loops (likely N = 4 OBC finite size); CDW uniform density (GS = superposition of
+    the TT patterns), one loop around the perimeter, bulk J_y ≈ 0 (same whole-width flow as the
+    cylinder). Ly = 4, two bulk rows: confirm with the saved 8x6 N=4 cylinder densmats.
+- **Reading:** CDW gapped everywhere (gap, S saturates, c falls, all rows decay fast). Laughlin at
+  Ly = 6 qualitatively right (gap·Lx const, coherent edge vs short-ranged bulk) but not
+  quantitative: c ≈ 3 not 1, edge decay much slower than the Laughlin r^-2. Ly = 4 ambiguous
+  (gaps flatten, but S(ℓ) at 10x4 still rises and the edge doesn't decay). Too small: ℓ ≤ 4 holds
+  0.5–2 particles (spacing 1/ρ1D = 2), so fits are UV-dominated; need Lx ≳ 16 (TTN).
+- Wider Ly helps little: at fixed ρ1D, N_φ = Lx for every Ly (no extra orbitals); edge separation
+  (Ly−1)/l_B = √(2π(Ly−1)) grows only 4.3 → 5.6 for Ly 4 → 6. Family commensurate for every even
+  Lx (α = 1/(Ly−1), phase on x bonds depends on y only, N_φ = 2N; bosons, no N-parity effect).
 
 **Bottom line:** OBC ground-state data for p = 0 (flat), 0.5, …, 3 at 6×Ly N=3 and 8×Ly N=4
 (Ly = 4–7), plus 10x4 N=5. All p go from the same Laughlin state to the same large-Γ state;
@@ -127,27 +155,16 @@ needed to resolve the p dependence (see Next).
 
 ## Next (start here)
 
-**Finite-size scaling of the fitted c (2026-10-15, next).** Follow the comment above the open
-block: put the per-size cut scans together (one loop over sizes) and scale the fitted c with
-Lx, for Laughlin (Ui = 0) and the CDW (large Ui), to see where c lands (expect c → 0 in the
-gapped CDW; Laughlin on a thin cylinder may also be gapped, or show c = 1 from the two edges).
-- Data now: Ui = 0 and 50, 6x4 N=3, 8x4 N=4, 10x4 N=5, 6x6 N=3, 8x6 N=4 in `cylinder/flat-ints`.
-- TTN next (2026-10-16): Ly = 6, Lx = 12, 16 (+ Ly = 8 width check), Ui = 0 and 50, GS only
-  (excited states too expensive): S(ℓ) vs chord, c in a fixed ℓ/Lx window with rms, S_2, and
-  `physical_correlation` (|⟨b†b⟩| along x per row: edge rows power law vs bulk rows exponential,
-  against chord distance); check which ℓ are tree bonds first. Gapless edge: S linear in the chord variable, c → 1; hybridized edges /
-  CDW: S saturates, c → 0. Bulk gap from torus data at the same α, not the cylinder.
-- If gapped, the topological info is in the saturated S(ℓ ≫ ξx) ≈ 2(a Ly − γ) (two cuts), so
-  S_sat vs Ly → −2γ, γ = ln√2 (Laughlin) vs 0 (TT); needs several Ly and ℓ ≫ ξx; degenerate GS
-  pair may be a superposition (MES).
-- Size family is commensurate for every even Lx: phase e^{2πiαy} on x bonds, α = N/(ν Lx (Ly−1))
-  = 1/(Ly−1) independent of Lx, N_φ = Lx = 2N; hardcore bosons, so no fermionic N-parity effect.
-- 10x4 needs a better EE route: dense ρ_A at ℓ = 5 is 21700² (7.5 GB). ρ_A is block-diagonal in
-  N_A, and the Schmidt values come from SVDs of the blocks Ψ_{N_A} (C(20,k) × C(20,5−k) at
-  10x4), so a block-SVD version of `compute_reduced_density_matrix` makes every cut cheap.
-- With 3–4 independent ℓ per size the fit is crude; TTN/MPS would give longer Lx.
-- Rényi-2 cross-check (slope c/4) deferred to the TTN scan, where S_n comes free from the Schmidt
-  values; at Ly = 4 ED it would only confirm "not in the CFT regime" (2026-10-16).
+**Edge thread → TTN (2026-10-16).** Ly = 6, Lx = 12, 16 (+ Ly = 8 width check), Ui = 0 and 50,
+GS only. First check which vertical cuts ℓ are tree bonds (compute all S(ℓ) on the same footing).
+Then per size: S(ℓ) vs chord, c in a fixed ℓ/Lx window (e.g. 0.1–0.5) with fit rms, S_2 from the
+Schmidt values (slope c/4, must agree with S_1), row correlations (edge vs bulk). Laughlin result
+= c → 1 with power-law edge / exponential bulk; c → 0 means hybridized edges (go wider).
+Single-edge cut A = {x ≤ ℓ, y ≤ Ly/2}: S = (1/6) log chord + a ℓ + const (fit all 0 < ℓ < Lx,
+no ℓ ↔ Lx − ℓ symmetry); independent chiral edges ⇒ half the full-cut slope (c_fit 1/2 vs 1),
+CDW both → 0. Not in ED (bulk 2–3 rows, 3 parameters on 3–5 points).
+If gapped, topology is in the saturated S ≈ 2(a Ly − γ) → −2γ vs Ly (γ = ln√2 vs 0), needs
+several Ly and a single-sector GS. Dropped: Rényi-2 in ED, Ly = 4 orbital-counting question.
 
 **Larger sizes to resolve the p dependence (decision open, 2026-10-14).** User's idea: fPEPS
 (`fpeps/execute-fpeps.jl`) for more system sizes. Discussed first:
@@ -256,8 +273,9 @@ Notes for any new p:
     V = 0.1–1000 (15 each, same grid recipe in V), same metadata; filenames carry only
     `interaction_strength` (no `scaling`).
   - ED `cluster-data/exact-diag/cylinder/dd-ints/`: V=50, 6×{4,5,6} N=3 (15 each), 6x7 (11), 8x4 (22).
-  - ED `cylinder/flat-ints/` (2026-10-15/16): flat Ui = 0 and 50, α = 1/3, 6x4 N=3, 8x4 N=4,
-    10x4 N=5; α = 1/5, 6x6 N=3, 8x6 N=4 (nev = 10), states + `ee_half` + `ee_cuts` in metadata; `full_basis` and `H` set to `nothing`.
+  - ED `cylinder/flat-ints/` (2026-10-15/16): flat Ui = 0 and 50, α = 1/3: 6x4 N=3, 8x4 N=4,
+    10x4 N=5; α = 1/5: 6x6 N=3, 8x6 N=4 (nev = 10). States in data; `ee_cuts` (all) and GS
+    `densmat` (not 10x4) in metadata; `full_basis` and `H` are `nothing`.
   - Lx sweep (2026-10-14), all 7 p, in the same `obc/<folder>`: 8×{4,5,6,7} N=4 and 10x4 N=5, one
     file per (size, p), named after the smallest s (flat: V = 0.1), whose metadata holds the sweep:
     `all_gammas`, `all_columncorrs1/2`, `all_evencolumndist1/2`, `all_occs1/2` (25 points; no
@@ -279,14 +297,19 @@ Notes for any new p:
 - [ ] V = 50 TTN data at 12x6+ for the torus?
 - [ ] Does fPEPS reach useful open sizes / accuracy (N conservation, D convergence of Γ_c)?
 - [ ] C⁴ / PES vs s at TTN sizes (the paper's more robust diagnostics).
-- [ ] Does the fitted c (vertical cuts, cylinder) converge with Lx, and to what, in the Laughlin
-  and CDW regimes? 6x4 / 8x4 at Ui = 0 give 3.2 / 2.7, i.e. not converged.
+- [ ] Cylinder Laughlin: does c → 1 (and 1/2 for the single-edge cut) and the edge correlation
+  become a power law at TTN Lx (Ly = 6)? ED (Lx ≤ 10) is qualitatively right but UV-dominated (c ≈ 3).
+- [ ] Does the J_x sign reversal of the inner rows track Γ_c (cylinder, larger N, dd vs flat)?
 
 ## Gotchas
 
 - `cylinder/flat-ints`: `full_basis` is `nothing` in the metadata, rebuild with
   `get_lattice_params_from_metadata(m)` (same basis order, checked against `ee_half`). 8x4
   `ee_cuts` has zeros for ℓ > Lx/2 (saved before mirroring; 6x4 is mirrored): mirror on reading.
+  GS one-body density matrix is `m["densmat"]` (metadata); `d["densmat"]` is an empty vector.
+- `physical_current` / `synthetic_current` (`exact-diag/observables.jl`) now take
+  `(densmat, lattice_params, hamilt_params)` and return 2t Im(e^{iφ} ρ[s, s+e]) with the flux and
+  twist phase (via `bond_current`); the old versions omitted the phase and divided by n_i + n_j.
 - `compute_reduced_density_matrix` returns a dense ρ_A over all N_A ≤ N configs of A: keep
   ℓ ≤ Lx/2 (8x4 ℓ = 7 would be 24158², 9 GB).
 - CurveFit is v1.4 (no `linear_fit`; the old TEE block at ~line 1853 fails): use LsqFit
@@ -349,20 +372,12 @@ Notes for any new p:
   metadata. 8×Ly block: Γ_c(Ly) still grows, Ly = 4 Γ_c flat in Lx, GS signal collapses with Ly as
   at 6×Ly. Error bars on b; local exponents: single power law poor for small p, clean for p ≥ 2.
   User: larger sizes needed, idea fPEPS; size family / MPS-TTN vs fPEPS discussed (Next).
-- 2026-10-15 — EE / central-charge side thread (`exact-diag/daily-things.jl`, end). Half-cut EE
-  (x ≤ Lx/2), OBC 6x4 N=3 flat Ui: S = 1.749 (Ui = 0), 0.948 (Ui = 50). Periodic x / open y
-  chosen for Calabrese–Cardy (cut scanned along the physical direction). Cut-size scan on the
-  cylinder, Ui = 0: c = 3.2 ± 0.1 (6x4), 2.7 ± 0.07 (8x4). `compute_reduced_density_matrix`
-  rewritten as ρ_A = Ψ Ψ† with sparse Ψ[a,b] (was an O(dim²) pair loop; same ρ_A to 1e-16).
-  Next: finite-size scaling of c for Laughlin and CDW.
-- 2026-10-16 — CC block: fit panels in one length(lxs)×length(intstrens) grid, c(Lx) separate.
-  Cylinder spectra Ly = 4: Ui = 0 low gaps saturate 8 → 10 (gapped/hybridized, c → 0 expected),
-  Ui = 50 TT doublet splitting halves per ΔLx = 2 under gap ≈ 0.2. Ly = 6 (6x6, 8x6): Ui = 0
-  gap·Lx ≈ const, c ≈ 2.6–3.1; Ly = 4 "gapped" downgraded to ambiguous (10x4 S(ℓ) still rising).
-  Row correlations |⟨b†_{r,y} b_{0,y}⟩| (8x4 / 8x6, r = 1–4, block "GS one-body correlations along x
-  per row"): Ui = 0 edge row stays large (8x4 y=1: 0.69, 0.47, 0.51, 0.49; 8x6: 0.91, 0.72, 0.54,
-  0.46) while middle rows fall (8x6 y=3: 0.71, 0.31, 0.12, 0.03): edge coherent, bulk short-ranged.
-  Edge decay is far slower than the Laughlin r^-2, and Ly = 4 doesn't look like gapped edges.
-  Ui = 50: all rows fall alike (8x6 ≈ 0.6, 0.15, 0.03–0.06, 0.01–0.03), gapped everywhere. Only 4
-  distances: no power-law vs exponential fit. GS densmat is in the metadata (`m["densmat"]`,
-  `d["densmat"]` empty), none for 10x4.
+- 2026-10-15 — Edge / central-charge side thread started (`exact-diag/daily-things.jl`, end):
+  cylinder vertical-cut Calabrese–Cardy fits; `compute_reduced_density_matrix` rewritten as
+  ρ_A = Ψ Ψ† with sparse Ψ (same ρ_A to 1e-16).
+- 2026-10-16 — CC fits in one grid; Ly = 6 ED (6x6, 8x6); spectra and row correlations: CDW
+  gapped everywhere, Laughlin qualitatively gapped bulk + gapless edge at Ly = 6 but UV-dominated
+  (c ≈ 3); Ly = 4 ambiguous. Plan: TTN Ly = 6, Lx = 12, 16, GS-only diagnostics (Next).
+- 2026-10-16 — Current functions fixed (Peierls phase); current blocks cleaned. CDW: one
+  whole-width circulation, no edge/bulk counterflow, edge coherence as short as bulk (ξ ≈ 1).
+  c_fit = 1 for Laughlin explained (two chiral edges, 1/6 each); single-edge cut test planned.

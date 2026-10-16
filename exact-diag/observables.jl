@@ -222,51 +222,44 @@ function synthetic_correlation(densmat::Array{ComplexF64,2},Lx::Int64,Ly::Int64;
     return syn_corrs
 end
 
-# functions for current along physical or synthetic dimension, made from density matrix
-function physical_current(densmat::Array{ComplexF64,2},lattice_params::Dict{String,Any}; kwargs...)
+# gauge-invariant particle current on the bond s -> s + e_dir (dir = 1: x, 2: y), from the density matrix
+# rho[i,j] = <b^dag_i b_j>. buildHam stores H[in,out] = -t e^{i phi}, phi = 2 pi (alpha[dir] (s_perp - 1) + twist[dir]/L_dir),
+# so J = d<n_{s+e}>/dt = 2 t Im(e^{i phi} rho[s,s+e])
+function bond_current(densmat::Array{ComplexF64,2},lattice_params::Dict{String,Any},hamilt_params::Dict,site::Tuple{Int64,Int64},dir::Int64)
+    Lx = lattice_params["Lx"]
+    Ly = lattice_params["Ly"]
+    alpha = hamilt_params["alpha"]
+    twist = get(lattice_params,"twist_angle",(0.0,0.0))
+    t = dir == 1 ? hamilt_params["tx"] : hamilt_params["ty"]
+
+    next_site = dir == 1 ? (mod1(site[1]+1,Lx),site[2]) : (site[1],mod1(site[2]+1,Ly))
+    phi = 2pi * (alpha[dir] * (site[3-dir] - 1) + twist[dir] / (Lx,Ly)[dir])
+
+    return 2 * t * imag(cis(phi) * densmat[linear_index(site,Lx,Ly),linear_index(next_site,Lx,Ly)])
+end
+
+# currents[x,y] on the bond (x,y) -> (x+1,y)
+function physical_current(densmat::Array{ComplexF64,2},lattice_params::Dict{String,Any},hamilt_params::Dict; kwargs...)
     if_plot = get(kwargs,:if_plot,true)
     Lx = lattice_params["Lx"]
     Ly = lattice_params["Ly"]
-    if_periodic_x = lattice_params["if_periodic_x"]
 
-    xlen = if_periodic_x ? Lx : Lx-1
-
-    currents = Array{Float64,2}(undef,xlen,Ly)
-    for s in 1:Ly
-        for j in 1:xlen
-            site1 = linear_index((j,s),Lx,Ly)
-            site2 = linear_index((mod1(j+1,Lx),s),Lx,Ly)
-            current_val = imag(densmat[site1,site2] - densmat[site2,site1])
-            current_normalization = densmat[site1,site1] + densmat[site2,site2]
-            current_val /= current_normalization
-            currents[j,s] = real(current_val)
-        end
-    end
+    xlen = lattice_params["if_periodic_x"] ? Lx : Lx-1
+    currents = [bond_current(densmat,lattice_params,hamilt_params,(x,y),1) for x in 1:xlen, y in 1:Ly]
 
     if_plot ? plot_physical_current(currents; kwargs...) : nothing
 
     return currents
 end
 
-function synthetic_current(densmat::Array{ComplexF64,2},lattice_params::Dict{String,Any}; kwargs...)
+# currents[x,y] on the bond (x,y) -> (x,y+1)
+function synthetic_current(densmat::Array{ComplexF64,2},lattice_params::Dict{String,Any},hamilt_params::Dict; kwargs...)
     if_plot = get(kwargs,:if_plot,true)
     Lx = lattice_params["Lx"]
     Ly = lattice_params["Ly"]
-    if_periodic_y = lattice_params["if_periodic_y"]
 
-    ylen = if_periodic_y ? Ly : Ly-1
-
-    currents = Array{Float64,2}(undef,Lx,ylen)
-    for j in 1:Lx
-        for s in 1:ylen
-            site1 = linear_index((j,s),Lx,Ly)
-            site2 = linear_index((j,mod1(s+1,Ly)),Lx,Ly)
-            current_val = imag(densmat[site1,site2] - densmat[site2,site1])
-            current_normalization = densmat[site1,site1] + densmat[site2,site2]
-            current_val /= current_normalization
-            currents[j,s] = real(current_val)
-        end
-    end
+    ylen = lattice_params["if_periodic_y"] ? Ly : Ly-1
+    currents = [bond_current(densmat,lattice_params,hamilt_params,(x,y),2) for x in 1:Lx, y in 1:ylen]
 
     if_plot ? plot_synthetic_current(currents; kwargs...) : nothing
 

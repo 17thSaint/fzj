@@ -4503,69 +4503,83 @@ if false
     ylim(1e-3,2.0)
 end=#
 
-#= currents for cylinder, weakened a bit by the all-to-all interaction
+#= currents on the cylinder (x periodic, y open) vs the all-to-all interaction Ui: J_x(y) profile across the strip
 if false
     lx,ly,n = 4,8,2
-    
-    pdict_laugh = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("flux_direction","x"),("if_periodic_x",true),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
-    states_laugh,nrgs_laugh,rhos_laugh,filepath_laugh,if_found_laugh,lattice_params_laugh,hamilt_params_laugh = run_normal_ed(pdict_laugh; output_level=1)
-    densmat_laugh = density_matrix(states_laugh[1],lattice_params_laugh; output_level=1)
+    intstrens = [0.0,0.5,1.0,2.0,5.0,10.0,20.0,50.0]
 
-    physcurr_laugh = physical_current(densmat_laugh,lattice_params_laugh; if_plot=false)
+    jxs = zeros(length(intstrens),ly)
+    for (i,intstren) in enumerate(intstrens)
+        pdict = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("flux_direction","x"),("if_periodic_x",true),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",4),("if_find_data",false),("if_save_data",false)])
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=0)
+        densmat = density_matrix(states[1],lattice_params; output_level=0)
 
-    fig,axs = subplots(2, 1, figsize=(6, 4))
-    axs[1].plot(1:ly,physcurr_laugh[1,:],"-p",label="Laughlin")
-
-    intstrens = range(0.5,50.0,length=11)
-    for intstren in intstrens
-        pdict_cdw = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("flux_direction","x"),("if_periodic_x",true),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
-        states_cdw,nrgs_cdw,rhos_cdw,filepath_cdw,if_found_cdw,lattice_params_cdw,hamilt_params_cdw = run_normal_ed(pdict_cdw; output_level=1)
-        densmat_cdw = density_matrix(states_cdw[1],lattice_params_cdw; output_level=1)
-
-        physcurr_cdw = physical_current(densmat_cdw,lattice_params_cdw; if_plot=false)
-
-        axs[1].plot(1:ly,physcurr_cdw[1,:],"-p",label="ULR=$(round(intstren,digits=1))")
-
-        axs[2].scatter(intstren,physcurr_cdw[1,2],c="b")
-        axs[2].scatter(intstren,physcurr_cdw[1,1],c="r")
-        axs[2].scatter(intstren,physcurr_cdw[1,3],c="g")
+        # translation invariant along x, average over the bonds anyway (a near-degenerate GS can break it)
+        jxs[i,:] = sum(physical_current(densmat,lattice_params,hamilt_params; if_plot=false); dims=1) ./ lx
     end
 
+    fig,axs = subplots(2,1,figsize=(6,8))
+    for (i,intstren) in enumerate(intstrens)
+        axs[1].plot(1:ly,jxs[i,:],"-o",c=PyPlot.cm.viridis((i-1)/(length(intstrens)-1)),label="ULR=$intstren")
+    end
+    axs[1].axhline(0,c="k",lw=0.5)
     axs[1].set_xlabel("y")
-    axs[1].set_ylabel("Physical Current")
-    axs[1].legend()
+    axs[1].set_ylabel(L"J_x(y)")
+    axs[1].legend(fontsize=7)
 
-    axs[2].set_xlabel("Interaction Strength")
-    axs[2].set_ylabel("Single Site Physical Current")
-    axs[2].legend()
+    # rows y and Ly+1-y carry opposite currents: show the lower half and its total
+    for y in 1:div(ly,2)
+        axs[2].plot(intstrens,jxs[:,y],"-o",label="y=$y")
+    end
+    axs[2].plot(intstrens,vec(sum(jxs[:,1:div(ly,2)];dims=2)),"--k",label=L"\sum_{y \leq L_y/2}")
+    axs[2].axhline(0,c="k",lw=0.5)
+    axs[2].set_xscale("symlog",linthresh=0.5)
+    axs[2].set_xlim(0,1.2*maximum(intstrens))
+    axs[2].set_xlabel("ULR")
+    axs[2].set_ylabel(L"J_x(y)")
+    axs[2].legend(fontsize=7)
+    fig.tight_layout()
 
 end=#
 
 
-#= currents and correlations for OBC
+# currents and correlations on OBC, Laughlin (Ui = 0) vs CDW (Ui = 50): bond-current map over the density, and
+#= one-body correlations along x per row
 if false
-    #lx,ly,n = 4,8,2
     lx,ly,n = 8,4,4
+    cases = [("Laughlin",0.0),("CDW",50.0)]
 
-    pdict_laugh = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("flux_direction","x"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",0.0),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
-    states_laugh,nrgs_laugh,rhos_laugh,filepath_laugh,if_found_laugh,lattice_params_laugh,hamilt_params_laugh = run_normal_ed(pdict_laugh; output_level=1)
-    densmat_laugh = density_matrix(states_laugh[1],lattice_params_laugh; output_level=1)
+    fig,axs = subplots(2,length(cases),figsize=(12,8))
+    for (i,(label,intstren)) in enumerate(cases)
+        pdict = Dict([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("flux_direction","x"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("lr","all"),("filling",0.5),("nev",4),("if_find_data",false),("if_save_data",false)])
+        states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(pdict; output_level=0)
+        densmat = density_matrix(states[1],lattice_params; output_level=0)
 
-    physcorr_laugh = physical_correlation(densmat_laugh,lx,ly; plot_title="Laughlin")
-    #synthcorr_laugh = synthetic_correlation(densmat_laugh,lx,ly; plot_title="Laughlin")
+        physcurr = physical_current(densmat,lattice_params,hamilt_params; if_plot=false) # (Lx-1) x Ly
+        synthcurr = synthetic_current(densmat,lattice_params,hamilt_params; if_plot=false) # Lx x (Ly-1)
+        physcorr = physical_correlation(densmat,lx,ly; if_plot=false)
+        dens = [real(densmat[linear_index((x,y),lx,ly),linear_index((x,y),lx,ly)]) for x in 1:lx, y in 1:ly]
 
-    #physcurr_laugh = physical_current(densmat_laugh,lattice_params_laugh; plot_title="Laughlin")
-    synthcurr_laugh = synthetic_current(densmat_laugh,lattice_params_laugh; plot_title="Laughlin")
+        # arrows at the bond midpoints, same scale in both panels
+        ax = axs[1,i]
+        sc = ax.scatter(repeat(1:lx,ly),repeat(1:ly,inner=lx),c=vec(dens),s=300,cmap="Greys",vmin=0,vmax=maximum(dens))
+        ax.quiver([x+0.5 for x in 1:lx-1, y in 1:ly],[y for x in 1:lx-1, y in 1:ly],physcurr,zero(physcurr),color="r",angles="xy",scale_units="xy",scale=0.3,pivot="mid")
+        ax.quiver([x for x in 1:lx, y in 1:ly-1],[y+0.5 for x in 1:lx, y in 1:ly-1],zero(synthcurr),synthcurr,color="b",angles="xy",scale_units="xy",scale=0.3,pivot="mid")
+        fig.colorbar(sc,ax=ax,label="density")
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+        ax.set_title("$label (ULR=$intstren), max |J| = $(round(max(maximum(abs.(physcurr)),maximum(abs.(synthcurr))),digits=3))")
 
-    pdict_cdw = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("flux_direction","x"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",50.0),("lr","all"),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
-    states_cdw,nrgs_cdw,rhos_cdw,filepath_cdw,if_found_cdw,lattice_params_cdw,hamilt_params_cdw = run_normal_ed(pdict_cdw; output_level=1)
-    densmat_cdw = density_matrix(states_cdw[1],lattice_params_cdw; output_level=1)
-
-    #synthcorr_cdw = synthetic_correlation(densmat_cdw,lx,ly; plot_title="CDW")
-    #physcurr_cdw = physical_current(densmat_cdw,lattice_params_cdw; plot_title="CDW")
-
-    physcorr_cdw = physical_correlation(densmat_cdw,lx,ly; plot_title="CDW")
-    synthcurr_cdw = synthetic_current(densmat_cdw,lattice_params_cdw; plot_title="CDW")
+        ax = axs[2,i]
+        for y in 1:cld(ly,2) # rows y and Ly+1-y are mirror images
+            ax.plot(0:lx-1,physcorr[:,y],"-o",label="y=$y")
+        end
+        ax.set_yscale("log")
+        ax.set_xlabel("x distance from x = 1")
+        ax.set_ylabel(L"|\langle b^\dagger_{x,y} b_{1,y}\rangle| / \sqrt{n n}")
+        ax.legend(fontsize=7)
+    end
+    fig.tight_layout()
 
 end=#
 
@@ -4675,8 +4689,8 @@ if false
 end=#
 
 # GS one-body correlations along x per row on the cylinder: gapless edge -> power law on the edge rows,
-# gapped bulk -> exponential in the middle rows. Plotted against the chord distance (Lx/pi) sin(pi r/Lx)
-if true
+#= gapped bulk -> exponential in the middle rows. Plotted against the chord distance (Lx/pi) sin(pi r/Lx)
+if false
     dataloc = get_folder_location("cluster-data/exact-diag/cylinder/flat-ints")
     lys = [4,6]
     lxs = [6,8]
@@ -4714,7 +4728,7 @@ if true
     end
     fig_corr.tight_layout()
 
-end
+end=#
 
 
 
