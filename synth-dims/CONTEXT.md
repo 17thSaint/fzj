@@ -20,9 +20,24 @@ Other exponents: scaling `"powerlaw"` with key `"exponent"` = p (p = 3 equals `"
 **Entanglement / central charge (2026-10-15, side thread):** vertical cuts (A = all sites with
 x ≤ ℓ, all y) on the cylinder (x periodic, y open), Calabrese–Cardy fit
 S = (c/3) log[(Lx/π) sin(πℓ/Lx)] + const over ℓ ≤ Lx/2 (S(ℓ) = S(Lx − ℓ) for the pure GS).
-Flat Ui = 0, Ly = 4: 6x4 N=3 c = 3.2 ± 0.1, 8x4 N=4 c = 2.7 ± 0.07 (3 resp. 4 independent
-points). Not a CFT value: the fit is dominated by the area-law offset at Lx ≤ 8; the 6x4 GS is
-gapped (E2 − E1 = 0.10; 8x4: 0.016). Block "try Calabrese-Cardy scaling cut size…" at the end
+Fits (2026-10-16, ℓ ≥ 1 / ℓ ≥ 2, Lx = 6, 8, 10; 2–5 points, rms ≲ 0.02):
+
+    | c fit | Ly = 4, Ui = 0 | Ly = 4, Ui = 50 | Ly = 6, Ui = 0 | Ly = 6, Ui = 50 |
+    |---|---|---|---|---|
+    | ℓ ≥ 1 | 3.2, 2.7, 2.9 | 1.46, 1.23, 1.06 | 2.76, 2.63 | 1.76, 1.59 |
+    | ℓ ≥ 2 | 3.9, 3.0, 3.1 | 1.37, 0.95, 0.74 | 3.06, 2.75 | 1.59, 1.36 |
+
+Spectra E − E1 (Lx = 6/8/10): Ly = 4 Ui = 0: E2 0.105/0.0158/0.0155, E3 0.112/0.059/0.056 (E3·Lx
+rises 0.47 → 0.56, gap saturating), yet S(ℓ) at 10x4 still rises (2.09, 2.26, 2.32 for ℓ = 3–5) and
+c doesn't drop at Lx = 10: ambiguous. Ly = 6 (α = 1/5) Ui = 0: E2 0.181/0.129, E3 0.199/0.143,
+gap·Lx ≈ const (1.08/1.03; v ≈ 0.17), no anomalous low state: consistent with a gapless edge, 1/Lx (2 sizes; bulk gap from torus).
+Ui = 50: TT doublet (Ly = 4: 0.023/0.011/0.0054, halves per ΔLx = 2; Ly = 6: 0.080/0.056) under a gap
+≈ 0.2 (Ly = 4), ≈ 0.1 (Ly = 6; Γ/Γ_c ≈ 14 vs 26); S(ℓ) saturates, c falls. If the Laughlin strip
+were gapped, c → 0 for Lx ≫ ξx and the fit could not separate it from TT.
+At fixed ρ1D, N_φ = Lx for every Ly: wider Ly doesn't add orbitals, edge separation grows only as
+(Ly−1)/l_B = √(2π(Ly−1)) (4.3 → 5.6 l_B for Ly 4 → 6), S(1) ≈ 1.2 at both Ly. ℓ ≤ 4 spans
+0.5–2 particles (spacing 1/ρ1D = 2): the fits are UV-dominated at every Ly; need Lx ≳ 16 (TTN).
+Block "try Calabrese-Cardy scaling cut size…" at the end
 of `exact-diag/daily-things.jl` (reads states, saves `ee_cuts`, fits c with LsqFit).
 
 **Bottom line:** OBC ground-state data for p = 0 (flat), 0.5, …, 3 at 6×Ly N=3 and 8×Ly N=4
@@ -116,12 +131,23 @@ needed to resolve the p dependence (see Next).
 block: put the per-size cut scans together (one loop over sizes) and scale the fitted c with
 Lx, for Laughlin (Ui = 0) and the CDW (large Ui), to see where c lands (expect c → 0 in the
 gapped CDW; Laughlin on a thin cylinder may also be gapped, or show c = 1 from the two edges).
-- Data now: only Ui = 0, 6x4 N=3 and 8x4 N=4 in `cylinder/flat-ints`. CDW points and 10x4 N=5
-  need new ED runs (saving = write, ask; the user makes folders).
+- Data now: Ui = 0 and 50, 6x4 N=3, 8x4 N=4, 10x4 N=5, 6x6 N=3, 8x6 N=4 in `cylinder/flat-ints`.
+- TTN next (2026-10-16): Ly = 6, Lx = 12, 16 (+ Ly = 8 width check), Ui = 0 and 50, GS only
+  (excited states too expensive): S(ℓ) vs chord, c in a fixed ℓ/Lx window with rms, S_2, and
+  `physical_correlation` (|⟨b†b⟩| along x per row: edge rows power law vs bulk rows exponential,
+  against chord distance); check which ℓ are tree bonds first. Gapless edge: S linear in the chord variable, c → 1; hybridized edges /
+  CDW: S saturates, c → 0. Bulk gap from torus data at the same α, not the cylinder.
+- If gapped, the topological info is in the saturated S(ℓ ≫ ξx) ≈ 2(a Ly − γ) (two cuts), so
+  S_sat vs Ly → −2γ, γ = ln√2 (Laughlin) vs 0 (TT); needs several Ly and ℓ ≫ ξx; degenerate GS
+  pair may be a superposition (MES).
+- Size family is commensurate for every even Lx: phase e^{2πiαy} on x bonds, α = N/(ν Lx (Ly−1))
+  = 1/(Ly−1) independent of Lx, N_φ = Lx = 2N; hardcore bosons, so no fermionic N-parity effect.
 - 10x4 needs a better EE route: dense ρ_A at ℓ = 5 is 21700² (7.5 GB). ρ_A is block-diagonal in
   N_A, and the Schmidt values come from SVDs of the blocks Ψ_{N_A} (C(20,k) × C(20,5−k) at
   10x4), so a block-SVD version of `compute_reduced_density_matrix` makes every cut cheap.
 - With 3–4 independent ℓ per size the fit is crude; TTN/MPS would give longer Lx.
+- Rényi-2 cross-check (slope c/4) deferred to the TTN scan, where S_n comes free from the Schmidt
+  values; at Ly = 4 ED it would only confirm "not in the CFT regime" (2026-10-16).
 
 **Larger sizes to resolve the p dependence (decision open, 2026-10-14).** User's idea: fPEPS
 (`fpeps/execute-fpeps.jl`) for more system sizes. Discussed first:
@@ -230,8 +256,8 @@ Notes for any new p:
     V = 0.1–1000 (15 each, same grid recipe in V), same metadata; filenames carry only
     `interaction_strength` (no `scaling`).
   - ED `cluster-data/exact-diag/cylinder/dd-ints/`: V=50, 6×{4,5,6} N=3 (15 each), 6x7 (11), 8x4 (22).
-  - ED `cluster-data/exact-diag/cylinder/flat-ints/` (2026-10-15): flat Ui = 0, 6x4 N=3 and 8x4
-    N=4, states + `ee_half` + `ee_cuts` in metadata; `full_basis` and `H` set to `nothing`.
+  - ED `cylinder/flat-ints/` (2026-10-15/16): flat Ui = 0 and 50, α = 1/3, 6x4 N=3, 8x4 N=4,
+    10x4 N=5; α = 1/5, 6x6 N=3, 8x6 N=4 (nev = 10), states + `ee_half` + `ee_cuts` in metadata; `full_basis` and `H` set to `nothing`.
   - Lx sweep (2026-10-14), all 7 p, in the same `obc/<folder>`: 8×{4,5,6,7} N=4 and 10x4 N=5, one
     file per (size, p), named after the smallest s (flat: V = 0.1), whose metadata holds the sweep:
     `all_gammas`, `all_columncorrs1/2`, `all_evencolumndist1/2`, `all_occs1/2` (25 points; no
@@ -329,3 +355,14 @@ Notes for any new p:
   cylinder, Ui = 0: c = 3.2 ± 0.1 (6x4), 2.7 ± 0.07 (8x4). `compute_reduced_density_matrix`
   rewritten as ρ_A = Ψ Ψ† with sparse Ψ[a,b] (was an O(dim²) pair loop; same ρ_A to 1e-16).
   Next: finite-size scaling of c for Laughlin and CDW.
+- 2026-10-16 — CC block: fit panels in one length(lxs)×length(intstrens) grid, c(Lx) separate.
+  Cylinder spectra Ly = 4: Ui = 0 low gaps saturate 8 → 10 (gapped/hybridized, c → 0 expected),
+  Ui = 50 TT doublet splitting halves per ΔLx = 2 under gap ≈ 0.2. Ly = 6 (6x6, 8x6): Ui = 0
+  gap·Lx ≈ const, c ≈ 2.6–3.1; Ly = 4 "gapped" downgraded to ambiguous (10x4 S(ℓ) still rising).
+  Row correlations |⟨b†_{r,y} b_{0,y}⟩| (8x4 / 8x6, r = 1–4, block "GS one-body correlations along x
+  per row"): Ui = 0 edge row stays large (8x4 y=1: 0.69, 0.47, 0.51, 0.49; 8x6: 0.91, 0.72, 0.54,
+  0.46) while middle rows fall (8x6 y=3: 0.71, 0.31, 0.12, 0.03): edge coherent, bulk short-ranged.
+  Edge decay is far slower than the Laughlin r^-2, and Ly = 4 doesn't look like gapped edges.
+  Ui = 50: all rows fall alike (8x6 ≈ 0.6, 0.15, 0.03–0.06, 0.01–0.03), gapped everywhere. Only 4
+  distances: no power-law vs exponential fit. GS densmat is in the metadata (`m["densmat"]`,
+  `d["densmat"]` empty), none for 10x4.

@@ -46,7 +46,7 @@ end
 
 include_other_files(["other-funcs/basic-2d-stuff.jl","other-funcs/basic-2d-observables.jl","exact-diag/two-dimensions.jl","exact-diag/observables.jl","exact-diag/hatsugai-mbcn.jl"])
 #include_other_files(["exact-diag/time-evolution.jl"])
-include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
+#include_other_files(["other-funcs/basic-2d-plottings.jl","exact-diag/plottings.jl"])
 
 function make_filename_dict(lattice_params::Dict,hamilt_params::Dict)
     if hamilt_params["U"][2] == 0.0
@@ -736,20 +736,18 @@ if false
     # (same U as "powerlaw" with exponent 3, and the dd-ints filenames) and "powerlaw" otherwise
     # if_save = false only for building the undressed matrices, which shouldn't leave a point file behind
     function sweep_params(p,gamma; if_save=true)
-        pdict = Dict{String,Any}([("output_level",0),("Lx",lx),("Ly",ly),("N",n),("if_reading",if_reading),("lr","all"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("filling",0.5),("nev",20),("if_find_data",if_save),("if_save_data",if_save),("if_densmat",false)])
+        pdict = Dict{String,Any}([("output_level",0),("interaction_strength",50.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",if_reading),("lr","all"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("filling",0.5),("nev",20),("if_find_data",if_save),("if_save_data",if_save),("if_densmat",false)])
         if_save && (pdict["dataloc"] = get_folder_location("cluster-data/exact-diag/obc/$(power_folder(p))"))
         if p == 0.0
             pdict["scaling_type"] = "flat"
             pdict["interaction_strength"] = gamma
         elseif p == 3.0
             pdict["scaling_type"] = "dd"
-            pdict["magnetic_spacing"] = round((intstren/gamma)^(1/3),digits=10)
-            pdict["interaction_strength"] = intstren
+            pdict["magnetic_spacing"] = (pdict["interaction_strength"]/gamma)^(1/3)
         else
             pdict["scaling_type"] = "powerlaw"
             pdict["exponent"] = p
-            pdict["magnetic_spacing"] = round((intstren/gamma)^(1/p),digits=10)
-            pdict["interaction_strength"] = intstren
+            pdict["magnetic_spacing"] = (pdict["interaction_strength"]/gamma)^(1/p)
         end
         return pdict
     end
@@ -792,9 +790,9 @@ if false
         # 13 coarse points over Γ = 0.1–1000 plus 12 in [Γ_guess/6, 10 Γ_guess] (25 coarse ones for an exponent without a guess)
         if haskey(gamma_guess,p)
             gc = gamma_guess[p][clamp(ly-3,1,4)]
-            gammas = sort(unique(round.(vcat(10 .^ range(-1,3,length=13), 10 .^ range(log10(gc/6),log10(10*gc),length=12)),sigdigits=8)))
+            gammas = sort(unique(vcat(10 .^ range(-1,3,length=13), 10 .^ range(log10(gc/6),log10(10*gc),length=12))))
         else
-            gammas = round.(10 .^ range(-1,3,length=25),sigdigits=8)
+            gammas = 10 .^ range(-1,3,length=25)
         end
 
         # write_data_jld2 writes into pwd() when the folder is missing, so fail instead of creating one
@@ -804,12 +802,15 @@ if false
         for (idx,gamma) in enumerate(gammas)
             pdict = sweep_params(p,gamma)
             # skip a point whose file is complete, checked without loading the states
-            _,_,running_args = get_normal_model_params_ed(pdict)
+            lp,hp,running_args = get_normal_model_params_ed(pdict)
             filepath = make_sure_file_type(joinpath(dataloc,running_args.filename),"jld2")
             if isfile(filepath) && jldopen(f -> haskey(f["metadata"],"occs2"),filepath,"r")
                 println("p = $p, Γ = $(round(gamma,sigdigits=4)): already done")
                 continue
             end
+
+            calced_gamma = hp["U"][1] / (hp["magnetic_spacing"] ^ p)
+            println("For exponent $p Calculated Gamma = $(calced_gamma) while perceived Gamma = $(gamma)")
 
             # computes and saves the point, or reads it back if it was saved without the metadata below
             start_time = time()

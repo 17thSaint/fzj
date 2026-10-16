@@ -4575,7 +4575,7 @@ if false
     dataloc = get_folder_location("cluster-data/exact-diag/cylinder/flat-ints")
     intstren = 0.0
     lxs = [6,8,10]
-    ly = 4
+    ly = 6
     ees = []
     for lx in lxs
 
@@ -4598,52 +4598,121 @@ if false
 end=#
 
 # try Calabrese-Cardy scaling cut size to get central charge
-# it works for individual, put it all together and do scaling of fitted c
-# for laughlin and CDW to see where it lands
-if true
-    intstren = 0.0
-    lx,ly,n = 8,4,4
-    dataloc = get_folder_location("cluster-data/exact-diag/cylinder/flat-ints")
-    pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren)])
-    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
-    d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
-    psi = d["state"][1]
-
-    #= vertical bipartitions A = all sites with x <= l, periodic x so S = (c/3) log((Lx/pi) sin(pi l/Lx)) + const
-    # only compute l <= Lx/2 (rho_A gets huge for large A), pure state so S(l) = S(Lx - l)
-    cuts = collect(1:lx-1)
-    ees = zeros(Float64,length(cuts))
-    for l in 1:div(lx,2)
-        println("Working on cut l = $l / $lx")
-        subsysA = [linear_index((x,y),lx,ly) for y in 1:ly for x in 1:l]
-        subsysB = find_subsystem_B(subsysA,lx,ly)
-        rho_A, unique_A_configs = compute_reduced_density_matrix(psi, lattice_params["full_basis"], subsysA, subsysB)
-        ees[l] = entanglement_entropy(rho_A)
-    end
-    datadict = Dict([("ee_cuts",ees),])
-    modify_data(datadict,joinpath(dataloc,all_files[1]),"metadata"; output_level=1,file_type="jld2")=#
-    ees = m["ee_cuts"]
-    cuts = collect(1:lx-1)
-    for l in div(lx,2)+1:lx-1
-        ees[l] = ees[lx-l]
-    end
-    chords = log.((lx/pi) .* sin.(pi .* cuts ./ lx))
-
-    # S = (c/3) chord + const, fit only the computed cuts l <= Lx/2 (the mirrored ones are copies)
+#= for Ly = 4, it does not seem to be following expected scaling, could be because too thin and edges hybridize
+if false
     using LsqFit
-    fitcuts = 1:div(lx,2)
-    cc_model(x,q) = (q[1]/3) .* x .+ q[2]
-    fit_result = curve_fit(cc_model,chords[fitcuts],ees[fitcuts],[1.0,0.0])
-    c_fit = fit_result.param[1]
-    c_err = length(fitcuts) > 2 ? LsqFit.stderror(fit_result)[1] : NaN
-    println("$(lx)x$(ly) N=$n cylinder ULR=$intstren: c = $c_fit ± $c_err")
+    ly = 6
+    dataloc = get_folder_location("cluster-data/exact-diag/cylinder/flat-ints")
+    lxs = [6,8,10]
+    intstrens = [0.0,50.0]
+    cs = [[] for intstren in intstrens]
+    c_errs = [[] for intstren in intstrens]
+    fig_fits, axs_fits = subplots(length(lxs),length(intstrens),figsize=(10,12))
+    for (i,intstren) in enumerate(intstrens)
+        for (j,lx) in enumerate(lxs)
+            n = Int(lx/2)
+
+            pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren)])
+            all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+            length(all_files) == 0 && continue
+            d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+            psi = d["state"][1]
+
+            lattice_params = get_lattice_params_from_metadata(m)
+
+            # vertical bipartitions A = all sites with x <= l, periodic x so S = (c/3) log((Lx/pi) sin(pi l/Lx)) + const
+            #= only compute l <= Lx/2 (rho_A gets huge for large A), pure state so S(l) = S(Lx - l)
+            cuts = collect(1:lx-1)
+            ees = zeros(Float64,length(cuts))
+            for l in 1:div(lx,2)
+                println("Working on cut l = $l / $lx")
+                subsysA = [linear_index((x,y),lx,ly) for y in 1:ly for x in 1:l]
+                subsysB = find_subsystem_B(subsysA,lx,ly)
+                rho_A, unique_A_configs = compute_reduced_density_matrix(psi, lattice_params["full_basis"], subsysA, subsysB)
+                ees[l] = entanglement_entropy(rho_A)
+            end
+            datadict = Dict([("ee_cuts",ees)])
+            modify_data(datadict,joinpath(dataloc,all_files[1]),"metadata"; output_level=1,file_type="jld2")=#
+            haskey(m,"ee_cuts") || continue
+            ees = m["ee_cuts"]
+            cuts = collect(1:lx-1)
+            for l in div(lx,2)+1:lx-1
+                ees[l] = ees[lx-l]
+            end
+            chords = log.((lx/pi) .* sin.(pi .* cuts ./ lx))
+
+            # S = (c/3) chord + const, fit only the computed cuts l <= Lx/2 (the mirrored ones are copies)
+            start_cut = lx > 6 ? 2 : 1
+            fitcuts = start_cut:div(lx,2)
+            cc_model(x,q) = (q[1]/3) .* x .+ q[2]
+            fit_result = curve_fit(cc_model,chords[fitcuts],ees[fitcuts],[1.0,0.0])
+            c_fit = fit_result.param[1]
+            c_err = length(fitcuts) > 2 ? LsqFit.stderror(fit_result)[1] : NaN
+            #println("$(lx)x$(ly) N=$n cylinder ULR=$intstren: c = $c_fit ± $c_err")
+
+            append!(cs[i], c_fit)
+            append!(c_errs[i], c_err)
+
+            ax = axs_fits[j,i]
+            ax.scatter(chords,ees,c="b")
+            ax.plot(chords,cc_model(chords,fit_result.param),c="r")
+            ax.set_xlabel(L"\log[(L_x/\pi)\sin(\pi \ell/L_x)]")
+            ax.set_ylabel("Entanglement Entropy")
+            ax.set_title("$(lx)x$(ly) N=$n ULR=$intstren, c=$(round(c_fit,digits=3)) ± $(round(c_err,digits=3))")
+        end
+    end
+    fig_fits.tight_layout()
 
     fig = figure()
-    scatter(chords,ees,c="b")
-    plot(chords,cc_model(chords,fit_result.param),c="r")
-    xlabel(L"\log[(L_x/\pi)\sin(\pi \ell/L_x)]")
-    ylabel("Entanglement Entropy")
-    title("$(lx)x$(ly) N=$n cylinder ULR=$intstren, c=$(round(c_fit,digits=3)) ± $(round(c_err,digits=3))")
+    for (i,intstren) in enumerate(intstrens)
+        errorbar(lxs[1:length(cs[i])],cs[i],yerr=c_errs[i],fmt="o-",capsize=3,label="ULR=$(intstren)")
+    end
+    xlabel(L"L_x")
+    ylabel("Fitted Central Charge c")
+    legend()
+
+
+end=#
+
+# GS one-body correlations along x per row on the cylinder: gapless edge -> power law on the edge rows,
+# gapped bulk -> exponential in the middle rows. Plotted against the chord distance (Lx/pi) sin(pi r/Lx)
+if true
+    dataloc = get_folder_location("cluster-data/exact-diag/cylinder/flat-ints")
+    lys = [4,6]
+    lxs = [6,8]
+    intstrens = [0.0,50.0]
+    markers = ["o","s","^"]
+    fig_corr, axs_corr = subplots(length(lys),length(intstrens),figsize=(10,8))
+    for (k,ly) in enumerate(lys)
+        for (i,intstren) in enumerate(intstrens)
+            ax = axs_corr[k,i]
+            for (j,lx) in enumerate(lxs)
+                n = Int(lx/2)
+                pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren)])
+                all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+                length(all_files) == 0 && continue
+                d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
+
+                densmat = m["densmat"] # GS densmat is saved in the metadata, d["densmat"] is empty
+                phys_corrs = physical_correlation(densmat,lx,ly; if_plot=false)
+
+                # r = 1..Lx/2 (periodic x), rows y and Ly+1-y are mirror images so plot y <= Ly/2
+                rs = 1:div(lx,2)
+                chords = (lx/pi) .* sin.(pi .* rs ./ lx)
+                for y in 1:cld(ly,2)
+                    ax.plot(chords,phys_corrs[rs.+1,y],"-"*markers[j],c="C$(y-1)",label="y=$y, Lx=$lx")
+                end
+            end
+            ax.set_xscale("log")
+            ax.set_yscale("log")
+            ax.xaxis.set_minor_formatter(PyPlot.matplotlib.ticker.NullFormatter())
+            ax.set_xlabel(L"(L_x/\pi)\sin(\pi r/L_x)")
+            ax.set_ylabel(L"|\langle b^\dagger_{r,y} b_{0,y}\rangle|")
+            ax.set_title("Ly=$ly ULR=$intstren")
+            ax.legend(fontsize=7)
+        end
+    end
+    fig_corr.tight_layout()
 
 end
 
