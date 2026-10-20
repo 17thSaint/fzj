@@ -136,7 +136,7 @@ function get_params_dict_from_filename(filename_before)
 	end
 	if split(filename,"-")[1] in ["virt","phys","Y","X"]
 		split_filename = split(filename,"-")[4:end]
-	elseif split(filename,"-")[1] in ["mps","ttn","rfa","laugh","basis","ed","wavefuncmps","wavefuncttn","hopping","interaction","periodicpotential","disorder","tevo","wavefunctevo"]
+	elseif split(filename,"-")[1] in ["mps","ttn","rfa","laugh","basis","ed","wavefuncmps","wavefuncttn","fpeps","wavefuncfpeps","hopping","interaction","periodicpotential","disorder","tevo","wavefunctevo"]
 		split_filename = split(filename,"-")[2:end]
 	else
 		split_filename = split(filename,"-")
@@ -301,7 +301,7 @@ end
 function check_plot_label(file_name,version)
 	split_name = split(file_name,"-")
 	potential_type = split_name[1]
-	if potential_type in ["densdens","occs","ttn","Y-dir-GF","X-dir-GF","Y-dir-current","X-dir-current","mps","rfa","laugh","tevo"]
+	if potential_type in ["densdens","occs","ttn","Y-dir-GF","X-dir-GF","Y-dir-current","X-dir-current","mps","rfa","laugh","tevo","fpeps"]
 		if potential_type != version
 			println("Wrong Plot Label: changing $potential_type => $version")
 			file_name = "$version-" * join(split_name[2:end],"-")

@@ -472,17 +472,17 @@ function position_state(allowed_sites::Vector{Tuple{Int64,Int64}}, params_dict::
     return position_state(linear_sites, params_dict; kwargs...)
 end
 
-#= run data collection with for loops
-if false
+# run data collection with for loops
+if true
 
 
     #which_one = args_dict["which_one"]
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
-    lx,ly,n = 6,5,3
-    intstren = 50.0
+    lx,ly,n = 4,4,2
+    intstren = 0.0
     #xi = 1.0
-    dataloc = get_folder_location("cluster-data/exact-diag/obc/dd-ints")
+    #dataloc = get_folder_location("cluster-data/exact-diag/obc/dd-ints")
     #anis = 1e-4
     #intstrens = range(0.0,10.0,length=11)
     #intlens = range(0.0,ly,length=11)
@@ -491,7 +491,7 @@ if false
     #for (idx,xi) in enumerate(intlens)
     #for (idx,anis) in enumerate(anises)
 
-    xis = 10 .^ (range(log10(10.0),log10(100.0),length=21))
+    #xis = 10 .^ (range(log10(10.0),log10(100.0),length=21))
     
     #=BLAS.set_num_threads(5)
     args_dict = make_args_dict(ARGS)
@@ -507,7 +507,7 @@ if false
     #tws2 = range(0.0,1.0,length=3)
     #for (idx,tw1) in enumerate(tws)
     #for (idx2,tw2) in enumerate(tws)
-    for (idx,xi) in enumerate(xis)
+    #for (idx,xi) in enumerate(xis)
     #for tw1 in tws
     #for ii in 1:1
         #if tw1 == 0.0 && tw2 == 0.0
@@ -522,13 +522,15 @@ if false
         #params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_pinning",true),("pinning_strength",1e-2),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",true)])
         #params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_pinning",false),("pinning_strength",1e-2),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",true)])
         #params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("scaling_type","dd"),("magnetic_spacing",xi),("dataloc",dataloc),("lr","all"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
-        params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("scaling_type","powerlaw"),("exponent",1.0),("magnetic_spacing",xi),("dataloc",dataloc),("lr","all"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
+        #params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("scaling_type","powerlaw"),("exponent",1.0),("magnetic_spacing",xi),("dataloc",dataloc),("lr","all"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
+        params_dict = Dict([("output_level",1),("if_check_fluxes",false),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("lr","all"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
 
         #println("Starting from here")
 
         if true
             states,nrgs,rhos,filepath,if_found,lattice_params,hamilt_params = run_normal_ed(params_dict; output_level=1)
         end
+        display(nrgs)
 
         #occs1 = get_occupancy(states[1],lattice_params; if_plot=false)
         #occs2 = get_occupancy(states[2],lattice_params; if_plot=false)
@@ -536,18 +538,18 @@ if false
         #modify_data(datadict,filepath,"metadata"; output_level=1,file_type="jld2")
 
         # column statistics for the CDW order parameters, read back with cdw_order_parameters
-        column_corr1,evencolumn_dist1 = column_cdw_statistics(states[1],lattice_params)
-        column_corr2,evencolumn_dist2 = column_cdw_statistics(states[2],lattice_params)
+        #column_corr1,evencolumn_dist1 = column_cdw_statistics(states[1],lattice_params)
+        #column_corr2,evencolumn_dist2 = column_cdw_statistics(states[2],lattice_params)
         #datadict = Dict([("column_corr1",column_corr1),("column_corr2",column_corr2),("evencolumn_dist1",evencolumn_dist1),("evencolumn_dist2",evencolumn_dist2)])
         #modify_data(datadict,filepath,"metadata"; output_level=1,file_type="jld2")
 
-        sp,_,binder = cdw_order_parameters((column_corr1 .+ column_corr2) ./ 2,(evencolumn_dist1 .+ evencolumn_dist2) ./ 2)
+        #=sp,_,binder = cdw_order_parameters((column_corr1 .+ column_corr2) ./ 2,(evencolumn_dist1 .+ evencolumn_dist2) ./ 2)
         scatter(xi,sp,c="b")
         scatter(xi,binder,c="r")
         xscale("log")
         xlabel("Spacing")
         ylabel("CDW Order Parameter / Binder Cumulant")
-        title("Transition $(lx)x$(ly) N=$n for Power Law with Exponent $(params_dict["exponent"])")
+        title("Transition $(lx)x$(ly) N=$n for Power Law with Exponent $(params_dict["exponent"])")=#
 
         #=fourpt = four_point(states[1],lattice_params; if_plot=false)
         fourpt_2 = four_point(states[2],lattice_params; if_plot=false)
@@ -655,7 +657,7 @@ if false
         #gammas1[idx,idx2] = gamma1
         #gammas2[idx,idx2] = gamma2
 
-    end
+    #end
     #end
 
     #=fig = figure()
@@ -696,7 +698,7 @@ if false
     colorbar()
     title("Gamma2 Magnitude")=#
 
-end=#
+end#
 
 # Γ sweeps on open strips for the power-law synthetic interaction, one usual ed-… file per Γ point
 # Run on the cluster from exact-diag/, either one task of the list below per array job,

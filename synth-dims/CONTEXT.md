@@ -1,6 +1,6 @@
 # Dipolar phase transition — status
 
-Update **Current state**, **Open questions** and **Log** as things change. Last updated: 2026-10-16
+Update **Current state**, **Open questions** and **Log** as things change. Last updated: 2026-10-20
 
 ## Goal
 
@@ -180,9 +180,8 @@ several Ly and a single-sector GS. Dropped: Rényi-2 in ED, Ly = 4 orbital-count
   against ED.
 - fPEPS risks: chiral topological states are hard for finite-D PEPS while the CDW is near
   product, so low D biases Γ_c down, possibly in a Ly/p-dependent way (needs D convergence of
-  Γ_c); the demo uses `siteinds("Boson",…)` with no U(1) or chemical potential, so N isn't fixed
-  unless QuantumNaturalfPEPS conserves it in sampling (not checked), and hardcore needs site dim
-  2; Γ = 0.1–1000 vs t = 1 is stiff. In its favour: diagonal long-range terms are cheap in VMC.
+  Γ_c); Γ = 0.1–1000 vs t = 1 is stiff. (Since addressed in the script: hardcore `"S=1/2"` sites,
+  sampling restricted to the N sector via `max_counts`.) In its favour: diagonal long-range terms are cheap in VMC.
   First step for fPEPS would be an 8x4/8x5 ED benchmark (N, hardcore, D = 2–6, Γ_c).
 
 Smaller options: Γ_c(Lx) figure at Ly = 4 (6x4, 8x4, 10x4); b(p) − b(0) / local-exponent panel
@@ -257,8 +256,10 @@ Notes for any new p:
 - `synth-dims/ed-plus-ttns.jl`: ED+TTN torus analysis; scaling blocks at the end (s_c/l_B plateau,
   Γ with V = 300, 50, boundary-interaction check), all `#= =#`.
 - `synth-dims/dd-paper-plots.jl`: paper figures (so far: shifted Zeeman minima + 1/(s r)³ profile).
-- `fpeps/execute-fpeps.jl`: fPEPS (QuantumNaturalfPEPS) for dd on OBC, 8x4 V=50 s=0.5, bond dim 2;
-  demo only (10 iterations), goal is larger open systems.
+- `fpeps/execute-fpeps.jl`: fPEPS (QuantumNaturalfPEPS + QuantumNaturalGradient, env
+  `--project=fpeps`), Hamiltonian from `fpeps/build-ham.jl` (`long_range_HH_ham`, hardcore bosons
+  on S=1/2, takes ED key names `if_periodic_x/y`). Currently a 4x4 N=2 flat Ui = 50 test, D = 6,
+  20 iterations; goal is larger open systems. Saves like the TTNs (2026-10-20, see Gotchas).
 - `synth-dims/long-range-ttn.jl`: TTN runner. `synth-dims/daily-things.jl`: TTN scratch.
 - Data:
   - ED torus `cluster-data/exact-diag/torus/new-gauge/dd-ints/`: V=300: 6x3 (42), 8x4 (65),
@@ -280,6 +281,7 @@ Notes for any new p:
     file per (size, p), named after the smallest s (flat: V = 0.1), whose metadata holds the sweep:
     `all_gammas`, `all_columncorrs1/2`, `all_evencolumndist1/2`, `all_occs1/2` (25 points; no
     energies). 8×Ly 12–120 MB, 10x4 210 MB. Read the metadata only (`jldopen`, as the 8×Ly block).
+  - fPEPS `cluster-data/synth-dims/fpeps/` (default `dataloc` of `execute-fpeps.jl`): empty so far.
 
 ## Open questions
 
@@ -341,6 +343,13 @@ Notes for any new p:
 - `"powerlaw"` filenames have a different key order than the dd ones (`ed-hopping_anisotropy-…`);
   `find_data_file` matches them fine.
 - Hand-excluded TTN points: 14x7 s = 20.0, 12x6 s = 1.53.
+- fPEPS files are JLD2 (the PEPS has no HDF5 serializer), split like the TTN ones:
+  `wavefuncfpeps-<params>.jld2` holds `peps` (double-layer envs stripped, they're a rebuildable
+  cache), `fpeps-<params>.jld2` holds `history` (DataFrame), `energy`, `rng` + metadata (params,
+  `bond_dim`, `sample_nr`, `maxiter`, `learning_rate`, `niter`). Both are overwritten every
+  iteration by the `evolve` callback; that's what `evolve(...; misc_restart)` needs to resume.
+  Find with `find_data_file(pdict, "fpeps", dataloc; file_type="jld2")` (default is `"h5"`).
+  Learning rate is `learning_rate` in metadata: `"lr"` is the long-range setting.
 - The 8x4 dd sweep sits in the old `magnetic_spacing-0.1` file and its `all_gammas` has 39 points:
   the 25 new ones plus the old coarse 8x4 points (incl. Γ = 10210, 50000, i.e. s = 0.17, 0.1) and
   3 duplicates. Γ_c is unaffected (17.2 vs 17.1 with Γ ≤ 1000).
@@ -381,3 +390,7 @@ Notes for any new p:
 - 2026-10-16 — Current functions fixed (Peierls phase); current blocks cleaned. CDW: one
   whole-width circulation, no edge/bulk counterflow, edge coherence as short as bulk (ξ ≈ 1).
   c_fit = 1 for Laughlin explained (two chiral edges, 1/6 each); single-edge cut test planned.
+- 2026-10-20 — fPEPS saving added (TTN-style wavefunc/metadata split, JLD2, every iteration,
+  `cluster-data/synth-dims/fpeps/`); `fpeps` prefixes in `data-storage-funcs.jl`, JLD2 in the
+  fpeps env. Tested end to end (2 iterations into the scratchpad). fPEPS dicts switched to
+  `if_periodic_x/y` (build-ham ignored `_phys/_synth`, so runs were always open).
