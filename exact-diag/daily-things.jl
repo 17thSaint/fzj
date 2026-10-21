@@ -4786,23 +4786,24 @@ end=#
 if true
     using LsqFit
     lx,ly,n = 10,4,5
-    dataloc = get_folder_location("cluster-data/exact-diag/obc/flat-ints")
-    intstrens = [0.1,46.41589]
+    if_cylinder = true
+    which_dataloc = if_cylinder ? "cylinder" : "obc"
+    dataloc = get_folder_location("cluster-data/exact-diag/$which_dataloc/flat-ints")
+    intstrens = if_cylinder ? [0.0,50.0] : [0.1,46.41589]
     cs = [[] for intstren in intstrens]
     c_errs = [[] for intstren in intstrens]
-    cols = ["b","g"]
+    cols = ["b","r"]
     fig_fits = figure()
     for (i,intstren) in enumerate(intstrens)
 
         pdict = Dict([("Lx",lx),("Ly",ly),("N",n),("interaction_strength",intstren)])
         all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
-        display(all_files)
         length(all_files) == 0 && continue
         d,m = read_data(joinpath(dataloc,all_files[1]); output_level=0)
         psi = d["state"][1]
 
-        # vertical bipartitions A = all sites with x <= l, periodic x so S = (c/3) log((Lx/pi) sin(pi l/Lx)) + const
-        #= only compute l <= Lx/2 (rho_A gets huge for large A), pure state so S(l) = S(Lx - l)
+        # vertical bipartitions A = all sites with x <= l, open x so one entangling point per edge: S = (c/6) log((2Lx/pi) sin(pi l/Lx)) + const
+        #= only compute l <= Lx/2 (rho_A gets huge for large A)
         lattice_params = get_lattice_params_from_metadata(m)
         cuts = collect(1:lx-1)
         ees = zeros(Float64,length(cuts))
@@ -4817,34 +4818,34 @@ if true
         modify_data(datadict,joinpath(dataloc,all_files[1]),"metadata"; output_level=1,file_type="jld2")=#
         
         haskey(m,"ee_cuts") || continue
-        ees = m["ee_cuts"]
-        cuts = collect(1:lx-1)
-        for l in div(lx,2)+1:lx-1
-            ees[l] = ees[lx-l]
-        end
+        cuts = collect(1:div(lx,2))
+        ees = m["ee_cuts"][cuts]
         chords = log.((lx/pi) .* sin.(pi .* cuts ./ lx))
 
-        cc_model(x,q) = (q[1]/6) .* x .+ q[2]
-        #= S = (c/3) chord + const, fit only the computed cuts l <= Lx/2 (the mirrored ones are copies)
+        c_coeff = if_cylinder ? 1/3 : 1/6
+
+        cc_model(x,q) = (q[1] * c_coeff) .* x .+ q[2]
+        # S = (c/6) chord + const (OBC; the 2 in the chord only shifts the const), fit the computed cuts l <= Lx/2
         start_cut = 2
         fitcuts = start_cut:div(lx,2)
         fit_result = curve_fit(cc_model,chords[fitcuts],ees[fitcuts],[1.0,0.0])
         c_fit = fit_result.param[1]
         c_err = length(fitcuts) > 2 ? LsqFit.stderror(fit_result)[1] : NaN
-        #println("$(lx)x$(ly) N=$n cylinder ULR=$intstren: c = $c_fit ± $c_err")
+        #println("$(lx)x$(ly) N=$n OBC ULR=$intstren: c = $c_fit ± $c_err")
 
         append!(cs[i], c_fit)
-        append!(c_errs[i], c_err)=#
+        append!(c_errs[i], c_err)#
 
-        which_intstren = intstren == 0.1 ? "Laughlin" : "CDW"
+        which_intstren = i == 1 ? "Laughlin" : "CDW"
 
-        scatter(chords,ees,c=cols[i],label="$(which_intstren)")
-        i == 1 && (plot(chords,cc_model(chords,[1.0,minimum(ees)]),c="r"))
+        plot(chords,ees,c=cols[i],"-p",label="$(which_intstren) c=$(round(c_fit,digits=3))")
+        #i == 1 && (plot(chords,cc_model(chords,[1.0,minimum(ees)]),c="r"))
         xlabel(L"\log[(L_x/\pi)\sin(\pi \ell/L_x)]")
         ylabel("Entanglement Entropy")
-        title("$(lx)x$(ly) N=$n OBC")
+        title("$(lx)x$(ly) N=$n $which_dataloc")
     end
     fig_fits.tight_layout()
+    legend()
 
     #=fig = figure()
     for (i,intstren) in enumerate(intstrens)
