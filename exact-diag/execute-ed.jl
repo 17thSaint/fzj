@@ -479,10 +479,10 @@ if false
     #which_one = args_dict["which_one"]
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
-    lx,ly,n = 4,4,2
-    intstren = 50.0
+    lx,ly,n = 8,4,4
+    intstren = 0.0
     #xi = 1.0
-    #dataloc = get_folder_location("cluster-data/exact-diag/obc/dd-ints")
+    dataloc = get_folder_location("cluster-data/exact-diag/obc/flat-ints")
     #anis = 1e-4
     #intstrens = range(0.0,10.0,length=11)
     #intlens = range(0.0,ly,length=11)
@@ -523,7 +523,7 @@ if false
         #params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_pinning",false),("pinning_strength",1e-2),("lr","all"),("if_periodic_x",true),("if_periodic_y",true),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",true)])
         #params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("scaling_type","dd"),("magnetic_spacing",xi),("dataloc",dataloc),("lr","all"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
         #params_dict = Dict([("output_level",1),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("scaling_type","powerlaw"),("exponent",1.0),("magnetic_spacing",xi),("dataloc",dataloc),("lr","all"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",20),("if_find_data",false),("if_save_data",false)])
-        params_dict = Dict([("output_level",1),("if_check_fluxes",false),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("lr","all"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",false)])
+        params_dict = Dict([("output_level",1),("if_check_fluxes",true),("dataloc",dataloc),("Lx",lx),("Ly",ly),("N",n),("if_reading",false),("lr","all"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("interaction_strength",intstren),("filling",0.5),("nev",10),("if_find_data",false),("if_save_data",true)])
 
         #println("Starting from here")
 
