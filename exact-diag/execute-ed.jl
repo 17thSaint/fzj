@@ -472,15 +472,15 @@ function position_state(allowed_sites::Vector{Tuple{Int64,Int64}}, params_dict::
     return position_state(linear_sites, params_dict; kwargs...)
 end
 
-# run data collection with for loops
-if true
+#= run data collection with for loops
+if false
 
 
     #which_one = args_dict["which_one"]
     #starting_val = (which_one-1)*10 + 1
     #ending_val = which_one*10
     lx,ly,n = 4,4,2
-    intstren = 0.0
+    intstren = 50.0
     #xi = 1.0
     #dataloc = get_folder_location("cluster-data/exact-diag/obc/dd-ints")
     #anis = 1e-4
@@ -698,7 +698,7 @@ if true
     colorbar()
     title("Gamma2 Magnitude")=#
 
-end#
+end=#
 
 # Γ sweeps on open strips for the power-law synthetic interaction, one usual ed-… file per Γ point
 # Run on the cluster from exact-diag/, either one task of the list below per array job,
@@ -826,6 +826,151 @@ if false
             println("p = $p, Γ = $(round(gamma,sigdigits=4)): $idx/$(length(gammas)) in $(round(time()-start_time,digits=1)) s",if_found ? " (read back)" : "")
             flush(stdout)
         end
+    end
+end=#
+
+# Γ sweeps on 8×Ly N=4 open strips for p = 4, 5, 6, to add to the Lx sweep plotted in daily-things.jl
+# ("cdw transition for 8xi N=4 scaling with power law exponent p"). One task per (size, p), its Γ points
+# spread over the task's threads. On the cluster, from exact-diag/:
+#     #SBATCH --array=0-11
+#     #SBATCH --cpus-per-task=14      (28 Γ points, so 2 rounds)
+#     julia --threads=$SLURM_CPUS_PER_TASK execute-ed.jl "which_one" $SLURM_ARRAY_TASK_ID
+# (tasks 0-2 are 8x4 for p = 4, 5, 6, then 8x5, 8x6, 8x7), or by hand,
+#     julia --threads=8 execute-ed.jl "Lx" 8 "Ly" 4 "particles" 4 ["exponent" 4]   (all three without "exponent")
+# Output as the returned Lx sweep: one file per (size, p) in obc/powerlaw-{4p0,5p0,6p0} (the folders must
+# exist), the usual ed-… file of the largest Γ (smallest s; states and energies, H and basis left out),
+# whose metadata also holds the sweep: all_gammas, all_columncorrs1/2, all_evencolumndist1/2, all_occs1/2,
+# all_nrgs (20 energies per point) and all_converged (converged eigenpairs per point). It is written once at
+# the end, so a killed task reruns from scratch, and a task whose file is already there is skipped.
+# Threads: reading and dressing H (getHamiltonian, which also fills the global dressed-hopping cache) is
+# locked, the eigsolves and observables run in parallel, BLAS is single-threaded. Memory is one H plus 60
+# Lanczos vectors per thread (~0.5-1 GB at 8x7). The undressed matrices are built under a lock file as in the block above.
+#= Runs only when execute-ed.jl is the script, not when it is included.
+if abspath(PROGRAM_FILE) == @__FILE__
+    using LinearAlgebra
+    BLAS.set_num_threads(1)
+    args_dict = make_args_dict(ARGS)
+    nev = 20
+    sweep_sizes = [(8,4,4),(8,5,4),(8,6,4),(8,7,4)]
+    all_exponents = [4.0,5.0,6.0]
+    sweep_tasks = [(lx,ly,n,p) for (lx,ly,n) in sweep_sizes for p in all_exponents]
+    if haskey(args_dict,"which_one")
+        lx,ly,n,p = sweep_tasks[args_dict["which_one"]+1]
+        exponents = [p]
+    else
+        lx,ly,n = args_dict["Lx"],args_dict["Ly"],args_dict["particles"]
+        exponents = haskey(args_dict,"exponent") ? [Float64(args_dict["exponent"])] : all_exponents
+    end
+    power_folder(p) = "powerlaw-" * replace(string(p),"." => "p")
+    println("Γ sweep for $(lx)x$(ly) N=$n, exponents $exponents on $(Threads.nthreads()) threads")
+
+    # V = 50, Γ = V / s^p; nothing is saved per point
+    function sweep_params(p,gamma)
+        pdict = Dict{String,Any}([("output_level",0),("interaction_strength",50.0),("Lx",lx),("Ly",ly),("N",n),("if_reading",true),("lr","all"),("if_periodic_x",false),("if_periodic_y",false),("hopping_anisotropy",1.0),("filling",0.5),("nev",nev),("if_find_data",false),("if_save_data",false),("if_densmat",false)])
+        pdict["dataloc"] = get_folder_location("cluster-data/exact-diag/obc/$(power_folder(p))")
+        pdict["scaling_type"] = "powerlaw"
+        pdict["exponent"] = p
+        pdict["magnetic_spacing"] = (pdict["interaction_strength"]/gamma)^(1/p)
+        return pdict
+    end
+
+    # undressed matrices (names as in saveHopping / saveInteraction): built once per size under a lock
+    undressed_loc = get_folder_location("cluster-data/exact-diag")
+    undressed_ready() = isfile(joinpath(undressed_loc,"hopping-N-$(n)-Lx-$(lx)-Ly-$(ly)-if_periodic_x-false-if_periodic_y-false.jld2")) &&
+                        isfile(joinpath(undressed_loc,"interaction-N-$(n)-Lx-$(lx)-Ly-$(ly).jld2"))
+    if !undressed_ready()
+        # exclusive create: exactly one job gets the lock file, the others find it already there
+        lockfile = joinpath(undressed_loc,"building-undressed-N-$(n)-Lx-$(lx)-Ly-$(ly)-obc.lock")
+        got_lock = try
+            close(Base.Filesystem.open(lockfile,Base.Filesystem.JL_O_WRONLY | Base.Filesystem.JL_O_CREAT | Base.Filesystem.JL_O_EXCL,0o644))
+            true
+        catch
+            false
+        end
+        if got_lock
+            println("Building the undressed matrices for $(lx)x$(ly) N=$n")
+            try
+                run_normal_ed(sweep_params(exponents[1],1.0); output_level=0)
+            finally
+                rm(lockfile)
+            end
+        else
+            println("Waiting for another job to build the undressed matrices ($lockfile)")
+            while isfile(lockfile)
+                sleep(60)
+            end
+        end
+        undressed_ready() || error("Undressed matrices for $(lx)x$(ly) N=$n still missing after the build")
+    end
+
+    # the basis is shared read-only by all threads
+    full_basis = n_particle_basis(n,lx,ly; output_level=0,dataloc=get_normal_model_params_ed(sweep_params(exponents[1],1.0))[3].basis_dataloc)
+
+    # one Γ point as run_normal_ed / find_eigenstates with if_reading, minus the saving; the states are kept only if asked.
+    # Larger Lanczos than find_eigenstates' default (krylovdim 30, maxiter 100): at large Γ the default leaves the upper
+    # levels unconverged (6x4 N=3 p=4 Γ=1e4 vs dense: E1-3 exact, E8+ off by 0.03-27), krylovdim 60 converges all 20
+    read_lock = ReentrantLock()
+    function sweep_point(p,gamma; if_keep_states=false)
+        lattice_params,hamilt_params,running_args = get_normal_model_params_ed(sweep_params(p,gamma))
+        lattice_params["full_basis"] = full_basis
+        H = lock(() -> getHamiltonian(lattice_params,hamilt_params; output_level=0),read_lock)
+        start_time = time()
+        rez = eigsolve(H,rand(Float64,size(full_basis,2)),nev,:SR,Lanczos(krylovdim=60,maxiter=1000))
+        runtime = time() - start_time
+        converged = rez[3].converged
+        converged < nev && println("p = $p, Γ = $(round(gamma,sigdigits=4)): only $converged of $nev eigenpairs converged")
+        sorted_indices = sortperm(real.(rez[1]))
+        states = rez[2][sorted_indices][1:nev]
+        nrgs = real.(rez[1][sorted_indices][1:nev])
+
+        column_corr1,evencolumn_dist1 = column_cdw_statistics(states[1],lattice_params)
+        column_corr2,evencolumn_dist2 = column_cdw_statistics(states[2],lattice_params)
+        occs1 = get_occupancy(states[1],lattice_params; if_plot=false)
+        occs2 = get_occupancy(states[2],lattice_params; if_plot=false)
+        metadata = merge(lattice_params,hamilt_params,named_tuple_to_dict(running_args),Dict{String,Any}([("runtime",runtime),("H",nothing),("full_basis",nothing)]))
+        return (states=if_keep_states ? states : nothing,nrgs=nrgs,metadata=metadata,runtime=runtime,converged=converged,
+                column_corr1=column_corr1,column_corr2=column_corr2,evencolumn_dist1=evencolumn_dist1,evencolumn_dist2=evencolumn_dist2,occs1=occs1,occs2=occs2)
+    end
+
+    # ground-state Γ_c (Hill fit of S(π)) of a no-save 6×Ly N=3 coarse scan (31 points over Γ = 0.1–1e5), used only
+    # to centre the fine window. The same scan at p = 3 gives 19.0, 29.6, 208, 392 against the fine-grid 18.9, 29.7,
+    # 56.3, 103, so Ly = 6, 7 are rough (small GS signal), hence the wide window and coarse points up to 1e4
+    gamma_guess = Dict(4.0=>[40.3,73.1,152.0,1400.0], 5.0=>[85.6,131.0,421.0,2020.0], 6.0=>[182.0,275.0,1440.0,7730.0])
+
+    for p in exponents
+        # 16 coarse points over Γ = 0.1–1e4 plus 12 in [Γ_guess/10, 10 Γ_guess], largest first
+        gc = gamma_guess[p][clamp(ly-3,1,4)]
+        gammas = sort(unique(vcat(10 .^ range(-1,4,length=16), 10 .^ range(log10(gc/10),log10(10*gc),length=12))); rev=true)
+
+        # write_data_jld2 writes into pwd() when the folder is missing, so fail instead of creating one
+        dataloc = get_folder_location("cluster-data/exact-diag/obc/$(power_folder(p))")
+        isdir(dataloc) || error("Missing data folder $dataloc for p = $p")
+        # the file is named after the largest Γ, as in the Lx sweep
+        filename = get_normal_model_params_ed(sweep_params(p,gammas[1]))[3].filename
+        if isfile(make_sure_file_type(joinpath(dataloc,filename),"jld2"))
+            println("p = $p: $filename already there, skipped")
+            continue
+        end
+
+        sweep_start = time()
+        results = Vector{Any}(undef,length(gammas))
+        Threads.@threads :dynamic for i in eachindex(gammas)
+            results[i] = sweep_point(p,gammas[i]; if_keep_states=(i == 1))
+            println("p = $p, Γ = $(round(gammas[i],sigdigits=4)) on thread $(Threads.threadid()): eigsolve $(round(results[i].runtime,digits=1)) s")
+            flush(stdout)
+        end
+
+        metadata = merge(results[1].metadata,Dict{String,Any}([("gamma",gammas[1]),
+            ("column_corr1",results[1].column_corr1),("column_corr2",results[1].column_corr2),
+            ("evencolumn_dist1",results[1].evencolumn_dist1),("evencolumn_dist2",results[1].evencolumn_dist2),
+            ("occs1",results[1].occs1),("occs2",results[1].occs2),
+            ("all_gammas",collect(gammas)),("all_nrgs",[r.nrgs for r in results]),("all_converged",[r.converged for r in results]),
+            ("all_columncorrs1",[r.column_corr1 for r in results]),("all_columncorrs2",[r.column_corr2 for r in results]),
+            ("all_evencolumndist1",[r.evencolumn_dist1 for r in results]),("all_evencolumndist2",[r.evencolumn_dist2 for r in results]),
+            ("all_occs1",[r.occs1 for r in results]),("all_occs2",[r.occs2 for r in results])]))
+        write_data_jld2(joinpath(dataloc,filename),Dict([("state",results[1].states),("nrg",results[1].nrgs),("densmat",[])]),metadata)
+        println("p = $p: $(length(gammas)) points in $(round((time()-sweep_start)/60,digits=1)) min, saved $filename")
+        flush(stdout)
     end
 end=#
 

@@ -1234,8 +1234,6 @@ if false
 
 end=#
 
-
-
 #= look at correlations, mostly see same as Felix
 if false
     lx,ly,n = 16,8,8
@@ -1283,6 +1281,10 @@ if false
 
 
 end=#
+
+
+
+
 
 
 "fin"

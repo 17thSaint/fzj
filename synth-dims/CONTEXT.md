@@ -15,7 +15,7 @@ Torus: ρ1D = 1/2, Lx × Lx/2, α = 1/Ly; sizes 6x3, 8x4, 10x5 (ED); 12x6, 14x7,
 Open y (OBC / cylinder, ED), V = 50: 6×Ly N=3 and 8×Ly N=4 with Ly = 4–7, 10x4 N=5.
 Other exponents: scaling `"powerlaw"` with key `"exponent"` = p (p = 3 equals `"dd"`).
 
-## Current state (2026-10-14)
+## Current state (2026-10-20)
 
 **Edge / central-charge side thread (2026-10-15/16, ED, flat Ui = 0 vs 50, cylinder x periodic,
 y open; blocks "try Calabrese-Cardy scaling cut size…" and "GS one-body correlations along x per
@@ -69,30 +69,52 @@ CDW = gapped everywhere (c → 0). Established: the CDW edge is gapped under str
   Lx (α = 1/(Ly−1), phase on x bonds depends on y only, N_φ = 2N; bosons, no N-parity effect).
 
 **Bottom line:** OBC ground-state data for p = 0 (flat), 0.5, …, 3 at 6×Ly N=3 and 8×Ly N=4
-(Ly = 4–7), plus 10x4 N=5. All p go from the same Laughlin state to the same large-Γ state;
-below Γ_c, p ≳ 1.5 takes a detour (precursor), no new phase seen. Γ_c grows with Ly for every p
-(including p = 0, i.e. partly geometry) at both Lx, and faster for larger p. At Ly = 4, Γ_c does
-not grow with Lx (6, 8, 10). Hints that the exponent changes the physics: small p is far from a
-single power law in Ly (curving down), p ≥ 2 is close to a clean power law, and b(p) − b(0) keeps
-growing past p = 1 with no saturation. But only 4 Ly, the GS CDW signal collapses with Ly at fixed
-N (S(π)/N rise ≈ 0.4, 0.15, 0.06, 0.035 for Ly = 4–7, at both Lx), and Hill vs midpoint Γ_c
-disagree at Ly ≥ 6. User (2026-10-14): these are good limited-size studies, larger sizes are
-needed to resolve the p dependence (see Next).
+(Ly = 4–7), plus 10x4 N=5; p = 4, 5, 6 at 8×Ly only. All p go from the same Laughlin state to the
+same large-Γ state; below Γ_c, p ≳ 1.5 takes a detour (precursor), no new phase seen.
+
+**Key result (2026-10-20, user: "this is big"): the larger the exponent, the stronger Γ_c diverges
+with system size.** At 8×Ly, Γ_c ∝ Ly^b over Ly = 5–7 with b = 0.84, 1.49, 2.47, 3.66, 5.07, 6.96,
+8.72 for p = 0, 1, 2, 3, 4, 5, 6 (S(π); Binder +0.2). Γ_c grows with Ly for every p, including
+p = 0 (partly geometry). What's new is that b(p) gets steeper with p instead of saturating:
+- b − p ≈ 0.4–0.8 for p ≤ 3. A plausible reading (unchecked): the coupling at range ~Ly,
+  Γ_c Ly^−p, grows only slowly.
+- b − p jumps to 1.1, 2.0, 2.7 for p = 4, 5, 6.
+- For p ≥ 4, Γ_c(Ly) bends **up** (local slope rises with Ly), so the divergence may be faster than
+  a power law (3 points can't tell a power law from an exponential).
+
+So for short-range interactions the CDW gets ever harder to reach as the system grows. Caveats:
+- Only Ly = 5–7, and Lx = 8 only for p ≥ 4.
+- Fixed N: the GS CDW signal collapses with Ly (S(π)/N rise ≈ 0.4, 0.15, 0.06, 0.035 for
+  Ly = 4–7, at both Lx).
+- Hill vs midpoint Γ_c disagree at Ly ≥ 6.
+- Ly = 4 is off the trend and is left out of b.
+
+At Ly = 4, Γ_c does not grow with Lx (6, 8, 10). User (2026-10-14): these are good limited-size
+studies, and larger sizes are needed to settle the p dependence (see Next).
 
 - **8×Ly N=4 (cluster sweep, 2026-10-14):** block "cdw transition for 8xi N=4 scaling…" in
   `exact-diag/daily-things.jl` (copy of the 6×Ly block, reads the `all_*` metadata, GS only).
-  GS Hill Γ_c from S(π), 6×Ly in brackets; b ± its standard error from the residuals of the
-  log-log line (Ly = 4–7):
+  GS Hill Γ_c from S(π), 6×Ly in brackets. b ± its standard error from the residuals of the
+  log-log line, over Ly = 4–7 (S(π), 6×Ly in brackets) and Ly = 5–7 (S(π) / Binder; the
+  block's current fit, `fit_ly_min = 5`, Ly = 4 still plotted):
 
-    | Γ_c GS, Hill | 8x4 | 8x5 | 8x6 | 8x7 | b |
-    |---|---|---|---|---|---|
-    | p = 0 | 1.95 (1.94) | 3.33 (2.78) | 3.83 (3.41) | 4.42 (3.98) | 1.43 ± 0.30 (1.28) |
-    | p = 0.5 | 2.63 (2.75) | 5.04 (4.23) | 6.13 (5.35) | 7.36 (6.43) | 1.80 ± 0.33 (1.51) |
-    | p = 1 | 3.62 (4.0) | 7.63 (6.31) | 9.91 (8.4) | 12.6 (10.7) | 2.19 ± 0.34 (1.74) |
-    | p = 1.5 | 5.37 (5.86) | 11.5 (9.29) | 16.0 (13.4) | 22.1 (19.0) | 2.48 ± 0.27 (2.09) |
-    | p = 2 | 8.01 (8.6) | 16.9 (13.8) | 26.0 (22.0) | 39.0 (32.6) | 2.80 ± 0.16 (2.39) |
-    | p = 2.5 | 12.0 (12.8) | 25.1 (20.4) | 42.7 (35.2) | 70.2 (56.9) | 3.14 ± 0.06 (2.68) |
-    | p = 3 | 17.2 (18.9) | 37.0 (29.7) | 70.5 (56.3) | 127 (103) | 3.57 ± 0.06 (3.05) |
+    | Γ_c GS, Hill | 8x4 | 8x5 | 8x6 | 8x7 | b, Ly 4–7 | b, Ly 5–7 |
+    |---|---|---|---|---|---|---|
+    | p = 0 | 1.95 (1.94) | 3.33 (2.78) | 3.83 (3.41) | 4.42 (3.98) | 1.43 ± 0.30 (1.28) | 0.84 ± 0.05 / 1.08 |
+    | p = 0.5 | 2.63 (2.75) | 5.04 (4.23) | 6.13 (5.35) | 7.36 (6.43) | 1.80 ± 0.33 (1.51) | 1.12 ± 0.03 / 1.36 |
+    | p = 1 | 3.62 (4.0) | 7.63 (6.31) | 9.91 (8.4) | 12.6 (10.7) | 2.19 ± 0.34 (1.74) | 1.49 ± 0.04 / 1.73 |
+    | p = 1.5 | 5.37 (5.86) | 11.5 (9.29) | 16.0 (13.4) | 22.1 (19.0) | 2.48 ± 0.27 (2.09) | 1.94 ± 0.07 / 2.17 |
+    | p = 2 | 8.01 (8.6) | 16.9 (13.8) | 26.0 (22.0) | 39.0 (32.6) | 2.80 ± 0.16 (2.39) | 2.47 ± 0.08 / 2.70 |
+    | p = 2.5 | 12.0 (12.8) | 25.1 (20.4) | 42.7 (35.2) | 70.2 (56.9) | 3.14 ± 0.06 (2.68) | 3.05 ± 0.09 / 3.27 |
+    | p = 3 | 17.2 (18.9) | 37.0 (29.7) | 70.5 (56.3) | 127 (103) | 3.57 ± 0.06 (3.05) | 3.66 ± 0.08 / 3.88 |
+    | p = 4 | 40.1 | 82.1 | 203 | 453 | 4.35 ± 0.35 | 5.07 ± 0.07 / 5.26 |
+    | p = 5 | 86.7 | 179 | 596 | 1860 | 5.51 ± 0.72 | 6.96 ± 0.22 / 7.13 |
+    | p = 6 | 186 | 385 | 1790 | 7270 | 6.61 ± 1.04 | 8.72 ± 0.19 / 8.89 |
+
+  - p = 4, 5, 6 (2026-10-20): 8×Ly only, folders `powerlaw-{4,5,6}p0`. The Γ sweep reaches
+    8–11 Γ_c at Ly = 6, 7. The Hill fit has `lower=[1e-3,0.1]` (p = 6, Ly = 4 otherwise walks x50
+    negative; no change for p ≤ 3).
+  - The Ly = 5–7 errors have 1 dof. They match the ≈ 0.1 that the Hill Γ_c errors alone give.
 
   - Ly ≥ 5: 8×Ly Γ_c is 10–25% above 6×Ly; still grows with Ly for every p, so not an N = 3
     artifact (Lx = 8 also changes α and Nφ).
@@ -100,15 +122,38 @@ needed to resolve the p dependence (see Next).
     p = 1: 4.0, 3.62, 3.34; p = 2: 8.6, 8.01, 8.14; p = 3: 18.9, 17.2, 17.7 (17.4, 16.6, 16.3).
     Flat or slightly falling with Lx.
   - Ly = 4 transitions are steeper than the Hill shape (the fit misses the upper tail), as at 6x4.
-- **Single power law Γ_c ∝ Ly^b is a poor fit (local exponents, 2026-10-14):** at 8×Ly the 4→5
-  step has slope 2.4–3.4 for every p, then the slope drops, so Ly = 4 dominates b. The b error
-  bars show it: ±0.3 for p ≤ 1.5, ±0.06 for p ≥ 2.5. b over Ly = 5–7 only (S(π)): Hill 0.84,
-  1.12, 1.49, 1.94, 2.47, 3.05 for p = 0–2.5 (b < 1 for small p); midpoint 1.26, 1.69, 2.09, 2.52,
-  3.00, 3.55 (never < 1). A local slope carries ±0.2–0.3, so "b crosses 1" isn't resolved. Both
+- **Neighbour-difference order parameter (2026-10-20):** O = Σ_{x,y} |⟨n_{x,y}⟩ − ⟨n_{x+1,y}⟩| /
+  ((Lx−1) Ly) from the GS occupancies `all_occs1`, block "cdw transition for 8xi N=4 scaling with
+  the neighbour-difference order parameter…". The GS ⟨n⟩ is x-reflection symmetric (Lx even maps
+  even ↔ odd columns), so the global staggered sum Σ_x (−1)^x ⟨N_x⟩ is exactly 0, but local
+  alternation pinned at each open edge is not. O is that one-point, edge-pinned part; S(π) is the
+  global staggered correlation (two-point, ⟨N⟩ part 0). Σ_x ⟨(N_x − N_{x+1})²⟩ stays ≈ 6–7 through
+  the transition; its disconnected part Σ (⟨N_x⟩ − ⟨N_{x+1}⟩)² follows O. Column profiles ⟨N_x⟩,
+  8x4: Laughlin 0.15 0.74 0.52 0.59 | sym. (edge depletion, overshoot, Friedel-like alternation
+  from both edges, 50–75% of O on the two edge bonds); CDW 0.50 flat (Ly = 4: symmetric cat of
+  the two TT patterns; Ly = 6: residual 0.48 0.52 0.49 0.51). **Precursor (p = 3, Ly = 4, Γ = 3–10):**
+  0.14 0.82 0.35 0.70 | sym., i.e. each edge pins an opposite TT pattern (even Lx) with a domain
+  wall at the centre: O peaks and S(π) dips because the wall cuts the staggered correlation. At
+  Γ_c the GS switches to the flat cat: O drops, S(π) jumps. Edge-dominated, so O ~ 1/(Lx−1) at
+  large Lx (boundary observable, unchecked). It still tracks the transition: O falls where S(π)
+  rises and 1 − O (normalized) nearly collapses onto S(π) for Ly ≥ 5; at Ly = 4 O is a sharp
+  step (GS level crossing) while S(π) keeps growing up to Γ ~ 10³. Falling Hill Γ_c(O) vs Γ_c(S(π)): same within 2–7% at Ly = 4 (all p), 5–20% high at
+  Ly = 5, 6, matches again at Ly = 7 for p ≥ 1.5, but for p ≤ 1 at Ly = 7 it is non-monotonic in Ly
+  (p = 0: 1.51, 4.04, 4.91, 3.49; no O peak, slow fall from Γ → 0). Ly = 4 large Γ (≳ 10³):
+  O jumps back up (near-degenerate TT doublet mixed arbitrarily, breaks reflection), fit stops at
+  O's minimum. O ≡ 0 on the cylinder (⟨n⟩ uniform in x).
+- **Single power law Γ_c ∝ Ly^b over Ly = 4–7 is a poor fit (local exponents, 2026-10-14/20):**
+  at 8×Ly the 4→5 step has slope 2.4–3.4 for every p (≈ 3.2 for p = 4–6), so Ly = 4 is off the
+  trend for both small and large p. After that step the slope drops for p ≤ 2, stays flat for
+  p = 2.5–3, and rises for p ≥ 4 (5→6: 5.0, 6.6, 8.4; 6→7: 5.2, 7.4, 9.1 for p = 4, 5, 6). The
+  Ly = 4–7 b error bars show it: ±0.3 for p ≤ 1.5, ±0.06 for p = 2.5–3, ±0.35–1.0 for p ≥ 4.
+  Hence b over Ly = 5–7 (table; b < 1 for small p). Midpoint Γ_c instead of Hill gives b(5–7) =
+  1.26, 1.69, 2.09, 2.52, 3.00, 3.55 for p = 0–2.5 (never < 1). A local slope carries ±0.2–0.3, so "b crosses 1" isn't resolved. Both
   give b(p) − b(0) still growing past p = 1 (midpoint ≈ 0.85 p): no saturation or kink at p = 1,
   where Σ r^−p starts converging in 1D. The naive picture (pair spread over Ly feels
   Γ Ly^−min(p,1)) predicts saturation; the data don't show it, which fits the pairs separating in
   y (precursor). Hill vs midpoint differ mainly in the baseline (dip minimum vs Γ → 0 value).
+  With p = 4–6 (2026-10-20), b(5–7) steepens from ≈ 0.6 to ≈ 1.8 per unit p (see Bottom line).
 - **6×Ly N=3 GS (2026-10-09):** Hill Γ_c from S(π) (Binder in brackets):
 
     | Γ_c GS, Hill | 6x4 | 6x5 | 6x6 | 6x7 | b |
@@ -184,8 +229,8 @@ several Ly and a single-sector GS. Dropped: Rényi-2 in ED, Ly = 4 orbital-count
   sampling restricted to the N sector via `max_counts`.) In its favour: diagonal long-range terms are cheap in VMC.
   First step for fPEPS would be an 8x4/8x5 ED benchmark (N, hardcore, D = 2–6, Γ_c).
 
-Smaller options: Γ_c(Lx) figure at Ly = 4 (6x4, 8x4, 10x4); b(p) − b(0) / local-exponent panel
-without Ly = 4; save energies (`all_nrgs`) in future sweeps to check E2 − E1 at Lx = 8.
+Smaller options: Γ_c(Lx) figure at Ly = 4 (6x4, 8x4, 10x4); p = 4–6 at 6×Ly N=3 (cheap; second
+Lx for the large-p divergence); Ly = 8 at 8×Ly N=4 for p ≥ 3 (power law vs exponential); save energies (`all_nrgs`) in future sweeps to check E2 − E1 at Lx = 8.
 
 **Lx sweep (done, 2026-10-14), for reuse:** runner `#= … if false` block "Γ sweeps on open
 strips…" in `exact-diag/execute-ed.jl`, `julia execute-ed.jl "which_one" $SLURM_ARRAY_TASK_ID`,
@@ -201,6 +246,20 @@ strips…" in `exact-diag/execute-ed.jl`, `julia execute-ed.jl "which_one" $SLUR
   (matrices read): 10x4 ~5 min, 8x7 ~3–4 min, 8x6 ~1.5 min; memory a few GB.
 - Reading path (`getHamiltonian`) equals `buildHam` exactly (max |ΔH| = 0) at 8x4–8x6 for flat,
   p = 1, 3 and dd; interaction files have no BC in the name (torus ones are reused).
+
+**p = 4, 5, 6 at 8×Ly N=4 (runner ready, not run, 2026-10-20):** active block "Γ sweeps on 8×Ly N=4
+open strips for p = 4, 5, 6" in `exact-diag/execute-ed.jl`, guarded by `abspath(PROGRAM_FILE) == @__FILE__`
+(runs only as the script, not when included). `--array=0-11` (sizes outer, 0–2 = 8x4), `julia
+--threads=$SLURM_CPUS_PER_TASK execute-ed.jl "which_one" $SLURM_ARRAY_TASK_ID`, 14 cpus for 28 Γ points.
+Γ points are threaded: getHamiltonian locked (JLD2 reads + the global `dressed_hopping_cache` aren't
+thread-safe), eigsolves parallel, BLAS 1 thread. Writes the returned-sweep format (one file per (size, p),
+named after the largest Γ, H/basis `nothing`) once at the end into `obc/powerlaw-{4p0,5p0,6p0}`
+(must exist on the cluster), plus `all_nrgs`, `all_converged`. Grid: 16 coarse over 0.1–1e4 + 12 in
+[Γ_g/10, 10 Γ_g]; Γ_g from a no-save 6×Ly N=3 31-point scan: p = 4: 40, 73, 152, 1400; p = 5: 86, 131,
+421, 2020; p = 6: 182, 275, 1440, 7730 (Ly = 4–7; the scan's p = 3 gives 19, 30, 208, 392 vs fine-grid
+18.9, 29.7, 56, 103, so Ly ≥ 6 is rough). Tested on 6x4 N=3 into the scratchpad (buildHam in place of
+the reads): file read by the 8×Ly block, GS S(π) matches run_normal_ed to 1e-13. Add 4.0, 5.0, 6.0 to `ps`
+when back.
 
 Notes for any new p:
 - **Code (done):** `"powerlaw"` in `long_range_scaling` (`other-funcs/basic-2d-stuff.jl`,
@@ -259,7 +318,10 @@ Notes for any new p:
 - `fpeps/execute-fpeps.jl`: fPEPS (QuantumNaturalfPEPS + QuantumNaturalGradient, env
   `--project=fpeps`), Hamiltonian from `fpeps/build-ham.jl` (`long_range_HH_ham`, hardcore bosons
   on S=1/2, takes ED key names `if_periodic_x/y`). Currently a 4x4 N=2 flat Ui = 50 test, D = 6,
-  20 iterations; goal is larger open systems. Saves like the TTNs (2026-10-20, see Gotchas).
+  20 iterations; goal is larger open systems. Saves like the TTNs (2026-10-20, see Gotchas);
+  `continue_fpeps(filepath, extra_iters)` (build-ham.jl) resumes a saved run in the same files.
+  With open boundaries the 4x4 N=2 test trips `check_fluxes` (α = 2/(0.5·3·3) = 0.44, "Alpha is
+  too large"); add `"if_check_fluxes" => false` to the params dict to skip the check.
 - `synth-dims/long-range-ttn.jl`: TTN runner. `synth-dims/daily-things.jl`: TTN scratch.
 - Data:
   - ED torus `cluster-data/exact-diag/torus/new-gauge/dd-ints/`: V=300: 6x3 (42), 8x4 (65),
@@ -285,8 +347,10 @@ Notes for any new p:
 
 ## Open questions
 
-- [ ] Does the exponent p change the physics? Hints: small p curves away from a power law in Ly,
-  p ≥ 2 doesn't; b(p) − b(0) grows past p = 1. Needs more sizes → which family and method (Next).
+- [ ] Does the exponent p change the physics? Strongest hint so far (2026-10-20): b(5–7) − p
+  ≈ 0.4–0.8 for p ≤ 3, then 1.1, 2.0, 2.7 for p = 4–6. Γ_c(Ly) curves down for small p and up for
+  p ≥ 4. Is the large-p divergence faster than a power law (exponential in Ly)? Does it survive
+  at fixed density (Lx growing with N)? Needs more sizes → which family and method (Next).
 - [ ] Why does the GS CDW signal at Γ → ∞ collapse with Ly (S(π)/N rise 0.40 → 0.035 for
   Ly = 4–7)? Same at N = 4 / Lx = 8, so it's Ly, not N. Is Γ_c(Ly) at fixed N meaningful there?
 - [ ] GS-only: Hill and midpoint Γ_c disagree at Ly ≥ 6 (small signal). Which to use / show both?
@@ -294,7 +358,9 @@ Notes for any new p:
   (only two Lx). Binder crossing in Lx with MPS/TTN?
 - [ ] What is the pre-transition dip in S(π)/Binder? Known: it deepens with p and Ly, is absent
   for p ≲ 1, and comes with same-column pairs separating in y; in 6x4 there are also true GS
-  level crossings near Γ → 0 and Γ_c.
+  level crossings near Γ → 0 and Γ_c. Candidate (2026-10-20, 8x4 p = 3 column profile): opposite
+  TT patterns pinned at the two open edges with a central domain wall. Check at other Ly/p and
+  at odd Lx (no frustration, so the dip should vanish), and whether a dip exists on the cylinder.
 - [ ] Is state 2 also excited (not a CDW partner) at 8×Ly, Ly ≥ 5? No energies in the sweep files.
 - [ ] V = 50 TTN data at 12x6+ for the torus?
 - [ ] Does fPEPS reach useful open sizes / accuracy (N conservation, D convergence of Γ_c)?
@@ -335,6 +401,11 @@ Notes for any new p:
   them to the file metadata** with `modify_data` — ask first.
 - Open y, Ly ≥ 5: states 1, 2 are not a degenerate CDW pair (E2 − E1 ~ 0.03–0.09 at Γ → ∞), so a
   2-state manifold fidelity picks up excited-state crossings; use GS-only fidelity there.
+- `find_eigenstates`' default Lanczos (krylovdim 30, maxiter 100) leaves the upper of 20 levels
+  unconverged at large Γ: 6x4 N=3 p = 4 vs dense, Γ = 1e3: E15+ off by 1e-3–0.1; Γ = 1e4: E1–3 exact,
+  E4–7 ~1e-6, E8+ 0.03–27. GS / state-2 observables unaffected. `Lanczos(krylovdim=60, maxiter=1000)`
+  converges all 20 (used in the p = 4–6 runner). Saved `nrg` beyond the lowest few at large Γ in older
+  files is suspect.
 - `write_data_jld2` never overwrites: an existing name gets `-mk-N` appended (`prep_file`), and a
   missing target folder silently writes into `pwd()`. Write to a fresh name and `mv`; check the
   folder exists (don't create folders: the user manages them).
@@ -350,6 +421,9 @@ Notes for any new p:
   iteration by the `evolve` callback; that's what `evolve(...; misc_restart)` needs to resume.
   Find with `find_data_file(pdict, "fpeps", dataloc; file_type="jld2")` (default is `"h5"`).
   Learning rate is `learning_rate` in metadata: `"lr"` is the long-range setting.
+  `evolve`'s `maxiter` counts restored iterations too (stops at `niter > maxiter`), so
+  `continue_fpeps` passes `maxiter = niter + extra_iters`; it rebuilds the Hamiltonian and an Euler
+  integrator from the metadata (only the integrator/solver type names are saved).
 - The 8x4 dd sweep sits in the old `magnetic_spacing-0.1` file and its `all_gammas` has 39 points:
   the 25 new ones plus the old coarse 8x4 points (incl. Γ = 10210, 50000, i.e. s = 0.17, 0.1) and
   3 duplicates. Γ_c is unaffected (17.2 vs 17.1 with Γ ≤ 1000).
@@ -390,7 +464,17 @@ Notes for any new p:
 - 2026-10-16 — Current functions fixed (Peierls phase); current blocks cleaned. CDW: one
   whole-width circulation, no edge/bulk counterflow, edge coherence as short as bulk (ξ ≈ 1).
   c_fit = 1 for Laughlin explained (two chiral edges, 1/6 each); single-edge cut test planned.
+- 2026-10-20 — p = 4, 5, 6 (8×Ly N=4) added to the 8×Ly block (bounded Hill fit, skips missing
+  sizes). Ly = 4 left out of the b fit (still plotted). **Key result:** Γ_c diverges with Ly ever
+  more strongly as p grows: b(5–7) = 5.07, 6.96, 8.72 for p = 4, 5, 6 (b − p: 1.1, 2.0, 2.7 vs
+  0.4–0.8 for p ≤ 3), and Γ_c(Ly) bends up for p ≥ 4.
 - 2026-10-20 — fPEPS saving added (TTN-style wavefunc/metadata split, JLD2, every iteration,
   `cluster-data/synth-dims/fpeps/`); `fpeps` prefixes in `data-storage-funcs.jl`, JLD2 in the
   fpeps env. Tested end to end (2 iterations into the scratchpad). fPEPS dicts switched to
-  `if_periodic_x/y` (build-ham ignored `_phys/_synth`, so runs were always open).
+  `if_periodic_x/y` (build-ham ignored `_phys/_synth`, so runs were always open). `continue_fpeps`
+  added, tested 5x5 N=2 D=2 (2 + 2 iterations into the scratchpad, history/niter carry over).
+- 2026-10-20 — Neighbour-difference order parameter O from GS occupancies (8×Ly N=4, all p): tracks
+  the transition via the open-x density profile (staggered ⟨n⟩ = 0 by reflection), Γ_c close to
+  S(π) at Ly = 4 and for large p, unreliable for small p at Ly = 7.
+- 2026-10-20 — Threaded cluster runner for p = 4, 5, 6 at 8×Ly N=4 in `execute-ed.jl` (not run yet);
+  Γ_c guesses from a 6×Ly coarse scan; found the default Lanczos leaves upper levels unconverged at large Γ.

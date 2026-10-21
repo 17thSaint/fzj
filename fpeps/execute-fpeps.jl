@@ -4,7 +4,7 @@
 This file contains set-up for fPEPS simulations
 
 Depends on:
-        build-ham.jl (long_range_HH_ham)
+        build-ham.jl (long_range_HH_ham, save_initial_fpeps, save_fpeps, continue_fpeps)
         other-funcs/basic-2d-stuff.jl
 
 
@@ -32,7 +32,7 @@ lx,ly,n = 4,4,2
 intstren = 50.0
 bond_dim = 6
 
-params_dict = Dict([("outputlevel",1),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("particles",n),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",intstren),("if_periodic_x",false),("if_periodic_y",false)])
+params_dict = Dict([("outputlevel",1),("if_check_fluxes",false),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("particles",n),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",intstren),("if_periodic_x",false),("if_periodic_y",false)])
 
 hilbert = ITensors.siteinds("S=1/2",lx,ly)
 peps = PEPS(ComplexF64, hilbert; bond_dim=bond_dim)
@@ -48,7 +48,7 @@ ham_opsum = long_range_HH_ham(params_dict)
 Oks_and_Eks = QuantumNaturalfPEPS.generate_Oks_and_Eks(peps, ham_opsum; threaded=true, multiproc=true, max_counts)
 
 # Setup the Integrator and Solver
-learning_rate, sample_nr, maxiter = 0.05, 2000, 20
+learning_rate, sample_nr, maxiter = 0.01, 2000, 20
 integrator = QuantumNaturalGradient.Euler(lr=learning_rate)
 solver = QuantumNaturalGradient.EigenSolver()
 

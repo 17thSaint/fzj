@@ -155,6 +155,24 @@ function synthetic_correlation(wavefunc::TTN.TreeTensorNetwork; kwargs...)
     return syn_corrs
 end
 
+# hopping coefficient on the bond s -> s + e_dir as long_range_HH_ham adds it, coeff b^dag_s b_{s+e}: get_inter_coeff
+# (flux along flux_direction) times e^{2 pi i twist[dir]} on the wrapping bond only, for the currents in
+# other-funcs/basic-2d-observables.jl. Not for if_synth_rectangle or hopping_old
+function ttn_hopping_coeff(metadata::Dict,Lx::Int64,Ly::Int64)
+    metadata["if_synth_rectangle"] && error("ttn_hopping_coeff: synth rectangle lattices not supported")
+    t_strength = haskey(metadata,"t_strength") ? metadata["t_strength"] : metadata["ts"]
+    twist = metadata["twist_angle"]
+    coeff_kwargs = (hopping_anisotropy=metadata["hopping_anisotropy"],flux_direction=metadata["flux_direction"],no_magF=metadata["no_magF"])
+
+    function hopping_coeff(site,dir)
+        next_site = dir == 1 ? (mod1(site[1]+1,Lx),site[2]) : (site[1],mod1(site[2]+1,Ly))
+        coeff = get_inter_coeff(site,next_site,t_strength,metadata["phi"],Lx,Ly; coeff_kwargs...)
+        return site[dir] == (Lx,Ly)[dir] ? coeff * cis(2pi * twist[dir]) : coeff
+    end
+
+    return hopping_coeff
+end
+
 function physical_current(densmat::Matrix{ComplexF64},Lx::Int64,Ly::Int64; kwargs...)
     if_plot = get(kwargs,:if_plot,true)
 

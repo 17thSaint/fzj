@@ -152,3 +152,53 @@ function save_fpeps(peps, misc::Dict, filepath::String)
     modify_data(Dict([("history",misc["history"]),("energy",misc["energy"]),("rng",misc["rng"])]), filepath, "all_data")
     modify_data(Dict([("niter",misc["niter"])]), filepath, "metadata")
 end
+
+# Continue a saved groundstate search for extra_iters more iterations. filepath is the fpeps-*.jld2 or its
+# wavefuncfpeps-*.jld2 (a bare filename is looked for in cluster-data/synth-dims/fpeps). The PEPS, history,
+# energy, rng and niter are read back and the Hamiltonian rebuilt from the metadata; sample_nr and the Euler
+# learning rate default to the saved ones. With if_save_data the same two files keep being overwritten
+function continue_fpeps(filepath::String, extra_iters::Int; if_save_data::Bool=true, sample_nr=nothing, learning_rate=nothing,
+        integrator=nothing, solver=QuantumNaturalGradient.EigenSolver(), threaded=true, multiproc=true, verbosity=2)
+
+    occursin("/",filepath) ? nothing : filepath = joinpath(get_folder_location("cluster-data/synth-dims/fpeps"), filepath)
+    filepath = joinpath(dirname(filepath), remove_wavefunc_from_filename(basename(filepath)))
+    data, metadata = read_data(filepath)
+    wavefunc_data, _ = read_data(add_wavefunc_to_filepath(filepath))
+    peps = wavefunc_data["peps"]
+    params_dict = Dict{String,Any}(metadata)
+
+    # niter = 0 means no iteration finished before the run stopped, so start the optimisation fresh
+    niter = params_dict["niter"]
+    misc_restart = niter == 0 ? nothing : Dict([("history",data["history"]),("energy",data["energy"]),("rng",data["rng"]),("niter",niter)])
+    maxiter = niter + extra_iters
+
+    lx,ly,n = params_dict["Lx"],params_dict["Ly"],params_dict["particles"]
+    max_counts = [n, lx*ly - n]
+    ham_opsum = long_range_HH_ham(params_dict)
+    Oks_and_Eks = QuantumNaturalfPEPS.generate_Oks_and_Eks(peps, ham_opsum; threaded, multiproc, max_counts)
+
+    sample_nr = isnothing(sample_nr) ? params_dict["sample_nr"] : sample_nr
+    learning_rate = isnothing(learning_rate) ? params_dict["learning_rate"] : learning_rate
+    if isnothing(integrator)
+        occursin("Euler", params_dict["integrator"]) ? nothing : @warn "saved integrator was $(params_dict["integrator"]), continuing with Euler"
+        integrator = QuantumNaturalGradient.Euler(lr=learning_rate)
+    end
+    println("Continuing $(basename(filepath)) from niter = $niter to maxiter = $maxiter")
+
+    if if_save_data
+        modify_data(Dict([("maxiter",maxiter),("sample_nr",sample_nr),("learning_rate",learning_rate),
+            ("solver",string(typeof(solver))),("integrator",string(typeof(integrator)))]), filepath, "metadata")
+    end
+
+    function callback(; state, misc, kwargs...)
+        if_save_data && save_fpeps(state.θ.obj, misc, filepath)
+        return nothing
+    end
+
+    θ = QuantumNaturalGradient.Parameters(peps)
+    @time loss_value, trained_θ, misc = QuantumNaturalGradient.evolve(Oks_and_Eks, θ;
+            integrator, verbosity, solver, sample_nr, maxiter, callback, misc_restart)
+
+    println("Final energy: $(real(loss_value))")
+    return loss_value, trained_θ.obj, misc
+end

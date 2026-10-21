@@ -222,48 +222,26 @@ function synthetic_correlation(densmat::Array{ComplexF64,2},Lx::Int64,Ly::Int64;
     return syn_corrs
 end
 
-# gauge-invariant particle current on the bond s -> s + e_dir (dir = 1: x, 2: y), from the density matrix
-# rho[i,j] = <b^dag_i b_j>. buildHam stores H[in,out] = -t e^{i phi}, phi = 2 pi (alpha[dir] (s_perp - 1) + twist[dir]/L_dir),
-# so J = d<n_{s+e}>/dt = 2 t Im(e^{i phi} rho[s,s+e])
-function bond_current(densmat::Array{ComplexF64,2},lattice_params::Dict{String,Any},hamilt_params::Dict,site::Tuple{Int64,Int64},dir::Int64)
+# hopping coefficient on the bond s -> s + e_dir as buildHam stores it, H[in,out] = -t e^{i phi},
+# phi = 2 pi (alpha[dir] (s_perp - 1) + twist[dir]/L_dir), for the currents in other-funcs/basic-2d-observables.jl
+function ed_hopping_coeff(lattice_params::Dict{String,Any},hamilt_params::Dict)
     Lx = lattice_params["Lx"]
     Ly = lattice_params["Ly"]
     alpha = hamilt_params["alpha"]
     twist = get(lattice_params,"twist_angle",(0.0,0.0))
-    t = dir == 1 ? hamilt_params["tx"] : hamilt_params["ty"]
+    ts = (hamilt_params["tx"],hamilt_params["ty"])
 
-    next_site = dir == 1 ? (mod1(site[1]+1,Lx),site[2]) : (site[1],mod1(site[2]+1,Ly))
-    phi = 2pi * (alpha[dir] * (site[3-dir] - 1) + twist[dir] / (Lx,Ly)[dir])
-
-    return 2 * t * imag(cis(phi) * densmat[linear_index(site,Lx,Ly),linear_index(next_site,Lx,Ly)])
+    return (site,dir) -> -ts[dir] * cis(2pi * (alpha[dir] * (site[3-dir] - 1) + twist[dir] / (Lx,Ly)[dir]))
 end
 
 # currents[x,y] on the bond (x,y) -> (x+1,y)
 function physical_current(densmat::Array{ComplexF64,2},lattice_params::Dict{String,Any},hamilt_params::Dict; kwargs...)
-    if_plot = get(kwargs,:if_plot,true)
-    Lx = lattice_params["Lx"]
-    Ly = lattice_params["Ly"]
-
-    xlen = lattice_params["if_periodic_x"] ? Lx : Lx-1
-    currents = [bond_current(densmat,lattice_params,hamilt_params,(x,y),1) for x in 1:xlen, y in 1:Ly]
-
-    if_plot ? plot_physical_current(currents; kwargs...) : nothing
-
-    return currents
+    return physical_current(densmat,ed_hopping_coeff(lattice_params,hamilt_params),lattice_params["Lx"],lattice_params["Ly"],lattice_params["if_periodic_x"]; kwargs...)
 end
 
 # currents[x,y] on the bond (x,y) -> (x,y+1)
 function synthetic_current(densmat::Array{ComplexF64,2},lattice_params::Dict{String,Any},hamilt_params::Dict; kwargs...)
-    if_plot = get(kwargs,:if_plot,true)
-    Lx = lattice_params["Lx"]
-    Ly = lattice_params["Ly"]
-
-    ylen = lattice_params["if_periodic_y"] ? Ly : Ly-1
-    currents = [bond_current(densmat,lattice_params,hamilt_params,(x,y),2) for x in 1:Lx, y in 1:ylen]
-
-    if_plot ? plot_synthetic_current(currents; kwargs...) : nothing
-
-    return currents
+    return synthetic_current(densmat,ed_hopping_coeff(lattice_params,hamilt_params),lattice_params["Lx"],lattice_params["Ly"],lattice_params["if_periodic_y"]; kwargs...)
 end
 
 # gap from Cecille Repellin's paper on Harper-Hofstadter model by hopping anisotropy

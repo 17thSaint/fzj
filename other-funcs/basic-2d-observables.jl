@@ -205,6 +205,42 @@ function visibility_fourpt(four_point_moms::Matrix{Float64}; kwargs...)
     return maxminratio
 end
 
+# gauge-invariant particle current on the bond s -> s + e_dir (dir = 1: x/phys, 2: y/synth), from the density matrix
+# rho[i,j] = <b^dag_i b_j>. For the hopping term coeff b^dag_s b_{s+e} + h.c. in H, J = d<n_{s+e}>/dt = -2 Im(coeff rho[s,s+e]).
+# hopping_coeff(site,dir) is coeff in the gauge of the code that built H, kwarg site_index(site) the row of rho
+# (default linear_index on the Lx x Ly lattice)
+function bond_current(densmat::Matrix{ComplexF64},hopping_coeff::Function,Lx::Int64,Ly::Int64,site::Tuple{Int64,Int64},dir::Int64; kwargs...)
+    site_index = get(kwargs,:site_index,s -> linear_index(s,Lx,Ly))
+
+    next_site = dir == 1 ? (mod1(site[1]+1,Lx),site[2]) : (site[1],mod1(site[2]+1,Ly))
+
+    return -2 * imag(hopping_coeff(site,dir) * densmat[site_index(site),site_index(next_site)])
+end
+
+# currents[x,y] on the bond (x,y) -> (x+1,y), (Lx-1) x Ly for open x
+function physical_current(densmat::Matrix{ComplexF64},hopping_coeff::Function,Lx::Int64,Ly::Int64,if_periodic_x::Bool; kwargs...)
+    if_plot = get(kwargs,:if_plot,true)
+
+    xlen = if_periodic_x ? Lx : Lx-1
+    currents = [bond_current(densmat,hopping_coeff,Lx,Ly,(x,y),1; kwargs...) for x in 1:xlen, y in 1:Ly]
+
+    if_plot ? plot_physical_current(currents; kwargs...) : nothing
+
+    return currents
+end
+
+# currents[x,y] on the bond (x,y) -> (x,y+1), Lx x (Ly-1) for open y
+function synthetic_current(densmat::Matrix{ComplexF64},hopping_coeff::Function,Lx::Int64,Ly::Int64,if_periodic_y::Bool; kwargs...)
+    if_plot = get(kwargs,:if_plot,true)
+
+    ylen = if_periodic_y ? Ly : Ly-1
+    currents = [bond_current(densmat,hopping_coeff,Lx,Ly,(x,y),2; kwargs...) for x in 1:Lx, y in 1:ylen]
+
+    if_plot ? plot_synthetic_current(currents; kwargs...) : nothing
+
+    return currents
+end
+
 
 
 

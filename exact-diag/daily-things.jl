@@ -4344,13 +4344,14 @@ if false
 
 end=#
 
-#= cdw transition for 8xi N=4 scaling with power law exponent p, cluster sweep (one file per size and p, whole Γ sweep in its metadata)
+# cdw transition for 8xi N=4 scaling with power law exponent p, cluster sweep (one file per size and p, whole Γ sweep in its metadata)
 if true
     using LsqFit
     lxlyns = [(8,4,4),(8,5,4),(8,6,4),(8,7,4)]
-    ps = [0.0,0.5,1.0,1.5,2.0,2.5,3.0]      # add 3.0 once the dd-ints sweep is back
+    ps = [0.0,0.5,1.0,1.5,2.0,2.5,3.0,4.0,5.0,6.0]
     intstren = 50.0
     if_gs_only = true
+    fit_ly_min = 5      # Ly = 4 is off the Γ_c(Ly) trend (GS level crossings): plotted, not in the b fit
     power_folder(p) = p == 0.0 ? "flat-ints" : p == 3.0 ? "dd-ints" : "powerlaw-" * replace(string(p),"." => "p")
     sweep_keys = ["all_gammas","all_columncorrs1","all_columncorrs2","all_evencolumndist1","all_evencolumndist2"]
 
@@ -4393,6 +4394,7 @@ if true
         for (i,(obs,lab)) in enumerate([("sp","2-point CDW Order Parameter"),("binder","Binder Cumulant")])
             for (j,(lx,ly,n)) in enumerate(lxlyns)
                 xs = datadict[(p,ly)]["gammas"]
+                isempty(xs) && continue      # size not run (yet) for this p
                 perm = sortperm(xs)
                 xs = xs[perm]
                 ys = datadict[(p,ly)][obs][perm]
@@ -4400,7 +4402,8 @@ if true
 
                 # rising Hill fit from the pre-transition dip upward, x50 = gamma_c
                 k = argmin(normalized_ys)
-                fit_result = curve_fit((x,q) -> 1 .- hill_model(x,q),xs[k:end],normalized_ys[k:end],[3*xs[k],3.0])
+                # lower bound keeps x50 > 0 (p = 6, Ly = 4 otherwise walks negative)
+                fit_result = curve_fit((x,q) -> 1 .- hill_model(x,q),xs[k:end],normalized_ys[k:end],[3*xs[k],3.0]; lower=[1e-3,0.1])
                 datadict[(p,ly)]["gamma_c_"*obs] = (fit_result.param[1],stderror(fit_result)[1])
 
                 fit_xs = 10 .^ range(log10(xs[k]),log10(xs[end]),length=100)
@@ -4413,17 +4416,20 @@ if true
             axs[i,ip].set_xscale("log")
             axs[i,ip].legend()
 
-            # Γ_c ∝ Ly^b from a log-log line through the 4 points
-            gamma_cs = [datadict[(p,ly)]["gamma_c_"*obs] for ly in lys]
+            # Γ_c ∝ Ly^b from a log-log line through the available sizes with Ly >= fit_ly_min (all are plotted)
+            p_lys = [ly for ly in lys if haskey(datadict[(p,ly)],"gamma_c_"*obs)]
+            gamma_cs = [datadict[(p,ly)]["gamma_c_"*obs] for ly in p_lys]
+            fit_mask = p_lys .>= fit_ly_min
+            fit_lys,fit_gamma_cs = p_lys[fit_mask],first.(gamma_cs[fit_mask])
             # standard error of b from the residuals of the line (includes the deviation from a power law)
-            design = [log.(lys) ones(length(lys))]
-            line = design \ log.(first.(gamma_cs))
-            residuals = log.(first.(gamma_cs)) .- design * line
-            b,b_err = line[1],sqrt(sum(abs2,residuals) / (length(lys) - 2) * inv(design' * design)[1,1])
+            design = [log.(fit_lys) ones(length(fit_lys))]
+            line = design \ log.(fit_gamma_cs)
+            residuals = log.(fit_gamma_cs) .- design * line
+            b,b_err = line[1],sqrt(sum(abs2,residuals) / (length(fit_lys) - 2) * inv(design' * design)[1,1])
             push!(obs_bs[obs],b)
             push!(obs_bs[obs*"_err"],b_err)
-            println("p = $p, $obs: Γ_c = $(round.(first.(gamma_cs),sigdigits=3)) ± $(round.(last.(gamma_cs),sigdigits=2)), Γ_c ∝ Ly^($(round(b,digits=2)) ± $(round(b_err,digits=2)))")
-            axs2[1].errorbar(lys,first.(gamma_cs),yerr=last.(gamma_cs),fmt=obs == "sp" ? "o-" : "s--",c="C$(ip-1)",mfc=obs == "sp" ? "C$(ip-1)" : "none",label=obs == "sp" ? "p = $p" : nothing)
+            println("p = $p, $obs: Ly = $p_lys (fit $fit_lys), Γ_c = $(round.(first.(gamma_cs),sigdigits=3)) ± $(round.(last.(gamma_cs),sigdigits=2)), Γ_c ∝ Ly^($(round(b,digits=2)) ± $(round(b_err,digits=2)))")
+            axs2[1].errorbar(p_lys,first.(gamma_cs),yerr=last.(gamma_cs),fmt=obs == "sp" ? "o-" : "s--",c="C$(ip-1)",mfc=obs == "sp" ? "C$(ip-1)" : "none",label=obs == "sp" ? "p = $p" : nothing)
         end
     end
     axs2[1].set_xlabel(L"L_y")
@@ -4437,10 +4443,89 @@ if true
     axs2[2].errorbar(ps,obs_bs["sp"],yerr=obs_bs["sp_err"],fmt="o-",capsize=3,label="2-point CDW Order Parameter")
     axs2[2].errorbar(ps,obs_bs["binder"],yerr=obs_bs["binder_err"],fmt="s--",mfc="none",capsize=3,label="Binder Cumulant")
     axs2[2].set_xlabel(L"p")
-    axs2[2].set_ylabel(L"b"*" in "*L"\Gamma_c \propto L_y^b")
+    axs2[2].set_ylabel(L"b"*" in "*L"\Gamma_c \propto L_y^b"*", "*L"L_y \geq"*" $fit_ly_min")
     axs2[2].legend()
     fig2.suptitle("8xLy N=4, " * (if_gs_only ? "ground state" : "states 1, 2 averaged"))
     fig2.tight_layout()
+    fig.tight_layout()
+
+end#
+
+# cdw transition for 8xi N=4 scaling with the neighbour-difference order parameter O = 1/((Lx-1) Ly) sum_x sum_y |n_x,y - n_x+1,y| from the occupancies, compared to S(π)
+#= felix's order parameter, but it requires pinning, 2pt is better
+if false
+    using LsqFit
+    lxlyns = [(8,4,4),(8,5,4),(8,6,4),(8,7,4)]
+    ps = [0.0,0.5,1.0,1.5,2.0,2.5,3.0]
+    intstren = 50.0
+    power_folder(p) = p == 0.0 ? "flat-ints" : p == 3.0 ? "dd-ints" : "powerlaw-" * replace(string(p),"." => "p")
+    sweep_keys = ["all_gammas","all_occs1","all_columncorrs1","all_evencolumndist1"]
+    # occs are Ly x Lx, averaged over the Lx - 1 open x bonds and the Ly rows
+    neighbour_difference(occs) = sum(abs.(occs[:,1:end-1] .- occs[:,2:end])) / (size(occs,1) * (size(occs,2) - 1))
+
+    datadict = Dict()
+    for p in ps
+        dataloc = get_folder_location("cluster-data/exact-diag/obc/$(power_folder(p))")
+        for (lx,ly,n) in lxlyns
+            key = (p,ly)
+            datadict[key] = Dict{String,Any}("nd"=>Float64[],"sp"=>Float64[],"gammas"=>Float64[])
+            pdict = Dict{String,Any}([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",false),("if_periodic_y",false)])
+            p != 0.0 && (pdict["interaction_strength"] = intstren)
+            all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+
+            for f in all_files
+                m = jldopen(joinpath(dataloc,f),"r") do fh
+                    haskey(fh["metadata"],"all_gammas") ? Dict(k => fh["metadata"][k] for k in sweep_keys) : nothing
+                end
+                isnothing(m) && continue
+
+                for i in eachindex(m["all_gammas"])
+                    sp,_,_ = cdw_order_parameters(Matrix{Float64}(m["all_columncorrs1"][i]),Vector{Float64}(m["all_evencolumndist1"][i]))
+                    append!(datadict[key]["gammas"],m["all_gammas"][i])
+                    append!(datadict[key]["nd"],neighbour_difference(Matrix{Float64}(m["all_occs1"][i])))
+                    append!(datadict[key]["sp"],sp / n)
+                end
+            end
+        end
+    end
+
+    fig, axs = subplots(2, length(ps), figsize=(3.5*length(ps), 7))
+    for (ip,p) in enumerate(ps)
+        for (j,(lx,ly,n)) in enumerate(lxlyns)
+            xs = datadict[(p,ly)]["gammas"]
+            perm = sortperm(xs)
+            xs = xs[perm]
+            nds = datadict[(p,ly)]["nd"][perm]
+            sps = datadict[(p,ly)]["sp"][perm]
+            norm_nds = (nds .- minimum(nds)) ./ (maximum(nds) - minimum(nds))
+            norm_sps = (sps .- minimum(sps)) ./ (maximum(sps) - minimum(sps))
+
+            # O falls through the transition: falling Hill fit from its maximum (pre-transition peak) down to its minimum,
+            # S(π) rising from its dip as in the block above. Past the minimum O can jump back up at Ly = 4, large Γ
+            # (arbitrary mix of the near-degenerate TT doublet breaks the x reflection), so those points are left out
+            k_nd,k_sp = argmax(norm_nds),argmin(norm_sps)
+            k_nd_end = k_nd - 1 + argmin(norm_nds[k_nd:end])
+            fit_nd = curve_fit(hill_model,xs[k_nd:k_nd_end],norm_nds[k_nd:k_nd_end],[3*xs[k_nd],3.0]; lower=[1e-3,0.1])
+            fit_sp = curve_fit((x,q) -> 1 .- hill_model(x,q),xs[k_sp:end],norm_sps[k_sp:end],[3*xs[k_sp],3.0])
+            datadict[(p,ly)]["gamma_c_nd"] = fit_nd.param[1]
+            datadict[(p,ly)]["gamma_c_sp"] = fit_sp.param[1]
+
+            axs[1,ip].plot(xs,nds,"o-",c="C$(j-1)",ms=4,label=L"L_y="*"$(ly)")
+            axs[2,ip].plot(xs,1 .- norm_nds,"o",c="C$(j-1)",ms=4,label=L"L_y="*"$(ly)")
+            axs[2,ip].plot(xs,norm_sps,"--",c="C$(j-1)")
+            axs[2,ip].axvline(fit_nd.param[1],c="C$(j-1)",ls=":",lw=1)
+        end
+        println("p = $p: Γ_c(O) = $(round.([datadict[(p,ly)]["gamma_c_nd"] for (lx,ly,n) in lxlyns],sigdigits=3)), Γ_c(S(π)) = $(round.([datadict[(p,ly)]["gamma_c_sp"] for (lx,ly,n) in lxlyns],sigdigits=3))")
+        for i in 1:2
+            axs[i,ip].set_xscale("log")
+            axs[i,ip].set_xlabel(p == 0.0 ? L"\Gamma = V" : L"\Gamma = V / s^p")
+            axs[i,ip].set_title("p = $p, ground state")
+            axs[i,ip].legend()
+        end
+        axs[1,ip].set_ylabel(L"O = \frac{1}{(L_x-1)L_y}\sum_{x,y}|n_{x,y}-n_{x+1,y}|")
+        axs[2,ip].set_ylabel("1 - O normalized (dots), S(π) normalized (dashed)")
+    end
+    fig.suptitle("8xLy N=4, neighbour-difference order parameter vs S(π)")
     fig.tight_layout()
 
 end=#
@@ -4542,6 +4627,91 @@ if false
 
 end=#
 
+#= pretty plot currents on OBC, looks a bit too meissner/vortex
+if false
+    lx,ly,n = 8,7,4
+
+    # only the diagonal and nearest-neighbour rho[t,s] = <b^dag_t b_s> (all the currents need), in one pass over
+    # the basis (columns are the occupied sites, descending), rest left zero
+    function nn_density_matrix(psi::Vector{ComplexF64},lattice_params::Dict)
+        Lx,Ly = lattice_params["Lx"],lattice_params["Ly"]
+        full_basis = lattice_params["full_basis"]
+        rho = zeros(ComplexF64,Lx*Ly,Lx*Ly)
+        for k in 1:size(full_basis,2)
+            state = full_basis[:,k]
+            for s in state
+                rho[s,s] += abs2(psi[k])
+                x,y = coordinate(s,Lx,Ly)
+                for (nx,ny) in ((x+1,y),(x-1,y),(x,y+1),(x,y-1))
+                    lattice_params["if_periodic_x"] ? (nx = mod1(nx,Lx)) : (1 <= nx <= Lx || continue)
+                    lattice_params["if_periodic_y"] ? (ny = mod1(ny,Ly)) : (1 <= ny <= Ly || continue)
+                    t = linear_index((nx,ny),Lx,Ly)
+                    t in state && continue
+                    rho[t,s] += conj(psi[find_basis_index(sort!(replace(state,s=>t),rev=true))]) * psi[k]
+                end
+            end
+        end
+        return rho
+    end
+
+    # saved flat-Ui GSs: the smallest and the largest Γ (= interaction_strength) file of the size
+    dataloc = get_folder_location("cluster-data/exact-diag/obc/flat-ints")
+    pdict = Dict{String,Any}([("Lx",lx),("Ly",ly),("N",n),("if_periodic_x",false),("if_periodic_y",false)])
+    all_files = find_data_file(pdict,"ed",dataloc; output_level=0,file_type="jld2")
+    file_gammas = [get_params_dict_from_filename(f)["interaction_strength"] for f in all_files]
+    which_files = [argmin(file_gammas),argmax(file_gammas)]
+    intstrens = file_gammas[which_files]
+
+    jxs = zeros(length(intstrens),ly)
+    jys = zeros(length(intstrens),lx)
+    physcurrs,synthcurrs = [],[]
+    for (i,f) in enumerate(all_files[which_files])
+        d,m = read_data(joinpath(dataloc,f); output_level=0)
+        lattice_params = get_lattice_params_from_metadata(m)
+        hamilt_params = Dict("alpha"=>m["alpha"],"tx"=>m["tx"],"ty"=>m["ty"]) # all bond_current needs
+        densmat = nn_density_matrix(d["state"][1],lattice_params) # density_matrix takes hours at 8x7
+
+        physcurr = physical_current(densmat,lattice_params,hamilt_params; if_plot=false) # (Lx-1) x Ly
+        synthcurr = synthetic_current(densmat,lattice_params,hamilt_params; if_plot=false) # Lx x (Ly-1)
+        push!(physcurrs,physcurr)
+        push!(synthcurrs,synthcurr)
+
+        # translation invariant along x, average over the bonds anyway (a near-degenerate GS can break it)
+        jxs[i,:] = sum(physcurr; dims=1) ./ lx
+        jys[i,:] = sum(synthcurr; dims=2) ./ ly
+    end
+
+    # one arrow per bond at its midpoint, length and colour ~ J, same scale (longest arrow 0.8 bonds) in both panels
+    jmax = maximum(max(maximum(abs.(physcurrs[i])),maximum(abs.(synthcurrs[i]))) for i in eachindex(intstrens))
+    arrow_scale = jmax / 0.8
+    fig,axs = subplots(1,length(intstrens),figsize=(6*length(intstrens),6*(ly+0.2)/(lx+0.2)+0.6),sharey=true)
+    for (i,intstren) in enumerate(intstrens)
+        ax = axs[i]
+        for y in 1:ly
+            ax.plot([1,lx],[y,y],c="0.85",lw=1,zorder=0)
+        end
+        for x in 1:lx
+            ax.plot([x,x],[1,ly],c="0.85",lw=1,zorder=0)
+        end
+
+        physcurr,synthcurr = physcurrs[i],synthcurrs[i]
+        qx = ax.quiver([x+0.5 for x in 1:lx-1, y in 1:ly],[y for x in 1:lx-1, y in 1:ly],physcurr,zero(physcurr),abs.(physcurr),
+            cmap="plasma",clim=(0,jmax),angles="xy",scale_units="xy",scale=arrow_scale,pivot="mid",width=0.008,zorder=2)
+        ax.quiver([x for x in 1:lx, y in 1:ly-1],[y+0.5 for x in 1:lx, y in 1:ly-1],zero(synthcurr),synthcurr,abs.(synthcurr),
+            cmap="plasma",clim=(0,jmax),angles="xy",scale_units="xy",scale=arrow_scale,pivot="mid",width=0.008,zorder=2)
+
+        ax.set_aspect("equal")
+        ax.set_xlim(0.4,lx+0.6)
+        ax.set_ylim(0.4,ly+0.6)
+        ax.set_xticks(1:lx)
+        ax.set_yticks(1:ly)
+        ax.set_xlabel("x")
+        i == 1 && ax.set_ylabel("y")
+        ax.set_title("Γ = $intstren, max |J| = $(round(max(maximum(abs.(physcurr)),maximum(abs.(synthcurr))),digits=3))")
+        i == length(intstrens) && fig.colorbar(qx,ax=axs,label=L"|J|",fraction=0.025,pad=0.02)
+    end
+
+end=#
 
 # currents and correlations on OBC, Laughlin (Ui = 0) vs CDW (Ui = 50): bond-current map over the density, and
 #= one-body correlations along x per row
@@ -4729,6 +4899,7 @@ if false
     fig_corr.tight_layout()
 
 end=#
+
 
 
 
