@@ -44,6 +44,17 @@ if true
     println("Binder:      exact $(round(binder_ex, digits=4)), sampled $(round(ops.binder, digits=4)) ± $(round(ops.binder_err, digits=4))")
 end
 
+### CDW order parameters of saved fPEPS runs, statistics saved into the metadata of their fpeps-*.jld2 (writes to cluster-data),
+### read back with fpeps_cdw_order_parameters(metadata) or read_column_cdw_statistics(metadata)
+if false
+    dataloc = get_folder_location("cluster-data/synth-dims/fpeps")
+    nsamples = 4000
+    for f in filter(f -> startswith(f,"fpeps-"), readdir(dataloc))
+        ops = fpeps_cdw_order_parameters(joinpath(dataloc,f), nsamples; if_save_data=true)
+        println("$f: S(pi) = $(ops.s_pi) ± $(ops.s_pi_err), Binder = $(ops.binder) ± $(ops.binder_err)")
+    end
+end
+
 
 
 

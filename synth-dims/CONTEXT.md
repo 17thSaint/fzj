@@ -313,7 +313,10 @@ Notes for any new p:
 - CDW order parameters, shared by ED and fPEPS in `other-funcs/basic-2d-observables.jl`:
   `column_cdw_statistics(ncols, probs)` (⟨n_x n_x'⟩, P(k on even columns) from column occupations
   `ncols[x,i]` of configurations with probabilities) and `cdw_order_parameters` (S(π), correlation
-  ratio, Binder). Each method only supplies `column_occupations` + probabilities.
+  ratio, Binder). Each method only supplies `column_occupations` + probabilities. Saving:
+  `save_column_cdw_statistics(filepath, corr, dist, k)` / `read_column_cdw_statistics(metadata, k; if_sweep)`
+  with the existing metadata keys (`column_corr<k>`, `evencolumn_dist<k>`; sweeps `all_columncorrs<k>`,
+  `all_evencolumndist<k>`); old ED blocks still write their dicts inline.
 - `exact-diag/observables.jl`: `get_manifold_occupancy` (→ `occs_eig1/2`); `column_occupations(full_basis, Lx)`
   and the ED wrapper `column_cdw_statistics(wavefunc, lattice_params)` (same call as before).
 - `synth-dims/ed-plus-ttns.jl`: ED+TTN torus analysis; scaling blocks at the end (s_c/l_B plateau,
@@ -329,7 +332,8 @@ Notes for any new p:
 - `fpeps/observables.jl` (no ED includes): `sample_fpeps_occupations` (`get_sample` + importance
   weights |ψ|²/p_c → `occs[x,y,i]`), `column_occupations(occs)`, `column_cdw_statistics(occs, weights)`;
   `fpeps_cdw_order_parameters(occs, weights)` adds jackknife errors (one pass over bins),
-  `(filepath, nsamples)` reads a saved run. `exact_fpeps_occupations(peps, N)` enumerates the sector
+  `(filepath, nsamples; if_save_data)` samples a saved run and optionally saves into its fpeps-*.jld2
+  metadata, `(metadata)` redoes the jackknife from saved bins. `exact_fpeps_occupations(peps, N)` enumerates the sector
   exactly (small systems only).
 - `fpeps/daily-things.jl`: fPEPS scratch blocks; first block tests the above against exact enumeration.
 - `synth-dims/long-range-ttn.jl`: TTN runner. `synth-dims/daily-things.jl`: TTN scratch.
@@ -430,6 +434,9 @@ Notes for any new p:
   `bond_dim`, `sample_nr`, `maxiter`, `learning_rate`, `niter`). Both are overwritten every
   iteration by the `evolve` callback; that's what `evolve(...; misc_restart)` needs to resume.
   Find with `find_data_file(pdict, "fpeps", dataloc; file_type="jld2")` (default is `"h5"`).
+  CDW statistics in fpeps metadata (GS, k = 1): `column_corr1`, `evencolumn_dist1` (all samples, ED
+  names) plus `column_corr_bins1`, `evencolumn_dist_bins1`, `bin_weights1` (jackknife), `nsamples1` and
+  `niter_sampled1`: if it differs from `niter`, the statistics predate a `continue_fpeps` and are stale.
   Learning rate is `learning_rate` in metadata: `"lr"` is the long-range setting.
   `evolve`'s `maxiter` counts restored iterations too (stops at `niter > maxiter`), so
   `continue_fpeps` passes `maxiter = niter + extra_iters`; it rebuilds the Hamiltonian and an Euler
@@ -494,3 +501,7 @@ Notes for any new p:
 - 2026-10-27 — CDW statistics/order parameters moved to `other-funcs/basic-2d-observables.jl` (ED and
   fPEPS only supply column occupations). ED: identical to the old code and saved metadata to 1e-14
   (29 OBC files, Lx sweep), 60× faster (10x4 N=5: 0.07 s vs 4.4 s). fPEPS jackknife identical, 75× faster.
+
+- 2026-10-27 — Common save/read for the column statistics (`basic-2d-observables.jl`, existing ED key
+  names) and fPEPS saving with per-bin statistics; tested on scratchpad copies of ED point/sweep files
+  and a scratchpad fPEPS file (round trips exact, other keys untouched, no -mk files).

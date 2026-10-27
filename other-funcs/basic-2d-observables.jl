@@ -91,6 +91,31 @@ function cdw_order_parameters(column_corr::Matrix{Float64},evencolumn_dist::Vect
     return s_pi, corr_ratio, binder
 end
 
+# metadata entries for the column statistics of state k (1 = GS), named as in the ED files: "column_corr<k>",
+# "evencolumn_dist<k>" for one point, "all_columncorrs<k>", "all_evencolumndist<k>" for a sweep (next to "all_gammas")
+function column_cdw_statistics_dict(column_corr::Matrix{Float64},evencolumn_dist::Vector{Float64},k::Int64=1)
+    return Dict{String,Any}([("column_corr$k",column_corr),("evencolumn_dist$k",evencolumn_dist)])
+end
+
+function column_cdw_statistics_dict(column_corrs::Vector{Matrix{Float64}},evencolumn_dists::Vector{Vector{Float64}},k::Int64=1)
+    return Dict{String,Any}([("all_columncorrs$k",column_corrs),("all_evencolumndist$k",evencolumn_dists)])
+end
+
+# adds the column statistics of state k to the metadata of an existing file (a write, overwrites the keys)
+function save_column_cdw_statistics(filepath::String,column_corr,evencolumn_dist,k::Int64=1; kwargs...)
+    return modify_data(column_cdw_statistics_dict(column_corr,evencolumn_dist,k),filepath,"metadata"; kwargs...)
+end
+
+# column statistics of state k back from metadata, nothing if not saved; if_sweep reads the all_* vectors
+function read_column_cdw_statistics(metadata::Dict,k::Int64=1; if_sweep::Bool=false)
+    if if_sweep
+        haskey(metadata,"all_columncorrs$k") || return nothing
+        return Matrix{Float64}.(metadata["all_columncorrs$k"]),Vector{Float64}.(metadata["all_evencolumndist$k"])
+    end
+    haskey(metadata,"column_corr$k") || return nothing
+    return Matrix{Float64}(metadata["column_corr$k"]),Vector{Float64}(metadata["evencolumn_dist$k"])
+end
+
 function save_ft_dd(ft_dd_val::ComplexF64,angle::Float64,filepath::String)
     data_dict = Dict([("ft_dd_$angle",ft_dd_val)])
     modify_data_jld2(data_dict,filepath,"metadata"; output_level=1)

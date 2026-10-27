@@ -76,23 +76,29 @@ column_occupations(occs::Array{Int8,3}) = dropdims(sum(occs,dims=2),dims=2)
 # column statistics of weighted samples, see column_cdw_statistics in other-funcs/basic-2d-observables.jl
 column_cdw_statistics(occs::Array{Int8,3},weights::Vector{Float64}) = column_cdw_statistics(column_occupations(occs),weights)
 
-# S(pi), correlation ratio and Binder cumulant (cdw_order_parameters) with jackknife errors over nbins bins of samples.
-# The samples are independent (no Markov chain), so the bins only set the cost of the jackknife. The column statistics
-# are computed once per bin, the leave-one-bin-out ones are the weighted totals minus that bin
-function fpeps_cdw_order_parameters(occs::Array{Int8,3}, weights::Vector{Float64}; nbins::Int=20)
+# column statistics per bin of samples (sample i in bin mod1(i,nbins)) and the bin weights, for the jackknife errors
+function binned_column_cdw_statistics(occs::Array{Int8,3}, weights::Vector{Float64}; nbins::Int=20)
     ncols = column_occupations(occs)
     nbins = min(nbins, size(ncols,2))
     bins = [b:nbins:size(ncols,2) for b in 1:nbins]
-
-    bin_weights = [sum(view(weights,bin)) for bin in bins]
     bin_stats = [column_cdw_statistics(ncols[:,bin], weights[bin]) for bin in bins]
+    return first.(bin_stats), last.(bin_stats), [sum(view(weights,bin)) for bin in bins]
+end
+
+# weighted sums over bins of the column statistics, the totals are these over sum(bin_weights)
+bin_sums(corr_bins, dist_bins, bin_weights) = sum(bin_weights .* corr_bins), sum(bin_weights .* dist_bins)
+
+# S(pi), correlation ratio and Binder cumulant (cdw_order_parameters) of all bins with jackknife errors. The samples are
+# independent (no Markov chain), so the bins only set the cost of the jackknife; the leave-one-bin-out statistics are
+# the weighted sums minus that bin
+function jackknife_cdw_order_parameters(corr_bins::Vector{Matrix{Float64}}, dist_bins::Vector{Vector{Float64}}, bin_weights::Vector{Float64})
+    nbins = length(bin_weights)
     total_weight = sum(bin_weights)
-    total_corr = sum(bin_weights[b] .* bin_stats[b][1] for b in 1:nbins)
-    total_dist = sum(bin_weights[b] .* bin_stats[b][2] for b in 1:nbins)
+    total_corr, total_dist = bin_sums(corr_bins, dist_bins, bin_weights)
 
     values = collect(cdw_order_parameters(total_corr ./ total_weight, total_dist ./ total_weight))
-    jack = [collect(cdw_order_parameters((total_corr .- bin_weights[b] .* bin_stats[b][1]) ./ (total_weight - bin_weights[b]),
-                                         (total_dist .- bin_weights[b] .* bin_stats[b][2]) ./ (total_weight - bin_weights[b])))
+    jack = [collect(cdw_order_parameters((total_corr .- bin_weights[b] .* corr_bins[b]) ./ (total_weight - bin_weights[b]),
+                                         (total_dist .- bin_weights[b] .* dist_bins[b]) ./ (total_weight - bin_weights[b])))
             for b in 1:nbins]
     jack_mean = sum(jack) / nbins
     errors = sqrt.((nbins - 1) / nbins .* sum(j -> (j .- jack_mean).^2, jack))
@@ -101,13 +107,35 @@ function fpeps_cdw_order_parameters(occs::Array{Int8,3}, weights::Vector{Float64
     return (; s_pi, corr_ratio, binder, s_pi_err=errors[1], corr_ratio_err=errors[2], binder_err=errors[3])
 end
 
-# CDW order parameters of a saved fPEPS (fpeps-*.jld2 or wavefuncfpeps-*.jld2), sampled in the particle sector of its metadata
-function fpeps_cdw_order_parameters(filepath::String, nsamples::Int; nbins::Int=20, threaded::Bool=true)
+fpeps_cdw_order_parameters(occs::Array{Int8,3}, weights::Vector{Float64}; nbins::Int=20) =
+    jackknife_cdw_order_parameters(binned_column_cdw_statistics(occs, weights; nbins)...)
+
+# metadata entries of the GS (k = 1): the ED keys "column_corr1", "evencolumn_dist1" over all samples (column_cdw_statistics_dict)
+# plus the per-bin statistics for the jackknife, the number of samples and the optimisation step niter they were drawn at
+function fpeps_cdw_statistics_dict(corr_bins::Vector{Matrix{Float64}}, dist_bins::Vector{Vector{Float64}}, bin_weights::Vector{Float64}, nsamples::Int, niter)
+    total_corr, total_dist = bin_sums(corr_bins, dist_bins, bin_weights)
+    stats = column_cdw_statistics_dict(total_corr ./ sum(bin_weights), total_dist ./ sum(bin_weights), 1)
+    return merge(stats, Dict{String,Any}([("column_corr_bins1",corr_bins),("evencolumn_dist_bins1",dist_bins),("bin_weights1",bin_weights),
+        ("nsamples1",nsamples),("niter_sampled1",niter)]))
+end
+
+# CDW order parameters with jackknife errors back from metadata saved by fpeps_cdw_order_parameters(filepath, ...; if_save_data=true)
+function fpeps_cdw_order_parameters(metadata::Dict)
+    haskey(metadata,"column_corr_bins1") || error("no binned column statistics in the metadata")
+    return jackknife_cdw_order_parameters(Matrix{Float64}.(metadata["column_corr_bins1"]), Vector{Float64}.(metadata["evencolumn_dist_bins1"]),
+        Vector{Float64}(metadata["bin_weights1"]))
+end
+
+# CDW order parameters of a saved fPEPS (fpeps-*.jld2 or wavefuncfpeps-*.jld2), sampled in the particle sector of its metadata.
+# if_save_data adds the statistics (fpeps_cdw_statistics_dict) to the metadata of the fpeps-*.jld2 file, overwriting older ones
+function fpeps_cdw_order_parameters(filepath::String, nsamples::Int; nbins::Int=20, threaded::Bool=true, if_save_data::Bool=false)
     filepath = joinpath(dirname(filepath), remove_wavefunc_from_filename(basename(filepath)))
     _, metadata = read_data(filepath)
     wavefunc_data, _ = read_data(add_wavefunc_to_filepath(filepath))
     lx,ly,n = metadata["Lx"],metadata["Ly"],metadata["particles"]
 
     occs, weights = sample_fpeps_occupations(wavefunc_data["peps"], nsamples; max_counts=[n, lx*ly - n], threaded)
-    return fpeps_cdw_order_parameters(occs, weights; nbins)
+    binned_stats = binned_column_cdw_statistics(occs, weights; nbins)
+    if_save_data && modify_data(fpeps_cdw_statistics_dict(binned_stats..., size(occs,3), metadata["niter"]), filepath, "metadata")
+    return jackknife_cdw_order_parameters(binned_stats...)
 end
