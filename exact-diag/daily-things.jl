@@ -4782,8 +4782,8 @@ if false
 end=#
 
 # try Calabrese-Cardy scaling cut size to get central charge
-# for Ly = 4, it does not seem to be following expected scaling, could be because too thin and edges hybridize
-if true
+#= for Ly = 4, it does not seem to be following expected scaling, could be because too thin and edges hybridize
+if false
     using LsqFit
     lx,ly,n = 10,4,5
     if_cylinder = true
@@ -4830,7 +4830,7 @@ if true
         fitcuts = start_cut:div(lx,2)
         fit_result = curve_fit(cc_model,chords[fitcuts],ees[fitcuts],[1.0,0.0])
         c_fit = fit_result.param[1]
-        c_err = length(fitcuts) > 2 ? LsqFit.stderror(fit_result)[1] : NaN
+        c_err = LsqFit.stderror(fit_result)[1]
         #println("$(lx)x$(ly) N=$n OBC ULR=$intstren: c = $c_fit ± $c_err")
 
         append!(cs[i], c_fit)
@@ -4856,7 +4856,7 @@ if true
     legend()=#
 
 
-end#
+end=#
 
 # GS one-body correlations along x per row with OBC : gapless edge -> power law on the edge rows,
 #= gapped bulk -> exponential in the middle rows

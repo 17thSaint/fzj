@@ -11,13 +11,16 @@ Depends on:
 =#
 ######################################################
 
+using Pkg
+Pkg.activate(".")
+
 include("../other-funcs/include-other-files.jl")
 include("build-ham.jl")
 include("../other-funcs/data-storage-funcs.jl")
 
-using QuantumNaturalGradient, QuantumNaturalfPEPS, ITensors, ITensorMPS, JLD2#, Distributed
+using QuantumNaturalGradient, QuantumNaturalfPEPS, ITensors, ITensorMPS, JLD2, Distributed
 
-#=nr_procs, nr_threads = 2, 8
+nr_procs, nr_threads = 10, 4
 addprocs(nr_procs, exeflags="-t $nr_threads")
 
 @everywhere begin
@@ -25,17 +28,21 @@ addprocs(nr_procs, exeflags="-t $nr_threads")
     using LinearAlgebra
     BLAS.set_num_threads(1) # Each thread should only use one Blas thread
 end
-BLAS.set_num_threads(16) # For computing the double layers
-=#
+BLAS.set_num_threads(prod([nr_procs, nr_threads])) # For computing the double layers
+#
 
-lx,ly,n = 4,4,2
-intstren = 50.0
-bond_dim = 6
+lx,ly,n = 8,7,4
+intstren = 46.4159
+bond_dim = 5
 
-params_dict = Dict([("outputlevel",1),("if_check_fluxes",false),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("particles",n),("if_save_data",false),("filling",0.5),("if_find_data",false),("onsite_strength",intstren),("if_periodic_x",false),("if_periodic_y",false)])
+dataloc = get_folder_location("cluster-data/synth-dims/fpeps/flat-ints")
+
+params_dict = Dict([("outputlevel",1),("dataloc",dataloc),("bond_dim",bond_dim),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("particles",n),("if_save_data",true),("filling",0.5),("if_find_data",false),("onsite_strength",intstren),("if_periodic_x",false),("if_periodic_y",false)])
+
+eigencut, contract_cutoff, sample_cutoff = 1e-6, 1e-6, 5e-4
 
 hilbert = ITensors.siteinds("S=1/2",lx,ly)
-peps = PEPS(ComplexF64, hilbert; bond_dim=bond_dim)
+peps = PEPS(ComplexF64, hilbert; bond_dim=bond_dim, contract_cutoff=contract_cutoff, sample_cutoff=sample_cutoff)
 QuantumNaturalfPEPS.multiply_algebraic_spectrum!(peps, 3.)
 
 # [#Up = occupied, #Dn = empty]; sz_sector_counts(peps, Q) fixes total Sz = Q, i.e. n - lx*ly/2 here
@@ -48,19 +55,17 @@ ham_opsum = long_range_HH_ham(params_dict)
 Oks_and_Eks = QuantumNaturalfPEPS.generate_Oks_and_Eks(peps, ham_opsum; threaded=true, multiproc=true, max_counts)
 
 # Setup the Integrator and Solver
-learning_rate, sample_nr, maxiter = 0.01, 2000, 20
+learning_rate, sample_nr, maxiter = 0.05, 3000, 5000
 integrator = QuantumNaturalGradient.Euler(lr=learning_rate)
-solver = QuantumNaturalGradient.EigenSolver()
+solver = QuantumNaturalGradient.EigenSolver(eigencut)
 
 # Define a Parameters object to be evolved
 θ = QuantumNaturalGradient.Parameters(peps)
 
 # Saving: like the TTNs, the PEPS goes in wavefuncfpeps-<params>.jld2 and the light data + metadata in fpeps-<params>.jld2
 if_save_data = params_dict["if_save_data"]
-dataloc = get(params_dict, "dataloc", get_folder_location("cluster-data/synth-dims/fpeps"))
-filename_keys = ["Lx","Ly","particles","onsite_strength","lr","hopping_anisotropy","if_periodic_x","if_periodic_y"]
-filename_dict = merge(Dict([(k,params_dict[k]) for k in filename_keys]), Dict([("bond_dim",bond_dim)]))
-metadata = merge(params_dict, Dict([("bond_dim",bond_dim),("sample_nr",sample_nr),("maxiter",maxiter),("learning_rate",learning_rate),("solver",string(typeof(solver))),("integrator",string(typeof(integrator))),("location",dataloc),("niter",0)]))
+filename_dict = make_fpeps_filename(params_dict)
+metadata = merge(params_dict, Dict([("bond_dim",bond_dim),("sample_nr",sample_nr),("maxiter",maxiter),("learning_rate",learning_rate),("solver",string(typeof(solver))),("integrator",string(typeof(integrator))),("location",dataloc),("niter",0),("contract_cutoff",contract_cutoff),("sample_cutoff",sample_cutoff),("eigencut",eigencut)]))
 filepath = if_save_data ? joinpath(dataloc, save_initial_fpeps(peps, metadata; location=dataloc, name="fpeps-" * make_parameters_filename(filename_dict) * ".jld2")) : nothing
 
 # Callback: overwrite the saved PEPS and history at each iteration (returning false would stop evolve)
@@ -69,7 +74,7 @@ function callback(; misc, kwargs...)
     return nothing
 end
 
-@time loss_value, trained_θ, misc = QuantumNaturalGradient.evolve(Oks_and_Eks, θ;
+loss_value, trained_θ, misc = QuantumNaturalGradient.evolve(Oks_and_Eks, θ;
         integrator,
         verbosity=2,
         solver,

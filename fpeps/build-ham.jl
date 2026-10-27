@@ -138,6 +138,46 @@ function strip_peps(peps)
         show_warning=peps.show_warning, mask=peps.mask)
 end
 
+# make filename
+function make_fpeps_filename(model_parameters::Dict)
+	# Start with the usual stuff for every filename
+	longrange_dist = model_parameters["lr"]
+	num_particles = model_parameters["particles"]
+	alpha = model_parameters["alpha"]
+	onsite_strength = model_parameters["onsite_strength"]
+	anis = model_parameters["hopping_anisotropy"]
+	bond_dim = model_parameters["bond_dim"]
+	
+	filename_dict::Dict{String,Any} = Dict([("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("onsite_strength",onsite_strength),("hopping_anisotropy",anis),("bond_dim",bond_dim)])
+
+	if model_parameters["scaling"] != "flat"
+		filename_dict["scaling"] = model_parameters["scaling"]
+		if model_parameters["scaling"] == "gaussian"
+			filename_dict["sigma"] = model_parameters["sigma"]
+		elseif model_parameters["scaling"] == "exp"
+			filename_dict["corr_length"] = model_parameters["corr_length"]
+		elseif model_parameters["scaling"] == "rydberg"
+			filename_dict["blockade_radius"] = model_parameters["blockade_radius"]
+		else
+			error("ULR Scaling Type Not Recognized: $(model_parameters["scaling"])")
+		end
+	end
+
+	if model_parameters["ts"] != 1.0
+		filename_dict["ts"] = model_parameters["ts"]
+	end
+
+	filename_dict["Lx"] = model_parameters["lattice_size"][1]
+	filename_dict["Ly"] = model_parameters["lattice_size"][2]
+
+	if model_parameters["if_pinning"]
+		filename_dict["if_pinning"] = true
+	end
+
+	return filename_dict
+end
+
+
 # main file first, so the wavefunc file takes its (possibly mk-renamed) name
 function save_initial_fpeps(peps, metadata::Dict; kwargs...)
     location, filename = kwargs[:location], kwargs[:name]

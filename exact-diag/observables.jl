@@ -143,48 +143,19 @@ function get_manifold_occupancy(states::Vector{Vector{ComplexF64}},lattice_param
     return final_dens, final_eigs
 end
 
-# column statistics for the CDW order parameters, with column occupations n_x = sum_y n_{x,y} (x physical):
-# column_corr[x,x'] = <n_x n_x'> and evencolumn_dist[k+1] = P(k particles on even columns), k = 0..N.
-# Small enough to save in metadata and correlation based, so works for translation invariant eigenstates
-function column_cdw_statistics(wavefunc::Vector{ComplexF64},lattice_params::Dict)
-    Lx::Int64,Ly::Int64,N::Int64 = lattice_params["Lx"],lattice_params["Ly"],lattice_params["N"]
-    full_basis = lattice_params["full_basis"]
-
-    column_corr = zeros(Float64,Lx,Lx)
-    evencolumn_dist = zeros(Float64,N+1)
-    ncol = zeros(Int64,Lx)
-
-    for i in 1:size(full_basis,2)
-        fill!(ncol,0)
-        for s in view(full_basis,:,i)
-            ncol[coordinate(s,Lx,Ly)[1]] += 1
-        end
-        p = abs2(wavefunc[i])
-        evencolumn_dist[sum(view(ncol,2:2:Lx))+1] += p
-        for x in 1:Lx, xx in 1:Lx
-            column_corr[x,xx] += p * ncol[x] * ncol[xx]
-        end
+# column occupations ncols[x,i] = sum_y n_{x,y} of basis state i, for column_cdw_statistics in
+# other-funcs/basic-2d-observables.jl (site s sits in column x = mod1(s,Lx), as in coordinate)
+function column_occupations(full_basis::AbstractMatrix{<:Integer},Lx::Int64)
+    ncols = zeros(Int8,Lx,size(full_basis,2))
+    for i in 1:size(full_basis,2), s in view(full_basis,:,i)
+        ncols[mod1(s,Lx),i] += 1
     end
-
-    return column_corr, evencolumn_dist
+    return ncols
 end
 
-# CDW order parameters from column_cdw_statistics (pass averages over a manifold to make them basis independent):
-# S(pi) = <|sum_x e^{i pi x} n_x|^2> / N, correlation ratio 1 - S(pi - 2pi/Lx)/S(pi), and Binder cumulant
-# 1 - <m^4>/(3<m^2>^2) of the staggered column magnetization m = sum_x (-1)^x n_x / N
-function cdw_order_parameters(column_corr::Matrix{Float64},evencolumn_dist::Vector{Float64})
-    Lx::Int64 = size(column_corr,1)
-    N::Int64 = length(evencolumn_dist) - 1
-
-    structure_factor(q) = real(sum(exp(im*q*(x-xx)) * column_corr[x,xx] for x in 1:Lx, xx in 1:Lx)) / N
-    s_pi = structure_factor(pi)
-    corr_ratio = 1 - structure_factor(pi - 2pi/Lx) / s_pi
-
-    stag_mags = [(2k - N) / N for k in 0:N]
-    m2,m4 = dot(evencolumn_dist,stag_mags.^2),dot(evencolumn_dist,stag_mags.^4)
-    binder = 1 - m4 / (3*m2^2)
-
-    return s_pi, corr_ratio, binder
+# column statistics of an ED eigenstate, see column_cdw_statistics in other-funcs/basic-2d-observables.jl
+function column_cdw_statistics(wavefunc::Vector{ComplexF64},lattice_params::Dict)
+    return column_cdw_statistics(column_occupations(lattice_params["full_basis"],lattice_params["Lx"]),abs2.(wavefunc))
 end
 
 # functions for two-site correlation along physical or synthetic dimension, made from density matrix

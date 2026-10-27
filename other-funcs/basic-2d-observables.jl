@@ -51,6 +51,46 @@ function get_cdwsf_occs(angle::Float64,occs::Matrix{Float64},radius::Int64=1; kw
     return get_cdwsf_occs(qvec,occs; kwargs...)
 end
 
+# column statistics for the CDW order parameters from configurations i with probability probs[i] (normalized here)
+# and column occupations ncols[x,i] = sum_y n_{x,y} (x physical), see column_occupations in exact-diag/observables.jl
+# (ED basis) and fpeps/observables.jl (samples): column_corr[x,x'] = <n_x n_x'> and evencolumn_dist[k+1] =
+# P(k particles on even columns), k = 0..N. Small enough to save in metadata and correlation based, so works for
+# translation invariant states
+function column_cdw_statistics(ncols::AbstractMatrix{<:Integer},probs::AbstractVector{Float64})
+    Lx::Int64 = size(ncols,1)
+    N::Int64 = sum(view(ncols,:,1))
+    all(sum(ncols,dims=1) .== N) || error("configurations have different particle numbers")
+
+    w = probs ./ sum(probs)
+    ncols_float = Float64.(ncols)
+    column_corr = (ncols_float .* transpose(w)) * transpose(ncols_float)
+
+    evencolumn_dist = zeros(Float64,N+1)
+    for (i,k) in enumerate(sum(view(ncols,2:2:Lx,:),dims=1))
+        evencolumn_dist[k+1] += w[i]
+    end
+
+    return column_corr, evencolumn_dist
+end
+
+# CDW order parameters from column_cdw_statistics (pass averages over a manifold to make them basis independent):
+# S(pi) = <|sum_x e^{i pi x} n_x|^2> / N, correlation ratio 1 - S(pi - 2pi/Lx)/S(pi), and Binder cumulant
+# 1 - <m^4>/(3<m^2>^2) of the staggered column magnetization m = sum_x (-1)^x n_x / N
+function cdw_order_parameters(column_corr::Matrix{Float64},evencolumn_dist::Vector{Float64})
+    Lx::Int64 = size(column_corr,1)
+    N::Int64 = length(evencolumn_dist) - 1
+
+    structure_factor(q) = real(sum(exp(im*q*(x-xx)) * column_corr[x,xx] for x in 1:Lx, xx in 1:Lx)) / N
+    s_pi = structure_factor(pi)
+    corr_ratio = 1 - structure_factor(pi - 2pi/Lx) / s_pi
+
+    stag_mags = [(2k - N) / N for k in 0:N]
+    m2,m4 = dot(evencolumn_dist,stag_mags.^2),dot(evencolumn_dist,stag_mags.^4)
+    binder = 1 - m4 / (3*m2^2)
+
+    return s_pi, corr_ratio, binder
+end
+
 function save_ft_dd(ft_dd_val::ComplexF64,angle::Float64,filepath::String)
     data_dict = Dict([("ft_dd_$angle",ft_dd_val)])
     modify_data_jld2(data_dict,filepath,"metadata"; output_level=1)

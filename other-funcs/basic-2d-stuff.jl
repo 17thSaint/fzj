@@ -296,31 +296,6 @@ function long_range_scaling(x_final::Int64,virt_edge_length::Int64,initial_stren
         for x in 1:virt_edge_length-1
             strengths[x+1] = initial_strength * (1 / (a*x)^3)
         end
-        #= need to apply a cap to the strength at 10^4
-        if maximum(strengths[2:end]) > 10^5
-            strengths[2:end] .= 10^5
-        end=#
-    elseif scaling_func == "magnetic_gradient"
-        # the field gradient displaces the synthetic states, so the spacing entering the
-        # dipolar tail follows a(t) = a0 + int_0^t B(t') sin(w(t-t'))/w dt'; the integral is
-        # accumulated by the caller (timeham in time-evolution.jl) and is zero at t = 0, where
-        # this reduces exactly to the "dd" profile at the initial spacing a0 = magnetic_spacing.
-        # Once the gradient switches off the displacement rings about zero rather than settling,
-        # so a0 + x goes negative whenever the ring amplitude exceeds a0. The spacing is an
-        # unsigned distance -- the states pass through each other and separate again -- so the
-        # tail follows |a| and stays repulsive rather than flipping sign at the crossing
-        a = abs(get(kwargs, :magnetic_spacing, 0.0) + kwargs[:magnetic_gradient_integral])
-        a == 0.0 && error("Magnetic gradient spacing is zero: either magnetic_spacing was left " *
-            "at zero, or the accumulated displacement cancels a0 exactly and the dipolar tail " *
-            "diverges -- raise magnetic_spacing or lower the gradient amplitude")
-        strengths = zeros(virt_edge_length)
-        strengths[1] = initial_strength
-        for x in 1:virt_edge_length-1
-            strengths[x+1] = initial_strength * (1 / (a*x)^3)
-        end
-        #=if maximum(strengths[2:end]) > 10^5
-            strengths[2:end] .= 10^5
-        end=#
     elseif scaling_func == "powerlaw"
         exponent = kwargs[:exponent]
         spacing = kwargs[:magnetic_spacing]
@@ -329,8 +304,6 @@ function long_range_scaling(x_final::Int64,virt_edge_length::Int64,initial_stren
         for x in 1:virt_edge_length-1
             strengths[x+1] = initial_strength * (1 / ((spacing*x)^exponent))
         end
-    else
-        error("Scaling function not recognized: ",scaling_func)
 	end
 	
 	strengths = round.(strengths,digits=trunc)

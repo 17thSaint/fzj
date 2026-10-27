@@ -1,6 +1,6 @@
 # Dipolar phase transition — status
 
-Update **Current state**, **Open questions** and **Log** as things change. Last updated: 2026-10-20
+Update **Current state**, **Open questions** and **Log** as things change. Last updated: 2026-10-27
 
 ## Goal
 
@@ -310,8 +310,12 @@ Notes for any new p:
   scaling…", "cdw transition for 8xi N=4 scaling…" = current Γ_c fits and plots; second figure
   Γ_c(Ly) and b(p) with error bars).
 - `exact-diag/execute-ed.jl`: `if false` runner block for the OBC/cylinder sweeps.
-- `exact-diag/observables.jl`: `get_manifold_occupancy` (→ `occs_eig1/2`); `column_cdw_statistics`
-  (⟨n_x n_x'⟩, P(k on even columns)) and `cdw_order_parameters` (S(π), correlation ratio, Binder).
+- CDW order parameters, shared by ED and fPEPS in `other-funcs/basic-2d-observables.jl`:
+  `column_cdw_statistics(ncols, probs)` (⟨n_x n_x'⟩, P(k on even columns) from column occupations
+  `ncols[x,i]` of configurations with probabilities) and `cdw_order_parameters` (S(π), correlation
+  ratio, Binder). Each method only supplies `column_occupations` + probabilities.
+- `exact-diag/observables.jl`: `get_manifold_occupancy` (→ `occs_eig1/2`); `column_occupations(full_basis, Lx)`
+  and the ED wrapper `column_cdw_statistics(wavefunc, lattice_params)` (same call as before).
 - `synth-dims/ed-plus-ttns.jl`: ED+TTN torus analysis; scaling blocks at the end (s_c/l_B plateau,
   Γ with V = 300, 50, boundary-interaction check), all `#= =#`.
 - `synth-dims/dd-paper-plots.jl`: paper figures (so far: shifted Zeeman minima + 1/(s r)³ profile).
@@ -322,6 +326,12 @@ Notes for any new p:
   `continue_fpeps(filepath, extra_iters)` (build-ham.jl) resumes a saved run in the same files.
   With open boundaries the 4x4 N=2 test trips `check_fluxes` (α = 2/(0.5·3·3) = 0.44, "Alpha is
   too large"); add `"if_check_fluxes" => false` to the params dict to skip the check.
+- `fpeps/observables.jl` (no ED includes): `sample_fpeps_occupations` (`get_sample` + importance
+  weights |ψ|²/p_c → `occs[x,y,i]`), `column_occupations(occs)`, `column_cdw_statistics(occs, weights)`;
+  `fpeps_cdw_order_parameters(occs, weights)` adds jackknife errors (one pass over bins),
+  `(filepath, nsamples)` reads a saved run. `exact_fpeps_occupations(peps, N)` enumerates the sector
+  exactly (small systems only).
+- `fpeps/daily-things.jl`: fPEPS scratch blocks; first block tests the above against exact enumeration.
 - `synth-dims/long-range-ttn.jl`: TTN runner. `synth-dims/daily-things.jl`: TTN scratch.
 - Data:
   - ED torus `cluster-data/exact-diag/torus/new-gauge/dd-ints/`: V=300: 6x3 (42), 8x4 (65),
@@ -478,3 +488,9 @@ Notes for any new p:
   S(π) at Ly = 4 and for large p, unreliable for small p at Ly = 7.
 - 2026-10-20 — Threaded cluster runner for p = 4, 5, 6 at 8×Ly N=4 in `execute-ed.jl` (not run yet);
   Γ_c guesses from a 6×Ly coarse scan; found the default Lanczos leaves upper levels unconverged at large Γ.
+- 2026-10-27 — fPEPS CDW order parameters (`fpeps/observables.jl`, test in `fpeps/daily-things.jl`):
+  random 4x4 N=2 D=3 PEPS, 16000 samples match exact enumeration within 1σ (S(π) 1.081 ± 0.014 vs
+  1.094, Binder 0.384 ± 0.008 vs 0.391). The combinatorial sector proposal gives n_eff ≈ 0.4 × samples.
+- 2026-10-27 — CDW statistics/order parameters moved to `other-funcs/basic-2d-observables.jl` (ED and
+  fPEPS only supply column occupations). ED: identical to the old code and saved metadata to 1e-14
+  (29 OBC files, Lx sweep), 60× faster (10x4 N=5: 0.07 s vs 4.4 s). fPEPS jackknife identical, 75× faster.

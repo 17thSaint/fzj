@@ -136,7 +136,7 @@ function get_params_dict_from_filename(filename_before)
 	end
 	if split(filename,"-")[1] in ["virt","phys","Y","X"]
 		split_filename = split(filename,"-")[4:end]
-	elseif split(filename,"-")[1] in ["mps","ttn","rfa","laugh","basis","ed","wavefuncmps","wavefuncttn","fpeps","wavefuncfpeps","hopping","interaction","periodicpotential","disorder","tevo","wavefunctevo"]
+	elseif split(filename,"-")[1] in ["mps","ttn","rfa","laugh","basis","ed","wavefuncmps","wavefuncttn","hopping","interaction","tevo","wavefunctevo","fpeps","wavefuncfpeps"]
 		split_filename = split(filename,"-")[2:end]
 	else
 		split_filename = split(filename,"-")
@@ -244,6 +244,7 @@ function find_data_file(params_dict,calc_type,location::String="/home/patrick/fz
 	remove_indices = []
 	# this is for finding a single file with all the correct parameters in the filename
 	if if_exact
+		println("Finding Exact File Match")
 		for i in 1:length(file_choices)
 			current_file = file_choices[i]
 			current_file_params_dict = get_params_dict_from_filename(current_file)
@@ -262,9 +263,15 @@ function find_data_file(params_dict,calc_type,location::String="/home/patrick/fz
 				try
 					!(current_file_params_dict[params] in params_dict[params]) && append!(remove_indices,i)
 				catch
-					if !haskey(current_file_params_dict, params) || current_file_params_dict[params] != params_dict[params]
+					#=try
+						#println("Error in first Attempt, $current_file")
+						current_file_metadata_dict = read_data(current_file; kwargs...)[2]
+						current_file_metadata_dict[params] in params_dict[params] ? nothing : append!(remove_indices,i)
+					catch
+						#println("Parameter $params could not be found in file $current_file, skipping")
 						append!(remove_indices,i)
-					end
+					end=#
+					append!(remove_indices,i)
 				end
 			end
 		end
@@ -301,7 +308,7 @@ end
 function check_plot_label(file_name,version)
 	split_name = split(file_name,"-")
 	potential_type = split_name[1]
-	if potential_type in ["densdens","occs","ttn","Y-dir-GF","X-dir-GF","Y-dir-current","X-dir-current","mps","rfa","laugh","tevo","fpeps"]
+	if potential_type in ["densdens","occs","ttn","Y-dir-GF","X-dir-GF","Y-dir-current","X-dir-current","mps","rfa","laugh","tevo"]
 		if potential_type != version
 			println("Wrong Plot Label: changing $potential_type => $version")
 			file_name = "$version-" * join(split_name[2:end],"-")
