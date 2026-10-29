@@ -325,15 +325,17 @@ Notes for any new p:
 - `fpeps/execute-fpeps.jl`: fPEPS (QuantumNaturalfPEPS + QuantumNaturalGradient, env
   `--project=fpeps`), Hamiltonian from `fpeps/build-ham.jl` (`long_range_HH_ham`, hardcore bosons
   on S=1/2, takes ED key names `if_periodic_x/y`). Currently a 4x4 N=2 flat Ui = 50 test, D = 6,
-  20 iterations; goal is larger open systems. Saves like the TTNs (2026-10-20, see Gotchas);
-  `continue_fpeps(filepath, extra_iters)` (build-ham.jl) resumes a saved run in the same files.
+  20 iterations; goal is larger open systems. Saves like the TTNs (2026-10-20, see Gotchas); saving,
+  the per-iteration `saving_fpeps_callback` and `continue_fpeps(filepath, extra_iters)` (resumes a
+  saved run in the same files) are in `fpeps/savings.jl` (2026-10-29).
   With open boundaries the 4x4 N=2 test trips `check_fluxes` (α = 2/(0.5·3·3) = 0.44, "Alpha is
   too large"); add `"if_check_fluxes" => false` to the params dict to skip the check.
 - `fpeps/observables.jl` (no ED includes): `sample_fpeps_occupations` (`get_sample` + importance
   weights |ψ|²/p_c → `occs[x,y,i]`), `column_occupations(occs)`, `column_cdw_statistics(occs, weights)`;
   `fpeps_cdw_order_parameters(occs, weights)` adds jackknife errors (one pass over bins),
   `(filepath, nsamples; if_save_data)` samples a saved run and optionally saves into its fpeps-*.jld2
-  metadata, `(metadata)` redoes the jackknife from saved bins. `exact_fpeps_occupations(peps, N)` enumerates the sector
+  metadata, `(metadata)` redoes the jackknife from saved bins. `output_level` 1/2 prints run info / sampling
+  progress every 10% with time left (default 0, silent). `exact_fpeps_occupations(peps, N)` enumerates the sector
   exactly (small systems only).
 - `fpeps/daily-things.jl`: fPEPS scratch blocks; first block tests the above against exact enumeration.
 - `synth-dims/long-range-ttn.jl`: TTN runner. `synth-dims/daily-things.jl`: TTN scratch.

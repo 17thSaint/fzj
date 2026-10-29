@@ -5,6 +5,7 @@ This file contains daily things for fPEPS
 
 Depends on:
     fpeps/build-ham.jl
+    fpeps/savings.jl
     fpeps/observables.jl
     other-funcs/data-storage-funcs.jl
 
@@ -12,9 +13,9 @@ Depends on:
 ######################################################
 
 include("../other-funcs/include-other-files.jl")
-include_other_files(["fpeps/build-ham.jl","fpeps/observables.jl","other-funcs/data-storage-funcs.jl"])
+include_other_files(["fpeps/build-ham.jl","fpeps/savings.jl","fpeps/observables.jl","other-funcs/data-storage-funcs.jl"])
 
-using QuantumNaturalfPEPS, ITensors, ITensorMPS, JLD2, Random
+using QuantumNaturalGradient, QuantumNaturalfPEPS, ITensors, ITensorMPS, JLD2, Random
 
 
 ### test CDW order parameters (S(pi), correlation ratio, Binder) from samples against exact enumeration,
@@ -50,8 +51,7 @@ if false
     dataloc = get_folder_location("cluster-data/synth-dims/fpeps")
     nsamples = 4000
     for f in filter(f -> startswith(f,"fpeps-"), readdir(dataloc))
-        ops = fpeps_cdw_order_parameters(joinpath(dataloc,f), nsamples; if_save_data=true)
-        println("$f: S(pi) = $(ops.s_pi) ± $(ops.s_pi_err), Binder = $(ops.binder) ± $(ops.binder_err)")
+        ops = fpeps_cdw_order_parameters(joinpath(dataloc,f), nsamples; if_save_data=true, output_level=2)
     end
 end
 

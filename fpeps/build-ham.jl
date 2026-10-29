@@ -32,56 +32,106 @@ function get_hopping_coeff(site,axis::Int,t_x::Float64,t_y::Float64,alpha::Float
 	return coeff
 end
 
-function long_range_HH_ham(model_paras::Dict{String,Any})
-
-	Lx,Ly = model_paras["Lx"],model_paras["Ly"]
+function get_normal_model_paras(params_dict::Dict{String,Any})
+	
+	Lx,Ly = params_dict["Lx"],params_dict["Ly"]
 	L = (Lx,Ly)
 	num_sites = Lx*Ly
-	outputlevel = get(model_paras, "outputlevel", 1)
+	outputlevel = get(params_dict, "outputlevel", 1)
 	outputlevel > 0 ? println("Lx = ",Lx,", Ly = ",Ly) : nothing
 
+	bond_dim = get(params_dict, "bond_dim", 5)
+
 	# lattice
-	if_periodic_x = get(model_paras, "if_periodic_x", false)
-	if_periodic_y = get(model_paras, "if_periodic_y", false)
+	if_periodic_x = get(params_dict, "if_periodic_x", false)
+	if_periodic_y = get(params_dict, "if_periodic_y", false)
 	if_per = (if_periodic_x,if_periodic_y)
 
 	# hopping and flux
-	t_strength::Float64 = get(model_paras, "ts", 1.0)
-	t_x,t_y = get_hopping_strengths(t_strength, Float64(get(model_paras, "hopping_anisotropy", 1.0)))
-	twist_angle = get(model_paras, "twist_angle", [0.0,0.0])
-	if haskey(model_paras, "alpha")
-		alpha = Float64(model_paras["alpha"])
+	t_strength = get(params_dict, "ts", 1.0)
+	hopping_anisotropy = get(params_dict, "hopping_anisotropy", 1.0)
+	t_x,t_y = get_hopping_strengths(t_strength, hopping_anisotropy)
+	twist_angle = get(params_dict, "twist_angle", [0.0,0.0])
+	particles = get(params_dict, "particles", Int(ceil(Lx/2)))
+	if haskey(params_dict, "alpha")
+		alpha = Float64(params_dict["alpha"])
 	else
-		particles = get(model_paras, "particles", Int(ceil(Lx/2)))
-		filling = get(model_paras, "filling", 0.5)
+		filling = get(params_dict, "filling", 0.5)
 		alpha = filling == 0.0 ? 0.0 : particles/(filling*(Lx - !if_periodic_x)*(Ly - !if_periodic_y))
 	end
-	get(model_paras, "no_magF", false) ? alpha = 0.0 : nothing
-	flux_direction = get(model_paras, "flux_direction", "y")
+	flux_direction = get(params_dict, "flux_direction", "y")
 	if if_periodic_y && !if_periodic_x
 		flux_direction = "y"
 	elseif if_periodic_x && !if_periodic_y
 		flux_direction = "x"
 	end
-	if get(model_paras, "if_check_fluxes", true) && alpha != 0.0
+	if get(params_dict, "if_check_fluxes", true) && alpha != 0.0
 		flux_direction = check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y,flux_direction; output_level=outputlevel)
 	end
 
 	# interactions, which_dir is the axis the long-range interaction acts along ("x", "y" or "both")
-	onsite_strength::Float64 = get(model_paras, "onsite_strength", 0.0)
-	scaling = get(model_paras, "scaling", "flat")
-	which_dir = scaling == "rydberg" ? "both" : get(model_paras, "which_dir", "y")
+	onsite_strength::Float64 = get(params_dict, "onsite_strength", 0.0)
+	scaling = get(params_dict, "scaling", "flat")
+	which_dir = scaling == "rydberg" ? "both" : get(params_dict, "which_dir", "y")
 	interaction_axis_length = which_dir == "x" ? Lx : which_dir == "y" ? Ly : max(Lx,Ly)
-	scaling_distance = get(model_paras, "lr", 0)
+	scaling_distance = get(params_dict, "lr", 0)
 	scaling_distance == "all" ? scaling_distance = interaction_axis_length - 1 : nothing
-	scaling_kwargs = Dict(Symbol(k) => v for (k,v) in model_paras)
+	scaling_kwargs = Dict(Symbol(k) => v for (k,v) in params_dict)
 	long_range_strengths = long_range_scaling(scaling_distance,interaction_axis_length,onsite_strength; scaling_kwargs...)
 	outputlevel > 0 ? display(long_range_strengths) : nothing
 
 	# on-site potentials
+	chem_strength = get(params_dict, "chem_strength", 0.0)
+	if_pinning = get(params_dict, "if_pinning", false)
+	pinning_strength::Float64 = get(params_dict, "pinning_strength", 1e-4)
+
+	# saving stuff
+	dataloc = get(params_dict, "dataloc", get_folder_location("cluster-data/synth-dims/fpeps"))
+	if_save_data = get(params_dict, "if_save_data", true)
+
+	model_paras::Dict{String,Any} = Dict([("Lx",Lx),("Ly",Ly),("particles",particles),("num_sites",num_sites),("if_periodic_x",if_periodic_x),("if_periodic_y",if_periodic_y),
+		("t_x",t_x),("t_y",t_y),("hopping_anisotropy",hopping_anisotropy),("twist_angle",twist_angle),("alpha",alpha),("flux_direction",flux_direction),
+		("onsite_strength",onsite_strength),("scaling",scaling),("which_dir",which_dir),
+		("interaction_axis_length",interaction_axis_length),("long_range_strengths",long_range_strengths),
+		("chem_strength",chem_strength),("if_pinning",if_pinning),("pinning_strength",pinning_strength),("outputlevel",outputlevel),
+		("dataloc",dataloc),("if_save_data",if_save_data),("bond_dim",bond_dim)])
+
+	
+	
+	return model_paras
+end
+
+function long_range_HH_ham(model_paras::Dict{String,Any})
+
+	Lx,Ly = model_paras["Lx"],model_paras["Ly"]
+	L = (Lx,Ly)
+	num_sites = Lx*Ly
+	outputlevel = model_paras["outputlevel"]
+
+	# lattice
+	if_periodic_x = false
+	if_periodic_y = false
+	if_per = (if_periodic_x,if_periodic_y)
+
+	# hopping and flux
+	t_x,t_y = model_paras["t_x"],model_paras["t_y"]
+	twist_angle = model_paras["twist_angle"]
+	alpha = Float64(model_paras["alpha"])
+	flux_direction = model_paras["flux_direction"]
+
+	# interactions, which_dir is the axis the long-range interaction acts along ("x", "y" or "both")
+	long_range_strengths = model_paras["long_range_strengths"]
+	which_dir = model_paras["which_dir"]
+
+	# on-site potentials
 	chem_strength = get(model_paras, "chem_strength", 0.0)
 	if_pinning = get(model_paras, "if_pinning", false)
-	pinning_strength::Float64 = get(model_paras, "pinning_strength", 1e-4)
+	pinning_strength = get(model_paras, "pinning_strength", 1e-4)
+
+	# on-site potentials
+	chem_strength = get(model_paras, "chem_strength", 0.0)
+	if_pinning = get(model_paras, "if_pinning", false)
+	pinning_strength = get(model_paras, "pinning_strength", 1e-4)
 
 	ham = ITensors.OpSum()
 
@@ -128,117 +178,4 @@ function long_range_HH_ham(model_paras::Dict{String,Any})
 	end
 
 	return ham
-end
-
-# cached double-layer envs are big and rebuilt on demand, so they're not saved
-function strip_peps(peps)
-    return PEPS(peps.tensors, peps.bond_dim; sample_dim=peps.sample_dim, sample_cutoff=peps.sample_cutoff,
-        contract_dim=peps.contract_dim, contract_cutoff=peps.contract_cutoff,
-        double_contract_dim=peps.double_contract_dim, double_contract_cutoff=peps.double_contract_cutoff,
-        show_warning=peps.show_warning, mask=peps.mask)
-end
-
-# make filename
-function make_fpeps_filename(model_parameters::Dict)
-	# Start with the usual stuff for every filename
-	longrange_dist = model_parameters["lr"]
-	num_particles = model_parameters["particles"]
-	alpha = model_parameters["alpha"]
-	onsite_strength = model_parameters["onsite_strength"]
-	anis = model_parameters["hopping_anisotropy"]
-	bond_dim = model_parameters["bond_dim"]
-	
-	filename_dict::Dict{String,Any} = Dict([("lr",longrange_dist),("particles",num_particles),("alpha",round(alpha,digits=4)),("onsite_strength",onsite_strength),("hopping_anisotropy",anis),("bond_dim",bond_dim)])
-
-	if model_parameters["scaling"] != "flat"
-		filename_dict["scaling"] = model_parameters["scaling"]
-		if model_parameters["scaling"] == "gaussian"
-			filename_dict["sigma"] = model_parameters["sigma"]
-		elseif model_parameters["scaling"] == "exp"
-			filename_dict["corr_length"] = model_parameters["corr_length"]
-		elseif model_parameters["scaling"] == "rydberg"
-			filename_dict["blockade_radius"] = model_parameters["blockade_radius"]
-		else
-			error("ULR Scaling Type Not Recognized: $(model_parameters["scaling"])")
-		end
-	end
-
-	if model_parameters["ts"] != 1.0
-		filename_dict["ts"] = model_parameters["ts"]
-	end
-
-	filename_dict["Lx"] = model_parameters["lattice_size"][1]
-	filename_dict["Ly"] = model_parameters["lattice_size"][2]
-
-	if model_parameters["if_pinning"]
-		filename_dict["if_pinning"] = true
-	end
-
-	return filename_dict
-end
-
-
-# main file first, so the wavefunc file takes its (possibly mk-renamed) name
-function save_initial_fpeps(peps, metadata::Dict; kwargs...)
-    location, filename = kwargs[:location], kwargs[:name]
-    actual_filename = write_data(filename, Dict([("history",nothing),("energy",nothing),("rng",nothing)]), location, metadata)
-    write_data("wavefunc"*actual_filename, Dict([("peps",strip_peps(peps))]), location, metadata)
-    return actual_filename
-end
-
-# misc from QuantumNaturalGradient.evolve; history/energy/rng/niter are what misc_restart needs
-function save_fpeps(peps, misc::Dict, filepath::String)
-    modify_data(Dict([("peps",strip_peps(peps))]), add_wavefunc_to_filepath(filepath), "all_data")
-    modify_data(Dict([("history",misc["history"]),("energy",misc["energy"]),("rng",misc["rng"])]), filepath, "all_data")
-    modify_data(Dict([("niter",misc["niter"])]), filepath, "metadata")
-end
-
-# Continue a saved groundstate search for extra_iters more iterations. filepath is the fpeps-*.jld2 or its
-# wavefuncfpeps-*.jld2 (a bare filename is looked for in cluster-data/synth-dims/fpeps). The PEPS, history,
-# energy, rng and niter are read back and the Hamiltonian rebuilt from the metadata; sample_nr and the Euler
-# learning rate default to the saved ones. With if_save_data the same two files keep being overwritten
-function continue_fpeps(filepath::String, extra_iters::Int; if_save_data::Bool=true, sample_nr=nothing, learning_rate=nothing,
-        integrator=nothing, solver=QuantumNaturalGradient.EigenSolver(), threaded=true, multiproc=true, verbosity=2)
-
-    occursin("/",filepath) ? nothing : filepath = joinpath(get_folder_location("cluster-data/synth-dims/fpeps"), filepath)
-    filepath = joinpath(dirname(filepath), remove_wavefunc_from_filename(basename(filepath)))
-    data, metadata = read_data(filepath)
-    wavefunc_data, _ = read_data(add_wavefunc_to_filepath(filepath))
-    peps = wavefunc_data["peps"]
-    params_dict = Dict{String,Any}(metadata)
-
-    # niter = 0 means no iteration finished before the run stopped, so start the optimisation fresh
-    niter = params_dict["niter"]
-    misc_restart = niter == 0 ? nothing : Dict([("history",data["history"]),("energy",data["energy"]),("rng",data["rng"]),("niter",niter)])
-    maxiter = niter + extra_iters
-
-    lx,ly,n = params_dict["Lx"],params_dict["Ly"],params_dict["particles"]
-    max_counts = [n, lx*ly - n]
-    ham_opsum = long_range_HH_ham(params_dict)
-    Oks_and_Eks = QuantumNaturalfPEPS.generate_Oks_and_Eks(peps, ham_opsum; threaded, multiproc, max_counts)
-
-    sample_nr = isnothing(sample_nr) ? params_dict["sample_nr"] : sample_nr
-    learning_rate = isnothing(learning_rate) ? params_dict["learning_rate"] : learning_rate
-    if isnothing(integrator)
-        occursin("Euler", params_dict["integrator"]) ? nothing : @warn "saved integrator was $(params_dict["integrator"]), continuing with Euler"
-        integrator = QuantumNaturalGradient.Euler(lr=learning_rate)
-    end
-    println("Continuing $(basename(filepath)) from niter = $niter to maxiter = $maxiter")
-
-    if if_save_data
-        modify_data(Dict([("maxiter",maxiter),("sample_nr",sample_nr),("learning_rate",learning_rate),
-            ("solver",string(typeof(solver))),("integrator",string(typeof(integrator)))]), filepath, "metadata")
-    end
-
-    function callback(; state, misc, kwargs...)
-        if_save_data && save_fpeps(state.θ.obj, misc, filepath)
-        return nothing
-    end
-
-    θ = QuantumNaturalGradient.Parameters(peps)
-    @time loss_value, trained_θ, misc = QuantumNaturalGradient.evolve(Oks_and_Eks, θ;
-            integrator, verbosity, solver, sample_nr, maxiter, callback, misc_restart)
-
-    println("Final energy: $(real(loss_value))")
-    return loss_value, trained_θ.obj, misc
 end

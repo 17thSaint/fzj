@@ -25,10 +25,13 @@ using QuantumNaturalfPEPS
 
 
 # occs[x,y,i] = n_{x,y} of sample i and the importance weights (mean 1) for nsamples samples of the peps.
-# max_counts = [N, Lx*Ly - N] samples in the N particle sector, as in execute-fpeps.jl
-function sample_fpeps_occupations(peps, nsamples::Int; max_counts=nothing, threaded::Bool=true)
+# max_counts = [N, Lx*Ly - N] samples in the N particle sector, as in execute-fpeps.jl.
+# output_level 1 prints start/end and the effective sample size, 2 also the progress every 10% of the samples
+function sample_fpeps_occupations(peps, nsamples::Int; max_counts=nothing, threaded::Bool=true, output_level::Int=0)
     Lx,Ly = size(peps)
+    start_time = time()
     QuantumNaturalfPEPS.update_double_layer_envs!(peps)
+    output_level > 0 && println("Double-layer environments of the $(Lx)x$(Ly) PEPS in $(round(time()-start_time,digits=1)) s")
 
     nr_threads = threaded ? Threads.nthreads() : 1
     k = ceil(Int, nsamples / nr_threads)
@@ -36,12 +39,28 @@ function sample_fpeps_occupations(peps, nsamples::Int; max_counts=nothing, threa
     logψs = zeros(ComplexF64, k*nr_threads)
     logpcs = zeros(Float64, k*nr_threads)
 
+    # samples done over all threads, for the progress output
+    nr_done = Threads.Atomic{Int}(0)
+    report_every = max(1, length(logpcs) ÷ 10)
+    output_level > 0 && println("Sampling $(length(logpcs)) configurations on $nr_threads threads")
+    flush(stdout)
+    start_time = time()
+
     Threads.@threads for t in 1:nr_threads
         for i in (1+(t-1)*k):(t*k)
             S, logpc, env_top = QuantumNaturalfPEPS.get_sample(peps; max_counts)
             logψs[i], _ = QuantumNaturalfPEPS.get_logψ_and_envs(peps, S, env_top)
             logpcs[i] = real(logpc)
             occs[:,:,i] .= 1 .- S
+
+            if output_level > 1
+                done = Threads.atomic_add!(nr_done, 1) + 1
+                if done % report_every == 0
+                    elapsed = time() - start_time
+                    println("  $done/$(length(logpcs)) samples ($(round(Int,100*done/length(logpcs))) %), $(round(elapsed,digits=1)) s, ~$(round(elapsed*(length(logpcs)-done)/done,digits=1)) s left")
+                    flush(stdout)
+                end
+            end
         end
     end
 
@@ -49,6 +68,7 @@ function sample_fpeps_occupations(peps, nsamples::Int; max_counts=nothing, threa
     n_eff = sum(weights)^2 / sum(abs2, weights)
     # the default combinatorial sector proposal already gives n_eff ~ 0.4 nsamples for a random 4x4 N=2 PEPS
     n_eff < 0.1 * length(weights) && @warn "effective sample size $(round(n_eff, digits=1)) of $(length(weights)), sampling is far from |ψ|²"
+    output_level > 0 && println("Sampled $(length(weights)) in $(round(time()-start_time,digits=1)) s, effective sample size $(round(n_eff,digits=1)) ($(round(Int,100*n_eff/length(weights))) %)")
 
     return occs, weights
 end
@@ -127,15 +147,26 @@ function fpeps_cdw_order_parameters(metadata::Dict)
 end
 
 # CDW order parameters of a saved fPEPS (fpeps-*.jld2 or wavefuncfpeps-*.jld2), sampled in the particle sector of its metadata.
-# if_save_data adds the statistics (fpeps_cdw_statistics_dict) to the metadata of the fpeps-*.jld2 file, overwriting older ones
-function fpeps_cdw_order_parameters(filepath::String, nsamples::Int; nbins::Int=20, threaded::Bool=true, if_save_data::Bool=false)
+# if_save_data adds the statistics (fpeps_cdw_statistics_dict) to the metadata of the fpeps-*.jld2 file, overwriting older ones.
+# output_level 1 prints the run, sampling start/end and the result, 2 also the sampling progress (see sample_fpeps_occupations)
+function fpeps_cdw_order_parameters(filepath::String, nsamples::Int; nbins::Int=20, threaded::Bool=true, if_save_data::Bool=false, output_level::Int=0)
     filepath = joinpath(dirname(filepath), remove_wavefunc_from_filename(basename(filepath)))
-    _, metadata = read_data(filepath)
-    wavefunc_data, _ = read_data(add_wavefunc_to_filepath(filepath))
+    _, metadata = read_data(filepath; output_level)
+    wavefunc_data, _ = read_data(add_wavefunc_to_filepath(filepath); output_level)
     lx,ly,n = metadata["Lx"],metadata["Ly"],metadata["particles"]
+    output_level > 0 && println("CDW order parameters of $(basename(filepath)): $(lx)x$(ly) N=$n, D = $(metadata["bond_dim"]), niter = $(metadata["niter"])")
 
-    occs, weights = sample_fpeps_occupations(wavefunc_data["peps"], nsamples; max_counts=[n, lx*ly - n], threaded)
+    occs, weights = sample_fpeps_occupations(wavefunc_data["peps"], nsamples; max_counts=[n, lx*ly - n], threaded, output_level)
     binned_stats = binned_column_cdw_statistics(occs, weights; nbins)
-    if_save_data && modify_data(fpeps_cdw_statistics_dict(binned_stats..., size(occs,3), metadata["niter"]), filepath, "metadata")
-    return jackknife_cdw_order_parameters(binned_stats...)
+    if if_save_data
+        modify_data(fpeps_cdw_statistics_dict(binned_stats..., size(occs,3), metadata["niter"]), filepath, "metadata")
+        output_level > 0 && println("Saved the column statistics to the metadata of $(basename(filepath))")
+    end
+
+    ops = jackknife_cdw_order_parameters(binned_stats...)
+    if output_level > 0
+        println("S(pi) = $(round(ops.s_pi,digits=4)) ± $(round(ops.s_pi_err,digits=4)), corr ratio = $(round(ops.corr_ratio,digits=4)) ± $(round(ops.corr_ratio_err,digits=4)), Binder = $(round(ops.binder,digits=4)) ± $(round(ops.binder_err,digits=4))")
+        flush(stdout)
+    end
+    return ops
 end
