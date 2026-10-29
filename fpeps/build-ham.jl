@@ -1,22 +1,22 @@
 #####################################################
 #=
 
-This file contains set-up for fPEPS simulations
+This file contains the model parameters (get_normal_model_paras) and Hamiltonian (long_range_HH_ham) for fPEPS
 
-Depends on:
+Depends on (all loaded by fpeps/load-fpeps.jl):
 	other-funcs/basic-2d-stuff.jl (coordinate, find_dist, check_fluxes, long_range_scaling, get_hopping_strengths)
+	other-funcs/data-storage-funcs.jl (get_folder_location, default dataloc)
 	ITensors (OpSum)
 
 All parameters are read from a String-keyed dict, axes are x (1st index, 1:Lx) and
-y (2nd index, 1:Ly), matching hilbert = siteinds("S=1/2", Lx, Ly)
+y (2nd index, 1:Ly), matching hilbert = siteinds("S=1/2", Lx, Ly). get_normal_model_paras keeps the
+inputs (lr, ts, filling, scaling inputs) next to what is derived from them, so it is also the saved
+metadata and running it again on that metadata gives the same model. Open boundaries only
 
 Hardcore bosons on S=1/2 sites: Up = occupied, Dn = empty, so b† = S+, b = S-, n = ProjUp
 
 =#
 ######################################################
-
-
-include("../other-funcs/basic-2d-stuff.jl")
 
 
 # Peierls hopping from site along axis (1 = x, 2 = y), Landau gauge with the phase on the
@@ -53,10 +53,10 @@ function get_normal_model_paras(params_dict::Dict{String,Any})
 	t_x,t_y = get_hopping_strengths(t_strength, hopping_anisotropy)
 	twist_angle = get(params_dict, "twist_angle", [0.0,0.0])
 	particles = get(params_dict, "particles", Int(ceil(Lx/2)))
+	filling = get(params_dict, "filling", 0.5)
 	if haskey(params_dict, "alpha")
 		alpha = Float64(params_dict["alpha"])
 	else
-		filling = get(params_dict, "filling", 0.5)
 		alpha = filling == 0.0 ? 0.0 : particles/(filling*(Lx - !if_periodic_x)*(Ly - !if_periodic_y))
 	end
 	flux_direction = get(params_dict, "flux_direction", "y")
@@ -65,7 +65,8 @@ function get_normal_model_paras(params_dict::Dict{String,Any})
 	elseif if_periodic_x && !if_periodic_y
 		flux_direction = "x"
 	end
-	if get(params_dict, "if_check_fluxes", true) && alpha != 0.0
+	if_check_fluxes = get(params_dict, "if_check_fluxes", true)
+	if if_check_fluxes && alpha != 0.0
 		flux_direction = check_fluxes(alpha,Lx,Ly,if_periodic_x,if_periodic_y,flux_direction; output_level=outputlevel)
 	end
 
@@ -76,6 +77,13 @@ function get_normal_model_paras(params_dict::Dict{String,Any})
 	interaction_axis_length = which_dir == "x" ? Lx : which_dir == "y" ? Ly : max(Lx,Ly)
 	scaling_distance = get(params_dict, "lr", 0)
 	scaling_distance == "all" ? scaling_distance = interaction_axis_length - 1 : nothing
+	# inputs of each scaling with the defaults of long_range_scaling (nothing = required), kept for the metadata and filename
+	scaling_inputs = Dict([("flat",[]),("gaussian",[("sigma",1.0)]),("exp",[("corr_length",interaction_axis_length)]),
+		("rydberg",[("blockade_radius",1.0)]),("dd",[("magnetic_spacing",1.0)]),("powerlaw",[("magnetic_spacing",nothing),("exponent",nothing)])])
+	haskey(scaling_inputs, scaling) || error("ULR Scaling Type Not Recognized: $scaling")
+	missing_inputs = [k for (k,d) in scaling_inputs[scaling] if isnothing(d) && !haskey(params_dict, k)]
+	isempty(missing_inputs) || error("scaling $scaling needs $(join(missing_inputs, ", ")) in params_dict")
+	scaling_paras = Dict{String,Any}([(k, isnothing(d) ? params_dict[k] : get(params_dict, k, d)) for (k,d) in scaling_inputs[scaling]])
 	scaling_kwargs = Dict(Symbol(k) => v for (k,v) in params_dict)
 	long_range_strengths = long_range_scaling(scaling_distance,interaction_axis_length,onsite_strength; scaling_kwargs...)
 	outputlevel > 0 ? display(long_range_strengths) : nothing
@@ -88,17 +96,17 @@ function get_normal_model_paras(params_dict::Dict{String,Any})
 	# saving stuff
 	dataloc = get(params_dict, "dataloc", get_folder_location("cluster-data/synth-dims/fpeps"))
 	if_save_data = get(params_dict, "if_save_data", true)
+	save_every::Int = get(params_dict, "save_every", 10)
 
-	model_paras::Dict{String,Any} = Dict([("Lx",Lx),("Ly",Ly),("particles",particles),("num_sites",num_sites),("if_periodic_x",if_periodic_x),("if_periodic_y",if_periodic_y),
-		("t_x",t_x),("t_y",t_y),("hopping_anisotropy",hopping_anisotropy),("twist_angle",twist_angle),("alpha",alpha),("flux_direction",flux_direction),
-		("onsite_strength",onsite_strength),("scaling",scaling),("which_dir",which_dir),
+	# inputs (ts, filling, lr, if_check_fluxes, scaling_paras) are kept next to what is derived from them
+	model_paras::Dict{String,Any} = Dict([("Lx",Lx),("Ly",Ly),("particles",particles),("filling",filling),("num_sites",num_sites),("if_periodic_x",if_periodic_x),("if_periodic_y",if_periodic_y),
+		("ts",t_strength),("t_x",t_x),("t_y",t_y),("hopping_anisotropy",hopping_anisotropy),("twist_angle",twist_angle),("alpha",alpha),("flux_direction",flux_direction),("if_check_fluxes",if_check_fluxes),
+		("onsite_strength",onsite_strength),("scaling",scaling),("which_dir",which_dir),("lr",get(params_dict, "lr", 0)),
 		("interaction_axis_length",interaction_axis_length),("long_range_strengths",long_range_strengths),
 		("chem_strength",chem_strength),("if_pinning",if_pinning),("pinning_strength",pinning_strength),("outputlevel",outputlevel),
-		("dataloc",dataloc),("if_save_data",if_save_data),("bond_dim",bond_dim)])
+		("dataloc",dataloc),("if_save_data",if_save_data),("save_every",save_every),("bond_dim",bond_dim)])
 
-	
-	
-	return model_paras
+	return merge(model_paras, scaling_paras)
 end
 
 function long_range_HH_ham(model_paras::Dict{String,Any})
@@ -122,11 +130,6 @@ function long_range_HH_ham(model_paras::Dict{String,Any})
 	# interactions, which_dir is the axis the long-range interaction acts along ("x", "y" or "both")
 	long_range_strengths = model_paras["long_range_strengths"]
 	which_dir = model_paras["which_dir"]
-
-	# on-site potentials
-	chem_strength = get(model_paras, "chem_strength", 0.0)
-	if_pinning = get(model_paras, "if_pinning", false)
-	pinning_strength = get(model_paras, "pinning_strength", 1e-4)
 
 	# on-site potentials
 	chem_strength = get(model_paras, "chem_strength", 0.0)

@@ -327,7 +327,10 @@ Notes for any new p:
   on S=1/2, takes ED key names `if_periodic_x/y`). Currently a 4x4 N=2 flat Ui = 50 test, D = 6,
   20 iterations; goal is larger open systems. Saves like the TTNs (2026-10-20, see Gotchas); saving,
   the per-iteration `saving_fpeps_callback` and `continue_fpeps(filepath, extra_iters)` (resumes a
-  saved run in the same files) are in `fpeps/savings.jl` (2026-10-29).
+  saved run in the same files) are in `fpeps/savings.jl` (2026-10-29). Loading: `fpeps/load-fpeps.jl`
+  is the hub (packages + other-funcs + build-ham/savings/observables via `include_other_files`, so
+  pwd inside fzj/ or local/<user>/); library files include nothing, drivers load
+  `include-other-files.jl` then the hub.
   With open boundaries the 4x4 N=2 test trips `check_fluxes` (α = 2/(0.5·3·3) = 0.44, "Alpha is
   too large"); add `"if_check_fluxes" => false` to the params dict to skip the check.
 - `fpeps/observables.jl` (no ED includes): `sample_fpeps_occupations` (`get_sample` + importance
@@ -433,8 +436,9 @@ Notes for any new p:
 - fPEPS files are JLD2 (the PEPS has no HDF5 serializer), split like the TTN ones:
   `wavefuncfpeps-<params>.jld2` holds `peps` (double-layer envs stripped, they're a rebuildable
   cache), `fpeps-<params>.jld2` holds `history` (DataFrame), `energy`, `rng` + metadata (params,
-  `bond_dim`, `sample_nr`, `maxiter`, `learning_rate`, `niter`). Both are overwritten every
-  iteration by the `evolve` callback; that's what `evolve(...; misc_restart)` needs to resume.
+  `bond_dim`, `sample_nr`, `maxiter`, `learning_rate`, `niter`, `save_every`). Both are overwritten
+  by the `evolve` callback every `save_every` iterations (params_dict key, default 10) and at maxiter, so
+  a killed job loses < save_every iterations; that's what `evolve(...; misc_restart)` needs to resume.
   Find with `find_data_file(pdict, "fpeps", dataloc; file_type="jld2")` (default is `"h5"`).
   CDW statistics in fpeps metadata (GS, k = 1): `column_corr1`, `evencolumn_dist1` (all samples, ED
   names) plus `column_corr_bins1`, `evencolumn_dist_bins1`, `bin_weights1` (jackknife), `nsamples1` and
@@ -443,6 +447,12 @@ Notes for any new p:
   `evolve`'s `maxiter` counts restored iterations too (stops at `niter > maxiter`), so
   `continue_fpeps` passes `maxiter = niter + extra_iters`; it rebuilds the Hamiltonian and an Euler
   integrator from the metadata (only the integrator/solver type names are saved).
+  Since 2026-10-29 metadata = `get_normal_model_paras` output (inputs `lr`, `ts`, `filling`,
+  `if_check_fluxes`, scaling inputs + derived `t_x`, `long_range_strengths`, ...), so re-running it on
+  the metadata gives the same model, for every scaling. Filenames now carry `lr` (+ `magnetic_spacing`
+  for dd/powerlaw, `ts` if ≠ 1, `which_dir` if ≠ y). Earlier runs in `fpeps/flat-ints`: the lr-all
+  46.4159 one has raw params only (`continue_fpeps` re-derives); the 18.90527 and 4x4 test files
+  have `"N"` instead of `"particles"` and won't load (user: leave them).
 - The 8x4 dd sweep sits in the old `magnetic_spacing-0.1` file and its `all_gammas` has 39 points:
   the 25 new ones plus the old coarse 8x4 points (incl. Γ = 10210, 50000, i.e. s = 0.17, 0.1) and
   3 duplicates. Γ_c is unaffected (17.2 vs 17.1 with Γ ≤ 1000).

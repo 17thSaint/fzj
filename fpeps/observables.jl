@@ -3,11 +3,10 @@
 
 This file contains observables for fPEPS wavefunctions, estimated from samples of |ψ|²
 
-Depends on:
-	other-funcs/basic-2d-stuff.jl (LinearAlgebra)
+Depends on (all loaded by fpeps/load-fpeps.jl):
 	other-funcs/basic-2d-observables.jl (column_cdw_statistics, cdw_order_parameters)
-	other-funcs/data-storage-funcs.jl (read_data, add_wavefunc_to_filepath, remove_wavefunc_from_filename)
-	QuantumNaturalfPEPS
+	other-funcs/data-storage-funcs.jl (read_data, modify_data, add_wavefunc_to_filepath, remove_wavefunc_from_filename)
+	QuantumNaturalfPEPS (get_sample, get_logψ_and_envs, logψ_exact, compute_importance_weights, update_double_layer_envs!)
 
 Samples S come from get_sample (S[x,y] = 0 is Up = occupied, so n = 1 - S) and are reweighted by
 |ψ(S)|²/p_c(S), since the row-by-row sampling with a finite contract_dim is only approximately |ψ|².
@@ -16,12 +15,6 @@ occupations come from samples instead of the ED basis
 
 =#
 ######################################################
-
-
-include("../other-funcs/basic-2d-stuff.jl")
-include("../other-funcs/basic-2d-observables.jl")
-
-using QuantumNaturalfPEPS
 
 
 # occs[x,y,i] = n_{x,y} of sample i and the importance weights (mean 1) for nsamples samples of the peps.

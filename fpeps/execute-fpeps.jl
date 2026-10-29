@@ -1,13 +1,17 @@
 #####################################################
 #=
 
-This file contains set-up for fPEPS simulations
+This file runs a new fPEPS groundstate search (cluster script, started from fpeps/), saving every save_every
+iterations (default 10) unless if_save_data = false. Resume a saved run with continue_fpeps (savings.jl) instead
 
 Depends on:
-        build-ham.jl (get_normal_model_paras, long_range_HH_ham)
-        savings.jl (make_fpeps_filename, save_initial_fpeps, saving_fpeps_callback, continue_fpeps)
-        other-funcs/basic-2d-stuff.jl
-
+        other-funcs/include-other-files.jl (include_other_files)
+        fpeps/load-fpeps.jl, of which
+                build-ham.jl (get_normal_model_paras, long_range_HH_ham)
+                savings.jl (make_fpeps_filename, save_initial_fpeps, saving_fpeps_callback)
+                other-funcs/data-storage-funcs.jl (get_folder_location, make_parameters_filename)
+                QuantumNaturalfPEPS (PEPS, generate_Oks_and_Eks), QuantumNaturalGradient (evolve, Parameters, Euler, EigenSolver)
+        Distributed (worker processes for generate_Oks_and_Eks)
 
 =#
 ######################################################
@@ -16,11 +20,9 @@ using Pkg
 Pkg.activate(".")
 
 include("../other-funcs/include-other-files.jl")
-include("build-ham.jl")
-include("savings.jl")
-include("../other-funcs/data-storage-funcs.jl")
+include_other_files(["fpeps/load-fpeps.jl"])
 
-using QuantumNaturalGradient, QuantumNaturalfPEPS, ITensors, ITensorMPS, JLD2, Distributed
+using Distributed
 
 nr_procs, nr_threads = 2, 2
 addprocs(nr_procs, exeflags="-t $nr_threads")
@@ -73,8 +75,8 @@ dataloc_pulled = model_paras["dataloc"]
 metadata = merge(model_paras, Dict([("bond_dim",bond_dim),("sample_nr",sample_nr),("maxiter",maxiter),("learning_rate",learning_rate),("solver",string(typeof(solver))),("integrator",string(typeof(integrator))),("location",dataloc),("niter",0),("contract_cutoff",contract_cutoff),("sample_cutoff",sample_cutoff),("eigencut",eigencut)]))
 filepath = if_save_data ? joinpath(dataloc_pulled, save_initial_fpeps(peps, metadata; location=dataloc_pulled, name="fpeps-" * filename * ".jld2")) : nothing
 
-# Callback: overwrite the saved PEPS and history at each iteration (filepath = nothing when not saving)
-callback = saving_fpeps_callback(filepath)
+# Callback: overwrite the saved PEPS and history every save_every iterations and at maxiter (filepath = nothing when not saving)
+callback = saving_fpeps_callback(filepath; save_every=model_paras["save_every"])
 
 loss_value, trained_θ, misc = QuantumNaturalGradient.evolve(Oks_and_Eks, θ;
         integrator,

@@ -3,13 +3,14 @@
 
 This file contains saving, saving callbacks and restarts for fPEPS groundstate searches
 
-Depends on:
-	fpeps/build-ham.jl (long_range_HH_ham, for continue_fpeps)
-	other-funcs/data-storage-funcs.jl (write_data, read_data, modify_data, add_wavefunc_to_filepath, remove_wavefunc_from_filename)
-	QuantumNaturalfPEPS (PEPS), QuantumNaturalGradient (evolve, Parameters, Euler, EigenSolver)
+Depends on (all loaded by fpeps/load-fpeps.jl):
+	fpeps/build-ham.jl (get_normal_model_paras, long_range_HH_ham, for continue_fpeps)
+	other-funcs/data-storage-funcs.jl (write_data, read_data, modify_data, get_folder_location, add_wavefunc_to_filepath, remove_wavefunc_from_filename)
+	QuantumNaturalfPEPS (PEPS, generate_Oks_and_Eks), QuantumNaturalGradient (evolve, Parameters, Euler, EigenSolver)
 
 Like the TTNs, the PEPS goes in wavefuncfpeps-<params>.jld2 and the light data (history, energy, rng)
-+ metadata in fpeps-<params>.jld2, both overwritten at each iteration by saving_fpeps_callback
++ metadata in fpeps-<params>.jld2, both overwritten by saving_fpeps_callback every save_every
+(params_dict key, default 10) iterations and at maxiter
 
 =#
 ######################################################
@@ -32,23 +33,31 @@ function make_fpeps_filename(model_parameters::Dict)
 	anis = model_parameters["hopping_anisotropy"]
 	bond_dim = model_parameters["bond_dim"]
 	
-	filename_dict::Dict{String,Any} = Dict([("particles",num_particles),("alpha",round(alpha,digits=4)),("onsite_strength",onsite_strength),("hopping_anisotropy",anis),("bond_dim",bond_dim)])
+	filename_dict::Dict{String,Any} = Dict([("lr",model_parameters["lr"]),("particles",num_particles),("alpha",round(alpha,digits=4)),("onsite_strength",onsite_strength),("hopping_anisotropy",anis),("bond_dim",bond_dim)])
 
-	if model_parameters["scaling"] != "flat"
-		filename_dict["scaling"] = model_parameters["scaling"]
-		if model_parameters["scaling"] == "gaussian"
-			filename_dict["sigma"] = model_parameters["sigma"]
-		elseif model_parameters["scaling"] == "exp"
-			filename_dict["corr_length"] = model_parameters["corr_length"]
-		elseif model_parameters["scaling"] == "rydberg"
-			filename_dict["blockade_radius"] = model_parameters["blockade_radius"]
-		elseif model_parameters["scaling"] == "powerlaw"
-			filename_dict["exponent"] = model_parameters["exponent"]
-		else
-			error("ULR Scaling Type Not Recognized: $(model_parameters["scaling"])")
-		end
-	else
-		filename_dict["scaling"] = "flat"
+	filename_dict["scaling"] = model_parameters["scaling"]
+	if model_parameters["scaling"] == "gaussian"
+		filename_dict["sigma"] = model_parameters["sigma"]
+	elseif model_parameters["scaling"] == "exp"
+		filename_dict["corr_length"] = model_parameters["corr_length"]
+	elseif model_parameters["scaling"] == "rydberg"
+		filename_dict["blockade_radius"] = model_parameters["blockade_radius"]
+	elseif model_parameters["scaling"] == "dd"
+		filename_dict["magnetic_spacing"] = model_parameters["magnetic_spacing"]
+	elseif model_parameters["scaling"] == "powerlaw"
+		filename_dict["magnetic_spacing"] = model_parameters["magnetic_spacing"]
+		filename_dict["exponent"] = model_parameters["exponent"]
+	elseif model_parameters["scaling"] != "flat"
+		error("ULR Scaling Type Not Recognized: $(model_parameters["scaling"])")
+	end
+
+	if model_parameters["ts"] != 1.0
+		filename_dict["ts"] = model_parameters["ts"]
+	end
+
+	# the interaction axis, default y (rydberg is always both)
+	if model_parameters["which_dir"] != "y" && model_parameters["scaling"] != "rydberg"
+		filename_dict["which_dir"] = model_parameters["which_dir"]
 	end
 
 	filename_dict["Lx"] = model_parameters["Lx"]
@@ -77,21 +86,23 @@ function save_fpeps(peps, misc::Dict, filepath::String)
     modify_data(Dict([("niter",misc["niter"])]), filepath, "metadata")
 end
 
-# Callback for QuantumNaturalGradient.evolve that overwrites the saved PEPS and history at each iteration
-# (returning false would stop evolve). Like the TTN saving observers everything it needs is carried with it
-# and the PEPS comes from the optimisation state, no globals. filepath = nothing gives a callback that does nothing
-function saving_fpeps_callback(filepath::Union{String,Nothing})
+# Callback for QuantumNaturalGradient.evolve that overwrites the saved PEPS and history every save_every iterations
+# and at maxiter (returning false would stop evolve). Like the TTN saving observers everything it needs is carried
+# with it and the PEPS comes from the optimisation state, no globals. filepath = nothing gives a callback that does nothing
+function saving_fpeps_callback(filepath::Union{String,Nothing}; save_every::Int=10)
     return function (; state, misc, kwargs...)
-        isnothing(filepath) || save_fpeps(state.θ.obj, misc, filepath)
+        if !isnothing(filepath) && (misc["niter"] % save_every == 0 || misc["niter"] >= state.maxiter)
+            save_fpeps(state.θ.obj, misc, filepath)
+        end
         return nothing
     end
 end
 
 # Continue a saved groundstate search for extra_iters more iterations. filepath is the fpeps-*.jld2 or its
 # wavefuncfpeps-*.jld2 (a bare filename is looked for in cluster-data/synth-dims/fpeps). The PEPS, history,
-# energy, rng and niter are read back and the Hamiltonian rebuilt from the metadata; sample_nr and the Euler
-# learning rate default to the saved ones. With if_save_data the same two files keep being overwritten
-function continue_fpeps(filepath::String, extra_iters::Int; if_save_data::Bool=true, sample_nr=nothing, learning_rate=nothing,
+# energy, rng and niter are read back and the Hamiltonian rebuilt from the metadata; sample_nr, the Euler
+# learning rate and save_every default to the saved ones. With if_save_data the same two files keep being overwritten
+function continue_fpeps(filepath::String, extra_iters::Int; if_save_data::Bool=true, save_every=nothing, sample_nr=nothing, learning_rate=nothing,
         integrator=nothing, solver=QuantumNaturalGradient.EigenSolver(), threaded=true, multiproc=true, verbosity=2)
 
     occursin("/",filepath) ? nothing : filepath = joinpath(get_folder_location("cluster-data/synth-dims/fpeps"), filepath)
@@ -100,6 +111,9 @@ function continue_fpeps(filepath::String, extra_iters::Int; if_save_data::Bool=t
     wavefunc_data, _ = read_data(add_wavefunc_to_filepath(filepath))
     peps = wavefunc_data["peps"]
     params_dict = Dict{String,Any}(metadata)
+    # runs saved before get_normal_model_paras stored only the raw params_dict, so derive t_x, long_range_strengths, ...
+    # from it. Newer runs already have them (runs from 2026-10-29 also keep lr, ts, filling and the scaling inputs)
+    haskey(params_dict, "long_range_strengths") || (params_dict = merge(params_dict, get_normal_model_paras(params_dict)))
 
     # niter = 0 means no iteration finished before the run stopped, so start the optimisation fresh
     niter = params_dict["niter"]
@@ -113,6 +127,7 @@ function continue_fpeps(filepath::String, extra_iters::Int; if_save_data::Bool=t
 
     sample_nr = isnothing(sample_nr) ? params_dict["sample_nr"] : sample_nr
     learning_rate = isnothing(learning_rate) ? params_dict["learning_rate"] : learning_rate
+    save_every = isnothing(save_every) ? get(params_dict, "save_every", 10) : save_every
     if isnothing(integrator)
         occursin("Euler", params_dict["integrator"]) ? nothing : @warn "saved integrator was $(params_dict["integrator"]), continuing with Euler"
         integrator = QuantumNaturalGradient.Euler(lr=learning_rate)
@@ -120,11 +135,11 @@ function continue_fpeps(filepath::String, extra_iters::Int; if_save_data::Bool=t
     println("Continuing $(basename(filepath)) from niter = $niter to maxiter = $maxiter")
 
     if if_save_data
-        modify_data(Dict([("maxiter",maxiter),("sample_nr",sample_nr),("learning_rate",learning_rate),
+        modify_data(Dict([("maxiter",maxiter),("sample_nr",sample_nr),("learning_rate",learning_rate),("save_every",save_every),
             ("solver",string(typeof(solver))),("integrator",string(typeof(integrator)))]), filepath, "metadata")
     end
 
-    callback = saving_fpeps_callback(if_save_data ? filepath : nothing)
+    callback = saving_fpeps_callback(if_save_data ? filepath : nothing; save_every)
 
     θ = QuantumNaturalGradient.Parameters(peps)
     @time loss_value, trained_θ, misc = QuantumNaturalGradient.evolve(Oks_and_Eks, θ;

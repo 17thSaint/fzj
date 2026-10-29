@@ -1,21 +1,21 @@
 #####################################################
 #=
 
-This file contains daily things for fPEPS
+This file contains daily things for fPEPS, ### header + if true/false blocks run from the REPL
+(pwd inside fzj/, for include_other_files)
 
 Depends on:
-    fpeps/build-ham.jl
-    fpeps/savings.jl
-    fpeps/observables.jl
-    other-funcs/data-storage-funcs.jl
+    other-funcs/include-other-files.jl (include_other_files)
+    fpeps/load-fpeps.jl (all of fpeps)
+    Random
 
 =#
 ######################################################
 
 include("../other-funcs/include-other-files.jl")
-include_other_files(["fpeps/build-ham.jl","fpeps/savings.jl","fpeps/observables.jl","other-funcs/data-storage-funcs.jl"])
+include_other_files(["fpeps/load-fpeps.jl"])
 
-using QuantumNaturalGradient, QuantumNaturalfPEPS, ITensors, ITensorMPS, JLD2, Random
+using Random
 
 
 ### test CDW order parameters (S(pi), correlation ratio, Binder) from samples against exact enumeration,
