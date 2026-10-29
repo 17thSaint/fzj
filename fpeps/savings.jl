@@ -4,7 +4,7 @@
 This file contains saving, saving callbacks and restarts for fPEPS groundstate searches
 
 Depends on (all loaded by fpeps/load-fpeps.jl):
-	fpeps/build-ham.jl (get_normal_model_paras, long_range_HH_ham, for continue_fpeps)
+	fpeps/build-ham.jl (get_fpeps_model_paras, long_range_HH_ham, particle_sector_counts, fpeps_scaling_inputs)
 	other-funcs/data-storage-funcs.jl (write_data, read_data, modify_data, get_folder_location, add_wavefunc_to_filepath, remove_wavefunc_from_filename)
 	QuantumNaturalfPEPS (PEPS, generate_Oks_and_Eks), QuantumNaturalGradient (evolve, Parameters, Euler, EigenSolver)
 
@@ -35,20 +35,10 @@ function make_fpeps_filename(model_parameters::Dict)
 	
 	filename_dict::Dict{String,Any} = Dict([("lr",model_parameters["lr"]),("particles",num_particles),("alpha",round(alpha,digits=4)),("onsite_strength",onsite_strength),("hopping_anisotropy",anis),("bond_dim",bond_dim)])
 
+	# the scaling (also when flat) and its inputs from fpeps_scaling_inputs (build-ham.jl)
 	filename_dict["scaling"] = model_parameters["scaling"]
-	if model_parameters["scaling"] == "gaussian"
-		filename_dict["sigma"] = model_parameters["sigma"]
-	elseif model_parameters["scaling"] == "exp"
-		filename_dict["corr_length"] = model_parameters["corr_length"]
-	elseif model_parameters["scaling"] == "rydberg"
-		filename_dict["blockade_radius"] = model_parameters["blockade_radius"]
-	elseif model_parameters["scaling"] == "dd"
-		filename_dict["magnetic_spacing"] = model_parameters["magnetic_spacing"]
-	elseif model_parameters["scaling"] == "powerlaw"
-		filename_dict["magnetic_spacing"] = model_parameters["magnetic_spacing"]
-		filename_dict["exponent"] = model_parameters["exponent"]
-	elseif model_parameters["scaling"] != "flat"
-		error("ULR Scaling Type Not Recognized: $(model_parameters["scaling"])")
+	for (k,_) in fpeps_scaling_inputs(model_parameters["scaling"], model_parameters["interaction_axis_length"])
+		filename_dict[k] = model_parameters[k]
 	end
 
 	if model_parameters["ts"] != 1.0
@@ -111,9 +101,9 @@ function continue_fpeps(filepath::String, extra_iters::Int; if_save_data::Bool=t
     wavefunc_data, _ = read_data(add_wavefunc_to_filepath(filepath))
     peps = wavefunc_data["peps"]
     params_dict = Dict{String,Any}(metadata)
-    # runs saved before get_normal_model_paras stored only the raw params_dict, so derive t_x, long_range_strengths, ...
+    # runs saved before get_fpeps_model_paras stored only the raw params_dict, so derive t_x, long_range_strengths, ...
     # from it. Newer runs already have them (runs from 2026-10-29 also keep lr, ts, filling and the scaling inputs)
-    haskey(params_dict, "long_range_strengths") || (params_dict = merge(params_dict, get_normal_model_paras(params_dict)))
+    haskey(params_dict, "long_range_strengths") || (params_dict = merge(params_dict, get_fpeps_model_paras(params_dict)))
 
     # niter = 0 means no iteration finished before the run stopped, so start the optimisation fresh
     niter = params_dict["niter"]
@@ -121,7 +111,7 @@ function continue_fpeps(filepath::String, extra_iters::Int; if_save_data::Bool=t
     maxiter = niter + extra_iters
 
     lx,ly,n = params_dict["Lx"],params_dict["Ly"],params_dict["particles"]
-    max_counts = [n, lx*ly - n]
+    max_counts = particle_sector_counts(lx, ly, n)
     ham_opsum = long_range_HH_ham(params_dict)
     Oks_and_Eks = QuantumNaturalfPEPS.generate_Oks_and_Eks(peps, ham_opsum; threaded, multiproc, max_counts)
 

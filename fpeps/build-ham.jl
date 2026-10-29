@@ -1,7 +1,7 @@
 #####################################################
 #=
 
-This file contains the model parameters (get_normal_model_paras) and Hamiltonian (long_range_HH_ham) for fPEPS
+This file contains the model parameters (get_fpeps_model_paras) and Hamiltonian (long_range_HH_ham) for fPEPS
 
 Depends on (all loaded by fpeps/load-fpeps.jl):
 	other-funcs/basic-2d-stuff.jl (coordinate, find_dist, check_fluxes, long_range_scaling, get_hopping_strengths)
@@ -9,7 +9,7 @@ Depends on (all loaded by fpeps/load-fpeps.jl):
 	ITensors (OpSum)
 
 All parameters are read from a String-keyed dict, axes are x (1st index, 1:Lx) and
-y (2nd index, 1:Ly), matching hilbert = siteinds("S=1/2", Lx, Ly). get_normal_model_paras keeps the
+y (2nd index, 1:Ly), matching hilbert = siteinds("S=1/2", Lx, Ly). get_fpeps_model_paras keeps the
 inputs (lr, ts, filling, scaling inputs) next to what is derived from them, so it is also the saved
 metadata and running it again on that metadata gives the same model. Open boundaries only
 
@@ -32,7 +32,20 @@ function get_hopping_coeff(site,axis::Int,t_x::Float64,t_y::Float64,alpha::Float
 	return coeff
 end
 
-function get_normal_model_paras(params_dict::Dict{String,Any})
+# [#Up = occupied, #Dn = empty] counts of the N particle sector, the max_counts of get_sample / generate_Oks_and_Eks
+# (sz_sector_counts(peps, Q) would fix total Sz = Q, i.e. N - Lx*Ly/2)
+particle_sector_counts(Lx::Int, Ly::Int, N::Int) = [N, Lx*Ly - N]
+
+# inputs of each scaling with the defaults of long_range_scaling (nothing = required), as (key, default) pairs.
+# The one place fpeps lists them: get_fpeps_model_paras keeps them in the metadata, make_fpeps_filename in the filename
+function fpeps_scaling_inputs(scaling::String, interaction_axis_length::Int)
+	all_inputs = Dict([("flat",[]),("gaussian",[("sigma",1.0)]),("exp",[("corr_length",interaction_axis_length)]),
+		("rydberg",[("blockade_radius",1.0)]),("dd",[("magnetic_spacing",1.0)]),("powerlaw",[("magnetic_spacing",nothing),("exponent",nothing)])])
+	haskey(all_inputs, scaling) || error("ULR Scaling Type Not Recognized: $scaling")
+	return all_inputs[scaling]
+end
+
+function get_fpeps_model_paras(params_dict::Dict{String,Any})
 	
 	Lx,Ly = params_dict["Lx"],params_dict["Ly"]
 	L = (Lx,Ly)
@@ -77,13 +90,10 @@ function get_normal_model_paras(params_dict::Dict{String,Any})
 	interaction_axis_length = which_dir == "x" ? Lx : which_dir == "y" ? Ly : max(Lx,Ly)
 	scaling_distance = get(params_dict, "lr", 0)
 	scaling_distance == "all" ? scaling_distance = interaction_axis_length - 1 : nothing
-	# inputs of each scaling with the defaults of long_range_scaling (nothing = required), kept for the metadata and filename
-	scaling_inputs = Dict([("flat",[]),("gaussian",[("sigma",1.0)]),("exp",[("corr_length",interaction_axis_length)]),
-		("rydberg",[("blockade_radius",1.0)]),("dd",[("magnetic_spacing",1.0)]),("powerlaw",[("magnetic_spacing",nothing),("exponent",nothing)])])
-	haskey(scaling_inputs, scaling) || error("ULR Scaling Type Not Recognized: $scaling")
-	missing_inputs = [k for (k,d) in scaling_inputs[scaling] if isnothing(d) && !haskey(params_dict, k)]
+	scaling_inputs = fpeps_scaling_inputs(scaling, interaction_axis_length)
+	missing_inputs = [k for (k,d) in scaling_inputs if isnothing(d) && !haskey(params_dict, k)]
 	isempty(missing_inputs) || error("scaling $scaling needs $(join(missing_inputs, ", ")) in params_dict")
-	scaling_paras = Dict{String,Any}([(k, isnothing(d) ? params_dict[k] : get(params_dict, k, d)) for (k,d) in scaling_inputs[scaling]])
+	scaling_paras = Dict{String,Any}([(k, isnothing(d) ? params_dict[k] : get(params_dict, k, d)) for (k,d) in scaling_inputs])
 	scaling_kwargs = Dict(Symbol(k) => v for (k,v) in params_dict)
 	long_range_strengths = long_range_scaling(scaling_distance,interaction_axis_length,onsite_strength; scaling_kwargs...)
 	outputlevel > 0 ? display(long_range_strengths) : nothing

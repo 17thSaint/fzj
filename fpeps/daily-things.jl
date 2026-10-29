@@ -28,7 +28,7 @@ if true
 
     hilbert = ITensors.siteinds("S=1/2",lx,ly)
     peps = PEPS(ComplexF64, hilbert; bond_dim=bond_dim)
-    max_counts = [n, lx*ly - n]
+    max_counts = particle_sector_counts(lx, ly, n)
 
     occs_ex, weights_ex = exact_fpeps_occupations(peps, n)
     column_corr_ex, evencolumn_dist_ex = column_cdw_statistics(occs_ex, weights_ex)

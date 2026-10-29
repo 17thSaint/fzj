@@ -4,6 +4,7 @@
 This file contains observables for fPEPS wavefunctions, estimated from samples of |ψ|²
 
 Depends on (all loaded by fpeps/load-fpeps.jl):
+	fpeps/build-ham.jl (particle_sector_counts)
 	other-funcs/basic-2d-observables.jl (column_cdw_statistics, cdw_order_parameters)
 	other-funcs/data-storage-funcs.jl (read_data, modify_data, add_wavefunc_to_filepath, remove_wavefunc_from_filename)
 	QuantumNaturalfPEPS (get_sample, get_logψ_and_envs, logψ_exact, compute_importance_weights, update_double_layer_envs!)
@@ -18,7 +19,7 @@ occupations come from samples instead of the ED basis
 
 
 # occs[x,y,i] = n_{x,y} of sample i and the importance weights (mean 1) for nsamples samples of the peps.
-# max_counts = [N, Lx*Ly - N] samples in the N particle sector, as in execute-fpeps.jl.
+# max_counts = particle_sector_counts(Lx, Ly, N) (build-ham.jl) samples in the N particle sector.
 # output_level 1 prints start/end and the effective sample size, 2 also the progress every 10% of the samples
 function sample_fpeps_occupations(peps, nsamples::Int; max_counts=nothing, threaded::Bool=true, output_level::Int=0)
     Lx,Ly = size(peps)
@@ -149,7 +150,7 @@ function fpeps_cdw_order_parameters(filepath::String, nsamples::Int; nbins::Int=
     lx,ly,n = metadata["Lx"],metadata["Ly"],metadata["particles"]
     output_level > 0 && println("CDW order parameters of $(basename(filepath)): $(lx)x$(ly) N=$n, D = $(metadata["bond_dim"]), niter = $(metadata["niter"])")
 
-    occs, weights = sample_fpeps_occupations(wavefunc_data["peps"], nsamples; max_counts=[n, lx*ly - n], threaded, output_level)
+    occs, weights = sample_fpeps_occupations(wavefunc_data["peps"], nsamples; max_counts=particle_sector_counts(lx, ly, n), threaded, output_level)
     binned_stats = binned_column_cdw_statistics(occs, weights; nbins)
     if if_save_data
         modify_data(fpeps_cdw_statistics_dict(binned_stats..., size(occs,3), metadata["niter"]), filepath, "metadata")

@@ -447,7 +447,7 @@ Notes for any new p:
   `evolve`'s `maxiter` counts restored iterations too (stops at `niter > maxiter`), so
   `continue_fpeps` passes `maxiter = niter + extra_iters`; it rebuilds the Hamiltonian and an Euler
   integrator from the metadata (only the integrator/solver type names are saved).
-  Since 2026-10-29 metadata = `get_normal_model_paras` output (inputs `lr`, `ts`, `filling`,
+  Since 2026-10-29 metadata = `get_fpeps_model_paras` output (inputs `lr`, `ts`, `filling`,
   `if_check_fluxes`, scaling inputs + derived `t_x`, `long_range_strengths`, ...), so re-running it on
   the metadata gives the same model, for every scaling. Filenames now carry `lr` (+ `magnetic_spacing`
   for dd/powerlaw, `ts` if ≠ 1, `which_dir` if ≠ y). Earlier runs in `fpeps/flat-ints`: the lr-all
