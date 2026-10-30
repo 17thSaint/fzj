@@ -24,7 +24,7 @@ include_other_files(["fpeps/load-fpeps.jl"])
 
 using Distributed
 
-nr_procs, nr_threads = 2, 2
+nr_procs, nr_threads = 12, 6
 addprocs(nr_procs, exeflags="-t $nr_threads")
 
 @everywhere begin
@@ -34,17 +34,20 @@ addprocs(nr_procs, exeflags="-t $nr_threads")
 end
 BLAS.set_num_threads(prod([nr_procs, nr_threads])) # For computing the double layers
 
+args_dict = make_args_dict(ARGS)
+
 # model
-lx,ly,n = 8,7,4
-intstren = 18.90527
-dataloc = get_folder_location("cluster-data/synth-dims/fpeps/flat-ints")
+lx,ly,n = args_dict["Lx"],args_dict["Ly"],args_dict["particles"]
+intstren = 50.0
+magspac = args_dict["magspac"]
+dataloc = get_folder_location("cluster-data/synth-dims/fpeps/dd-ints")
 
 # optimisation (bond_dim also goes in params_dict, it's part of the filename)
 bond_dim = 5
 eigencut, contract_cutoff, sample_cutoff = 1e-6, 1e-6, 5e-4
 learning_rate, sample_nr, maxiter = 0.05, 3000, 5000
 
-params_dict = Dict([("outputlevel",1),("dataloc",dataloc),("if_check_fluxes",false),("bond_dim",bond_dim),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("particles",n),("if_save_data",true),("filling",0.5),("onsite_strength",intstren)])
+params_dict = Dict([("outputlevel",1),("dataloc",dataloc),("scaling","dd"),("magnetic_spacing",magspac),("bond_dim",bond_dim),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("particles",n),("if_save_data",true),("filling",0.5),("onsite_strength",intstren)])
 model_paras = get_fpeps_model_paras(params_dict)
 
 hilbert = ITensors.siteinds("S=1/2",lx,ly)
@@ -72,7 +75,7 @@ metadata = merge(model_paras, Dict([("sample_nr",sample_nr),("maxiter",maxiter),
 filepath = model_paras["if_save_data"] ? joinpath(dataloc, save_initial_fpeps(peps, metadata; location=dataloc, name=filename)) : nothing
 
 # Callback: overwrite the saved PEPS and history every save_every iterations and at maxiter (filepath = nothing when not saving)
-callback = saving_fpeps_callback(filepath; save_every=model_paras["save_every"])
+callback = saving_fpeps_callback(filepath; save_every=model_paras["save_every"], nrgtol=model_paras["nrgtol"])
 
 loss_value, trained_θ, misc = QuantumNaturalGradient.evolve(Oks_and_Eks, θ;
         integrator,

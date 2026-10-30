@@ -77,14 +77,23 @@ function save_fpeps(peps, misc::Dict, filepath::String)
 end
 
 # Callback for QuantumNaturalGradient.evolve that overwrites the saved PEPS and history every save_every iterations
-# and at maxiter (returning false would stop evolve). Like the TTN saving observers everything it needs is carried
-# with it and the PEPS comes from the optimisation state, no globals. filepath = nothing gives a callback that does nothing
-function saving_fpeps_callback(filepath::Union{String,Nothing}; save_every::Int=10)
+# and at maxiter. Like the TTN saving observers everything it needs is carried with it and the PEPS comes from the
+# optimisation state, no globals. Once there are 11 energies, each iteration compares the mean of the last 10 energies
+# with the mean of the 10 before the newest one; if it changed by less than nrgtol (params_dict key) the PEPS is saved
+# and the callback returns false, which stops evolve
+function saving_fpeps_callback(filepath::Union{String,Nothing}; save_every::Int=2, nrgtol=nothing)
     return function (; state, misc, kwargs...)
-        if !isnothing(filepath) && (misc["niter"] % save_every == 0 || misc["niter"] >= state.maxiter)
+        if_stop = false
+        energies = misc["history"][!, "energy"]   # the column itself, no copy
+        if length(energies) >= 11
+            mean_change = abs(sum(energies[end-9:end]) / 10 - sum(energies[end-10:end-1]) / 10)
+            if_stop = mean_change < nrgtol
+            if_stop && println("nrgtol reached at niter = $(misc["niter"]): mean of last 10 energies changed by $mean_change < $nrgtol")
+        end
+        if !isnothing(filepath) && (if_stop || misc["niter"] % save_every == 0 || misc["niter"] >= state.maxiter)
             save_fpeps(state.θ.obj, misc, filepath)
         end
-        return nothing
+        return if_stop ? false : nothing
     end
 end
 
@@ -129,7 +138,7 @@ function continue_fpeps(filepath::String, extra_iters::Int; if_save_data::Bool=t
             ("solver",string(typeof(solver))),("integrator",string(typeof(integrator)))]), filepath, "metadata")
     end
 
-    callback = saving_fpeps_callback(if_save_data ? filepath : nothing; save_every)
+    callback = saving_fpeps_callback(if_save_data ? filepath : nothing; save_every, nrgtol=get(params_dict, "nrgtol", nothing))
 
     θ = QuantumNaturalGradient.Parameters(peps)
     @time loss_value, trained_θ, misc = QuantumNaturalGradient.evolve(Oks_and_Eks, θ;
@@ -137,4 +146,16 @@ function continue_fpeps(filepath::String, extra_iters::Int; if_save_data::Bool=t
 
     println("Final energy: $(real(loss_value))")
     return loss_value, trained_θ.obj, misc
+end
+
+
+function choose_dataloc(input_dict::Dict{String,Any})
+    if input_dict["exponent"] == 3.0
+        return get_folder_location("cluster-data/synth-dims/fpeps/dd-ints")
+    elseif input_dict["exponent"] == 0.0
+        return get_folder_location("cluster-data/synth-dims/fpeps/flat-ints")
+    elseif input_dict["exponent"] in [0.5, 1.0, 1.5, 2.0, 2.5, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0]
+        exponent_string = replace(string(input_dict["exponent"]), "." => "p")
+        return get_folder_location("cluster-data/synth-dims/fpeps/powerlaw-$exponent_string")
+    end
 end

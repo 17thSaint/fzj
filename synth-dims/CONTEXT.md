@@ -324,8 +324,10 @@ Notes for any new p:
 - `synth-dims/dd-paper-plots.jl`: paper figures (so far: shifted Zeeman minima + 1/(s r)³ profile).
 - `fpeps/execute-fpeps.jl`: fPEPS (QuantumNaturalfPEPS + QuantumNaturalGradient, env
   `--project=fpeps`), Hamiltonian from `fpeps/build-ham.jl` (`long_range_HH_ham`, hardcore bosons
-  on S=1/2, takes ED key names `if_periodic_x/y`). Currently a 4x4 N=2 flat Ui = 50 test, D = 6,
-  20 iterations; goal is larger open systems. Saves like the TTNs (2026-10-20, see Gotchas); saving,
+  on S=1/2, takes ED key names `if_periodic_x/y`). Currently 8x8 N=4 dd V = 50, D = 5, `magspac` from
+  the command line (slurm farm), random initial PEPS. `column_exclusion_peps` (build-ham.jl,
+  2026-10-30: ≤ 1 particle per column, equal weight in the N sector, + 1e-2 noise to leave the zero-gradient
+  product point; `occupied_columns` for a TT-like start) exists but is not used. Saves like the TTNs (2026-10-20, see Gotchas); saving,
   the per-iteration `saving_fpeps_callback` and `continue_fpeps(filepath, extra_iters)` (resumes a
   saved run in the same files) are in `fpeps/savings.jl` (2026-10-29). Loading: `fpeps/load-fpeps.jl`
   is the hub (packages + other-funcs + build-ham/savings/observables via `include_other_files`, so
@@ -362,7 +364,9 @@ Notes for any new p:
     file per (size, p), named after the smallest s (flat: V = 0.1), whose metadata holds the sweep:
     `all_gammas`, `all_columncorrs1/2`, `all_evencolumndist1/2`, `all_occs1/2` (25 points; no
     energies). 8×Ly 12–120 MB, 10x4 210 MB. Read the metadata only (`jldopen`, as the 8×Ly block).
-  - fPEPS `cluster-data/synth-dims/fpeps/` (default `dataloc` of `execute-fpeps.jl`): empty so far.
+  - fPEPS `cluster-data/synth-dims/fpeps/{flat-ints,dd-ints}/`: `dd-ints` holds the 8x8 N=4 D=5 V=50
+    magspac sweep (10 `fpeps-*.jld2`, no wavefunc files synced). `find_data_file` sorts them by
+    ascending magspac, while the slurm array runs descending (task 0 = 1.126 … task 9 = 0.288).
 
 ## Open questions
 
@@ -517,3 +521,19 @@ Notes for any new p:
 - 2026-10-27 — Common save/read for the column statistics (`basic-2d-observables.jl`, existing ED key
   names) and fPEPS saving with per-bin statistics; tested on scratchpad copies of ED point/sweep files
   and a scratchpad fPEPS file (round trips exact, other keys untouched, no -mk files).
+- 2026-10-29 — `execute-fpeps.jl` set to 8x8 N=4 OBC, dd, V = 50, global `magspac` (same α family as
+  ED 8×Ly: α = 0.163). Γ_c(8x8) estimate from the 8×Ly p = 3 GS Hill fits (S(π)): ≈ 210 (s ≈ 0.62),
+  range 190–240 (b(5–7) = 3.66 or local slope 3.82 → 207–211; up-bend like p ≥ 4 → ~230). Hill width
+  grows with Ly (exponent 1.9, 2.3, 2.8 for Ly = 5–7; Γ10–Γ90 = 57–281 at 8x7), so expect
+  Γ10–Γ90 ≈ 100–450 (s ≈ 0.79–0.48), dip minimum near Γ ≈ 50–60 (s ≈ 0.95). ED 8x8 N=4 (635k states,
+  basis file exists) could check this directly.
+- 2026-10-30 — fPEPS saving checked: a scratchpad 4x4 N=2 run saves `history.energy` identical to the
+  logged `E =` (`real(mean(Es))`, energy of θ *before* that step's update, so the saved PEPS is one step
+  ahead). The JLD2 warnings are the Observer's logger closures in the history DataFrame (stored by name
+  only), harmless for the numbers. 8x8 dd runs: magspac ≥ 0.715 converge (E ≈ −8.2 to −11.7, ‖θ‖ ≈ 3–50);
+  magspac ≤ 0.614 diverge (‖θ‖ 4e7–2e10, E from −3 up to +600) and the ≤ 0.528 files stopped at
+  niter 10–150 (2026-10-29 ~16:00). Cause is the Euler step, not (only) the start: the split is at
+  lr·V(d=1) ≈ 7–11 (V(d=1) = 35 at magspac 1.126 … 2093 at 0.288, lr = 0.05). 4x4 N=2 magspac 0.39
+  (V(d=1) = 843, exact E0 = −4.05), 20–30 steps: lr = 0.05 diverges from both a random and the column
+  start (column starts at −2.3, ‖θ‖ ×2–3 per step); lr = 0.002 is stable for both, column −2.3 → −2.6,
+  random +99 → −1.4. Open: lr ∝ 1/V(d=1) (or an adaptive step) in execute-fpeps.jl.

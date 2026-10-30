@@ -1,12 +1,13 @@
 #####################################################
 #=
 
-This file contains the model parameters (get_fpeps_model_paras) and Hamiltonian (long_range_HH_ham) for fPEPS
+This file contains the model parameters (get_fpeps_model_paras), Hamiltonian (long_range_HH_ham) and the
+column-exclusion initial state (column_exclusion_peps) for fPEPS
 
 Depends on (all loaded by fpeps/load-fpeps.jl):
 	other-funcs/basic-2d-stuff.jl (coordinate, find_dist, check_fluxes, long_range_scaling, get_hopping_strengths)
 	other-funcs/data-storage-funcs.jl (get_folder_location, default dataloc)
-	ITensors (OpSum)
+	ITensors (OpSum), QuantumNaturalfPEPS (PEPS)
 
 All parameters are read from a String-keyed dict, axes are x (1st index, 1:Lx) and
 y (2nd index, 1:Ly), matching hilbert = siteinds("S=1/2", Lx, Ly). get_fpeps_model_paras keeps the
@@ -106,7 +107,8 @@ function get_fpeps_model_paras(params_dict::Dict{String,Any})
 	# saving stuff
 	dataloc = get(params_dict, "dataloc", get_folder_location("cluster-data/synth-dims/fpeps"))
 	if_save_data = get(params_dict, "if_save_data", true)
-	save_every::Int = get(params_dict, "save_every", 10)
+	save_every::Int = get(params_dict, "save_every", 2)
+	nrgtol = get(params_dict, "nrgtol", nothing)
 
 	# inputs (ts, filling, lr, if_check_fluxes, scaling_paras) are kept next to what is derived from them
 	model_paras::Dict{String,Any} = Dict([("Lx",Lx),("Ly",Ly),("particles",particles),("filling",filling),("num_sites",num_sites),("if_periodic_x",if_periodic_x),("if_periodic_y",if_periodic_y),
@@ -114,7 +116,7 @@ function get_fpeps_model_paras(params_dict::Dict{String,Any})
 		("onsite_strength",onsite_strength),("scaling",scaling),("which_dir",which_dir),("lr",get(params_dict, "lr", 0)),
 		("interaction_axis_length",interaction_axis_length),("long_range_strengths",long_range_strengths),
 		("chem_strength",chem_strength),("if_pinning",if_pinning),("pinning_strength",pinning_strength),("outputlevel",outputlevel),
-		("dataloc",dataloc),("if_save_data",if_save_data),("save_every",save_every),("bond_dim",bond_dim)])
+		("dataloc",dataloc),("if_save_data",if_save_data),("save_every",save_every),("nrgtol",nrgtol),("bond_dim",bond_dim)])
 
 	return merge(model_paras, scaling_paras)
 end
@@ -191,4 +193,37 @@ function long_range_HH_ham(model_paras::Dict{String,Any})
 	end
 
 	return ham
+end
+
+# Initial PEPS with at most one particle per column (fixed x, the interaction axis is y): each column is the
+# y-MPS of a|empty> + b|W> (W = one particle spread evenly along y), so the y-links carry a counter
+# (1 = no particle yet, 2 = placed) and the x-links only their first state, the rest of bond_dim is zeros.
+# occupied_columns = nothing has a = b = 1 on every column, i.e. in the N sector all configurations with
+# <= 1 particle per column at equal weight; a list has a = 0, b = 1 on those columns and a = 1, b = 0 on
+# the others (1:2:Lx is Tao-Thouless-like). noise*randn is added to every entry so no amplitude is exactly zero.
+# kwargs go to PEPS (contract_cutoff, sample_cutoff, ...)
+function column_exclusion_peps(::Type{T}, hilbert; bond_dim::Int=5, occupied_columns=nothing, noise=1e-2, kwargs...) where {T<:Number}
+	Lx, Ly = size(hilbert)
+	bond_dim >= 2 || error("column_exclusion_peps needs bond_dim >= 2 for the column counter")
+	peps = PEPS(T, hilbert; bond_dim, kwargs...)
+	up, dn = 1, 2
+	for i in 1:Lx, j in 1:Ly
+		old_inds = inds(peps[i,j])
+		s = hilbert[i,j]
+		yl = j > 1 ? commonind(peps[i,j], peps[i,j-1]) : nothing
+		yr = j < Ly ? commonind(peps[i,j], peps[i,j+1]) : nothing
+		xls = [commonind(peps[i,j], peps[k,j]) for k in (i-1,i+1) if 1 <= k <= Lx]
+		a, b = isnothing(occupied_columns) ? (1.0, 1.0) : (i in occupied_columns ? (0.0, 1.0) : (1.0, 0.0))
+
+		t = ITensor(noise .* randn(T, dims(old_inds)...), old_inds...)
+		# counter transitions (left -> right, occupation); the last site of a column weighs the end states with (a, b)
+		for (cl, cr, occ) in ((1,1,dn), (1,2,up), (2,2,dn))
+			(isnothing(yl) && cl != 1) && continue
+			amp = isnothing(yr) ? (cr == 1 ? a : b) : 1.0
+			idx = [s => occ; isnothing(yl) ? [] : [yl => cl]; isnothing(yr) ? [] : [yr => cr]; [xl => 1 for xl in xls]]
+			t[idx...] += amp
+		end
+		peps[i,j] = t
+	end
+	return peps
 end
