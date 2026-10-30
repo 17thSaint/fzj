@@ -45,7 +45,7 @@ dataloc = choose_dataloc(args_dict)
 if exponent == 0.0
     scaling_version = "flat"
 elseif exponent == 3.0
-    scaling_version == "dd"
+    scaling_version = "dd"
 else
     scaling_version = "powerlaw"
 end
@@ -60,7 +60,7 @@ max_counts = particle_sector_counts(lx, ly, n)
 println("Sampling in the particle number N = $n sector, max_counts = $max_counts")
 
 # range of Gamma values
-gamma_vals = []
+gamma_vals = [35.0231,55.1244,86.8161,136.789,216.006,339.679,537.868,842.9,1329.95,2093.11]
 
 previous_filepath = nothing
 
@@ -69,7 +69,7 @@ for (i,gamma) in enumerate(gamma_vals)
     magspac = exponent == 0.0 ? 1.0 : (intstren / gamma) .^ (1/exponent)
 
 
-    params_dict = Dict([("outputlevel",1),("dataloc",dataloc),("scaling",scaling_version),("magnetic_spacing",magspac),("bond_dim",bond_dim),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("particles",n),("if_save_data",true),("filling",0.5),("onsite_strength",intstren)])
+    params_dict = Dict([("outputlevel",1),("nrgtol",1e-2),("dataloc",dataloc),("scaling",scaling_version),("magnetic_spacing",magspac),("bond_dim",bond_dim),("lr","all"),("hopping_anisotropy",1.0),("Lx",lx),("Ly",ly),("particles",n),("if_save_data",true),("filling",0.5),("onsite_strength",intstren)])
     model_paras = get_fpeps_model_paras(params_dict)
 
     # initial state: use the previous final state, otherwise a random starting state
@@ -96,7 +96,7 @@ for (i,gamma) in enumerate(gamma_vals)
 
     # Saving: like the TTNs, the PEPS goes in wavefuncfpeps-<params>.jld2 and the light data + metadata in fpeps-<params>.jld2
     filename = "fpeps-" * make_parameters_filename(make_fpeps_filename(model_paras)) * ".jld2"
-    metadata = merge(model_paras, Dict([("sample_nr",sample_nr),("maxiter",maxiter),("learning_rate",learning_rate),("solver",string(typeof(solver))),("integrator",string(typeof(integrator))),("niter",0),("contract_cutoff",contract_cutoff),("sample_cutoff",sample_cutoff),("eigencut",eigencut),("init_state",init_state),("init_noise",init_noise)]))
+    metadata = merge(model_paras, Dict([("sample_nr",sample_nr),("maxiter",maxiter),("learning_rate",learning_rate),("solver",string(typeof(solver))),("integrator",string(typeof(integrator))),("niter",0),("contract_cutoff",contract_cutoff),("sample_cutoff",sample_cutoff),("eigencut",eigencut)]))
     filepath = model_paras["if_save_data"] ? joinpath(dataloc, save_initial_fpeps(peps, metadata; location=dataloc, name=filename)) : nothing
 
     global previous_filepath = filepath

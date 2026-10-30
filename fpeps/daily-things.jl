@@ -56,27 +56,33 @@ if false
 end=#
 
 
-# check convergence of 8x8 cluster data
+# check convergence of 16x8 cluster data
 if true
-    lx,ly,n = 8,8,4
-    dataloc = get_folder_location("cluster-data/synth-dims/fpeps/dd-ints")
+    lx,ly,n = 16,8,8
+    dataloc = get_folder_location("cluster-data/synth-dims/fpeps/flat-ints")
     pdict = Dict([("Lx",lx),("Ly",ly),("particles",n)])
     all_files = find_data_file(pdict, "fpeps", dataloc; file_type="jld2")
-    
-    for f in all_files
+    display(all_files)
 
-        d,m = read_data(joinpath(dataloc, f); output_level=0)
-        
-        nrg_history = d["history"]
-        average_count = 20
-        running_average = [mean(nrg_history.energy[max(1,i-average_count):i]) for i in 1:length(nrg_history.energy)]
-        fig = figure()
-        plot(nrg_history.niter, running_average .- minimum(nrg_history.energy), "-o")
-        yscale("log")
-        ylabel("Energy - min(Energy)")
-        xlabel("Iteration Number")
-        title("fPEPS convergence for MagSpac = $(m["magnetic_spacing"])")
-    end
+    d,m = read_data(joinpath(dataloc, all_files[1]); output_level=0)
+    
+    nrg_history = d["history"]
+    average_count = 20
+    running_average = [sum(nrg_history.energy[i-average_count+1:i]) for i in average_count:length(nrg_history.energy)]
+    fig = figure()
+    plot(1:length(running_average), running_average .- minimum(running_average), "-o")
+    yscale("log")
+    ylabel("Energy - min(Energy)")
+    xlabel("Iteration Number")
+    title("fPEPS convergence for ULR=$(m["onsite_strength"])")
+
+    fig = figure()
+    nrg_avg_change = abs.(running_average[2:end] .- running_average[1:end-1])
+    plot(1:length(nrg_avg_change), nrg_avg_change, "-o")
+    yscale("log")
+    ylabel("Change in Energy")
+    xlabel("Iteration Number")
+    title("fPEPS convergence for ULR=$(m["onsite_strength"])")
 end
 
 

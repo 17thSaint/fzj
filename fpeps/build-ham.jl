@@ -108,7 +108,7 @@ function get_fpeps_model_paras(params_dict::Dict{String,Any})
 	dataloc = get(params_dict, "dataloc", get_folder_location("cluster-data/synth-dims/fpeps"))
 	if_save_data = get(params_dict, "if_save_data", true)
 	save_every::Int = get(params_dict, "save_every", 2)
-	nrgtol = get(params_dict, "nrgtol", nothing)
+	nrgtol = get(params_dict, "nrgtol", 1e-4)
 
 	# inputs (ts, filling, lr, if_check_fluxes, scaling_paras) are kept next to what is derived from them
 	model_paras::Dict{String,Any} = Dict([("Lx",Lx),("Ly",Ly),("particles",particles),("filling",filling),("num_sites",num_sites),("if_periodic_x",if_periodic_x),("if_periodic_y",if_periodic_y),

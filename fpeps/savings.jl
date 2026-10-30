@@ -88,7 +88,11 @@ function saving_fpeps_callback(filepath::Union{String,Nothing}; save_every::Int=
         if length(energies) >= 11
             mean_change = abs(sum(energies[end-9:end]) / 10 - sum(energies[end-10:end-1]) / 10)
             if_stop = mean_change < nrgtol
-            if_stop && println("nrgtol reached at niter = $(misc["niter"]): mean of last 10 energies changed by $mean_change < $nrgtol")
+            if if_stop
+                println("NRG Tolerance reached at niter = $(misc["niter"]): mean of last 10 energies changed by $mean_change < $nrgtol")
+            else
+                println("Mean Change = $mean_change")
+            end
         end
         if !isnothing(filepath) && (if_stop || misc["niter"] % save_every == 0 || misc["niter"] >= state.maxiter)
             save_fpeps(state.θ.obj, misc, filepath)
@@ -149,7 +153,7 @@ function continue_fpeps(filepath::String, extra_iters::Int; if_save_data::Bool=t
 end
 
 
-function choose_dataloc(input_dict::Dict{String,Any})
+function choose_dataloc(input_dict::Dict)
     if input_dict["exponent"] == 3.0
         return get_folder_location("cluster-data/synth-dims/fpeps/dd-ints")
     elseif input_dict["exponent"] == 0.0
